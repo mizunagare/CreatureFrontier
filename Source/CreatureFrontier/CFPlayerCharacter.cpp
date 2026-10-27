@@ -11,6 +11,7 @@
 #include "CreatureDefinition.h"
 #include "InventoryComponent.h"
 #include "WildEncounter.h"
+#include "WorldLoot.h"
 #include "GameFramework/CharacterMovementComponent.h"
 
 void ACFPlayerCharacter::QuickSave() { SaveProgress(); }
@@ -72,6 +73,8 @@ bool ACFPlayerCharacter::SaveProgress(const FString& Slot)
         Record.Stamina = It->Stamina;
         Record.SpecialCooldown = It->SpecialCooldownRemaining;
         Record.EncounterId = It->EncounterId;
+        Record.bAlpha = It->bAlpha;
+        Record.AlphaCooldown = It->AlphaCooldown;
         Record.bOwned = It->Tamer == GetController();
         Record.Disposition = It->Disposition;
         Record.Activity = It->Activity;
@@ -80,6 +83,14 @@ bool ACFPlayerCharacter::SaveProgress(const FString& Slot)
     }
     for (TActorIterator<AWildEncounter> It(GetWorld()); It; ++It)
         Save->EncounterTimers.Add(It->EncounterId, It->GetSavedRemaining());
+    for (TActorIterator<AWorldLoot> It(GetWorld()); It; ++It)
+    {
+        FLootSaveRecord Record;
+        Record.Transform = It->GetActorTransform();
+        Record.Materials = It->Materials;
+        Record.Medicine = It->Medicine;
+        Save->Loot.Add(Record);
+    }
     const bool bSaved = UGameplayStatics::SaveGameToSlot(Save, Slot, 0);
     Feedback = bSaved ? TEXT("Saved - F9 to restore") : TEXT("Save failed");
     return bSaved;
@@ -89,7 +100,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
 {
     if (!HasAuthority() || !GetController()) return false;
     auto* Save = Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot, 0));
-    if (!Save || Save->FormatVersion < 1 || Save->FormatVersion > 5 ||
+    if (!Save || Save->FormatVersion < 1 || Save->FormatVersion > 6 ||
         Save->MapName != UGameplayStatics::GetCurrentLevelName(this, true) ||
         !FMath::IsFinite(Save->Health) || Save->Health < 0 || Save->Health > 100 ||
         Save->Resources < 0 || Save->PlayerTransform.ContainsNaN() || Save->ViewRotation.ContainsNaN())
@@ -109,6 +120,9 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
     for (const auto& Entry : Save->EncounterTimers)
         if (Entry.Key.IsNone() || !FMath::IsFinite(Entry.Value) || Entry.Value < 0 || Entry.Value > 600)
         { Feedback = TEXT("Invalid encounter timer in save"); return false; }
+    for (const auto& Record : Save->Loot)
+        if (Record.Transform.ContainsNaN() || Record.Materials < 0 || Record.Materials > 999 || Record.Medicine < 0 || Record.Medicine > 999)
+        { Feedback = TEXT("Invalid loot in save"); return false; }
     TArray<ACreatureCharacter*> OldCreatures;
     for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It) OldCreatures.Add(*It);
     TArray<ACreatureCharacter*> Restored;
@@ -123,7 +137,8 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
             Record.Level < 1 || Record.Level > 20 || Record.Experience < 0 ||
             (Record.Level < 20 ? Record.Experience >= Record.Level * 100 : Record.Experience != 0) ||
             !FMath::IsFinite(Record.Stamina) || Record.Stamina < 0 || Record.Stamina > 100 ||
-            !FMath::IsFinite(Record.SpecialCooldown) || Record.SpecialCooldown < 0 || Record.SpecialCooldown > 60)
+            !FMath::IsFinite(Record.SpecialCooldown) || Record.SpecialCooldown < 0 || Record.SpecialCooldown > 60 ||
+            !FMath::IsFinite(Record.AlphaCooldown) || Record.AlphaCooldown < 0 || Record.AlphaCooldown > 10)
         {
             for (auto* Pet : Restored) Pet->Destroy();
             Feedback = TEXT("Save references unavailable or invalid creature data");
@@ -140,11 +155,16 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
         Pet->Definition = LoadedDefinition;
         Pet->EncounterId = Record.EncounterId;
         Pet->Level = Record.Level;
+        Pet->bAlpha = Record.bAlpha;
+        if (Save->FormatVersion < 6 && !Record.EncounterId.IsNone())
+            for (TActorIterator<AWildEncounter> It(GetWorld()); It; ++It)
+                if (It->EncounterId == Record.EncounterId) { Pet->bAlpha = It->bBoss; break; }
         Pet->FinishSpawning(Record.Transform);
         Pet->Health = FMath::Min(Pet->GetMaxHealth(), Record.Health);
         Pet->Experience = Record.Experience;
         Pet->Stamina = Record.Stamina;
         Pet->SpecialCooldownRemaining = Record.SpecialCooldown;
+        Pet->AlphaCooldown = Record.AlphaCooldown;
         Pet->Disposition = Record.Disposition;
         Pet->Tamer = Record.bOwned ? GetController() : nullptr;
         Pet->Activity = Record.Activity;
@@ -154,6 +174,23 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
             Pet->Activity = Record.bOwned ? ECreatureActivity::Follow : ECreatureActivity::Idle;
         Restored.Add(Pet);
     }
+    TArray<AWorldLoot*> OldLoot, RestoredLoot;
+    for (TActorIterator<AWorldLoot> It(GetWorld()); It; ++It) OldLoot.Add(*It);
+    for (const auto& Record : Save->Loot)
+    {
+        auto* Drop = GetWorld()->SpawnActor<AWorldLoot>(AWorldLoot::StaticClass(), Record.Transform);
+        if (!Drop)
+        {
+            for (auto* Staged : Restored) Staged->Destroy();
+            for (auto* Staged : RestoredLoot) Staged->Destroy();
+            Feedback = TEXT("Could not restore loot");
+            return false;
+        }
+        Drop->Materials = Record.Materials;
+        Drop->Medicine = Record.Medicine;
+        RestoredLoot.Add(Drop);
+    }
+    for (auto* Drop : OldLoot) Drop->Destroy();
     for (auto* Pet : OldCreatures) Pet->Destroy();
     for (TActorIterator<AWildEncounter> It(GetWorld()); It; ++It)
         It->RestorePopulation(Save->EncounterTimers.FindRef(It->EncounterId));

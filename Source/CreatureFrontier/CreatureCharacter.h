@@ -33,6 +33,9 @@ public:
     TObjectPtr<UCreatureDefinition> Definition;
 
     UPROPERTY(BlueprintReadOnly, Category="Encounter") FName EncounterId;
+    UPROPERTY(Replicated, BlueprintReadOnly, Category="Encounter") bool bAlpha = false;
+    UPROPERTY(Replicated, BlueprintReadOnly, Category="Combat") float AlphaCooldown = 3;
+    UPROPERTY(Replicated, BlueprintReadOnly, Category="Combat") float AlphaWindup = 0;
 
     UPROPERTY(ReplicatedUsing=OnRep_Health, BlueprintReadOnly, Category="Creature")
     float Health = 100.0f;
@@ -107,6 +110,8 @@ protected:
     void OnRep_Activity();
 
 private:
+    bool TickAlphaAttack(float DeltaSeconds, APawn* Target);
+    UPROPERTY() TObjectPtr<UStaticMeshComponent> AlphaWarning;
     bool HasClearSight(const AActor* Target) const;
     bool TickSpecial(float DeltaSeconds);
     void ResolveSpecial();

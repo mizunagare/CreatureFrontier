@@ -37,6 +37,9 @@ void ACFHUD::DrawHUD()
         }
     if (auto* Creature = Player->TraceCreature())
     {
+        if (Creature->bAlpha && Creature->Disposition != ECreatureDisposition::Tamed)
+            DrawText(FString::Printf(TEXT("ALPHA - Crystal Quake %s %.1fs"), Creature->AlphaWindup > 0 ? TEXT("INCOMING") : TEXT("cooldown"),
+                Creature->AlphaWindup > 0 ? Creature->AlphaWindup : Creature->AlphaCooldown), FLinearColor(1,.3f,.05f), X-130, Y+115);
         DrawText(FString::Printf(TEXT("%s (%s)  Lv%d  HP %.0f/%.0f  Capture %.0f%%"),
             *Creature->GetCreatureName(), Creature->Disposition == ECreatureDisposition::Tamed ? TEXT("Companion") : TEXT("Wild"),
             Creature->Level, Creature->Health, Creature->GetMaxHealth(), Player->CaptureComponent->CalculateCaptureChance(Creature)*100.0f),

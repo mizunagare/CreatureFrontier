@@ -26,6 +26,17 @@ struct FCreatureSaveRecord
     UPROPERTY() ECreatureActivity Activity = ECreatureActivity::Idle;
     UPROPERTY() FName WorkSiteName;
     UPROPERTY() FName EncounterId;
+    UPROPERTY() bool bAlpha = false;
+    UPROPERTY() float AlphaCooldown = 3;
+};
+
+USTRUCT()
+struct FLootSaveRecord
+{
+    GENERATED_BODY()
+    UPROPERTY() FTransform Transform;
+    UPROPERTY() int32 Materials = 0;
+    UPROPERTY() int32 Medicine = 0;
 };
 
 UCLASS()
@@ -33,7 +44,7 @@ class CREATUREFRONTIER_API UFrontierSaveGame : public USaveGame
 {
     GENERATED_BODY()
 public:
-    UPROPERTY() int32 FormatVersion = 5;
+    UPROPERTY() int32 FormatVersion = 6;
     UPROPERTY() FString MapName;
     UPROPERTY() FTransform PlayerTransform;
     UPROPERTY() FRotator ViewRotation;
@@ -42,4 +53,5 @@ public:
     UPROPERTY() TMap<EFrontierItem, int32> InventoryStacks;
     UPROPERTY() TArray<FCreatureSaveRecord> Creatures;
     UPROPERTY() TMap<FName, float> EncounterTimers;
+    UPROPERTY() TArray<FLootSaveRecord> Loot;
 };

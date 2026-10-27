@@ -5,6 +5,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "CFPlayerCharacter.h"
 #include "InventoryComponent.h"
+#include "WorldLoot.h"
 #include "WorkStation.h"
 #include "EngineUtils.h"
 #include "Components/CapsuleComponent.h"
@@ -78,6 +79,9 @@ ACreatureCharacter::ACreatureCharacter()
     SkillIndicator = Part(TEXT("SkillIndicator"), CylinderMesh.Object, FVector(0,0,-84), FVector(1.6,1.6,.015));
     SkillIndicator->SetVisibility(false);
     SkillIndicator->SetHiddenInGame(true);
+    AlphaWarning = Part(TEXT("AlphaWarning"), CylinderMesh.Object, FVector(0,0,-84), FVector(7.6,7.6,.02));
+    AlphaWarning->SetVisibility(false);
+    AlphaWarning->SetHiddenInGame(true);
 }
 
 void ACreatureCharacter::OnConstruction(const FTransform& Transform)
@@ -114,6 +118,7 @@ void ACreatureCharacter::RefreshAppearance()
     for (const auto& Piece : EyeParts) Piece->SetMaterial(0, White);
     for (const auto& Piece : Pupils) Piece->SetMaterial(0, Black);
     SkillIndicator->SetMaterial(0, Accent);
+    AlphaWarning->SetMaterial(0, MakeColor(FLinearColor(1,.12f,.02f)));
 }
 
 FString ACreatureCharacter::GetCreatureName() const
@@ -180,6 +185,9 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
         SkillIndicator->SetHiddenInGame(!bEffect);
         const float Size = 1.6f + FMath::Sin(GetWorld()->GetTimeSeconds()*12.0f)*0.12f;
         SkillIndicator->SetRelativeScale3D(FVector(Size,Size,.015));
+        const bool bWarning = bAlpha && Health > 0 && Disposition != ECreatureDisposition::Tamed && AlphaWindup > 0;
+        AlphaWarning->SetVisibility(bWarning);
+        AlphaWarning->SetHiddenInGame(!bWarning);
     }
     if (!HasAuthority()) return;
     SpecialCooldownRemaining = FMath::Max(0.0f, SpecialCooldownRemaining - DeltaSeconds);
@@ -187,8 +195,9 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
     GuardRemaining = FMath::Max(0.0f, GuardRemaining - DeltaSeconds);
     SkillPulseRemaining = FMath::Max(0.0f, SkillPulseRemaining - DeltaSeconds);
     RetaliationRemaining = FMath::Max(0.0f, RetaliationRemaining - DeltaSeconds);
+    AlphaCooldown = FMath::Max(0.0f, AlphaCooldown - DeltaSeconds);
     GetCharacterMovement()->MaxWalkSpeed = (Definition ? Definition->MoveSpeed : 320.0f) * (SlowRemaining > 0 ? 0.5f : 1.0f);
-    if (Health <= 0.0f) { ClearCombatOrders(); StopNavigation(); return; }
+    if (Health <= 0.0f) { AlphaWindup = 0; ClearCombatOrders(); StopNavigation(); return; }
 
     AttackCooldown = FMath::Max(0.0f, AttackCooldown - DeltaSeconds);
     if (Disposition == ECreatureDisposition::Tamed)
@@ -264,8 +273,8 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
         return;
     }
     APawn* Player = UGameplayStatics::GetPlayerPawn(this, 0);
-    if (!IsValid(Player)) { StopNavigation(); return; }
-    if (const auto* Hero = Cast<ACFPlayerCharacter>(Player); Hero && Hero->Health <= 0.0f) { StopNavigation(); return; }
+    if (!IsValid(Player)) { AlphaWindup = 0; StopNavigation(); return; }
+    if (const auto* Hero = Cast<ACFPlayerCharacter>(Player); Hero && Hero->Health <= 0.0f) { AlphaWindup = 0; StopNavigation(); return; }
 
     APawn* Target = Player;
     float Closest = GetDistanceTo(Player);
@@ -283,6 +292,7 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
     }
     const FVector Offset = Target->GetActorLocation() - GetActorLocation();
     const float Distance2D = Offset.Size2D();
+    if ((AlphaWindup > 0 || Distance2D <= AggroRange || bProvoked) && TickAlphaAttack(DeltaSeconds, Target)) return;
     if (Distance2D <= AggroRange || bProvoked)
     {
         Disposition = ECreatureDisposition::Hostile;
@@ -348,10 +358,17 @@ float ACreatureCharacter::TakeDamage(float DamageAmount, FDamageEvent const& Dam
         }
         if (Health <= 0.0f)
         {
+            AlphaWindup = 0;
             SetActivity(ECreatureActivity::Rest);
             StopNavigation();
             if (Disposition != ECreatureDisposition::Tamed && IsValid(EventInstigator))
             {
+                if (auto* Hero = Cast<ACFPlayerCharacter>(EventInstigator->GetPawn()))
+                {
+                    auto* Loot = GetWorld()->SpawnActor<AWorldLoot>(GetActorLocation() + FVector(0,0,-55), FRotator::ZeroRotator);
+                    if (Loot) { Loot->Materials = bAlpha ? 8 : 2; Loot->Medicine = bAlpha ? 1 : 0; }
+                    Hero->Feedback = TEXT("Loot dropped - approach the gold cache to collect");
+                }
                 for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It)
                     if (It->Tamer == EventInstigator && It->GetDistanceTo(this) <= 1500.0f)
                         It->AddExperience((DamageCauser == *It ? 50 : 25) * Level);
@@ -374,6 +391,7 @@ void ACreatureCharacter::Tame(AController* NewTamer)
 {
     if (!HasAuthority() || !IsValid(NewTamer)) return;
     Tamer = NewTamer;
+    AlphaWindup = 0;
     RetaliationTarget.Reset();
     RetaliationRemaining = 0;
     Disposition = ECreatureDisposition::Tamed;
@@ -389,6 +407,9 @@ void ACreatureCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
 {
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
     DOREPLIFETIME(ACreatureCharacter, Health);
+    DOREPLIFETIME(ACreatureCharacter, bAlpha);
+    DOREPLIFETIME(ACreatureCharacter, AlphaCooldown);
+    DOREPLIFETIME(ACreatureCharacter, AlphaWindup);
     DOREPLIFETIME(ACreatureCharacter, Level);
     DOREPLIFETIME(ACreatureCharacter, Experience);
     DOREPLIFETIME(ACreatureCharacter, Stamina);
