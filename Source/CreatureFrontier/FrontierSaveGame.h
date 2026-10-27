@@ -6,6 +6,7 @@
 #include "InventoryComponent.h"
 #include "CreatureJournalTypes.h"
 #include "ObjectiveTypes.h"
+#include "EquipmentTypes.h"
 #include "FrontierSaveGame.generated.h"
 
 class ACreatureCharacter;
@@ -64,7 +65,8 @@ class CREATUREFRONTIER_API UFrontierSaveGame : public USaveGame
 {
     GENERATED_BODY()
 public:
-    UPROPERTY() int32 FormatVersion = 13;
+    UPROPERTY() int32 FormatVersion = 14;
+    UPROPERTY() FPlayerEquipmentState Equipment;
     UPROPERTY() FFrontierObjectiveProgress Objectives;
     UPROPERTY() TArray<FCreatureJournalEntry> Journal;
     UPROPERTY() FString MapName;

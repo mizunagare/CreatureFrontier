@@ -13,6 +13,7 @@ class UInventoryComponent;
 class UBaseBuildingComponent;
 class AWorkStation;
 class UCreatureDefinition;
+class UPlayerEquipmentComponent;
 enum class EFrontierItem : uint8;
 
 UCLASS()
@@ -28,6 +29,12 @@ public:
     float Health = 100.0f;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Inventory")
     TObjectPtr<UInventoryComponent> Inventory;
+    UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Category="Equipment") TObjectPtr<UPlayerEquipmentComponent> Equipment;
+    void CraftSpear();
+    void CraftVest();
+    void ToggleSpear();
+    void ToggleVest();
+    float GetPlayerAttackDamage() const;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Building") TObjectPtr<UBaseBuildingComponent> Building;
     void ToggleBuilding();
     void CycleBuilding();

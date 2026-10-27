@@ -2,6 +2,7 @@
 #include "CFPlayerCharacter.h"
 #include "CreatureCharacter.h"
 #include "CreatureDefinition.h"
+#include "PlayerEquipmentComponent.h"
 #include "CaptureComponent.h"
 #include "InventoryComponent.h"
 #include "BaseBuildingComponent.h"
@@ -40,6 +41,9 @@ void ACFHUD::DrawHUD()
     DrawText(Player->GetObjectiveStatus(),FLinearColor::Green,32,474);
     DrawText(Player->GetObjectiveHint(),FLinearColor::White,32,503);
     DrawText(Player->GetObjectiveRewardText(),FLinearColor::Yellow,32,532);
+    DrawRect(FLinearColor(.02f,.04f,.06f,.88f),18,572,550,54);
+    DrawText(FString::Printf(TEXT("GEAR: %s | attack %.0f | vest %.0f%% reduction"),Player->Equipment->GetState().bSpearEquipped?TEXT("SPEAR"):TEXT("UNARMED"),Player->GetPlayerAttackDamage(),Player->Equipment->GetDamageReduction()*100),FLinearColor::White,32,578);
+    DrawText(FString::Printf(TEXT("4 craft spear (%d) | 5 craft vest (%d) | 6/7 equip toggle"),Player->Equipment->SpearCost,Player->Equipment->VestCost),FLinearColor::White,32,602);
     if(Player->Health<=0) DrawText(TEXT("DOWNED | R: base respawn | F9: load save"),FLinearColor::Red,X-150,Y-100);
     else if(Player->GetRespawnProtectionRemaining()>0) DrawText(FString::Printf(TEXT("RESPAWN SHIELD %.1fs | attacks end it"),Player->GetRespawnProtectionRemaining()),FLinearColor::Green,X-150,Y-100);
     if (Player->Building->IsActive()) DrawText(Player->Building->GetHint(), FLinearColor::Yellow,32,440);

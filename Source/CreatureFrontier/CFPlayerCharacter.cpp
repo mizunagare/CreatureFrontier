@@ -15,6 +15,13 @@
 #include "WorldLoot.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "TimerManager.h"
+#include "PlayerEquipmentComponent.h"
+
+void ACFPlayerCharacter::CraftSpear() { Equipment->CraftSpear(); }
+void ACFPlayerCharacter::CraftVest() { Equipment->CraftVest(); }
+void ACFPlayerCharacter::ToggleSpear() { Equipment->ToggleSpear(); }
+void ACFPlayerCharacter::ToggleVest() { Equipment->ToggleVest(); }
+float ACFPlayerCharacter::GetPlayerAttackDamage() const { return AttackDamage+Equipment->GetAttackBonus(); }
 
 void ACFPlayerCharacter::QuickSave() { SaveProgress(); }
 void ACFPlayerCharacter::QuickLoad() { LoadProgress(); }
@@ -68,6 +75,7 @@ bool ACFPlayerCharacter::SaveProgress(const FString& Slot)
     Save->InventoryStacks = Inventory->GetStacks();
     Save->Journal = Journal;
     Save->Objectives = Objectives;
+    Save->Equipment=Equipment->GetState();
     for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It)
     {
         FCreatureSaveRecord Record;
@@ -121,7 +129,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
 {
     if (!HasAuthority() || !GetController()) return false;
     auto* Save = Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot, 0));
-    if (!Save || Save->FormatVersion < 1 || Save->FormatVersion > 13 ||
+    if (!Save || Save->FormatVersion < 1 || Save->FormatVersion > 14 ||
         Save->MapName != UGameplayStatics::GetCurrentLevelName(this, true) ||
         !FMath::IsFinite(Save->Health) || Save->Health < 0 || Save->Health > 100 ||
         Save->Resources < 0 || Save->PlayerTransform.ContainsNaN() || Save->ViewRotation.ContainsNaN())
@@ -133,6 +141,8 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
     {
         Save->InventoryStacks = {{EFrontierItem::Material, Save->Resources}, {EFrontierItem::CaptureDevice, 5}, {EFrontierItem::Medicine, 1}};
     }
+    if(Save->FormatVersion<14) Save->Equipment=FPlayerEquipmentState();
+    if(!UPlayerEquipmentComponent::Validate(Save->Equipment)) { Feedback=TEXT("Invalid equipment in save"); return false; }
     if (Save->FormatVersion < 9) Save->InventoryStacks.FindOrAdd(EFrontierItem::Food) = 3;
     if (!UInventoryComponent::Validate(Save->InventoryStacks))
     {
@@ -291,6 +301,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
     GetCharacterMovement()->StopMovementImmediately();
     Health = Save->Health;
     RespawnProtectionUntil=0;
+    Equipment->Restore(Save->Equipment);
     Inventory->Restore(Save->InventoryStacks);
     GetCharacterMovement()->SetMovementMode(Health > 0 ? MOVE_Walking : MOVE_None);
     SelectedCompanion.Reset();
@@ -321,13 +332,14 @@ float ACFPlayerCharacter::TakeDamage(float Amount, const FDamageEvent& Event, AC
 {
     if (!HasAuthority() || Health <= 0.0f || !FMath::IsFinite(Amount) || Amount<=0) return 0.0f;
     if(GetRespawnProtectionRemaining()>0) { Feedback=TEXT("Base respawn protection - attacking ends the shield"); return 0; }
-    const float Applied = FMath::Min(Health, FMath::Max(0.0f, Amount));
+    const float Applied = FMath::Min(Health, Amount*(1-Equipment->GetDamageReduction()));
     Health -= Applied;
     Feedback = Health <= 0.0f ? TEXT("Downed - R respawns at base without resetting the world | F9 load") : TEXT("Taking damage!");
     if (Health <= 0.0f)
     {
         GetCharacterMovement()->StopMovementImmediately(); GetCharacterMovement()->DisableMovement(); StopJumping();
         Building->Cancel(); bRosterOpen=false; bJournalOpen=false;
+        Equipment->RefreshVisual();
         for(TActorIterator<ACreatureCharacter> It(GetWorld());It;++It) It->HandlePlayerDowned(this);
     }
     return Applied;
@@ -442,6 +454,7 @@ ACFPlayerCharacter::ACFPlayerCharacter()
     CaptureComponent = CreateDefaultSubobject<UCaptureComponent>(TEXT("CaptureComponent"));
     Inventory = CreateDefaultSubobject<UInventoryComponent>(TEXT("Inventory"));
     Building = CreateDefaultSubobject<UBaseBuildingComponent>(TEXT("Building"));
+    Equipment = CreateDefaultSubobject<UPlayerEquipmentComponent>(TEXT("Equipment"));
 }
 
 void ACFPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -485,6 +498,10 @@ void ACFPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
     PlayerInputComponent->BindKey(EKeys::PageDown, IE_Pressed, this, &ACFPlayerCharacter::NextJournalPage);
     PlayerInputComponent->BindKey(EKeys::PageUp, IE_Pressed, this, &ACFPlayerCharacter::PreviousJournalPage);
     PlayerInputComponent->BindKey(EKeys::N, IE_Pressed, this, &ACFPlayerCharacter::ClaimObjectiveReward);
+    PlayerInputComponent->BindKey(EKeys::Four, IE_Pressed, this, &ACFPlayerCharacter::CraftSpear);
+    PlayerInputComponent->BindKey(EKeys::Five, IE_Pressed, this, &ACFPlayerCharacter::CraftVest);
+    PlayerInputComponent->BindKey(EKeys::Six, IE_Pressed, this, &ACFPlayerCharacter::ToggleSpear);
+    PlayerInputComponent->BindKey(EKeys::Seven, IE_Pressed, this, &ACFPlayerCharacter::ToggleVest);
 }
 
 void ACFPlayerCharacter::MoveForward(float Value)
@@ -523,10 +540,11 @@ void ACFPlayerCharacter::Attack()
     if (Health <= 0.0f || GetWorld()->GetTimeSeconds() < NextAttackTime) return;
     RespawnProtectionUntil=0;
     NextAttackTime = GetWorld()->GetTimeSeconds() + 0.4;
+    Equipment->PlayAttack();
     if (ACreatureCharacter* Creature = TraceCreature())
     {
         if (Creature->Disposition == ECreatureDisposition::Tamed) return;
-        const float Applied = UGameplayStatics::ApplyDamage(Creature, AttackDamage, GetController(), this, UDamageType::StaticClass());
+        const float Applied = UGameplayStatics::ApplyDamage(Creature, GetPlayerAttackDamage(), GetController(), this, UDamageType::StaticClass());
         Feedback = Applied > 0 ? TEXT("Hit! Right mouse: capture before health reaches zero") : TEXT("Creature retreating - wait for it to return home");
     }
 }

@@ -5,6 +5,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerStart.h"
 #include "EngineUtils.h"
+#include "PlayerEquipmentComponent.h"
 
 void ACFPlayerCharacter::InitializeRespawnAnchor()
 {
@@ -57,6 +58,7 @@ bool ACFPlayerCharacter::RespawnAtBase()
     SetActorLocationAndRotation(Location,FRotator(0,RespawnAnchor.Rotator().Yaw,0),false,nullptr,ETeleportType::TeleportPhysics);
     GetController()->SetControlRotation(FRotator(0,RespawnAnchor.Rotator().Yaw,0));
     Health=100; GetCharacterMovement()->SetMovementMode(MOVE_Walking);
+    Equipment->RefreshVisual();
     RespawnProtectionUntil=GetWorld()->GetTimeSeconds()+3;
     Feedback=TEXT("Respawned at base - world preserved, companions not healed. Shield 3s; attacks end it");
     return true;

@@ -4,9 +4,9 @@
 
 ## Windows 独立原型
 
-当前最新本机版本：`D:\myGame\Builds\Windows-Respawn\CreatureFrontier.exe`。
+当前最新本机版本：`D:\myGame\Builds\Windows-Equipment\CreatureFrontier.exe`。
 双击即可进入测试地图，不需要先打开 Unreal Editor。复制到其他机器时需复制整个
-`Builds\Windows-Respawn` 文件夹，不能只复制根目录的启动 EXE。
+`Builds\Windows-Equipment` 文件夹，不能只复制根目录的启动 EXE。
 这是 Development 灰盒原型，尚未完成正式美术、内容与性能优化。
 
 战斗更新预览另外输出到 `D:\myGame\Builds\Windows-Combat\CreatureFrontier.exe`，
@@ -24,7 +24,8 @@
 伙伴图鉴更新输出到 `D:\myGame\Builds\Windows-Journal\CreatureFrontier.exe`。
 新手旅程更新输出到 `D:\myGame\Builds\Windows-Journey\CreatureFrontier.exe`。
 基地重生更新输出到 `D:\myGame\Builds\Windows-Respawn\CreatureFrontier.exe`。
-旧存档版本 1–12 可以读取，新版存档版本为 13（包含旅程计数/领奖状态、图鉴历史及已有的待复工状态）。
+基础装备更新输出到 `D:\myGame\Builds\Windows-Equipment\CreatureFrontier.exe`。
+旧存档版本 1–13 可以读取，新版存档版本为 14（包含装备拥有/穿戴状态及已有旅程、图鉴和工作状态）。
 新版保存后的存档不能交给旧版程序读取；请保留旧存档备份。
 测试脚本默认选择 `Builds` 下最新编译的 Development 程序，也可明确指定：
 `.\Scripts\Test-Packaged.ps1 -BuildRoot D:\myGame\Builds\Windows-Combat`。
@@ -63,6 +64,8 @@ Windows 开发环境已部署并验证：Unreal Engine 5.8、Visual Studio C++ �
 - `Tab`：展开/收起队伍面板；`[` / `]` 浏览伙伴，`Enter` 选择高亮伙伴
 - `I`：打开/关闭伙伴图鉴；`PageUp` / `PageDown` 浏览已发现物种
 - `N`：当前新手目标达成后领取奖励，推进到下一步
+- `4` / `5`：工作设施 8 米内制作长矛（8 材料）/ 护甲（12 材料），并自动装备
+- `6` / `7`：装备或卸下已拥有的长矛 / 护甲
 - `F`：召回当前指令范围内的伙伴跟随，并自动攻击玩家周边的野生宠物
 - `E`：靠近出生点后方的工作台（8 米内），分配伙伴采集；到达后每 3 秒产出 1 资源
 - `R`：倒地后在原基地附近安全位置重生，保留当前世界；存活时不执行
@@ -150,9 +153,29 @@ R 现在是倒地重生，不再重开地图；存活时按 R 不能免费回血
 不会补充捕捉装置、药物或食物；当前原型没有玩家死亡掉包/资源扣除惩罚。
 
 R 本身不自动写盘，仍需 F5 保存。F9 读取倒地存档后可以再按 R 重生；
-临时保护不存入快照，读档始终清除保护，存档格式继续使用 13。
+临时保护不存入快照，读档始终清除保护；这项功能不额外保存保护时长。
 `-CFRespawnTest -CFRespawnPreview -RenderOffscreen -windowed -ResX=1280 -ResY=720 -norhithread -forcerhibypass "-ExecCmds=t.MaxFPS 60"`
 可输出 `Saved/RespawnPreview/downed.png` 与 `respawn.png`，不覆盖玩家存档。
+
+## 玩家基础装备
+
+Frontier Spear 花费 8 材料，装备后在原型基础攻击 25 上增加 10，当前每击 35。
+Trail Vest 花费 12 材料，穿戴后减少玩家受到的伤害 20%，普通攻击与首领范围攻击走同一伤害入口。
+每种只能拥有一件；重复制作不扣料，也不会叠加数值。4/5 制作后自动装备，之后用 6/7 切换穿戴。
+制作需玩家存活并靠近 8 米内任意工作设施，食槽不算；卸下/穿戴不回血、不返还材料。
+当前装备是独立的两个槽位状态，不是可堆叠背包物品，没有丢弃、交易、耐久或随机词条。
+
+长矛为第一人称相机附着的原创几何占位模型，左键带 0.22 秒短刺表现；没有碰撞或导航影响，
+卸下、倒地、建造模式时隐藏。现有攻击仍沿用原型准星射线/12 米交互范围，不是正式近战碰撞判定，
+手臂动画、武器碰撞、正式美术与音效仍待制作。护甲当前仅体现状态与减伤，没有完整服装模型。
+
+拥有和穿戴状态随 F5/F9 保存/恢复，反复读档不创建重复武器、不直接累加属性；R 重生也保留装备。
+旧存档 1–13 从无装备状态开始，不额外扣材料；“未拥有却已穿戴”的异常记录会在替换世界前被拒绝。
+成本、攻击加成与减伤比例集中在 `UPlayerEquipmentComponent` 可编辑默认属性中，当前尚无配方数据资产或装备菜单。
+HUD 下方显示实际攻击/减伤与快捷键。
+
+`-CFEquipmentTest -CFEquipmentPreview -RenderOffscreen -windowed -ResX=1280 -ResY=720 -norhithread -forcerhibypass "-ExecCmds=t.MaxFPS 60"`
+可输出 `Saved/EquipmentPreview/equipped.png` 与 `unequipped.png`，使用独立测试槽，不覆盖玩家存档。
 
 主动技能消耗 20 体力，蓄力 0.65 秒；伙伴会先尝试进入射程，最多等待 6 秒。
 工作/休息中的伙伴不响应战斗指令，F 可重新启用跟随。F 取消集火和蓄力；
@@ -256,7 +279,10 @@ HUD 显示玩家生命、资源、伙伴数量、工作数量和准星目标的�
 `-CFRespawnTest` 验证存活拒绝、死亡清理、落点全堵拒绝/敌人避让、世界与伙伴状态保留、
 保护到期与攻击/指令取消、倒地快照重生、读档清除保护以及反复读档不复制人口/设施/战利品，
 使用 `FrontierRespawnDeadAutomation` 等独立测试槽。
-当前打包回归共 19 项，包含伙伴分工、图鉴、新手目标与基地重生测试。
+`-CFEquipmentTest` 验证制作距离/材料/存活门槛、重复制作、装备切换、真实攻击与减伤、
+模型部件碰撞/导航/动画位移、读档不叠加属性/网格、异常记录拒绝、旧档迁移与重生保留，
+使用 `FrontierEquipmentAutomation` 等独立测试槽。
+当前打包回归共 20 项，包含伙伴分工、图鉴、新手目标、基地重生与装备测试。
 同时添加 `-CFRosterPreview -RenderOffscreen -windowed -ResX=1280 -ResY=720 -norhithread -forcerhibypass "-ExecCmds=t.MaxFPS 60"`（不要使用 `-nullrhi`），
 可生成 11 只伙伴的两页界面截图 `Saved/RosterPreview/team.png` 和 `team_page2.png` 后退出，不写入玩家存档。
 已知显示问题：当前机器 D3D12 离屏截图存在间歇性缺字，上述兼容参数可改善但尚未完全消除。
