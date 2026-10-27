@@ -9,6 +9,7 @@
 #include "BaseBuildingComponent.h"
 #include "WildEncounter.h"
 #include "WorkStation.h"
+#include "ResourceNode.h"
 #include "Engine/Canvas.h"
 #include "EngineUtils.h"
 
@@ -48,6 +49,7 @@ void ACFHUD::DrawHUD()
     }
     if (auto* Site = Player->TraceFacility(); Site && Site->IsFoodStore())
         DrawText(FString::Printf(TEXT("FOOD STORE %d / 30 | U deposit | O withdraw"),Site->StoredFood),FLinearColor::Yellow,X-130,Y+25);
+    if(auto* Node=Player->TraceResource()) DrawText(Node->GetStatus(),FLinearColor::Yellow,X-160,Y+25);
     float RegionY = Canvas->ClipY - 90;
     for (TActorIterator<AWildEncounter> It(GetWorld()); It; ++It)
         if (Player->GetDistanceTo(*It) < 1800)
@@ -68,6 +70,8 @@ void ACFHUD::DrawHUD()
             FLinearColor::White, X-130, Y+25);
         if (Creature->Disposition == ECreatureDisposition::Tamed)
         {
+            const FString ResourceStatus=Creature->GetGatheringStatus();
+            if(!ResourceStatus.IsEmpty()) DrawText(ResourceStatus,FLinearColor::Yellow,X-130,Y-95);
             DrawText(FString::Printf(TEXT("BOND %d/100 %s | Y pet (2.5m) | wait %.0fs"),Creature->BondPoints,*Creature->GetBondLabel(),FMath::CeilToFloat(Creature->PettingCooldown)),FLinearColor::Green,X-30,Y+165);
             if(Creature->CarriedFood>0 || (Creature->WorkSite && Creature->WorkSite->RequiredSpecialty==EWorkSpecialty::Transport))
                 DrawText(FString::Printf(TEXT("TRANSPORT cargo %d/3 food | Z recover within 6m"),Creature->CarriedFood),FLinearColor::Yellow,X-130,Y-125);

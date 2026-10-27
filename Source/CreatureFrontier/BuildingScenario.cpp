@@ -4,6 +4,7 @@
 #include "CreatureCharacter.h"
 #include "CreatureDefinition.h"
 #include "WorkStation.h"
+#include "ResourceNode.h"
 #include "FrontierSaveGame.h"
 #include "InventoryComponent.h"
 #include "Camera/CameraComponent.h"
@@ -55,11 +56,16 @@ void RunBuildingScenario(UWorld* World, ACFPlayerCharacter* Hero)
     if (!Mine || !Craft) { UE_LOG(LogTemp,Error,TEXT("CF_BUILD FAIL secondary facilities: %s"),*Hero->Feedback); FPlatformMisc::RequestExitWithStatus(false,1); return; }
     const FGuid MineId = Mine->PersistentId;
     const FGuid GatherId = Gather->PersistentId;
+    AResourceNode* MineSource=nullptr;
+    for(TActorIterator<AResourceNode> It(World);It;++It) if(It->PersistentId==FGuid(0xCF170000,0,0,2)) MineSource=*It;
+    if(!MineSource) { UE_LOG(LogTemp,Error,TEXT("CF_BUILD FAIL resource fixture")); FPlatformMisc::RequestExitWithStatus(false,1); return; }
+    MineSource->SetActorLocation(FVector(-500,-900,0));
+    const int32 SourceBefore=MineSource->Remaining;
     const FTransform PetTransform(FRotator::ZeroRotator,FVector(-300,-900,40));
     auto* Pet = World->SpawnActorDeferred<ACreatureCharacter>(ACreatureCharacter::StaticClass(),PetTransform,nullptr,nullptr,ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
     Pet->Definition = Stone; Pet->FinishSpawning(PetTransform); Pet->Tame(Hero->GetController());
     Pet->WorkSite = Mine; Pet->SetActivity(ECreatureActivity::Work); Pet->Tick(1.6f);
-    const bool Work = Hero->Inventory->Count(EFrontierItem::Material) == 64;
+    const bool Work = Hero->Inventory->Count(EFrontierItem::Material) == 64 && MineSource->Remaining==SourceBefore-1;
     const FString Slot = TEXT("FrontierBuildingAutomation");
     bool Saved = Hero->SaveProgress(Slot) && Hero->LoadProgress(Slot) && Hero->LoadProgress(Slot);
     int32 Count = 0; bool Scale = true, Link = false;

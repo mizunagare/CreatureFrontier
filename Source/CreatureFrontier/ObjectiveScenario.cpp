@@ -6,6 +6,7 @@
 #include "InventoryComponent.h"
 #include "BaseBuildingComponent.h"
 #include "WorkStation.h"
+#include "ResourceNode.h"
 #include "FrontierSaveGame.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
@@ -41,14 +42,16 @@ void RunObjectiveScenario(UWorld* World,ACFPlayerCharacter* Hero)
     Sequence &= Pet->Tamer==Hero->GetController() && Hero->GetObjectives().Claimed==2 && Hero->Inventory->Count(EFrontierItem::Material)==112;
     AWorkStation* Gather=nullptr;
     for(TActorIterator<AWorkStation> It(World);It;++It) if(It->RequiredSpecialty==EWorkSpecialty::Gathering) Gather=*It;
-    if(!Gather) { FPlatformMisc::RequestExitWithStatus(false,1); return; }
+    AResourceNode* Source=nullptr;
+    for(TActorIterator<AResourceNode> It(World);It;++It) if(It->PersistentId==FGuid(0xCF170000,0,0,1)) Source=*It;
+    if(!Gather || !Source) { FPlatformMisc::RequestExitWithStatus(false,1); return; }
     auto SetStack=[Hero](EFrontierItem Item,int32 Amount) { auto Stacks=Hero->Inventory->GetStacks(); Stacks.FindOrAdd(Item)=Amount; Hero->Inventory->Restore(Stacks); };
     Pet->WorkSite=Gather; Pet->SetActivity(ECreatureActivity::Work); Pet->SetActorLocation(Gather->GetActorLocation()+FVector(0,180,55));
     SetStack(EFrontierItem::Material,999); Pet->Tick(2);
     bool Production=Hero->GetObjectives().WorkMaterials==0 && Pet->Experience==0;
     Hero->Inventory->Consume(EFrontierItem::Material,1); Pet->Tick(0);
     Production &= Hero->GetObjectives().WorkMaterials==1 && Pet->Experience==1;
-    Hero->Inventory->Consume(EFrontierItem::Material,2); Pet->Tick(2); Pet->Tick(2);
+    Hero->Inventory->Consume(EFrontierItem::Material,2); Source->Tick(2); Pet->Tick(2); Source->Tick(2); Pet->Tick(2);
     Production &= Hero->GetObjectives().WorkMaterials==3;
     Hero->ClaimObjectiveReward(); bool Capacity=Hero->GetObjectives().Claimed==2 && Hero->Inventory->Count(EFrontierItem::Material)==999;
     Hero->Inventory->Consume(EFrontierItem::Material,12); Hero->ClaimObjectiveReward();

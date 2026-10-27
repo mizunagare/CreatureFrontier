@@ -23,7 +23,7 @@ void ACreatureCharacter::UpdateCreaturePresentation(float DeltaSeconds)
     const bool Resting=!Dead && !Moving && Activity==ECreatureActivity::Rest;
     const bool Working=!Dead && !Moving && Activity==ECreatureActivity::Work && IsValid(WorkSite) &&
         WorkSite->RequiredSpecialty!=EWorkSpecialty::Transport && WorkSite->RequiredSpecialty!=EWorkSpecialty::Feeding &&
-        !FeedingSite.IsValid() && FVector::Dist2D(GetActorLocation(),WorkSite->GetActorLocation())<=220;
+        !FeedingSite.IsValid() && ((WorkSite->RequiredSpecialty==EWorkSpecialty::Farming && FVector::Dist2D(GetActorLocation(),WorkSite->GetActorLocation())<=220) || bGatheringActive);
     const bool Charging=!Dead && (SpecialWindupRemaining>0 || AlphaWindup>0);
     VisualState=Dead?TEXT("Downed"):HitPoseRemaining>0?TEXT("Hurt"):Charging?TEXT("Charging"):StrikePoseRemaining>0?TEXT("Striking"):
         AffectionPoseRemaining>0?TEXT("Affection"):Resting?TEXT("Resting"):Moving?TEXT("Moving"):Working?TEXT("Working"):TEXT("Idle");

@@ -55,6 +55,8 @@ public:
     bool IsNearWorkStation() const;
     FString Feedback;
     ACreatureCharacter* TraceCreature() const;
+    class AResourceNode* TraceResource() const;
+    void GatherAimedResource();
     bool SelectCompanion(ACreatureCharacter* Pet);
     void SelectAimedCompanion();
     void ClearCompanionSelection();

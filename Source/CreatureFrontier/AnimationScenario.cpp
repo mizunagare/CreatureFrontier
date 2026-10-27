@@ -46,7 +46,7 @@ void RunAnimationScenario(UWorld* World,ACFPlayerCharacter* Hero)
         Pet->GetCharacterMovement()->Velocity=FVector::ZeroVector; Pet->SetActivity(ECreatureActivity::Rest);
         for(int32 Step=0;Step<20;++Step) Pet->UpdateCreaturePresentation(.05f);
         States &= Pet->GetVisualState()==TEXT("Resting") && Pivot->GetRelativeScale3D().Z<.8 && Eye->GetRelativeScale3D().Z<.05;
-        auto* Site=World->SpawnActor<AWorkStation>(Pet->GetActorLocation(),FRotator::ZeroRotator); Pet->WorkSite=Site; Pet->SetActivity(ECreatureActivity::Work); Pet->UpdateCreaturePresentation(.05f);
+        auto* Site=World->SpawnActor<AWorkStation>(Pet->GetActorLocation(),FRotator::ZeroRotator); Site->RequiredSpecialty=EWorkSpecialty::Farming; Pet->WorkSite=Site; Pet->SetActivity(ECreatureActivity::Work); Pet->UpdateCreaturePresentation(.05f);
         States &= Pet->GetVisualState()==TEXT("Working");
         Pet->SpecialWindupRemaining=.6f; Pet->UpdateCreaturePresentation(.05f);
         States &= Pet->GetVisualState()==TEXT("Charging") && Pivot->GetRelativeRotation().Pitch<-5;

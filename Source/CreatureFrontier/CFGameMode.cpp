@@ -1,4 +1,6 @@
 #include "CFGameMode.h"
+#include "ResourceNode.h"
+#include "ResourceScenario.h"
 #include "CFPlayerCharacter.h"
 #include "CFHUD.h"
 #include "CombatScenario.h"
@@ -49,6 +51,13 @@ ACFGameMode::ACFGameMode()
 void ACFGameMode::BeginPlay()
 {
     Super::BeginPlay();
+    SeedFrontierResources(GetWorld());
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFResourceTest")))
+    {
+        FTimerHandle ResourceStart;
+        GetWorldTimerManager().SetTimer(ResourceStart,[this]() { if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0))) RunResourceScenario(GetWorld(),Hero); },1.f,false);
+        return;
+    }
     const bool bSaveWrite = FParse::Param(FCommandLine::Get(), TEXT("CFSaveWrite"));
     const bool bSaveRead = FParse::Param(FCommandLine::Get(), TEXT("CFSaveRead"));
     const bool bInventoryTest = FParse::Param(FCommandLine::Get(), TEXT("CFInventoryTest"));
@@ -343,9 +352,15 @@ void ACFGameMode::BeginPlay()
                 Hero->Inventory->Count(EFrontierItem::CaptureDevice) == 7 && Hero->Inventory->Count(EFrontierItem::Medicine) == 3 &&
                 Hero->GetActorLocation().Equals(FVector(-450, 0, 120), 1.0f);
             const bool bSecondLoad = Hero->LoadProgress(TestSlot);
+            int32 ResourceCount=0,Depleted=0;
+            for(TActorIterator<AResourceNode> It(GetWorld());It;++It)
+            {
+                ++ResourceCount;
+                if(It->PersistentId==FGuid(0xCF170000,0,0,1) && It->Remaining==0 && It->RegrowRemaining==123 && It->HarvestCooldown==.6f) ++Depleted;
+            }
             int32 RepeatedCount = 0;
             for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It) ++RepeatedCount;
-            const bool bPass = bLoaded && bValues && bSecondLoad && Count == RepeatedCount && Owned == 1 && Workers == 1;
+            const bool bPass = bLoaded && bValues && bSecondLoad && Count == RepeatedCount && Owned == 1 && Workers == 1 && ResourceCount==6 && Depleted==1;
             UE_LOG(LogTemp, Display, TEXT("CF_SAVE_READ %s values=%d owned=%d workers=%d count=%d repeated=%d"),
                 bPass ? TEXT("PASS") : TEXT("FAIL"), bValues, Owned, Workers, Count, RepeatedCount);
             FPlatformMisc::RequestExitWithStatus(false, bPass ? 0 : 4);
@@ -365,6 +380,8 @@ void ACFGameMode::BeginPlay()
             Hero->Health = 67;
             Pet->Level = 4; Pet->Experience = 123; Pet->Stamina = 62;
             Pet->SpecialCooldownRemaining = 5.5f;
+            for(TActorIterator<AResourceNode> It(GetWorld());It;++It)
+                if(It->PersistentId==FGuid(0xCF170000,0,0,1)) { It->Remaining=0; It->RegrowRemaining=123; It->HarvestCooldown=.6f; }
             Hero->Inventory->Restore({{EFrontierItem::Material, 42}, {EFrontierItem::CaptureDevice, 7}, {EFrontierItem::Medicine, 3}});
             const bool bSaved = Hero->SaveProgress(TestSlot);
             UE_LOG(LogTemp, Display, TEXT("CF_SAVE_WRITE %s"), bSaved ? TEXT("PASS") : TEXT("FAIL"));

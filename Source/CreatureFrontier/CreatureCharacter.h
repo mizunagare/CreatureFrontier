@@ -27,6 +27,7 @@ public:
     void UpdateCreaturePresentation(float DeltaSeconds);
     FName GetVisualState() const { return VisualState; }
     FVector GetFollowDestination() const;
+    FString GetGatheringStatus() const;
     UPROPERTY(Replicated,BlueprintReadOnly,Category="Care") int32 BondPoints=0;
     UPROPERTY(Replicated,BlueprintReadOnly,Category="Care") float PettingCooldown=0;
     void AddBond(int32 Amount);
@@ -129,6 +130,12 @@ protected:
     void OnRep_Activity();
 
 private:
+    void TickGathering(float DeltaSeconds,ACFPlayerCharacter* Recipient);
+    void ResetGathering();
+    TWeakObjectPtr<class AResourceNode> GatherTarget, FailedResource;
+    double GatherExpires=0, FailedResourceUntil=0;
+    float GatherRetry=0;
+    bool bGatheringActive=false;
     bool HasClearFollowApproach(const FVector& Destination) const;
     FVector FindFollowApproach(const FVector& Destination) const;
     FName VisualState=TEXT("Idle");

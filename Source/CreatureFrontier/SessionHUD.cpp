@@ -40,6 +40,7 @@ void ACFHUD::DrawControlHelp(ACFPlayerCharacter* Player)
 {
     const TArray<FString> Lines={
         TEXT("WASD move | mouse look | Space jump"),
+        TEXT("M gather resource (3m) | shared finite stock"),
         TEXT("LMB melee | RMB capture / cancel spear windup"),
         TEXT("Q focus enemy | G companion special"),
         TEXT("L select one companion | K command all"),

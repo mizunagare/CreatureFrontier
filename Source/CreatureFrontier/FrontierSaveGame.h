@@ -11,6 +11,19 @@
 
 class ACreatureCharacter;
 class UCreatureDefinition;
+class UResourceDefinition;
+
+USTRUCT()
+struct FResourceSaveRecord
+{
+    GENERATED_BODY()
+    UPROPERTY() FGuid Id;
+    UPROPERTY() TSoftObjectPtr<UResourceDefinition> Definition;
+    UPROPERTY() FTransform Transform;
+    UPROPERTY() int32 Remaining=0;
+    UPROPERTY() float HarvestCooldown=0;
+    UPROPERTY() float RegrowRemaining=0;
+};
 
 USTRUCT()
 struct FCreatureSaveRecord
@@ -68,7 +81,8 @@ class CREATUREFRONTIER_API UFrontierSaveGame : public USaveGame
 {
     GENERATED_BODY()
 public:
-    UPROPERTY() int32 FormatVersion = 16;
+    UPROPERTY() int32 FormatVersion = 17;
+    UPROPERTY() TArray<FResourceSaveRecord> ResourceNodes;
     UPROPERTY() FPlayerEquipmentState Equipment;
     UPROPERTY() FFrontierObjectiveProgress Objectives;
     UPROPERTY() TArray<FCreatureJournalEntry> Journal;

@@ -256,6 +256,7 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
         {
             if (WorkSite->RequiredSpecialty == EWorkSpecialty::Feeding) { SetActivity(ECreatureActivity::Rest); return; }
             if(WorkSite->RequiredSpecialty==EWorkSpecialty::Transport) { TickHauling(DeltaSeconds); return; }
+            if(WorkSite->RequiredSpecialty!=EWorkSpecialty::Farming) { TickGathering(DeltaSeconds,OwnerPlayer); return; }
             if (ProgressSite.Get() != WorkSite.Get()) { WorkProgress = 0; ProgressSite = WorkSite; }
             const FVector Offset = WorkSite->GetActorLocation() - GetActorLocation();
             if (Offset.Size2D() > 220.0f) { NavigateTo(WorkSite->GetActorLocation(), 35.0f); WorkProgress = 0.0f; }
@@ -272,12 +273,11 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
                     return;
                 }
                 WorkProgress += DeltaSeconds * GetWorkEfficiency(WorkSite) * (Nutrition < 20 ? .5f : 1.0f);
-                const bool Farm = WorkSite->RequiredSpecialty == EWorkSpecialty::Farming;
-                const float Interval = Farm ? 6.0f : 3.0f;
+                const float Interval = 6.0f;
                 if (WorkProgress >= Interval)
                 {
-                    if (Farm ? WorkSite->AdjustFoodStock(1) : OwnerPlayer->Inventory->AddItem(EFrontierItem::Material,1))
-                    { OwnerPlayer->RecordCompanionProduction(this,Farm ? EFrontierItem::Food : EFrontierItem::Material); AddExperience(1); WorkProgress = 0; }
+                    if (WorkSite->AdjustFoodStock(1))
+                    { OwnerPlayer->RecordCompanionProduction(this,EFrontierItem::Food); AddExperience(1); WorkProgress = 0; }
                     else WorkProgress = Interval; // Ready harvest stays pending while inventory is full.
                 }
             }
@@ -448,7 +448,7 @@ void ACreatureCharacter::SetActivity(ECreatureActivity NewActivity)
     if (HasAuthority() && (NewActivity == ECreatureActivity::Work || NewActivity == ECreatureActivity::Rest)) ClearCombatOrders();
     if (!HasAuthority() || Activity == NewActivity) return;
     if (NewActivity != ECreatureActivity::Rest) bResumeWorkAfterRest = false;
-    if (NewActivity != ECreatureActivity::Work) WorkProgress = 0;
+    if (NewActivity != ECreatureActivity::Work) ResetGathering();
     Activity = NewActivity;
     OnRep_Activity();
 }

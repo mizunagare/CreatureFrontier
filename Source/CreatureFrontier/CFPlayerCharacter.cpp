@@ -16,6 +16,8 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "TimerManager.h"
 #include "PlayerEquipmentComponent.h"
+#include "ResourceNode.h"
+#include "ResourcePersistence.h"
 
 void ACFPlayerCharacter::CraftSpear() { Equipment->CraftSpear(); }
 void ACFPlayerCharacter::CraftVest() { Equipment->CraftVest(); }
@@ -74,6 +76,13 @@ bool ACFPlayerCharacter::SaveProgress(const FString& Slot)
     Save->Journal = Journal;
     Save->Objectives = Objectives;
     Save->Equipment=Equipment->GetState();
+    for(TActorIterator<AResourceNode> It(GetWorld());It;++It)
+    {
+        FResourceSaveRecord Record;
+        Record.Id=It->PersistentId; Record.Definition=It->Definition.Get(); Record.Transform=It->GetActorTransform();
+        Record.Remaining=It->Remaining; Record.HarvestCooldown=It->HarvestCooldown; Record.RegrowRemaining=It->RegrowRemaining;
+        Save->ResourceNodes.Add(Record);
+    }
     for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It)
     {
         FCreatureSaveRecord Record;
@@ -129,7 +138,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
 {
     if (!HasAuthority() || !GetController()) return false;
     auto* Save = Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot, 0));
-    if (!Save || Save->FormatVersion < 1 || Save->FormatVersion > 16 ||
+    if (!Save || Save->FormatVersion < 1 || Save->FormatVersion > 17 ||
         Save->MapName != UGameplayStatics::GetCurrentLevelName(this, true) ||
         !FMath::IsFinite(Save->Health) || Save->Health < 0 || Save->Health > 100 ||
         Save->Resources < 0 || Save->PlayerTransform.ContainsNaN() || Save->ViewRotation.ContainsNaN())
@@ -186,6 +195,8 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
         { Feedback = TEXT("Invalid facility in save"); return false; }
         FacilityIds.Add(Record.Id);
     }
+    FResourceRestoreTransaction ResourceRestore(GetWorld());
+    if(!ResourceRestore.Stage(Save)) { Feedback=TEXT("Invalid or unavailable resource snapshot; world unchanged"); return false; }
     TArray<ACreatureCharacter*> OldCreatures;
     for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It) OldCreatures.Add(*It);
     TArray<ACreatureCharacter*> Restored;
@@ -298,6 +309,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
             IsValid(Pet->WorkSite) && Pet->WorkSite->RequiredSpecialty != EWorkSpecialty::Feeding;
     }
     CancelMeleeAttack(); Building->Cancel();
+    ResourceRestore.Commit();
     for (auto* Site : OldBuilt) Site->Destroy();
     for (auto* Drop : OldLoot) Drop->Destroy();
     for (auto* Pet : OldCreatures) Pet->Destroy();
@@ -491,6 +503,7 @@ void ACFPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
     PlayerInputComponent->BindKey(EKeys::F1, IE_Pressed, this, &ACFPlayerCharacter::ToggleHelp);
     PlayerInputComponent->BindKey(EKeys::C, IE_Pressed, this, &ACFPlayerCharacter::ToggleBackpack);
     PlayerInputComponent->BindKey(EKeys::Y, IE_Pressed, this, &ACFPlayerCharacter::PetAimedCompanion);
+    PlayerInputComponent->BindKey(EKeys::M, IE_Pressed, this, &ACFPlayerCharacter::GatherAimedResource);
     PlayerInputComponent->BindKey(EKeys::One, IE_Pressed, this, &ACFPlayerCharacter::CraftCaptureDevice);
     PlayerInputComponent->BindKey(EKeys::Two, IE_Pressed, this, &ACFPlayerCharacter::CraftMedicine);
     PlayerInputComponent->BindKey(EKeys::Three, IE_Pressed, this, &ACFPlayerCharacter::CraftFood);
