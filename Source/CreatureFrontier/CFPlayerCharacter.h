@@ -32,6 +32,8 @@ public:
     void CommandWork();
     void CommandRest();
     void HealCompanion();
+    void CommandFocus();
+    void CommandSpecial();
     void RestartLevel();
     void QuitGame();
     bool SaveProgress(const FString& Slot = TEXT("FrontierSlot"));

@@ -74,6 +74,10 @@ ACreatureCharacter::ACreatureCharacter()
     Feet.Add(Part(TEXT("FootFR"), SphereShape, FVector(24,22,-75), FVector(.32,.25,.2)));
     Feet.Add(Part(TEXT("FootBL"), SphereShape, FVector(-24,-22,-75), FVector(.32,.25,.2)));
     Feet.Add(Part(TEXT("FootBR"), SphereShape, FVector(-24,22,-75), FVector(.32,.25,.2)));
+    static ConstructorHelpers::FObjectFinder<UStaticMesh> CylinderMesh(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
+    SkillIndicator = Part(TEXT("SkillIndicator"), CylinderMesh.Object, FVector(0,0,-84), FVector(1.6,1.6,.015));
+    SkillIndicator->SetVisibility(false);
+    SkillIndicator->SetHiddenInGame(true);
 }
 
 void ACreatureCharacter::OnConstruction(const FTransform& Transform)
@@ -109,6 +113,7 @@ void ACreatureCharacter::RefreshAppearance()
     for (const auto& Piece : Feet) Piece->SetMaterial(0, Accent);
     for (const auto& Piece : EyeParts) Piece->SetMaterial(0, White);
     for (const auto& Piece : Pupils) Piece->SetMaterial(0, Black);
+    SkillIndicator->SetMaterial(0, Accent);
 }
 
 FString ACreatureCharacter::GetCreatureName() const
@@ -146,10 +151,7 @@ void ACreatureCharacter::NavigateTo(const FVector& Destination, float Acceptance
 bool ACreatureCharacter::CanHit(const AActor* Target) const
 {
     if (!IsValid(Target) || GetDistanceTo(Target) > AttackRange) return false;
-    FHitResult Hit;
-    FCollisionQueryParams Params(SCENE_QUERY_STAT(CreatureMelee), false, this);
-    return !GetWorld()->LineTraceSingleByChannel(Hit, GetActorLocation(), Target->GetActorLocation(), ECC_Visibility, Params)
-        || Hit.GetActor() == Target;
+    return HasClearSight(Target);
 }
 
 void ACreatureCharacter::BeginPlay()
@@ -173,15 +175,26 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
         const float Bob = Health > 0 ? FMath::Sin(GetWorld()->GetTimeSeconds()*(Speed > 10 ? 10.0f : 2.2f))*(Speed > 10 ? 3.0f : 0.8f) : 0;
         VisualPivot->SetRelativeLocation(FVector(0,0,Bob));
         VisualPivot->SetRelativeRotation(FRotator(0,0,Health <= 0 ? 65.0f : 0));
+        const bool bEffect = Health > 0 && (SpecialWindupRemaining > 0 || SkillPulseRemaining > 0 || GuardRemaining > 0);
+        SkillIndicator->SetVisibility(bEffect);
+        SkillIndicator->SetHiddenInGame(!bEffect);
+        const float Size = 1.6f + FMath::Sin(GetWorld()->GetTimeSeconds()*12.0f)*0.12f;
+        SkillIndicator->SetRelativeScale3D(FVector(Size,Size,.015));
     }
     if (!HasAuthority()) return;
-    if (Health <= 0.0f) { StopNavigation(); return; }
+    SpecialCooldownRemaining = FMath::Max(0.0f, SpecialCooldownRemaining - DeltaSeconds);
+    SlowRemaining = FMath::Max(0.0f, SlowRemaining - DeltaSeconds);
+    GuardRemaining = FMath::Max(0.0f, GuardRemaining - DeltaSeconds);
+    SkillPulseRemaining = FMath::Max(0.0f, SkillPulseRemaining - DeltaSeconds);
+    RetaliationRemaining = FMath::Max(0.0f, RetaliationRemaining - DeltaSeconds);
+    GetCharacterMovement()->MaxWalkSpeed = (Definition ? Definition->MoveSpeed : 320.0f) * (SlowRemaining > 0 ? 0.5f : 1.0f);
+    if (Health <= 0.0f) { ClearCombatOrders(); StopNavigation(); return; }
 
     AttackCooldown = FMath::Max(0.0f, AttackCooldown - DeltaSeconds);
     if (Disposition == ECreatureDisposition::Tamed)
     {
         ACFPlayerCharacter* OwnerPlayer = Tamer ? Cast<ACFPlayerCharacter>(Tamer->GetPawn()) : nullptr;
-        if (!OwnerPlayer || OwnerPlayer->Health <= 0.0f) { StopNavigation(); return; }
+        if (!OwnerPlayer || OwnerPlayer->Health <= 0.0f) { ClearCombatOrders(); StopNavigation(); return; }
         if (Activity == ECreatureActivity::Rest)
         {
             if (IsValid(WorkSite) && GetDistanceTo(WorkSite) > 220.0f)
@@ -219,9 +232,15 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
             return;
         }
         WorkProgress = 0.0f;
-        ACreatureCharacter* Enemy = nullptr;
+        if (!IsValid(FocusTarget) || FocusTarget->Health <= 0 || FocusTarget->Disposition == ECreatureDisposition::Tamed || OwnerPlayer->GetDistanceTo(FocusTarget) > 1500.0f)
+        {
+            FocusTarget = nullptr;
+            bSpecialRequested = false;
+        }
+        if (TickSpecial(DeltaSeconds)) return;
+        ACreatureCharacter* Enemy = FocusTarget;
         float Best = 1000.0f;
-        for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It)
+        if (!Enemy) for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It)
         {
             if (It->Disposition == ECreatureDisposition::Tamed || It->Health <= 0.0f) continue;
             const float Distance = OwnerPlayer->GetDistanceTo(*It);
@@ -256,9 +275,15 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
         const float Distance = GetDistanceTo(*It);
         if (Distance < Closest) { Closest = Distance; Target = *It; }
     }
+    bool bProvoked = false;
+    if (auto* Aggressor = RetaliationTarget.Get(); Aggressor && RetaliationRemaining > 0 && GetDistanceTo(Aggressor) <= 2000.0f)
+    {
+        const auto* Pet = Cast<ACreatureCharacter>(Aggressor);
+        if (!Pet || Pet->Health > 0) { Target = Aggressor; bProvoked = true; }
+    }
     const FVector Offset = Target->GetActorLocation() - GetActorLocation();
     const float Distance2D = Offset.Size2D();
-    if (Distance2D <= AggroRange)
+    if (Distance2D <= AggroRange || bProvoked)
     {
         Disposition = ECreatureDisposition::Hostile;
         SetActivity(ECreatureActivity::Combat);
@@ -311,10 +336,16 @@ void ACreatureCharacter::AddExperience(int32 Amount)
 float ACreatureCharacter::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent,
     AController* EventInstigator, AActor* DamageCauser)
 {
-    const float Applied = FMath::Min(Health, FMath::Max(0.0f, DamageAmount));
+    const float Applied = FMath::Min(Health, FMath::Max(0.0f, DamageAmount) * (GuardRemaining > 0 ? 0.5f : 1.0f));
     if (HasAuthority() && Applied > 0)
     {
         Health = FMath::Max(0.0f, Health - Applied);
+        if (Disposition != ECreatureDisposition::Tamed && Health > 0)
+        {
+            APawn* Aggressor = Cast<APawn>(DamageCauser);
+            if (!Aggressor && EventInstigator) Aggressor = EventInstigator->GetPawn();
+            if (IsValid(Aggressor) && Aggressor != this) { RetaliationTarget = Aggressor; RetaliationRemaining = 12.0f; }
+        }
         if (Health <= 0.0f)
         {
             SetActivity(ECreatureActivity::Rest);
@@ -333,6 +364,7 @@ float ACreatureCharacter::TakeDamage(float DamageAmount, FDamageEvent const& Dam
 
 void ACreatureCharacter::SetActivity(ECreatureActivity NewActivity)
 {
+    if (HasAuthority() && (NewActivity == ECreatureActivity::Work || NewActivity == ECreatureActivity::Rest)) ClearCombatOrders();
     if (!HasAuthority() || Activity == NewActivity) return;
     Activity = NewActivity;
     OnRep_Activity();
@@ -342,6 +374,8 @@ void ACreatureCharacter::Tame(AController* NewTamer)
 {
     if (!HasAuthority() || !IsValid(NewTamer)) return;
     Tamer = NewTamer;
+    RetaliationTarget.Reset();
+    RetaliationRemaining = 0;
     Disposition = ECreatureDisposition::Tamed;
     Activity = ECreatureActivity::Follow;
     OnTamed();
@@ -358,6 +392,10 @@ void ACreatureCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
     DOREPLIFETIME(ACreatureCharacter, Level);
     DOREPLIFETIME(ACreatureCharacter, Experience);
     DOREPLIFETIME(ACreatureCharacter, Stamina);
+    DOREPLIFETIME(ACreatureCharacter, SpecialCooldownRemaining);
+    DOREPLIFETIME(ACreatureCharacter, SpecialWindupRemaining);
+    DOREPLIFETIME(ACreatureCharacter, SlowRemaining);
+    DOREPLIFETIME(ACreatureCharacter, GuardRemaining);
     DOREPLIFETIME(ACreatureCharacter, Disposition);
     DOREPLIFETIME(ACreatureCharacter, Activity);
     DOREPLIFETIME(ACreatureCharacter, Tamer);

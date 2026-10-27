@@ -14,7 +14,7 @@ void ACFHUD::DrawHUD()
     const float X = Canvas->ClipX * 0.5f, Y = Canvas->ClipY * 0.5f;
     DrawLine(X-7, Y, X+7, Y, FLinearColor::White);
     DrawLine(X, Y-7, X, Y+7, FLinearColor::White);
-    DrawRect(FLinearColor(0.02f,0.03f,0.05f,0.85f), 18, 18, 550, 260);
+    DrawRect(FLinearColor(0.02f,0.03f,0.05f,0.85f), 18, 18, 550, 290);
     DrawText(FString::Printf(TEXT("HEALTH %.0f / 100    MATERIALS %d"), Player->Health, Player->Inventory->Count(EFrontierItem::Material)), FLinearColor::White, 32, 30);
     int32 Companions = 0, Working = 0;
     for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It)
@@ -25,7 +25,8 @@ void ACFHUD::DrawHUD()
     DrawText(FString::Printf(TEXT("DEVICES %d    MEDICINE %d"), Player->Inventory->Count(EFrontierItem::CaptureDevice), Player->Inventory->Count(EFrontierItem::Medicine)), FLinearColor::White, 32, 136);
     DrawText(TEXT("1 craft device (3) | 2 craft medicine (5) | H heal"), FLinearColor::White, 32, 162);
     DrawText(TEXT("T rest at base | P treat aimed companion | Esc exit"), FLinearColor::White, 32, 190);
-    DrawText(Player->Feedback, FLinearColor::Yellow, 32, 222);
+    DrawText(TEXT("Q focus aimed enemy | G companion special (20 stamina)"), FLinearColor::White, 32, 216);
+    DrawText(Player->Feedback, FLinearColor::Yellow, 32, 252);
     if (auto* Creature = Player->TraceCreature())
     {
         DrawText(FString::Printf(TEXT("%s (%s)  Lv%d  HP %.0f/%.0f  Capture %.0f%%"),
@@ -33,7 +34,13 @@ void ACFHUD::DrawHUD()
             Creature->Level, Creature->Health, Creature->GetMaxHealth(), Player->CaptureComponent->CalculateCaptureChance(Creature)*100.0f),
             FLinearColor::White, X-130, Y+25);
         if (Creature->Disposition == ECreatureDisposition::Tamed)
+        {
             DrawText(FString::Printf(TEXT("XP %d/%d  Stamina %.0f%%  %s"), Creature->Experience, Creature->Level*100,
                 Creature->Stamina, *UEnum::GetValueAsString(Creature->Activity)), FLinearColor::Green, X-130, Y+48);
+            DrawText(FString::Printf(TEXT("%s | cooldown %.1fs %s"), *Creature->GetSpecialName(), Creature->SpecialCooldownRemaining,
+                Creature->SpecialWindupRemaining > 0 ? TEXT("CHARGING") : TEXT("")), FLinearColor::Yellow, X-130, Y+70);
+        }
+        if (Creature->SlowRemaining > 0 || Creature->GuardRemaining > 0)
+            DrawText(FString::Printf(TEXT("SLOW %.1fs  GUARD %.1fs"), Creature->SlowRemaining, Creature->GuardRemaining), FLinearColor::Yellow, X-130, Y+92);
     }
 }

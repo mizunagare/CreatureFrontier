@@ -40,6 +40,20 @@ public:
     int32 Experience = 0;
     UPROPERTY(Replicated, BlueprintReadOnly, Category="Care")
     float Stamina = 100.0f;
+    UPROPERTY(Replicated, BlueprintReadOnly, Category="Combat")
+    float SpecialCooldownRemaining = 0.0f;
+    UPROPERTY(Replicated, BlueprintReadOnly, Category="Combat")
+    float SpecialWindupRemaining = 0.0f;
+    UPROPERTY(Replicated, BlueprintReadOnly, Category="Combat")
+    float SlowRemaining = 0.0f;
+    UPROPERTY(Replicated, BlueprintReadOnly, Category="Combat")
+    float GuardRemaining = 0.0f;
+    UPROPERTY() TObjectPtr<ACreatureCharacter> FocusTarget;
+    bool OrderAttack(ACreatureCharacter* Target);
+    bool RequestSpecial(ACreatureCharacter* Target);
+    void ClearCombatOrders();
+    bool IsSpecialReady() const;
+    FString GetSpecialName() const;
     UFUNCTION(BlueprintPure, Category="Progression")
     float GetMaxHealth() const;
     UFUNCTION(BlueprintPure, Category="Progression")
@@ -91,6 +105,16 @@ protected:
     void OnRep_Activity();
 
 private:
+    bool HasClearSight(const AActor* Target) const;
+    bool TickSpecial(float DeltaSeconds);
+    void ResolveSpecial();
+    UPROPERTY() TObjectPtr<UStaticMeshComponent> SkillIndicator;
+    TWeakObjectPtr<ACreatureCharacter> SpecialTarget;
+    TWeakObjectPtr<APawn> RetaliationTarget;
+    float RetaliationRemaining = 0.0f;
+    bool bSpecialRequested = false;
+    double SpecialRequestExpires = 0.0;
+    float SkillPulseRemaining = 0.0f;
     void RefreshAppearance();
     UPROPERTY() TObjectPtr<class USceneComponent> VisualPivot;
     UPROPERTY() TArray<TObjectPtr<UStaticMeshComponent>> AccentParts;

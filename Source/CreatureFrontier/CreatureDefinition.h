@@ -30,6 +30,14 @@ public:
     float AttackSeconds = 1.2f;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Work", meta=(ClampMin="0.5", ClampMax="3"))
     float WorkSpeed = 1.5f;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Special")
+    FText SpecialName;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Special", meta=(ClampMin="150", ClampMax="1200"))
+    float SpecialRange = 600.0f;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Special", meta=(ClampMin="1", ClampMax="5"))
+    float SpecialDamageScale = 2.0f;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Special", meta=(ClampMin="3", ClampMax="30"))
+    float SpecialCooldownSeconds = 8.0f;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Stats", meta=(ClampMin="1"))
     int32 BaseMaxHealth = 100;

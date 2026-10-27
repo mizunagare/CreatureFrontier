@@ -1,6 +1,7 @@
 #include "CFGameMode.h"
 #include "CFPlayerCharacter.h"
 #include "CFHUD.h"
+#include "CombatScenario.h"
 #include "CaptureComponent.h"
 #include "CreatureCharacter.h"
 #include "CreatureDefinition.h"
@@ -34,12 +35,14 @@ void ACFGameMode::BeginPlay()
     const bool bNavTest = FParse::Param(FCommandLine::Get(), TEXT("CFNavTest"));
     const bool bCareTest = FParse::Param(FCommandLine::Get(), TEXT("CFCareTest"));
     const bool bSpeciesTest = FParse::Param(FCommandLine::Get(), TEXT("CFSpeciesTest"));
-    if (!bSaveWrite && !bSaveRead && !bInventoryTest && !bNavTest && !bCareTest && !bSpeciesTest && !FParse::Param(FCommandLine::Get(), TEXT("CFSmokeTest"))) return;
+    const bool bCombatTest = FParse::Param(FCommandLine::Get(), TEXT("CFCombatTest"));
+    if (!bSaveWrite && !bSaveRead && !bInventoryTest && !bNavTest && !bCareTest && !bSpeciesTest && !bCombatTest && !FParse::Param(FCommandLine::Get(), TEXT("CFSmokeTest"))) return;
     FTimerHandle TestStart;
-    GetWorldTimerManager().SetTimer(TestStart, [this, bSaveWrite, bSaveRead, bInventoryTest, bNavTest, bCareTest, bSpeciesTest]()
+    GetWorldTimerManager().SetTimer(TestStart, [this, bSaveWrite, bSaveRead, bInventoryTest, bNavTest, bCareTest, bSpeciesTest, bCombatTest]()
     {
         auto* Hero = Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerPawn(this, 0));
         if (!Hero) { FPlatformMisc::RequestExitWithStatus(true, 1); return; }
+        if (bCombatTest) { RunCompanionCombatScenario(GetWorld(), Hero); return; }
         if (bSpeciesTest)
         {
             TArray<ACreatureCharacter*> Pets;
@@ -244,7 +247,7 @@ void ACFGameMode::BeginPlay()
                 {
                     ++Owned;
                     if (It->WorkSite && It->Activity == ECreatureActivity::Work && It->Health == 75 &&
-                        It->Level == 4 && It->Experience == 123 && It->Stamina == 62) ++Workers;
+                        It->Level == 4 && It->Experience == 123 && It->Stamina == 62 && It->SpecialCooldownRemaining == 5.5f) ++Workers;
                 }
             }
             const bool bValues = Hero->Health == 67 && Hero->Inventory->Count(EFrontierItem::Material) == 42 &&
@@ -272,6 +275,7 @@ void ACFGameMode::BeginPlay()
         {
             Hero->Health = 67;
             Pet->Level = 4; Pet->Experience = 123; Pet->Stamina = 62;
+            Pet->SpecialCooldownRemaining = 5.5f;
             Hero->Inventory->Restore({{EFrontierItem::Material, 42}, {EFrontierItem::CaptureDevice, 7}, {EFrontierItem::Medicine, 3}});
             const bool bSaved = Hero->SaveProgress(TestSlot);
             UE_LOG(LogTemp, Display, TEXT("CF_SAVE_WRITE %s"), bSaved ? TEXT("PASS") : TEXT("FAIL"));

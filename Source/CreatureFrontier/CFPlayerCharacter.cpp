@@ -69,6 +69,7 @@ bool ACFPlayerCharacter::SaveProgress(const FString& Slot)
         Record.Level = It->Level;
         Record.Experience = It->Experience;
         Record.Stamina = It->Stamina;
+        Record.SpecialCooldown = It->SpecialCooldownRemaining;
         Record.bOwned = It->Tamer == GetController();
         Record.Disposition = It->Disposition;
         Record.Activity = It->Activity;
@@ -84,7 +85,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
 {
     if (!HasAuthority() || !GetController()) return false;
     auto* Save = Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot, 0));
-    if (!Save || Save->FormatVersion < 1 || Save->FormatVersion > 3 ||
+    if (!Save || Save->FormatVersion < 1 || Save->FormatVersion > 4 ||
         Save->MapName != UGameplayStatics::GetCurrentLevelName(this, true) ||
         !FMath::IsFinite(Save->Health) || Save->Health < 0 || Save->Health > 100 ||
         Save->Resources < 0 || Save->PlayerTransform.ContainsNaN() || Save->ViewRotation.ContainsNaN())
@@ -114,7 +115,8 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
             !FMath::IsFinite(Record.Health) || Record.Health < 0 ||
             Record.Level < 1 || Record.Level > 20 || Record.Experience < 0 ||
             (Record.Level < 20 ? Record.Experience >= Record.Level * 100 : Record.Experience != 0) ||
-            !FMath::IsFinite(Record.Stamina) || Record.Stamina < 0 || Record.Stamina > 100)
+            !FMath::IsFinite(Record.Stamina) || Record.Stamina < 0 || Record.Stamina > 100 ||
+            !FMath::IsFinite(Record.SpecialCooldown) || Record.SpecialCooldown < 0 || Record.SpecialCooldown > 60)
         {
             for (auto* Pet : Restored) Pet->Destroy();
             Feedback = TEXT("Save references unavailable or invalid creature data");
@@ -134,6 +136,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
         Pet->Health = FMath::Min(Pet->GetMaxHealth(), Record.Health);
         Pet->Experience = Record.Experience;
         Pet->Stamina = Record.Stamina;
+        Pet->SpecialCooldownRemaining = Record.SpecialCooldown;
         Pet->Disposition = Record.Disposition;
         Pet->Tamer = Record.bOwned ? GetController() : nullptr;
         Pet->Activity = Record.Activity;
@@ -184,8 +187,39 @@ void ACFPlayerCharacter::CommandFollow()
 {
     if (Health <= 0.0f) return;
     for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It)
-        if (It->Tamer == GetController()) { It->WorkSite = nullptr; It->SetActivity(ECreatureActivity::Follow); }
+        if (It->Tamer == GetController()) { It->ClearCombatOrders(); It->WorkSite = nullptr; It->SetActivity(ECreatureActivity::Follow); }
     Feedback = TEXT("Companions following");
+}
+
+void ACFPlayerCharacter::CommandFocus()
+{
+    if (!HasAuthority() || Health <= 0) return;
+    auto* Target = TraceCreature();
+    if (!Target || Target->Health <= 0 || Target->Disposition == ECreatureDisposition::Tamed)
+    { Feedback = TEXT("Aim at a living wild creature to focus attacks"); return; }
+    int32 Count = 0;
+    for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It)
+        if (It->Tamer == GetController() && It->GetDistanceTo(this) <= 1800 && It->OrderAttack(Target)) ++Count;
+    Feedback = FString::Printf(TEXT("Focus %s: %d active companions"), *Target->GetCreatureName(), Count);
+}
+
+void ACFPlayerCharacter::CommandSpecial()
+{
+    if (!HasAuthority() || Health <= 0) return;
+    auto* Aimed = TraceCreature();
+    ACreatureCharacter* BestPet = nullptr;
+    ACreatureCharacter* BestTarget = nullptr;
+    float BestDistance = TNumericLimits<float>::Max();
+    for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It)
+    {
+        if (It->Tamer != GetController() || !It->IsSpecialReady() || It->GetDistanceTo(this) > 1800) continue;
+        auto* Target = IsValid(Aimed) && Aimed->Health > 0 && Aimed->Disposition != ECreatureDisposition::Tamed ? Aimed : It->FocusTarget.Get();
+        if (!IsValid(Target) || Target->Health <= 0 || Target->Disposition == ECreatureDisposition::Tamed || Target->GetDistanceTo(this) > 1500) continue;
+        const float Distance = It->GetDistanceTo(Target);
+        if (Distance < BestDistance) { BestDistance = Distance; BestPet = *It; BestTarget = Target; }
+    }
+    if (BestPet && BestPet->RequestSpecial(BestTarget)) Feedback = BestPet->GetCreatureName() + TEXT(" moving into skill range");
+    else Feedback = TEXT("Need an active companion, target, 20 stamina and ready cooldown");
 }
 
 void ACFPlayerCharacter::CommandWork()
@@ -258,6 +292,8 @@ void ACFPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
     PlayerInputComponent->BindKey(EKeys::E, IE_Pressed, this, &ACFPlayerCharacter::CommandWork);
     PlayerInputComponent->BindKey(EKeys::T, IE_Pressed, this, &ACFPlayerCharacter::CommandRest);
     PlayerInputComponent->BindKey(EKeys::P, IE_Pressed, this, &ACFPlayerCharacter::HealCompanion);
+    PlayerInputComponent->BindKey(EKeys::Q, IE_Pressed, this, &ACFPlayerCharacter::CommandFocus);
+    PlayerInputComponent->BindKey(EKeys::G, IE_Pressed, this, &ACFPlayerCharacter::CommandSpecial);
     PlayerInputComponent->BindKey(EKeys::R, IE_Pressed, this, &ACFPlayerCharacter::RestartLevel);
     PlayerInputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &ACFPlayerCharacter::QuitGame);
     PlayerInputComponent->BindKey(EKeys::F5, IE_Pressed, this, &ACFPlayerCharacter::QuickSave);

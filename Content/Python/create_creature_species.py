@@ -47,6 +47,13 @@ for spec in specs:
                   body_color=unreal.LinearColor(*spec['color'], 1), accent_color=unreal.LinearColor(*spec['accent'], 1))
     for key, value in values.items():
         asset.set_editor_property(key, value)
+    skill = {
+        'DA_Mosskip': ('Bramble Snare', 600.0, 2.0, 8.0),
+        'DA_Cinderkit': ('Cinder Burst', 700.0, 2.5, 7.0),
+        'DA_Craglet': ('Stone Guard', 400.0, 2.0, 10.0),
+    }[spec['asset']]
+    for key, value in zip(('special_name', 'special_range', 'special_damage_scale', 'special_cooldown_seconds'), skill):
+        asset.set_editor_property(key, value)
     assert editor_assets.save_loaded_asset(asset)
     definitions.append(asset)
 
