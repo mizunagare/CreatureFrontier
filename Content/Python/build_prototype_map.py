@@ -1,0 +1,48 @@
+import unreal
+
+
+MAP_PATH = "/Game/Maps/L_Prototype"
+
+
+def spawn(actor_class, location, rotation=None):
+    return unreal.EditorLevelLibrary.spawn_actor_from_class(
+        actor_class,
+        unreal.Vector(*location),
+        rotation or unreal.Rotator(),
+    )
+
+
+unreal.EditorLevelLibrary.new_level(MAP_PATH)
+
+cube = unreal.load_asset("/Engine/BasicShapes/Cube.Cube")
+
+floor = spawn(unreal.StaticMeshActor, (0, 0, -100))
+floor.static_mesh_component.set_static_mesh(cube)
+floor.set_actor_scale3d(unreal.Vector(40, 40, 1))
+floor.set_actor_label("Prototype Floor")
+
+for index, location in enumerate(((800, 500, 100), (1000, -400, 100), (1600, 100, 100))):
+    obstacle = spawn(unreal.StaticMeshActor, location)
+    obstacle.static_mesh_component.set_static_mesh(cube)
+    obstacle.set_actor_scale3d(unreal.Vector(1.5, 1.5, 2.0))
+    obstacle.set_actor_label(f"Cover Block {index + 1}")
+
+player_start = spawn(unreal.PlayerStart, (0, 0, 120), unreal.Rotator(0, 0, 0))
+player_start.set_actor_label("Player Start")
+
+sun = spawn(unreal.DirectionalLight, (0, 0, 1000), unreal.Rotator(-45, -35, 0))
+sun.set_actor_label("Sun")
+sun.light_component.set_editor_property("intensity", 8.0)
+
+sky = spawn(unreal.SkyLight, (0, 0, 500))
+sky.set_actor_label("Sky Light")
+sky.light_component.set_editor_property("intensity", 1.0)
+
+for index, location in enumerate(((700, 0, 90), (1250, 450, 90), (1500, -550, 90))):
+    creature = spawn(unreal.CreatureCharacter, location)
+    creature.set_actor_label(f"Wild Creature {index + 1}")
+    creature.set_editor_property("aggro_range", 1400.0)
+
+unreal.EditorLevelLibrary.save_all_dirty_levels()
+unreal.log(f"Creature Frontier prototype map created: {MAP_PATH}")
+
