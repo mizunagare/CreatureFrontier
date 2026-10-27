@@ -1,5 +1,7 @@
 #include "CreatureCharacter.h"
 #include "NavigationSystem.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 
 bool ACreatureCharacter::TickHabitatReturn()
 {
@@ -42,14 +44,22 @@ void ACreatureCharacter::TickRoaming(float DeltaSeconds)
             if (Nav->GetRandomReachablePointInRadius(HabitatHome,RoamRadius,Point) && FVector::Dist2D(GetActorLocation(),Point.Location) > 110)
             { Found = true; break; }
         if (!Found)
-        { StopNavigation(); SetActivity(ECreatureActivity::Idle); RoamPause = 2; return; }
+        {
+            if(FParse::Param(FCommandLine::Get(),TEXT("CFRoamTrace")))
+                UE_LOG(LogTemp,Display,TEXT("CF_ROAM_SELECT failed time=%.3f location=%s"),GetWorld()->GetTimeSeconds(),*GetActorLocation().ToString());
+            StopNavigation(); SetActivity(ECreatureActivity::Idle); RoamPause = 2; return;
+        }
         RoamTarget = Point.Location; bHasRoamTarget = true;
+        if(FParse::Param(FCommandLine::Get(),TEXT("CFRoamTrace")))
+            UE_LOG(LogTemp,Display,TEXT("CF_ROAM_SELECT time=%.3f distance=%.3f location=%s target=%s"),GetWorld()->GetTimeSeconds(),FVector::Dist2D(GetActorLocation(),RoamTarget),*GetActorLocation().ToString(),*RoamTarget.ToString());
         SetActivity(ECreatureActivity::Wander);
     }
     if (FVector::Dist2D(GetActorLocation(),RoamTarget) <= 85)
     {
         StopNavigation(); SetActivity(ECreatureActivity::Idle);
         RoamPause = FMath::FRandRange(2.0f,5.0f); bHasRoamTarget = false;
+        if(FParse::Param(FCommandLine::Get(),TEXT("CFRoamTrace")))
+            UE_LOG(LogTemp,Display,TEXT("CF_ROAM_ARRIVE time=%.3f distance=%.3f homeDistance=%.3f pause=%.3f"),GetWorld()->GetTimeSeconds(),FVector::Dist2D(GetActorLocation(),RoamTarget),FVector::Dist2D(GetActorLocation(),HabitatHome),RoamPause);
     }
     else NavigateTo(RoamTarget,55);
 }

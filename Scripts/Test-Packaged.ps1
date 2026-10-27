@@ -30,6 +30,10 @@ $cases = @(
     @{Flag='CFBossTest'; Marker='CF_BOSS PASS'},
     @{Flag='CFBuildingTest'; Marker='CF_BUILD PASS'},
     @{Flag='CFWorldTest'; Marker='CF_WORLD PASS'},
+    @{Flag='CFWorldTest'; Label='CFWorldShort1549'; Marker='CF_WORLD PASS'; Arguments=@('-CFRoamSeed=1549');
+        SeedMarker='CF_WORLD_SEED 1549'; Pattern='CF_WORLD_ROAM pass=1 travel=(?:[0-2]?\d|3[0-4])\.\d{2} path=\d+\.\d{2} legs=2 continuous=1 within=1'},
+    @{Flag='CFWorldTest'; Label='CFWorldShort3028'; Marker='CF_WORLD PASS'; Arguments=@('-CFRoamSeed=3028');
+        SeedMarker='CF_WORLD_SEED 3028'; Pattern='CF_WORLD_ROAM pass=1 travel=(?:[0-2]?\d|3[0-4])\.\d{2} path=\d+\.\d{2} legs=2 continuous=1 within=1'},
     @{Flag='CFFarmingTest'; Marker='CF_FARM PASS'},
     @{Flag='CFFeedingTest'; Marker='CF_FEED PASS'},
     @{Flag='CFWorkCycleTest'; Marker='CF_WORK_CYCLE PASS'},
@@ -66,10 +70,13 @@ $cases = @(
 foreach ($case in $cases) {
     $repeatCount = if ($case.Repeats) { [int]$case.Repeats } else { 1 }
     for ($attempt = 1; $attempt -le $repeatCount; $attempt++) {
-        $label = if ($repeatCount -gt 1) { "$($case.Flag)-$attempt" } else { $case.Flag }
+        $caseName = if ($case.Label) { $case.Label } else { $case.Flag }
+        $label = if ($repeatCount -gt 1) { "$caseName-$attempt" } else { $caseName }
         $logPath = Join-Path $testLogRoot ($label + '.log')
+        $arguments = @('-nullrhi', '-nosound', '-unattended', '-nop4', "-$($case.Flag)", "-abslog=`"$logPath`"")
+        if ($case.Arguments) { $arguments += $case.Arguments }
         $testProcess = Start-Process -FilePath $exePath -WorkingDirectory $BuildRoot `
-            -ArgumentList @('-nullrhi', '-nosound', '-unattended', '-nop4', "-$($case.Flag)", "-abslog=`"$logPath`"") `
+            -ArgumentList $arguments `
             -WindowStyle Hidden -PassThru
         if (-not $testProcess.WaitForExit($TimeoutSeconds * 1000)) {
             $testProcess.Kill()
@@ -78,6 +85,12 @@ foreach ($case in $cases) {
         if ($testProcess.ExitCode -ne 0) { throw "$label failed with exit code $($testProcess.ExitCode)" }
         if (-not (Select-String -LiteralPath $logPath -SimpleMatch $case.Marker -Quiet)) {
             throw "$label did not emit its success marker; inspect $logPath"
+        }
+        if ($case.SeedMarker -and -not (Select-String -LiteralPath $logPath -SimpleMatch $case.SeedMarker -Quiet)) {
+            throw "$label ignored its replay seed; inspect $logPath"
+        }
+        if ($case.Pattern -and -not (Select-String -LiteralPath $logPath -Pattern $case.Pattern -Quiet)) {
+            throw "$label did not exercise two short completed legs; inspect $logPath"
         }
         Write-Host "${label}: PASS"
     }

@@ -2,9 +2,10 @@
 
 原创第一人称生物捕捉 RPG 原型。玩法重点是捕捉伙伴，并与伙伴共同生活、工作和战斗。
 
-本轮补清楚野外工作前往/超时重试/采集/等待/暂停状态，目标丢失先停止旧导航再退出任务。
+本轮定位并重放了“合法短步折返被误判为巡游卡死”的测试问题，保留原位移分支，增加实际两段短步验证、连续位移检查与冻结负对照；不改变游戏巡游数值或存档。最终 28 正例/2 负例、41 类/45 进程完整回归与三次 D3D12 行为复测符合预期，详情见 [野生生态与复现](Docs/WILD_ECOLOGY.md)。
+上轮补清楚野外工作前往/超时重试/采集/等待/暂停状态，目标丢失先停止旧导航再退出任务。
 受阻读档、开门后真实到达才结算、工作/休息中的目标销毁已按固定场景验证；最终 41 类/43 进程回归与两张图形检查通过，存档仍为 20。详细规则见 [野外工作令](Docs/FIELD_WORK.md)。
-首轮巡游专项曾偶发失败，复测通过但根因未定位，仍列为后续排查项。
+首次巡游旧失败缺少轨迹，无法事后唯一归因；本轮已明确复现相同症状的一种误报机制，不宣称任意动态封路或长期巡游已稳定。
 上轮跟随修正执行了默认不限帧十次、48 项排列/帧率矩阵、40 进程回归和四次图形检查。
 诊断入口、失败候选与验收边界见 [跟随说明](Docs/FOLLOWING.md)，不代表任意规模或复杂布局已稳定。
 
@@ -41,10 +42,11 @@
 
 ## Windows 独立原型
 
-当前最新本机版本：`D:\myGame\Builds\Windows-FieldRecovery-Final\CreatureFrontier.exe`。
+当前最新本机版本：`E:\CreatureFrontierBuilds\Windows-RoamVerification\CreatureFrontier.exe`。
 双击即可进入测试地图，不需要先打开 Unreal Editor。复制到其他机器时需复制整个
-`Builds\Windows-FieldRecovery-Final` 文件夹，不能只复制根目录的启动 EXE。
+`E:\CreatureFrontierBuilds\Windows-RoamVerification` 文件夹，不能只复制根目录的启动 EXE。
 这是 Development 灰盒原型，尚未完成正式美术、内容与性能优化。
+本轮 D 盘归档时空间不足，仅将本轮两个新构建完整迁至 E 盘并核对哈希；所有既有构建和存档仍保留。D 盘余量较低，后续打包请显式选择有空间的输出目录。
 
 战斗更新预览另外输出到 `D:\myGame\Builds\Windows-Combat\CreatureFrontier.exe`，
 以便保留正在运行的旧版。这个目录有独立存档；需要迁移旧进度时，先退出两个程序，
@@ -81,16 +83,17 @@
 `Saved/SessionPreview/` 生成暂停、帮助、常驻 HUD 三张检查图；请勿同时使用 `-nullrhi`。
 旧存档版本 1–19 可以读取，新版存档版本为 20（保留研究、物品、灯及节点预算，增加野外资源目标与恢复意图）。
 新版保存后的存档不能交给旧版程序读取；请保留旧存档备份。
-测试脚本默认选择 `Builds` 下最新编译的 Development 程序，也可明确指定：
-`.\Scripts\Test-Packaged.ps1 -BuildRoot D:\myGame\Builds\Windows-FieldRecovery-Final`。
+测试脚本默认只选择项目 `Builds` 下最新编译的 Development 程序，不会发现 E 盘构建；本轮必须明确指定：
+`.\Scripts\Test-Packaged.ps1 -BuildRoot E:\CreatureFrontierBuilds\Windows-RoamVerification`。
 每个测试限时 60 秒，超时只结束该脚本启动的测试进程。
 每次回归使用 `Saved/PackagedTests/<时间戳-随机标识>/` 下的新日志，避免读取上次运行的成功标记。
 
 重新打包和验证（在项目根目录执行）：
 
 ```powershell
-.\Scripts\Package-Windows.ps1
-.\Scripts\Test-Packaged.ps1
+.\Scripts\Package-Windows.ps1 -ArchiveDirectory E:\CreatureFrontierBuilds\Windows-Next
+.\Scripts\Test-Packaged.ps1 -BuildRoot E:\CreatureFrontierBuilds\Windows-Next
+.\Scripts\Test-WorldRoaming.ps1 -BuildRoot E:\CreatureFrontierBuilds\Windows-Next
 ```
 
 测试脚本直接运行打包后的程序，验证捕捉/工作、背包制作、伙伴成长照料、跨进程存档、导航绕障碍和近战遮挡。
