@@ -25,7 +25,7 @@ bool ACreatureCharacter::OrderAttack(ACreatureCharacter* Target)
 
 bool ACreatureCharacter::IsSpecialReady() const
 {
-    return Health > 0 && Disposition == ECreatureDisposition::Tamed && Stamina >= 20 &&
+    return Health > 0 && Nutrition > 0 && Disposition == ECreatureDisposition::Tamed && Stamina >= 20 &&
         SpecialCooldownRemaining <= 0 && SpecialWindupRemaining <= 0 &&
         Activity != ECreatureActivity::Work && Activity != ECreatureActivity::Rest;
 }

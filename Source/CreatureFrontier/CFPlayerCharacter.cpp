@@ -75,6 +75,7 @@ bool ACFPlayerCharacter::SaveProgress(const FString& Slot)
         Record.Level = It->Level;
         Record.Experience = It->Experience;
         Record.Stamina = It->Stamina;
+        Record.Nutrition = It->Nutrition;
         Record.SpecialCooldown = It->SpecialCooldownRemaining;
         Record.EncounterId = It->EncounterId;
         Record.bAlpha = It->bAlpha;
@@ -114,7 +115,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
 {
     if (!HasAuthority() || !GetController()) return false;
     auto* Save = Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot, 0));
-    if (!Save || Save->FormatVersion < 1 || Save->FormatVersion > 8 ||
+    if (!Save || Save->FormatVersion < 1 || Save->FormatVersion > 9 ||
         Save->MapName != UGameplayStatics::GetCurrentLevelName(this, true) ||
         !FMath::IsFinite(Save->Health) || Save->Health < 0 || Save->Health > 100 ||
         Save->Resources < 0 || Save->PlayerTransform.ContainsNaN() || Save->ViewRotation.ContainsNaN())
@@ -126,6 +127,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
     {
         Save->InventoryStacks = {{EFrontierItem::Material, Save->Resources}, {EFrontierItem::CaptureDevice, 5}, {EFrontierItem::Medicine, 1}};
     }
+    if (Save->FormatVersion < 9) Save->InventoryStacks.FindOrAdd(EFrontierItem::Food) = 3;
     if (!UInventoryComponent::Validate(Save->InventoryStacks))
     {
         Feedback = TEXT("Invalid inventory in save");
@@ -160,6 +162,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
             Record.Level < 1 || Record.Level > 20 || Record.Experience < 0 ||
             (Record.Level < 20 ? Record.Experience >= Record.Level * 100 : Record.Experience != 0) ||
             !FMath::IsFinite(Record.Stamina) || Record.Stamina < 0 || Record.Stamina > 100 ||
+            !FMath::IsFinite(Record.Nutrition) || Record.Nutrition < 0 || Record.Nutrition > 100 ||
             !FMath::IsFinite(Record.SpecialCooldown) || Record.SpecialCooldown < 0 || Record.SpecialCooldown > 60 ||
             !FMath::IsFinite(Record.AlphaCooldown) || Record.AlphaCooldown < 0 || Record.AlphaCooldown > 10 ||
             Record.HabitatHome.ContainsNaN() || !FMath::IsFinite(Record.RoamRadius) || Record.RoamRadius < 0 || Record.RoamRadius > 600 ||
@@ -188,6 +191,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
         Pet->Health = FMath::Min(Pet->GetMaxHealth(), Record.Health);
         Pet->Experience = Record.Experience;
         Pet->Stamina = Record.Stamina;
+        Pet->Nutrition = Record.Nutrition;
         Pet->SpecialCooldownRemaining = Record.SpecialCooldown;
         Pet->AlphaCooldown = Record.AlphaCooldown;
         Pet->bHasHabitat = Record.bHasHabitat && !Record.bOwned;
@@ -404,6 +408,8 @@ void ACFPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
     PlayerInputComponent->BindKey(EKeys::F9, IE_Pressed, this, &ACFPlayerCharacter::QuickLoad);
     PlayerInputComponent->BindKey(EKeys::One, IE_Pressed, this, &ACFPlayerCharacter::CraftCaptureDevice);
     PlayerInputComponent->BindKey(EKeys::Two, IE_Pressed, this, &ACFPlayerCharacter::CraftMedicine);
+    PlayerInputComponent->BindKey(EKeys::Three, IE_Pressed, this, &ACFPlayerCharacter::CraftFood);
+    PlayerInputComponent->BindKey(EKeys::J, IE_Pressed, this, &ACFPlayerCharacter::FeedAimedCompanion);
     PlayerInputComponent->BindKey(EKeys::H, IE_Pressed, this, &ACFPlayerCharacter::UseMedicine);
     PlayerInputComponent->BindKey(EKeys::B, IE_Pressed, this, &ACFPlayerCharacter::ToggleBuilding);
     PlayerInputComponent->BindKey(EKeys::V, IE_Pressed, this, &ACFPlayerCharacter::CycleBuilding);

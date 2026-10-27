@@ -29,6 +29,9 @@ public:
     void DismantleBuilding();
     void CraftCaptureDevice();
     void CraftMedicine();
+    void CraftFood();
+    void FeedAimedCompanion();
+    bool FeedCompanion(ACreatureCharacter* Pet);
     void UseMedicine();
     bool IsNearWorkStation() const;
     FString Feedback;
@@ -73,4 +76,5 @@ private:
     void MoveForward(float Value);
     void MoveRight(float Value);
     double NextAttackTime = 0.0;
+    double NextFeedTime = 0;
 };

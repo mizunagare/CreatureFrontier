@@ -43,7 +43,7 @@ for spec in specs:
     values = dict(display_name=spec['name'], description=spec['description'], form=spec['form'],
                   base_max_health=spec['health'], base_attack=spec['attack'], base_capture_rate=spec['rate'],
                   move_speed=spec['speed'], attack_seconds=spec['seconds'], work_speed=spec['work'],
-                  work_specialties=[spec['job']], palette_material=palette,
+                  work_specialties=[spec['job']] + ([unreal.WorkSpecialty.FARMING] if spec['asset'] == 'DA_Mosskip' else []), palette_material=palette,
                   body_color=unreal.LinearColor(*spec['color'], 1), accent_color=unreal.LinearColor(*spec['accent'], 1))
     for key, value in values.items():
         asset.set_editor_property(key, value)

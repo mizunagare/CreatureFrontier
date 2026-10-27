@@ -14,7 +14,7 @@ UBaseBuildingComponent::UBaseBuildingComponent() { PrimaryComponentTick.bCanEver
 
 int32 UBaseBuildingComponent::GetCost(EWorkSpecialty Specialty)
 {
-    return Specialty == EWorkSpecialty::Gathering ? 10 : Specialty == EWorkSpecialty::Mining ? 12 : Specialty == EWorkSpecialty::Crafting ? 15 : 0;
+    return Specialty == EWorkSpecialty::Gathering ? 10 : Specialty == EWorkSpecialty::Mining ? 12 : Specialty == EWorkSpecialty::Crafting ? 15 : Specialty == EWorkSpecialty::Farming ? 18 : 0;
 }
 
 bool UBaseBuildingComponent::IsBuildTransformValid(const FTransform& Transform)
@@ -62,7 +62,8 @@ void UBaseBuildingComponent::EndPlay(const EEndPlayReason::Type Reason) { Cancel
 void UBaseBuildingComponent::Cycle()
 {
     if (!bActive) return;
-    Selected = Selected == EWorkSpecialty::Gathering ? EWorkSpecialty::Mining : Selected == EWorkSpecialty::Mining ? EWorkSpecialty::Crafting : EWorkSpecialty::Gathering;
+    Selected = Selected == EWorkSpecialty::Gathering ? EWorkSpecialty::Mining : Selected == EWorkSpecialty::Mining ? EWorkSpecialty::Crafting :
+        Selected == EWorkSpecialty::Crafting ? EWorkSpecialty::Farming : EWorkSpecialty::Gathering;
     UpdatePlacement();
 }
 

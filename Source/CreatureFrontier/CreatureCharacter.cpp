@@ -205,6 +205,12 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
     {
         ACFPlayerCharacter* OwnerPlayer = Tamer ? Cast<ACFPlayerCharacter>(Tamer->GetPawn()) : nullptr;
         if (!OwnerPlayer || OwnerPlayer->Health <= 0.0f) { ClearCombatOrders(); StopNavigation(); return; }
+        Nutrition = FMath::Max(0.0f,Nutrition - DeltaSeconds*(Activity == ECreatureActivity::Work ? .35f : Activity == ECreatureActivity::Rest ? .04f : .08f));
+        if (Nutrition <= 0 && Activity == ECreatureActivity::Work)
+        {
+            SetActivity(ECreatureActivity::Rest); WorkProgress = 0;
+            OwnerPlayer->Feedback = TEXT("A companion is hungry. J: feed aimed companion | 3: craft food at base");
+        }
         if (Activity == ECreatureActivity::Rest)
         {
             if (IsValid(WorkSite) && GetDistanceTo(WorkSite) > 220.0f)
@@ -219,6 +225,7 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
         }
         if (Activity == ECreatureActivity::Work && IsValid(WorkSite))
         {
+            if (ProgressSite.Get() != WorkSite.Get()) { WorkProgress = 0; ProgressSite = WorkSite; }
             const FVector Offset = WorkSite->GetActorLocation() - GetActorLocation();
             if (Offset.Size2D() > 220.0f) { NavigateTo(WorkSite->GetActorLocation(), 35.0f); WorkProgress = 0.0f; }
             else
@@ -232,11 +239,14 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
                     OwnerPlayer->Feedback = TEXT("A companion is exhausted and resting at base");
                     return;
                 }
-                WorkProgress += DeltaSeconds * GetWorkEfficiency(WorkSite);
-                if (WorkProgress >= 3.0f)
+                WorkProgress += DeltaSeconds * GetWorkEfficiency(WorkSite) * (Nutrition < 20 ? .5f : 1.0f);
+                const bool Farm = WorkSite->RequiredSpecialty == EWorkSpecialty::Farming;
+                const float Interval = Farm ? 6.0f : 3.0f;
+                if (WorkProgress >= Interval)
                 {
-                    if (OwnerPlayer->Inventory->AddItem(EFrontierItem::Material, 1)) AddExperience(1);
-                    WorkProgress = 0.0f;
+                    if (OwnerPlayer->Inventory->AddItem(Farm ? EFrontierItem::Food : EFrontierItem::Material, 1))
+                    { AddExperience(1); WorkProgress = 0; }
+                    else WorkProgress = Interval; // Ready harvest stays pending while inventory is full.
                 }
             }
             return;
@@ -387,6 +397,7 @@ void ACreatureCharacter::SetActivity(ECreatureActivity NewActivity)
 {
     if (HasAuthority() && (NewActivity == ECreatureActivity::Work || NewActivity == ECreatureActivity::Rest)) ClearCombatOrders();
     if (!HasAuthority() || Activity == NewActivity) return;
+    if (NewActivity != ECreatureActivity::Work) WorkProgress = 0;
     Activity = NewActivity;
     OnRep_Activity();
 }
@@ -418,6 +429,7 @@ void ACreatureCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
     DOREPLIFETIME(ACreatureCharacter, Level);
     DOREPLIFETIME(ACreatureCharacter, Experience);
     DOREPLIFETIME(ACreatureCharacter, Stamina);
+    DOREPLIFETIME(ACreatureCharacter, Nutrition);
     DOREPLIFETIME(ACreatureCharacter, SpecialCooldownRemaining);
     DOREPLIFETIME(ACreatureCharacter, SpecialWindupRemaining);
     DOREPLIFETIME(ACreatureCharacter, SlowRemaining);

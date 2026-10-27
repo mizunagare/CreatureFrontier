@@ -49,6 +49,7 @@ public:
     int32 Experience = 0;
     UPROPERTY(Replicated, BlueprintReadOnly, Category="Care")
     float Stamina = 100.0f;
+    UPROPERTY(Replicated, BlueprintReadOnly, Category="Care") float Nutrition = 100;
     UPROPERTY(Replicated, BlueprintReadOnly, Category="Combat")
     float SpecialCooldownRemaining = 0.0f;
     UPROPERTY(Replicated, BlueprintReadOnly, Category="Combat")
@@ -145,4 +146,5 @@ private:
     double NextNavigationUpdate = 0.0;
     float AttackCooldown = 0.0f;
     float WorkProgress = 0.0f;
+    TWeakObjectPtr<AWorkStation> ProgressSite;
 };

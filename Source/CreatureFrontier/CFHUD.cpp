@@ -16,7 +16,7 @@ void ACFHUD::DrawHUD()
     const float X = Canvas->ClipX * 0.5f, Y = Canvas->ClipY * 0.5f;
     DrawLine(X-7, Y, X+7, Y, FLinearColor::White);
     DrawLine(X, Y-7, X, Y+7, FLinearColor::White);
-    DrawRect(FLinearColor(0.02f,0.03f,0.05f,0.85f), 18, 18, 550, 320);
+    DrawRect(FLinearColor(0.02f,0.03f,0.05f,0.85f), 18, 18, 550, 350);
     DrawText(FString::Printf(TEXT("HEALTH %.0f / 100    MATERIALS %d"), Player->Health, Player->Inventory->Count(EFrontierItem::Material)), FLinearColor::White, 32, 30);
     int32 Companions = 0, Working = 0;
     for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It)
@@ -29,8 +29,9 @@ void ACFHUD::DrawHUD()
     DrawText(TEXT("T rest at base | P treat aimed companion | Esc exit"), FLinearColor::White, 32, 190);
     DrawText(TEXT("Q focus aimed enemy | G companion special (20 stamina)"), FLinearColor::White, 32, 216);
     DrawText(TEXT("B build mode | V cycle facility | X dismantle (50% refund)"), FLinearColor::White,32,242);
-    DrawText(Player->Feedback, FLinearColor::Yellow, 32, 278);
-    if (Player->Building->IsActive()) DrawText(Player->Building->GetHint(), FLinearColor::Yellow,32,350);
+    DrawText(FString::Printf(TEXT("FOOD %d | 3 craft food (2 materials) | J feed aimed companion"),Player->Inventory->Count(EFrontierItem::Food)),FLinearColor::White,32,268);
+    DrawText(Player->Feedback, FLinearColor::Yellow, 32, 308);
+    if (Player->Building->IsActive()) DrawText(Player->Building->GetHint(), FLinearColor::Yellow,32,380);
     float RegionY = Canvas->ClipY - 90;
     for (TActorIterator<AWildEncounter> It(GetWorld()); It; ++It)
         if (Player->GetDistanceTo(*It) < 1800)
@@ -51,8 +52,8 @@ void ACFHUD::DrawHUD()
             FLinearColor::White, X-130, Y+25);
         if (Creature->Disposition == ECreatureDisposition::Tamed)
         {
-            DrawText(FString::Printf(TEXT("XP %d/%d  Stamina %.0f%%  %s"), Creature->Experience, Creature->Level*100,
-                Creature->Stamina, *UEnum::GetValueAsString(Creature->Activity)), FLinearColor::Green, X-130, Y+48);
+            DrawText(FString::Printf(TEXT("XP %d/%d  Stamina %.0f%%  Satiety %.0f%%  %s"), Creature->Experience, Creature->Level*100,
+                Creature->Stamina,Creature->Nutrition, *UEnum::GetValueAsString(Creature->Activity)), FLinearColor::Green, X-130, Y+48);
             DrawText(FString::Printf(TEXT("%s | cooldown %.1fs %s"), *Creature->GetSpecialName(), Creature->SpecialCooldownRemaining,
                 Creature->SpecialWindupRemaining > 0 ? TEXT("CHARGING") : TEXT("")), FLinearColor::Yellow, X-130, Y+70);
         }

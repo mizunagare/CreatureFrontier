@@ -19,4 +19,5 @@ public:
 private:
     void RefreshLabel();
     UPROPERTY() TObjectPtr<class UTextRenderComponent> Label;
+    UPROPERTY() TArray<TObjectPtr<class UStaticMeshComponent>> FarmPlants;
 };

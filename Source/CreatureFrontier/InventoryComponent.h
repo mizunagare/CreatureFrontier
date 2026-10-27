@@ -4,7 +4,7 @@
 #include "InventoryComponent.generated.h"
 
 UENUM(BlueprintType)
-enum class EFrontierItem : uint8 { Material, CaptureDevice, Medicine };
+enum class EFrontierItem : uint8 { Material, CaptureDevice, Medicine, Food };
 
 UCLASS(ClassGroup=(Frontier), meta=(BlueprintSpawnableComponent))
 class CREATUREFRONTIER_API UInventoryComponent : public UActorComponent

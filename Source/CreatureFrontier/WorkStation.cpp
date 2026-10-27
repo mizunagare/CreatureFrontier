@@ -19,6 +19,17 @@ AWorkStation::AWorkStation()
     Label->SetWorldSize(24);
     Label->SetHorizontalAlignment(EHTA_Center);
     Label->SetTextRenderColor(FColor(235,240,220));
+    static ConstructorHelpers::FObjectFinder<UStaticMesh> Cone(TEXT("/Engine/BasicShapes/Cone.Cone"));
+    for (int32 Index=0; Index<6; ++Index)
+    {
+        auto* Plant = CreateDefaultSubobject<UStaticMeshComponent>(*FString::Printf(TEXT("FarmPlant%d"),Index));
+        Plant->SetupAttachment(Mesh); Plant->SetStaticMesh(Cone.Object);
+        Plant->SetRelativeLocation(FVector((Index%3-1)*30,Index<3 ? -25 : 25,65));
+        Plant->SetRelativeScale3D(FVector(.2,.3,.3));
+        Plant->SetCollisionEnabled(ECollisionEnabled::NoCollision); Plant->SetCanEverAffectNavigation(false);
+        Plant->SetVisibility(false); Plant->SetHiddenInGame(true);
+        FarmPlants.Add(Plant);
+    }
 }
 
 void AWorkStation::OnConstruction(const FTransform& Transform)
@@ -42,6 +53,17 @@ void AWorkStation::BeginPlay()
 
 void AWorkStation::RefreshLabel()
 {
+    const bool Farm = RequiredSpecialty == EWorkSpecialty::Farming;
+    for (const auto& Plant : FarmPlants)
+    {
+        Plant->SetVisibility(Farm); Plant->SetHiddenInGame(!Farm);
+        if (Farm)
+            if (auto* Palette = LoadObject<UMaterialInterface>(nullptr,TEXT("/Game/Materials/M_CreaturePalette.M_CreaturePalette")))
+            {
+                auto* Material = UMaterialInstanceDynamic::Create(Palette,this);
+                Material->SetVectorParameterValue(TEXT("Tint"),FLinearColor(.12f,.6f,.08f)); Plant->SetMaterial(0,Material);
+            }
+    }
     const FString Name = UEnum::GetValueAsString(RequiredSpecialty).Replace(TEXT("EWorkSpecialty::"), TEXT(""));
-    Label->SetText(FText::FromString(Name + (bPlayerBuilt ? TEXT("\nBUILT FACILITY") : TEXT("\nWORK STATION"))));
+    Label->SetText(FText::FromString(Name + (Farm ? TEXT("\nFOOD GARDEN") : bPlayerBuilt ? TEXT("\nBUILT FACILITY") : TEXT("\nWORK STATION"))));
 }
