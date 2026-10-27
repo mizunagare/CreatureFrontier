@@ -16,38 +16,35 @@ void ACFHUD::DrawHUD()
     Super::DrawHUD();
     auto* Player = Cast<ACFPlayerCharacter>(GetOwningPawn());
     if (!Canvas || !Player) return;
+    if(Player->IsPauseMenuOpen()) { DrawPauseMenu(Player); return; }
     const float X = Canvas->ClipX * 0.5f, Y = Canvas->ClipY * 0.5f;
     DrawLine(X-7, Y, X+7, Y, FLinearColor::White);
     DrawLine(X, Y-7, X, Y+7, FLinearColor::White);
-    DrawRect(FLinearColor(0.02f,0.03f,0.05f,0.85f), 18, 18, 550, 410);
+    DrawRect(FLinearColor(0.02f,0.03f,0.05f,0.85f), 18, 18, 500, 158);
     DrawText(FString::Printf(TEXT("HEALTH %.0f / 100    MATERIALS %d"), Player->Health, Player->Inventory->Count(EFrontierItem::Material)), FLinearColor::White, 32, 30);
     int32 Companions = 0, Working = 0;
     for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It)
         if (It->Tamer == Player->GetController()) { ++Companions; if (It->Activity == ECreatureActivity::Work) ++Working; }
-    DrawText(FString::Printf(TEXT("COMPANIONS %d    WORKING %d"), Companions, Working), FLinearColor::Green, 32, 57);
-    DrawText(TEXT("WASD move | Space jump | LMB melee | RMB capture"), FLinearColor::White, 32, 84);
-    DrawText(TEXT("F follow | E work | R downed respawn | F5 save | F9 load"), FLinearColor::White, 32, 108);
-    DrawText(FString::Printf(TEXT("DEVICES %d    MEDICINE %d"), Player->Inventory->Count(EFrontierItem::CaptureDevice), Player->Inventory->Count(EFrontierItem::Medicine)), FLinearColor::White, 32, 136);
-    DrawText(TEXT("1 craft device (3) | 2 craft medicine (5) | H heal"), FLinearColor::White, 32, 162);
-    DrawText(TEXT("T rest at base | P treat aimed companion | Esc exit"), FLinearColor::White, 32, 190);
-    DrawText(TEXT("Q focus aimed enemy | G companion special (20 stamina)"), FLinearColor::White, 32, 216);
-    DrawText(TEXT("B build mode | V cycle facility | X dismantle (50% refund)"), FLinearColor::White,32,242);
-    DrawText(FString::Printf(TEXT("FOOD %d | 3 craft food (2 materials) | J feed aimed companion"),Player->Inventory->Count(EFrontierItem::Food)),FLinearColor::White,32,268);
-    DrawText(TEXT("Garden/trough: U store | O take | Z recover pet cargo"),FLinearColor::White,32,294);
-    DrawText(Player->GetCommandScopeText(),FLinearColor::Green,32,320);
-    DrawText(TEXT("Tab team | [ / ] browse | Enter select | I journal"),FLinearColor::White,32,342);
-    DrawText(Player->Feedback, FLinearColor::Yellow, 32, 368);
-    DrawRect(FLinearColor(.02f,.04f,.06f,.88f),18,462,550,104);
-    DrawText(Player->GetObjectiveStatus(),FLinearColor::Green,32,474);
-    DrawText(Player->GetObjectiveHint(),FLinearColor::White,32,503);
-    DrawText(Player->GetObjectiveRewardText(),FLinearColor::Yellow,32,532);
+    DrawText(FString::Printf(TEXT("DEVICES %d | MEDICINE %d | FOOD %d"),Player->Inventory->Count(EFrontierItem::CaptureDevice),Player->Inventory->Count(EFrontierItem::Medicine),Player->Inventory->Count(EFrontierItem::Food)),FLinearColor::White,32,54);
+    DrawText(FString::Printf(TEXT("COMPANIONS %d | WORKING %d"),Companions,Working),FLinearColor::Green,32,78);
+    DrawText(Player->GetCommandScopeText(),FLinearColor::Green,32,102);
+    DrawText(FString::Printf(TEXT("%s | attack %.0f | reach %.1fm | vest %.0f%%"),Player->Equipment->GetState().bSpearEquipped?TEXT("SPEAR"):TEXT("UNARMED"),Player->GetPlayerAttackDamage(),Player->GetPlayerMeleeRange()/100,Player->Equipment->GetDamageReduction()*100),FLinearColor::White,32,126);
+    DrawText(TEXT("F1 controls | Esc pause | Tab team | I journal"),FLinearColor::White,32,150);
+    DrawRect(FLinearColor(.02f,.04f,.06f,.88f),18,184,600,52);
+    DrawWrappedText(Player->Feedback,FLinearColor::Yellow,32,194,570,2);
+    const float JourneyY=Canvas->ClipY-200;
+    DrawRect(FLinearColor(.02f,.04f,.06f,.88f),18,JourneyY,550,112);
+    DrawText(Player->GetObjectiveStatus(),FLinearColor::Green,32,JourneyY+12);
+    DrawText(Player->GetObjectiveHint(),FLinearColor::White,32,JourneyY+40);
+    DrawText(Player->GetObjectiveRewardText(),FLinearColor::Yellow,32,JourneyY+68);
     if(Player->IsMeleePending()) DrawText(TEXT("SPEAR WINDUP - keep aim and stay in reach"),FLinearColor::Yellow,X-150,Y-70);
-    DrawRect(FLinearColor(.02f,.04f,.06f,.88f),18,572,550,54);
-    DrawText(FString::Printf(TEXT("GEAR: %s | attack %.0f | reach %.1fm | vest %.0f%%"),Player->Equipment->GetState().bSpearEquipped?TEXT("SPEAR"):TEXT("UNARMED"),Player->GetPlayerAttackDamage(),Player->GetPlayerMeleeRange()/100,Player->Equipment->GetDamageReduction()*100),FLinearColor::White,32,578);
-    DrawText(FString::Printf(TEXT("4 craft spear (%d) | 5 craft vest (%d) | 6/7 equip toggle"),Player->Equipment->SpearCost,Player->Equipment->VestCost),FLinearColor::White,32,602);
     if(Player->Health<=0) DrawText(TEXT("DOWNED | R: base respawn | F9: load save"),FLinearColor::Red,X-150,Y-100);
     else if(Player->GetRespawnProtectionRemaining()>0) DrawText(FString::Printf(TEXT("RESPAWN SHIELD %.1fs | attacks end it"),Player->GetRespawnProtectionRemaining()),FLinearColor::Green,X-150,Y-100);
-    if (Player->Building->IsActive()) DrawText(Player->Building->GetHint(), FLinearColor::Yellow,32,440);
+    if (Player->Building->IsActive())
+    {
+        DrawRect(FLinearColor(.02f,.04f,.06f,.9f),18,JourneyY-68,550,56);
+        DrawWrappedText(Player->Building->GetHint(),FLinearColor::Yellow,32,JourneyY-56,520,2);
+    }
     if (auto* Site = Player->TraceFacility(); Site && Site->IsFoodStore())
         DrawText(FString::Printf(TEXT("FOOD STORE %d / 30 | U deposit | O withdraw"),Site->StoredFood),FLinearColor::Yellow,X-130,Y+25);
     float RegionY = Canvas->ClipY - 90;
@@ -83,6 +80,7 @@ void ACFHUD::DrawHUD()
         if (Creature->SlowRemaining > 0 || Creature->GuardRemaining > 0)
             DrawText(FString::Printf(TEXT("SLOW %.1fs  GUARD %.1fs"), Creature->SlowRemaining, Creature->GuardRemaining), FLinearColor::Yellow, X-130, Y+92);
     }
+    if(Player->IsHelpVisible()) DrawControlHelp(Player);
     if (Player->IsJournalOpen())
     {
         const auto& Entries=Player->GetJournal();

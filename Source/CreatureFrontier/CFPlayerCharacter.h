@@ -97,6 +97,15 @@ public:
     bool LoadProgress(const FString& Slot = TEXT("FrontierSlot"));
     void QuickSave();
     void QuickLoad();
+    void TogglePauseMenu();
+    void PauseMenuNext();
+    void PauseMenuPrevious();
+    void ConfirmInterfaceAction();
+    void ToggleHelp();
+    bool IsPauseMenuOpen() const { return bPauseMenu; }
+    bool IsPauseConfirmationPending() const { return bPauseConfirmation; }
+    int32 GetPauseSelection() const { return PauseSelection; }
+    bool IsHelpVisible() const { return bHelpVisible; }
     UFUNCTION()
     void CaptureResolved(ACreatureCharacter* Creature, bool bSucceeded);
 
@@ -125,6 +134,12 @@ protected:
     virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 
 private:
+    FString GetQuickSaveSlot() const;
+    bool ClosePauseMenu();
+    bool bPauseMenu=false;
+    bool bPauseConfirmation=false;
+    bool bHelpVisible=false;
+    int32 PauseSelection=0;
     void ResolveMeleeStrike();
     FTimerHandle MeleeTimer;
     bool bMeleePending=false;

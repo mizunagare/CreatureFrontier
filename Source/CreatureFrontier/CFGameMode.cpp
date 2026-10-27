@@ -16,6 +16,7 @@
 #include "EquipmentScenario.h"
 #include "MeleeScenario.h"
 #include "LogisticsScenario.h"
+#include "SessionScenario.h"
 #include "CaptureComponent.h"
 #include "CreatureCharacter.h"
 #include "CreatureDefinition.h"
@@ -65,6 +66,13 @@ void ACFGameMode::BeginPlay()
     const bool bRespawnTest = FParse::Param(FCommandLine::Get(), TEXT("CFRespawnTest"));
     const bool bEquipmentTest = FParse::Param(FCommandLine::Get(), TEXT("CFEquipmentTest"));
     const bool bMeleeTest = FParse::Param(FCommandLine::Get(), TEXT("CFMeleeTest"));
+    const bool bSessionTest = FParse::Param(FCommandLine::Get(), TEXT("CFSessionTest"));
+    if(bSessionTest)
+    {
+        FTimerHandle SessionStart;
+        GetWorldTimerManager().SetTimer(SessionStart,[this]() { if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0))) RunSessionScenario(GetWorld(),Hero); },1.f,false);
+        return;
+    }
     const bool bLogisticsTest = FParse::Param(FCommandLine::Get(), TEXT("CFLogisticsTest"));
     if (!bSaveWrite && !bSaveRead && !bInventoryTest && !bNavTest && !bCareTest && !bSpeciesTest && !bCombatTest && !bEncounterTest && !bBossTest && !bBuildingTest && !bWorldTest && !bWorldPreview && !bFarmingTest && !bFarmPreview && !bFeedingTest && !bWorkCycleTest && !bSquadTest && !bJournalTest && !bObjectiveTest && !bRespawnTest && !bEquipmentTest && !bMeleeTest && !bLogisticsTest && !FParse::Param(FCommandLine::Get(), TEXT("CFSmokeTest"))) return;
     FTimerHandle TestStart;

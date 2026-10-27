@@ -16,7 +16,7 @@ TArray<ACreatureCharacter*> ACFPlayerCharacter::GetCompanionRoster() const
 void ACFPlayerCharacter::ToggleRoster()
 {
     bRosterOpen = !bRosterOpen;
-    if (bRosterOpen) bJournalOpen = false;
+    if (bRosterOpen) { bJournalOpen = false; bHelpVisible=false; }
     if (bRosterOpen && !GetCompanionRoster().Contains(RosterHighlight.Get())) StepRoster(1);
 }
 

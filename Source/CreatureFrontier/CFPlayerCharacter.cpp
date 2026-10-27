@@ -23,8 +23,6 @@ void ACFPlayerCharacter::ToggleSpear() { Equipment->ToggleSpear(); }
 void ACFPlayerCharacter::ToggleVest() { Equipment->ToggleVest(); }
 float ACFPlayerCharacter::GetPlayerAttackDamage() const { return AttackDamage+Equipment->GetAttackBonus(); }
 
-void ACFPlayerCharacter::QuickSave() { SaveProgress(); }
-void ACFPlayerCharacter::QuickLoad() { LoadProgress(); }
 void ACFPlayerCharacter::ToggleBuilding() { Building->Toggle(); }
 void ACFPlayerCharacter::CycleBuilding() { Building->Cycle(); }
 void ACFPlayerCharacter::DismantleBuilding() { Building->Dismantle(); }
@@ -480,9 +478,12 @@ void ACFPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
     PlayerInputComponent->BindKey(EKeys::Q, IE_Pressed, this, &ACFPlayerCharacter::CommandFocus);
     PlayerInputComponent->BindKey(EKeys::G, IE_Pressed, this, &ACFPlayerCharacter::CommandSpecial);
     PlayerInputComponent->BindKey(EKeys::R, IE_Pressed, this, &ACFPlayerCharacter::RequestRespawn);
-    PlayerInputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &ACFPlayerCharacter::QuitGame);
-    PlayerInputComponent->BindKey(EKeys::F5, IE_Pressed, this, &ACFPlayerCharacter::QuickSave);
-    PlayerInputComponent->BindKey(EKeys::F9, IE_Pressed, this, &ACFPlayerCharacter::QuickLoad);
+    PlayerInputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &ACFPlayerCharacter::TogglePauseMenu).bExecuteWhenPaused=true;
+    PlayerInputComponent->BindKey(EKeys::F5, IE_Pressed, this, &ACFPlayerCharacter::QuickSave).bExecuteWhenPaused=true;
+    PlayerInputComponent->BindKey(EKeys::F9, IE_Pressed, this, &ACFPlayerCharacter::QuickLoad).bExecuteWhenPaused=true;
+    PlayerInputComponent->BindKey(EKeys::Up, IE_Pressed, this, &ACFPlayerCharacter::PauseMenuPrevious).bExecuteWhenPaused=true;
+    PlayerInputComponent->BindKey(EKeys::Down, IE_Pressed, this, &ACFPlayerCharacter::PauseMenuNext).bExecuteWhenPaused=true;
+    PlayerInputComponent->BindKey(EKeys::F1, IE_Pressed, this, &ACFPlayerCharacter::ToggleHelp);
     PlayerInputComponent->BindKey(EKeys::One, IE_Pressed, this, &ACFPlayerCharacter::CraftCaptureDevice);
     PlayerInputComponent->BindKey(EKeys::Two, IE_Pressed, this, &ACFPlayerCharacter::CraftMedicine);
     PlayerInputComponent->BindKey(EKeys::Three, IE_Pressed, this, &ACFPlayerCharacter::CraftFood);
@@ -498,7 +499,7 @@ void ACFPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
     PlayerInputComponent->BindKey(EKeys::Tab, IE_Pressed, this, &ACFPlayerCharacter::ToggleRoster);
     PlayerInputComponent->BindKey(EKeys::RightBracket, IE_Pressed, this, &ACFPlayerCharacter::NextRosterCompanion);
     PlayerInputComponent->BindKey(EKeys::LeftBracket, IE_Pressed, this, &ACFPlayerCharacter::PreviousRosterCompanion);
-    PlayerInputComponent->BindKey(EKeys::Enter, IE_Pressed, this, &ACFPlayerCharacter::SelectRosterCompanion);
+    PlayerInputComponent->BindKey(EKeys::Enter, IE_Pressed, this, &ACFPlayerCharacter::ConfirmInterfaceAction).bExecuteWhenPaused=true;
     PlayerInputComponent->BindKey(EKeys::I, IE_Pressed, this, &ACFPlayerCharacter::ToggleJournal);
     PlayerInputComponent->BindKey(EKeys::PageDown, IE_Pressed, this, &ACFPlayerCharacter::NextJournalPage);
     PlayerInputComponent->BindKey(EKeys::PageUp, IE_Pressed, this, &ACFPlayerCharacter::PreviousJournalPage);

@@ -4,9 +4,9 @@
 
 ## Windows 独立原型
 
-当前最新本机版本：`D:\myGame\Builds\Windows-Logistics\CreatureFrontier.exe`。
+当前最新本机版本：`D:\myGame\Builds\Windows-Session\CreatureFrontier.exe`。
 双击即可进入测试地图，不需要先打开 Unreal Editor。复制到其他机器时需复制整个
-`Builds\Windows-Logistics` 文件夹，不能只复制根目录的启动 EXE。
+`Builds\Windows-Session` 文件夹，不能只复制根目录的启动 EXE。
 这是 Development 灰盒原型，尚未完成正式美术、内容与性能优化。
 
 战斗更新预览另外输出到 `D:\myGame\Builds\Windows-Combat\CreatureFrontier.exe`，
@@ -27,6 +27,10 @@
 基础装备更新输出到 `D:\myGame\Builds\Windows-Equipment\CreatureFrontier.exe`。
 玩家近战更新输出到 `D:\myGame\Builds\Windows-Melee\CreatureFrontier.exe`。
 食物运输更新输出到 `D:\myGame\Builds\Windows-Logistics\CreatureFrontier.exe`。
+暂停菜单与精简 HUD 更新输出到 `D:\myGame\Builds\Windows-Session\CreatureFrontier.exe`。
+菜单为键盘操作；帮助、队伍和图鉴面板不会暂停，只有 Esc 菜单暂停世界。
+使用 `-CFSessionTest -CFSessionPreview -RenderOffscreen` 可运行菜单测试并在当前程序的
+`Saved/SessionPreview/` 生成暂停、帮助、常驻 HUD 三张检查图；请勿同时使用 `-nullrhi`。
 旧存档版本 1–14 可以读取，新版存档版本为 15（包含农圃库存、伙伴携带食物及已有进度）。
 新版保存后的存档不能交给旧版程序读取；请保留旧存档备份。
 测试脚本默认选择 `Builds` 下最新编译的 Development 程序，也可明确指定：
@@ -73,8 +77,9 @@ Windows 开发环境已部署并验证：Unreal Engine 5.8、Visual Studio C++ �
 - `F`：召回当前指令范围内的伙伴跟随，并自动攻击玩家周边的野生宠物
 - `E`：靠近出生点后方的工作台（8 米内），分配伙伴采集；到达后每 3 秒产出 1 资源
 - `R`：倒地后在原基地附近安全位置重生，保留当前世界；存活时不执行
-- `Esc`：退出游戏（退出前需自行按 F5 保存）
-- `F5`：保存当前进度；`F9`：读取进度（包括重新打开游戏之后）
+- `Esc`：暂停世界并打开菜单；上下选择、Enter 执行。可继续、保存、确认读档、倒地重生、确认退出；退出不自动保存。
+- `F1`：开关操作帮助（帮助不暂停世界）；默认 HUD 只显示关键状态与当前目标。
+- `F5`：保存当前进度（暂停时也可用）；`F9`：先打开读档确认，再按 F9 或 Enter 恢复快照。Esc 取消确认但保持暂停，再按 Esc 继续游戏。读档成功后仍保持暂停。
 - `1`：工作台 8 米内消耗 3 材料制作 1 个捕捉装置
 - `2`：工作台 8 米内消耗 5 材料制作 1 份治疗药
 - `H`：使用 1 份治疗药恢复最多 40 生命（满血或倒地不消耗）
@@ -306,7 +311,7 @@ HUD 显示玩家生命、资源、伙伴数量、工作数量和准星目标的�
 `-CFLogisticsTest` 验证真实寻路取货/卸货/进食、满食槽不取货、部分卸货、途中反复读档守恒、
 改派保留、背包容量与倒地回收、携带食物应急进食、自动休息复工、非法库存/携带量拒绝和旧档迁移，
 使用 `FrontierLogisticsAutomation` 等独立测试槽。
-当前打包回归共 22 项，包含伙伴分工、图鉴、新手目标、基地重生、装备、近战与食物物流测试。
+当前打包回归共 23 项，包含伙伴分工、图鉴、新手目标、基地重生、装备、近战、食物物流与暂停菜单测试。
 同时添加 `-CFRosterPreview -RenderOffscreen -windowed -ResX=1280 -ResY=720 -norhithread -forcerhibypass "-ExecCmds=t.MaxFPS 60"`（不要使用 `-nullrhi`），
 可生成 11 只伙伴的两页界面截图 `Saved/RosterPreview/team.png` 和 `team_page2.png` 后退出，不写入玩家存档。
 已知显示问题：当前机器 D3D12 离屏截图存在间歇性缺字，上述兼容参数可改善但尚未完全消除。
