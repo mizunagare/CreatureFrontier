@@ -63,6 +63,9 @@ public:
     ACreatureCharacter* TraceCreature() const;
     class AResourceNode* TraceResource() const;
     void GatherAimedResource();
+    void InteractGarden();
+    void DepositGardenSeed();
+    void WithdrawGardenSeed();
     bool SelectCompanion(ACreatureCharacter* Pet);
     void SelectAimedCompanion();
     void ClearCompanionSelection();

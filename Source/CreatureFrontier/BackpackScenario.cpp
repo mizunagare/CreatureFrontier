@@ -35,7 +35,7 @@ void RunBackpackScenario(UWorld* World,ACFPlayerCharacter* Hero)
         Craft &= Hero->GetBackpackRecipe()==Index && Hero->GetBackpackRecipeStatus(Index).StartsWith(TEXT("LOCKED"));
         Hero->ConfirmInterfaceAction(); Hero->PauseMenuNext();
     }
-    for(int32 Index=7;Index<10;++Index)
+    for(int32 Index=7;Index<11;++Index)
     {
         Craft &= Hero->GetBackpackRecipe()==Index && !Hero->GetBackpackRecipeStatus(Index).StartsWith(TEXT("READY"));
         Hero->ConfirmInterfaceAction(); Hero->PauseMenuNext();

@@ -23,6 +23,8 @@ AWildEncounter::AWildEncounter()
 void AWildEncounter::BeginPlay()
 {
     Super::BeginPlay();
+    for(const TCHAR* Flag:{TEXT("CFCropTest"),TEXT("CFCropWrite"),TEXT("CFCropRead"),TEXT("CFCropLegacyRead")})
+        if(FParse::Param(FCommandLine::Get(),Flag)) SetActorTickEnabled(false);
     for(const TCHAR* Flag:{TEXT("CFMaterialsTest"),TEXT("CFMaterialsWrite"),TEXT("CFMaterialsRead"),TEXT("CFCargoOreTest")})
         if(FParse::Param(FCommandLine::Get(),Flag)) SetActorTickEnabled(false);
     for(const TCHAR* Flag:{TEXT("CFFieldRecoveryTest"),TEXT("CFFieldRecoveryWrite"),TEXT("CFFieldRecoveryRead"),TEXT("CFStorageTest"),TEXT("CFStorageWrite"),TEXT("CFStorageRead"),TEXT("CFCargoTest"),TEXT("CFCargoWrite"),TEXT("CFCargoRead"),TEXT("CFCargoCrystalTest")})

@@ -6,6 +6,7 @@
 #include "StorageScenario.h"
 #include "CargoScenario.h"
 #include "MaterialsScenario.h"
+#include "CropScenario.h"
 #include "HomeScenario.h"
 #include "ExpeditionScenario.h"
 #include "CFPlayerCharacter.h"
@@ -59,6 +60,11 @@ void ACFGameMode::BeginPlay()
 {
     Super::BeginPlay();
     SeedFrontierResources(GetWorld());
+    const int32 CropMode=FParse::Param(FCommandLine::Get(),TEXT("CFCropWrite"))?1:FParse::Param(FCommandLine::Get(),TEXT("CFCropRead"))?2:FParse::Param(FCommandLine::Get(),TEXT("CFCropLegacyRead"))?3:0;
+    if(CropMode || FParse::Param(FCommandLine::Get(),TEXT("CFCropTest")))
+    {
+        FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this,CropMode](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0))) RunCropScenario(GetWorld(),Hero,CropMode);},1.f,false);return;
+    }
     const int32 MaterialsMode=FParse::Param(FCommandLine::Get(),TEXT("CFMaterialsWrite"))?1:FParse::Param(FCommandLine::Get(),TEXT("CFMaterialsRead"))?2:0;
     if(MaterialsMode || FParse::Param(FCommandLine::Get(),TEXT("CFMaterialsTest")))
     {

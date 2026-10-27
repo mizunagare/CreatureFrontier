@@ -80,6 +80,9 @@ struct FFacilitySaveRecord
     UPROPERTY() FGuid Id;
     UPROPERTY() EWorkSpecialty Specialty = EWorkSpecialty::Gathering;
     UPROPERTY() int32 StoredFood = 0;
+    UPROPERTY() int32 Seeds=0;
+    UPROPERTY() bool bPlanted=false;
+    UPROPERTY() float GrowthWork=0;
 };
 
 UCLASS()

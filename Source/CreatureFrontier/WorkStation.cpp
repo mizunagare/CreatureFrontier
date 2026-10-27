@@ -1,4 +1,5 @@
 #include "WorkStation.h"
+#include "FarmCropComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/TextRenderComponent.h"
 #include "Engine/StaticMesh.h"
@@ -10,6 +11,7 @@
 AWorkStation::AWorkStation()
 {
     PrimaryActorTick.bCanEverTick=true;
+    Crop=CreateDefaultSubobject<UFarmCropComponent>(TEXT("Crop"));
     auto* Mesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("WorkBench"));
     SetRootComponent(Mesh);
     static ConstructorHelpers::FObjectFinder<UStaticMesh> Cube(TEXT("/Engine/BasicShapes/Cube.Cube"));
@@ -68,7 +70,8 @@ void AWorkStation::RefreshLabel()
     int32 Index = 0;
     for (const auto& Plant : FarmPlants)
     {
-        const bool Show = Farm || (Trough && Index < (StoredFood+4)/5);
+        const bool Show = (Farm && Crop->bPlanted) || (Trough && Index < (StoredFood+4)/5);
+        if(Farm) Plant->SetRelativeScale3D(FVector(.12,.18,.12+FMath::Max(0,Crop->Stage())*.1));
         ++Index;
         Plant->SetVisibility(Show); Plant->SetHiddenInGame(!Show);
         Plant->SetStaticMesh(LoadObject<UStaticMesh>(nullptr,Farm ? TEXT("/Engine/BasicShapes/Cone.Cone") : TEXT("/Engine/BasicShapes/Sphere.Sphere")));
@@ -81,6 +84,6 @@ void AWorkStation::RefreshLabel()
     }
     const FString Name = UEnum::GetValueAsString(RequiredSpecialty).Replace(TEXT("EWorkSpecialty::"), TEXT(""));
     Label->SetText(FText::FromString(Trough ? FString::Printf(TEXT("FEEDING TROUGH\nFOOD %d/30 | U+ O-"),StoredFood) :
-        Farm ? FString::Printf(TEXT("FOOD GARDEN\nSTOCK %d/30 | U+ O-"),StoredFood) : RequiredSpecialty==EWorkSpecialty::Transport ? TEXT("TRANSPORT POST\nFARM -> TROUGH | E assign") :
+        Farm ? FString::Printf(TEXT("FOOD GARDEN | FOOD %d/30\n%s"),StoredFood,*Crop->Status()) : RequiredSpecialty==EWorkSpecialty::Transport ? TEXT("TRANSPORT POST\nFARM -> TROUGH | E assign") :
         Name + (bPlayerBuilt ? TEXT("\nBUILT FACILITY") : TEXT("\nWORK STATION"))));
 }

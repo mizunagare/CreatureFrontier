@@ -3,6 +3,7 @@
 #include "CreatureCharacter.h"
 #include "CreatureDefinition.h"
 #include "WorkStation.h"
+#include "FarmCropComponent.h"
 #include "BaseBuildingComponent.h"
 #include "InventoryComponent.h"
 #include "FrontierSaveGame.h"
@@ -23,6 +24,7 @@ void RunWorkCycleScenario(UWorld* World, ACFPlayerCharacter* Hero)
     auto At = [](float X) { return FTransform(FRotator::ZeroRotator,FVector(X,-700,-15),FVector(2,1,.7)); };
     Hero->Building->Selected = EWorkSpecialty::Farming;
     auto* Garden = Hero->Building->BuildAt(At(0));
+    if(Garden) Garden->Crop->Seeds=10; // Recovery resumes existing seeded agriculture, not free production.
     if (!Garden) { FPlatformMisc::RequestExitWithStatus(false,1); return; }
     const FGuid Id = Garden->PersistentId;
     const FTransform Transform(FRotator::ZeroRotator,FVector(0,-900,40));

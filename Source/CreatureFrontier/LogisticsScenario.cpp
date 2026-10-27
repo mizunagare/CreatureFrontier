@@ -3,6 +3,7 @@
 #include "CreatureCharacter.h"
 #include "CreatureDefinition.h"
 #include "WorkStation.h"
+#include "FarmCropComponent.h"
 #include "BaseBuildingComponent.h"
 #include "InventoryComponent.h"
 #include "FrontierSaveGame.h"
@@ -107,6 +108,7 @@ void RunLogisticsScenario(UWorld* World,ACFPlayerCharacter* Hero)
     auto Build=[&](EWorkSpecialty Kind,int32 X,int32 Y) { Hero->Building->Selected=Kind; return Hero->Building->BuildAt(FTransform(FRotator::ZeroRotator,FVector(X,Y,-15),FVector(2,1,.7))); };
     auto* Garden=Build(EWorkSpecialty::Farming,0,-700); auto* Trough=Build(EWorkSpecialty::Feeding,0,-1100); auto* Post=Build(EWorkSpecialty::Transport,-300,-700);
     if(!Garden || !Trough || !Post) { UE_LOG(LogTemp,Error,TEXT("CF_LOGISTICS FAIL building %s"),*Hero->Feedback); FPlatformMisc::RequestExitWithStatus(false,1); return; }
+    Garden->Crop->Seeds=3; // Exactly three input seeds for the production/transport fixture.
     auto Make=[&](FVector Position)
     {
         const FTransform Transform(Position); auto* Pet=World->SpawnActorDeferred<ACreatureCharacter>(ACreatureCharacter::StaticClass(),Transform,nullptr,nullptr,ESpawnActorCollisionHandlingMethod::AlwaysSpawn);

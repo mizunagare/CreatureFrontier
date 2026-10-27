@@ -1,4 +1,5 @@
 #include "BaseBuildingComponent.h"
+#include "FarmCropComponent.h"
 #include "CFPlayerCharacter.h"
 #include "Camera/CameraComponent.h"
 #include "InventoryComponent.h"
@@ -173,6 +174,7 @@ bool UBaseBuildingComponent::DismantleStation(AWorkStation* Station)
     if (!Hero || !Hero->HasAuthority() || Hero->Health <= 0 || !IsValid(Station) || !Station->bPlayerBuilt || Hero->GetDistanceTo(Station) > 600) return false;
     const int32 Refund = GetCost(Station->RequiredSpecialty)/2;
     if (Station->StoredFood > 0) { Hero->Feedback = TEXT("Withdraw food with O before dismantling the facility"); return false; }
+    if(Station->Crop->IsOccupied()) {Hero->Feedback=TEXT("Harvest crop and withdraw reserved seeds with F3 before dismantling");return false;}
     if (!Hero->Inventory->AddItem(EFrontierItem::Material,Refund)) { Hero->Feedback = TEXT("Make inventory space for dismantle refund"); return false; }
     for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It)
         if (It->WorkSite == Station) { It->WorkSite = nullptr; It->SetActivity(ECreatureActivity::Follow); }

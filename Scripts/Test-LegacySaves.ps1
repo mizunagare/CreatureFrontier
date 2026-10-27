@@ -1,5 +1,6 @@
 param([Parameter(Mandatory=$true)][string]$LegacyBuildRoot,
-      [Parameter(Mandatory=$true)][string]$BuildRoot)
+      [Parameter(Mandatory=$true)][string]$BuildRoot,
+      [switch]$IncludeCrops)
 
 $ErrorActionPreference='Stop'
 $projectRoot=Split-Path $PSScriptRoot -Parent
@@ -15,6 +16,12 @@ $cases=@(
 )
 if(Test-Path -LiteralPath (Join-Path $LegacyBuildRoot 'CreatureFrontier\Saved\SaveGames\CargoCross.sav')){
     $cases += @{Slot='CargoCross'; Flag='CFCargoRead'; Marker='CF_CARGO_READ PASS'}
+}
+if(Test-Path -LiteralPath (Join-Path $LegacyBuildRoot 'CreatureFrontier\Saved\SaveGames\MaterialsCross.sav')){
+    $cases += @{Slot='MaterialsCross'; Flag='CFMaterialsRead'; Marker='CF_MATERIALS_READ PASS'}
+}
+if($IncludeCrops -and (Test-Path -LiteralPath (Join-Path $LegacyBuildRoot 'CreatureFrontier\Saved\SaveGames\FrontierFarmingAutomation.sav'))){
+    $cases += @{Slot='FrontierFarmingAutomation'; Flag='CFCropLegacyRead'; Marker='CF_CROP_LEGACY_READ PASS'}
 }
 $results=@()
 foreach($case in $cases){

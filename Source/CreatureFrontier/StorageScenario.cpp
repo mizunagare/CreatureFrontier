@@ -69,7 +69,7 @@ void RunStorageScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
     if(Mode==2)
     {
         auto* Saved=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("StorageCross"),0));
-        const int32 ItemCount=Saved && Saved->FormatVersion<23?6:static_cast<int32>(EFrontierItem::Count);
+        const int32 ItemCount=Saved && Saved->FormatVersion<23?6:Saved && Saved->FormatVersion<24?9:static_cast<int32>(EFrontierItem::Count);
         const bool Loaded=Saved && Hero->LoadProgress(TEXT("StorageCross")) && Snapshot(World,Hero,ItemCount) && Hero->LoadProgress(TEXT("StorageCross")) && Snapshot(World,Hero,ItemCount);
         Finish(World,Hero,Loaded,Mode); return;
     }
@@ -139,7 +139,7 @@ void RunStorageScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
         if(Case==6)
         {
             Bad->FormatVersion=20;
-            for(auto Item:{EFrontierItem::Fiber,EFrontierItem::Ore,EFrontierItem::Scrap}) Bad->InventoryStacks.Remove(Item);
+            for(auto Item:{EFrontierItem::Fiber,EFrontierItem::Ore,EFrontierItem::Scrap,EFrontierItem::Seeds}) Bad->InventoryStacks.Remove(Item);
         }
         if(Case==7) { FCreatureSaveRecord Broken; Broken.Id=FGuid::NewGuid(); Broken.CreatureClass=ACreatureCharacter::StaticClass(); Broken.Health=-1; Bad->Creatures.Add(Broken); }
         if(Case==8) { FFacilitySaveRecord Overlap; Overlap.Id=FGuid::NewGuid(); Overlap.Transform=FTransform(FRotator::ZeroRotator,FVector(-400,-800,5),FVector(2,1,.7)); Bad->Facilities.Add(Overlap); }
@@ -147,7 +147,7 @@ void RunStorageScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
     }
     auto* Legacy=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(Good,0)); Legacy->FormatVersion=20;
     auto LegacyPack=BeforePack;
-    for(auto Item:{EFrontierItem::Fiber,EFrontierItem::Ore,EFrontierItem::Scrap}) {Legacy->InventoryStacks.Remove(Item); LegacyPack.Remove(Item);}
+    for(auto Item:{EFrontierItem::Fiber,EFrontierItem::Ore,EFrontierItem::Scrap,EFrontierItem::Seeds}) {Legacy->InventoryStacks.Remove(Item); LegacyPack.Remove(Item);}
     Legacy->HomeModules.RemoveAll([](const FHomeModuleRecord& R){return R.Definition.LoadSynchronous()->Kind==EHomeModuleKind::Storage;});
     Legacy->HomeModules[0].StoredItems.Add(EFrontierItem::Crystal,999); // Future field ignored for actual old-format structure.
     bool Migration=UGameplayStatics::SaveGameToSlot(Legacy,TEXT("StorageLegacy20"),0) && Hero->LoadProgress(TEXT("StorageLegacy20")) &&

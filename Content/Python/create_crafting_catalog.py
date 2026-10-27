@@ -13,7 +13,7 @@ items = []
 for kind, name, multiplier in [(I.MATERIAL, 'Materials', 0), (I.CAPTURE_DEVICE, 'Devices', 1),
                                 (I.MEDICINE, 'Medicine', 0), (I.FOOD, 'Food', 0),
                                 (I.CRYSTAL, 'Crystals', 0), (I.RESONANCE_DEVICE, 'Resonance devices', 1.5),
-                                (I.FIBER, 'Fibers', 0), (I.ORE, 'Ore', 0), (I.SCRAP, 'Mechanical scrap', 0)]:
+                                (I.FIBER, 'Fibers', 0), (I.ORE, 'Ore', 0), (I.SCRAP, 'Mechanical scrap', 0), (I.SEEDS, 'Planting seeds', 0)]:
     item = unreal.FrontierItemDisplay()
     for key, value in dict(item=kind, display_name=name, capture_multiplier=multiplier).items():
         item.set_editor_property(key, value)
@@ -39,7 +39,8 @@ asset.set_editor_property('items', items)
 for rid, name, costs, output, amount, required, description in [
     ('WeaveSupplies', 'Weave building supplies', {I.FIBER: 2, I.MATERIAL: 1}, I.MATERIAL, 4, U.NONE, 'At base: bind fibers into usable building supplies. Net gain 3 materials.'),
     ('OreTools', 'Process ore tools', {I.ORE: 2, I.MATERIAL: 1}, I.CAPTURE_DEVICE, 2, U.NONE, 'At base: shape ore into two capture devices.'),
-    ('ScrapResonator', 'Rebuild resonators', {I.SCRAP: 2, I.CRYSTAL: 1}, I.RESONANCE_DEVICE, 2, U.CRYSTAL_STUDY, 'At base after crystal study: recover two resonators from mechanical scrap.')]:
+    ('ScrapResonator', 'Rebuild resonators', {I.SCRAP: 2, I.CRYSTAL: 1}, I.RESONANCE_DEVICE, 2, U.CRYSTAL_STUDY, 'At base after crystal study: recover two resonators from mechanical scrap.'),
+    ('PlantingSeeds', 'Prepare planting seeds', {I.FIBER: 1, I.FOOD: 1}, I.SEEDS, 3, U.NONE, 'At base: prepare three seed packets. G sows/tends/harvests; F2 stocks a garden; F3 retrieves reserved seeds.')]:
     recipe = unreal.FrontierRecipe()
     for key, value in dict(id=rid, display_name=name, description=description, inputs=costs,
                            reward=R.ITEM, output=output, output_amount=amount,

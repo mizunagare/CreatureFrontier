@@ -24,7 +24,7 @@ AResourceNode* Node(UWorld* World,uint32 Id)
 bool Snapshot(UWorld* World,ACFPlayerCharacter* Hero)
 {
     auto* Saved=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("MaterialsCross"),0));
-    bool Pass=Saved && Saved->FormatVersion==23 && Hero->Inventory->Count(EFrontierItem::Material)==2 &&
+    bool Pass=Saved && Saved->FormatVersion>=23 && Saved->FormatVersion<=24 && Hero->Inventory->Count(EFrontierItem::Material)==2 &&
         Hero->Inventory->Count(EFrontierItem::CaptureDevice)==2 && Hero->Inventory->Count(EFrontierItem::ResonanceDevice)==2;
     for(uint32 Id=8;Id<=10;++Id) Pass &= Node(World,Id) && Node(World,Id)->Remaining==0 &&
         Hero->Inventory->Count(static_cast<EFrontierItem>(static_cast<uint8>(EFrontierItem::Fiber)+Id-8))==1;
@@ -41,7 +41,7 @@ void RunMaterialsScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
         for(TActorIterator<ACreatureCharacter> It(World);It;++It) It->Destroy();
         Hero->GetCharacterMovement()->DisableMovement();
         Hero->Inventory->Restore({{EFrontierItem::Material,2}}); // Known processing-cost fixture, not resource yield.
-        auto* Catalog=UCraftingCatalog::Load(); Pass=Catalog && Catalog->Validate() && Catalog->Items.Num()==9 && Catalog->Recipes.Num()==10;
+        auto* Catalog=UCraftingCatalog::Load(); Pass=Catalog && Catalog->Validate() && Catalog->Items.Num()==10 && Catalog->Recipes.Num()==11;
         for(uint32 Id=8;Id<=10;++Id)
         {
             auto* Source=Node(World,Id); if(!Source){Pass=false;break;}

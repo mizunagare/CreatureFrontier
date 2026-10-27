@@ -1,6 +1,7 @@
 #include "CreatureCharacter.h"
 #include "CreatureDefinition.h"
 #include "CompanionCargoComponent.h"
+#include "FarmCropComponent.h"
 #include "CreatureAffinity.h"
 #include "AIController.h"
 #include "Navigation/PathFollowingComponent.h"
@@ -279,7 +280,7 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
             if(WorkSite->RequiredSpecialty!=EWorkSpecialty::Farming) { TickGathering(DeltaSeconds,OwnerPlayer); return; }
             if (ProgressSite.Get() != WorkSite.Get()) { WorkProgress = 0; ProgressSite = WorkSite; }
             const FVector Offset = WorkSite->GetActorLocation() - GetActorLocation();
-            if (Offset.Size2D() > 220.0f) { NavigateTo(WorkSite->GetActorLocation(), 35.0f); WorkProgress = 0.0f; }
+            if (Offset.Size() > 220.0f) { NavigateTo(WorkSite->GetActorLocation(), 35.0f); WorkProgress = 0.0f; }
             else
             {
                 StopNavigation();
@@ -292,14 +293,8 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
                     OwnerPlayer->Feedback = TEXT("Companion resting; work resumes at 80 stamina, 20 satiety and 80% health");
                     return;
                 }
-                WorkProgress += DeltaSeconds * GetWorkEfficiency(WorkSite) * (Nutrition < 20 ? .5f : 1.0f);
-                const float Interval = 6.0f;
-                if (WorkProgress >= Interval)
-                {
-                    if (WorkSite->AdjustFoodStock(1))
-                    { OwnerPlayer->RecordCompanionProduction(this,EFrontierItem::Food); AddExperience(1); WorkProgress = 0; }
-                    else WorkProgress = Interval; // Ready harvest stays pending while inventory is full.
-                }
+                if(WorkSite->Crop->Work(this,OwnerPlayer,DeltaSeconds*GetWorkEfficiency(WorkSite)*(Nutrition<20?.5f:1.f)))
+                { OwnerPlayer->RecordCompanionProduction(this,EFrontierItem::Food); AddExperience(1); }
             }
             return;
         }

@@ -23,10 +23,14 @@
 #include "HomePersistence.h"
 #include "StorageInteractionComponent.h"
 #include "CompanionCargoComponent.h"
+#include "FarmCropComponent.h"
 #include "HomeModule.h"
 #include "ResearchComponent.h"
 
 void ACFPlayerCharacter::CraftSpear() { Equipment->CraftSpear(); }
+void ACFPlayerCharacter::InteractGarden() {if(auto* Site=TraceFacility()) Site->Crop->Interact(this,0);}
+void ACFPlayerCharacter::DepositGardenSeed() {if(auto* Site=TraceFacility()) Site->Crop->Interact(this,1);}
+void ACFPlayerCharacter::WithdrawGardenSeed() {if(auto* Site=TraceFacility()) Site->Crop->Interact(this,2);}
 void ACFPlayerCharacter::CraftVest() { Equipment->CraftVest(); }
 void ACFPlayerCharacter::ToggleSpear() { Equipment->ToggleSpear(); }
 void ACFPlayerCharacter::ToggleVest() { Equipment->ToggleVest(); }
@@ -81,7 +85,7 @@ bool ACFPlayerCharacter::SaveProgress(const FString& Slot)
 {
     if (!HasAuthority() || !GetController()) return false;
     auto* Save = Cast<UFrontierSaveGame>(UGameplayStatics::CreateSaveGameObject(UFrontierSaveGame::StaticClass()));
-    Save->FormatVersion=23;
+    Save->FormatVersion=24;
     Save->MapName = UGameplayStatics::GetCurrentLevelName(this, true);
     Save->PlayerTransform = GetActorTransform();
     Save->ViewRotation = GetController()->GetControlRotation();
@@ -147,6 +151,7 @@ bool ACFPlayerCharacter::SaveProgress(const FString& Slot)
             FFacilitySaveRecord Record;
             Record.Transform = It->GetActorTransform(); Record.Id = It->PersistentId; Record.Specialty = It->RequiredSpecialty;
             Record.StoredFood = It->StoredFood;
+            Record.Seeds=It->Crop->Seeds; Record.bPlanted=It->Crop->bPlanted; Record.GrowthWork=It->Crop->GrowthWork;
             Save->Facilities.Add(Record);
         }
     const bool bSaved = UGameplayStatics::SaveGameToSlot(Save, Slot, 0);
@@ -158,7 +163,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
 {
     if (!HasAuthority() || !GetController()) return false;
     auto* Save = Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot, 0));
-    if (!Save || Save->FormatVersion < 1 || Save->FormatVersion > 23 ||
+    if (!Save || Save->FormatVersion < 1 || Save->FormatVersion > 24 ||
         Save->MapName != UGameplayStatics::GetCurrentLevelName(this, true) ||
         !FMath::IsFinite(Save->Health) || Save->Health < 0 || Save->Health > 100 ||
         Save->Resources < 0 || Save->PlayerTransform.ContainsNaN() || Save->ViewRotation.ContainsNaN())
@@ -182,6 +187,8 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
     if(Save->FormatVersion<23)
         for(const auto& Entry:Save->InventoryStacks) if(Entry.Key>=EFrontierItem::Fiber && Entry.Value>0)
         { Feedback=TEXT("Unknown differentiated material in legacy save"); return false; }
+    if(Save->FormatVersion<24 && Save->InventoryStacks.FindRef(EFrontierItem::Seeds)>0)
+    {Feedback=TEXT("Unknown seed item in legacy inventory");return false;}
     if (!UInventoryComponent::Validate(Save->InventoryStacks))
     {
         Feedback = TEXT("Invalid inventory in save");
@@ -215,9 +222,10 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
         { Feedback = TEXT("Invalid loot in save"); return false; }
     TSet<FGuid> FacilityIds;
     if (Save->Facilities.Num() > 20) { Feedback = TEXT("Invalid facility count in save"); return false; }
-    for (const auto& Record : Save->Facilities)
+    for (auto& Record : Save->Facilities)
     {
-        if (!Record.Id.IsValid() || FacilityIds.Contains(Record.Id) || UBaseBuildingComponent::GetCost(Record.Specialty) <= 0 ||
+        if(Save->FormatVersion<24) {Record.Seeds=0;Record.bPlanted=false;Record.GrowthWork=0;}
+        if (!UFarmCropComponent::Validate(Record) || !Record.Id.IsValid() || FacilityIds.Contains(Record.Id) || UBaseBuildingComponent::GetCost(Record.Specialty) <= 0 ||
             !UBaseBuildingComponent::IsBuildTransformValid(Record.Transform) || Record.StoredFood < 0 || Record.StoredFood > 30 ||
             (Record.Specialty != EWorkSpecialty::Feeding && Record.Specialty != EWorkSpecialty::Farming && Record.StoredFood != 0) ||
             (Save->FormatVersion<15 && ((Record.Specialty==EWorkSpecialty::Farming && Record.StoredFood!=0) || Record.Specialty==EWorkSpecialty::Transport)))
@@ -341,6 +349,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
         }
         Site->bPlayerBuilt = true; Site->PersistentId = Record.Id; Site->RequiredSpecialty = Record.Specialty;
         Site->StoredFood = Record.StoredFood;
+        Site->Crop->Seeds=Record.Seeds; Site->Crop->bPlanted=Record.bPlanted; Site->Crop->GrowthWork=Record.GrowthWork;
         Site->FinishSpawning(Record.Transform);
         RestoredBuilt.Add(Site);
     }
@@ -584,6 +593,9 @@ void ACFPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
     PlayerInputComponent->BindKey(EKeys::Left, IE_Pressed, Storage.Get(), &UStorageInteractionComponent::WithdrawStack);
     PlayerInputComponent->BindKey(EKeys::Y, IE_Pressed, this, &ACFPlayerCharacter::PetAimedCompanion);
     PlayerInputComponent->BindKey(EKeys::M, IE_Pressed, this, &ACFPlayerCharacter::GatherAimedResource);
+    PlayerInputComponent->BindKey(EKeys::G,IE_Pressed,this,&ACFPlayerCharacter::InteractGarden);
+    PlayerInputComponent->BindKey(EKeys::F2,IE_Pressed,this,&ACFPlayerCharacter::DepositGardenSeed);
+    PlayerInputComponent->BindKey(EKeys::F3,IE_Pressed,this,&ACFPlayerCharacter::WithdrawGardenSeed);
     PlayerInputComponent->BindKey(EKeys::Zero, IE_Pressed, CaptureComponent.Get(), &UCaptureComponent::ToggleDevice);
     PlayerInputComponent->BindKey(EKeys::One, IE_Pressed, this, &ACFPlayerCharacter::CraftCaptureDevice);
     PlayerInputComponent->BindKey(EKeys::Two, IE_Pressed, this, &ACFPlayerCharacter::CraftMedicine);

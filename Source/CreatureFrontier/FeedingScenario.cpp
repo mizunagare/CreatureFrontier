@@ -5,6 +5,7 @@
 #include "BaseBuildingComponent.h"
 #include "InventoryComponent.h"
 #include "WorkStation.h"
+#include "FarmCropComponent.h"
 #include "FrontierSaveGame.h"
 #include "Camera/CameraComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -26,6 +27,7 @@ void RunFeedingScenario(UWorld* World, ACFPlayerCharacter* Hero)
     Builder->Selected = EWorkSpecialty::Feeding; auto* Trough = Builder->BuildAt(At(0));
     Builder->Selected = EWorkSpecialty::Farming; auto* Garden = Builder->BuildAt(At(-700));
     if (!Trough || !Garden) { UE_LOG(LogTemp,Error,TEXT("CF_FEED FAIL build")); FPlatformMisc::RequestExitWithStatus(false,1); return; }
+    Garden->Crop->Seeds=3; // The return-to-work assertion includes seeded production after eating.
     const FGuid Id = Trough->PersistentId, GardenId = Garden->PersistentId;
     Hero->FirstPersonCamera->SetWorldRotation((Trough->GetActorLocation()-Hero->FirstPersonCamera->GetComponentLocation()).Rotation());
     Hero->DepositTroughFood(); Hero->DepositTroughFood();

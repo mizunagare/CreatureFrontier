@@ -6,6 +6,7 @@
 #include "InventoryComponent.h"
 #include "BaseBuildingComponent.h"
 #include "WorkStation.h"
+#include "FarmCropComponent.h"
 #include "ResourceNode.h"
 #include "FrontierSaveGame.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -59,6 +60,7 @@ void RunObjectiveScenario(UWorld* World,ACFPlayerCharacter* Hero)
     Hero->Building->Selected=EWorkSpecialty::Farming;
     auto* Garden=Hero->Building->BuildAt(FTransform(FRotator::ZeroRotator,FVector(0,-700,-15),FVector(2,1,.7)));
     if(!Garden) { FPlatformMisc::RequestExitWithStatus(false,1); return; }
+    Garden->Crop->Seeds=2; // Objective credit requires two real seed inputs, not free garden output.
     Pet->WorkSite=Garden; Pet->SetActorLocation(Garden->GetActorLocation()+FVector(0,180,55));
     SetStack(EFrontierItem::Food,999); Garden->StoredFood=30; Pet->Tick(4); Production &= Hero->GetObjectives().FarmFood==0;
     Garden->AdjustFoodStock(-1); Pet->Tick(0); Production &= Hero->GetObjectives().FarmFood==1;

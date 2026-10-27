@@ -4,6 +4,7 @@
 #include "CreatureCharacter.h"
 #include "CreatureDefinition.h"
 #include "WorkStation.h"
+#include "FarmCropComponent.h"
 #include "InventoryComponent.h"
 #include "FrontierSaveGame.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -46,7 +47,8 @@ void RunFarmingScenario(UWorld* World, ACFPlayerCharacter* Hero)
     TArray<UStaticMeshComponent*> Pieces; Garden->GetComponents(Pieces);
     int32 Plants = 0;
     for (auto* Piece : Pieces) if (Piece->GetName().StartsWith(TEXT("FarmPlant")) && Piece->IsVisible()) ++Plants;
-    Build &= Plants == 6;
+    Build &= Plants == 0 && !Garden->Crop->bPlanted && Garden->Crop->Seeds==0;
+    Garden->Crop->Seeds=12; // Explicit seed fixture; production must consume these.
     const FTransform Transform(FRotator::ZeroRotator,FVector(0,-900,40));
     auto* Pet = World->SpawnActorDeferred<ACreatureCharacter>(ACreatureCharacter::StaticClass(),Transform,nullptr,nullptr,ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
     Pet->Definition = Definition; Pet->FinishSpawning(Transform); Pet->Tame(Hero->GetController());
