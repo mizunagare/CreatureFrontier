@@ -26,6 +26,10 @@ public:
     void CommandFollow();
     void CommandWork();
     void RestartLevel();
+    bool SaveProgress(const FString& Slot = TEXT("FrontierSlot"));
+    bool LoadProgress(const FString& Slot = TEXT("FrontierSlot"));
+    void QuickSave();
+    void QuickLoad();
     UFUNCTION()
     void CaptureResolved(ACreatureCharacter* Creature, bool bSucceeded);
 

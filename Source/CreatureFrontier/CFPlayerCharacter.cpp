@@ -6,7 +6,98 @@
 #include "Kismet/GameplayStatics.h"
 #include "EngineUtils.h"
 #include "WorkStation.h"
+#include "FrontierSaveGame.h"
+#include "CreatureDefinition.h"
 #include "GameFramework/CharacterMovementComponent.h"
+
+void ACFPlayerCharacter::QuickSave() { SaveProgress(); }
+void ACFPlayerCharacter::QuickLoad() { LoadProgress(); }
+
+bool ACFPlayerCharacter::SaveProgress(const FString& Slot)
+{
+    if (!HasAuthority() || !GetController()) return false;
+    auto* Save = Cast<UFrontierSaveGame>(UGameplayStatics::CreateSaveGameObject(UFrontierSaveGame::StaticClass()));
+    Save->MapName = UGameplayStatics::GetCurrentLevelName(this, true);
+    Save->PlayerTransform = GetActorTransform();
+    Save->ViewRotation = GetController()->GetControlRotation();
+    Save->Health = Health;
+    Save->Resources = Resources;
+    for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It)
+    {
+        FCreatureSaveRecord Record;
+        Record.CreatureClass = It->GetClass();
+        Record.Definition = It->Definition.Get();
+        Record.Transform = It->GetActorTransform();
+        Record.Health = It->Health;
+        Record.bOwned = It->Tamer == GetController();
+        Record.Disposition = It->Disposition;
+        Record.Activity = It->Activity;
+        Record.WorkSiteName = IsValid(It->WorkSite) ? It->WorkSite->GetFName() : NAME_None;
+        Save->Creatures.Add(Record);
+    }
+    const bool bSaved = UGameplayStatics::SaveGameToSlot(Save, Slot, 0);
+    Feedback = bSaved ? TEXT("Saved - F9 to restore") : TEXT("Save failed");
+    return bSaved;
+}
+
+bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
+{
+    if (!HasAuthority() || !GetController()) return false;
+    auto* Save = Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot, 0));
+    if (!Save || Save->FormatVersion != 1 ||
+        Save->MapName != UGameplayStatics::GetCurrentLevelName(this, true) ||
+        !FMath::IsFinite(Save->Health) || Save->Health < 0 || Save->Health > 100 ||
+        Save->Resources < 0 || Save->PlayerTransform.ContainsNaN() || Save->ViewRotation.ContainsNaN())
+    {
+        Feedback = TEXT("No compatible save for this map");
+        return false;
+    }
+    TArray<ACreatureCharacter*> OldCreatures;
+    for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It) OldCreatures.Add(*It);
+    TArray<ACreatureCharacter*> Restored;
+    // Stage every actor before replacing the live world; a missing asset leaves it intact.
+    for (const auto& Record : Save->Creatures)
+    {
+        UClass* CreatureClass = Record.CreatureClass.LoadSynchronous();
+        UCreatureDefinition* LoadedDefinition = Record.Definition.LoadSynchronous();
+        if (!CreatureClass || CreatureClass->HasAnyClassFlags(CLASS_Abstract) ||
+            (!Record.Definition.IsNull() && !LoadedDefinition) || Record.Transform.ContainsNaN() ||
+            !FMath::IsFinite(Record.Health) || Record.Health < 0)
+        {
+            for (auto* Pet : Restored) Pet->Destroy();
+            Feedback = TEXT("Save references unavailable or invalid creature data");
+            return false;
+        }
+        auto* Pet = GetWorld()->SpawnActorDeferred<ACreatureCharacter>(CreatureClass, Record.Transform,
+            nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+        if (!Pet)
+        {
+            for (auto* Staged : Restored) Staged->Destroy();
+            Feedback = TEXT("Could not restore creatures");
+            return false;
+        }
+        Pet->Definition = LoadedDefinition;
+        Pet->FinishSpawning(Record.Transform);
+        Pet->Health = Record.Health;
+        Pet->Disposition = Record.Disposition;
+        Pet->Tamer = Record.bOwned ? GetController() : nullptr;
+        Pet->Activity = Record.Activity;
+        for (TActorIterator<AWorkStation> It(GetWorld()); It; ++It)
+            if (It->GetFName() == Record.WorkSiteName) { Pet->WorkSite = *It; break; }
+        if (Pet->Activity == ECreatureActivity::Work && !Pet->WorkSite)
+            Pet->Activity = Record.bOwned ? ECreatureActivity::Follow : ECreatureActivity::Idle;
+        Restored.Add(Pet);
+    }
+    for (auto* Pet : OldCreatures) Pet->Destroy();
+    SetActorTransform(Save->PlayerTransform, false, nullptr, ETeleportType::TeleportPhysics);
+    GetController()->SetControlRotation(Save->ViewRotation);
+    GetCharacterMovement()->StopMovementImmediately();
+    Health = Save->Health;
+    Resources = Save->Resources;
+    GetCharacterMovement()->SetMovementMode(Health > 0 ? MOVE_Walking : MOVE_None);
+    Feedback = TEXT("Save restored");
+    return true;
+}
 
 void ACFPlayerCharacter::RestartLevel()
 {
@@ -83,6 +174,8 @@ void ACFPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
     PlayerInputComponent->BindKey(EKeys::F, IE_Pressed, this, &ACFPlayerCharacter::CommandFollow);
     PlayerInputComponent->BindKey(EKeys::E, IE_Pressed, this, &ACFPlayerCharacter::CommandWork);
     PlayerInputComponent->BindKey(EKeys::R, IE_Pressed, this, &ACFPlayerCharacter::RestartLevel);
+    PlayerInputComponent->BindKey(EKeys::F5, IE_Pressed, this, &ACFPlayerCharacter::QuickSave);
+    PlayerInputComponent->BindKey(EKeys::F9, IE_Pressed, this, &ACFPlayerCharacter::QuickLoad);
 }
 
 void ACFPlayerCharacter::MoveForward(float Value)

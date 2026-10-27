@@ -20,7 +20,7 @@ void ACFHUD::DrawHUD()
         if (It->Tamer == Player->GetController()) { ++Companions; if (It->Activity == ECreatureActivity::Work) ++Working; }
     DrawText(FString::Printf(TEXT("COMPANIONS %d    WORKING %d"), Companions, Working), FLinearColor::Green, 32, 57);
     DrawText(TEXT("WASD move | Space jump | LMB hit | RMB capture"), FLinearColor::White, 32, 84);
-    DrawText(TEXT("F follow / assist | E assign work | R restart"), FLinearColor::White, 32, 108);
+    DrawText(TEXT("F follow | E work | R restart | F5 save | F9 load"), FLinearColor::White, 32, 108);
     DrawText(Player->Feedback, FLinearColor::Yellow, 32, 142);
     if (auto* Creature = Player->TraceCreature())
     {
