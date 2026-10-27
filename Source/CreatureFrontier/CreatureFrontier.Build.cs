@@ -7,7 +7,8 @@ public class CreatureFrontier : ModuleRules
         PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
         PublicDependencyModuleNames.AddRange(new[]
         {
-            "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput", "GameplayTags", "AIModule"
+            "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput", "GameplayTags", "AIModule", "NavigationSystem"
         });
+        if (Target.bBuildEditor) PrivateDependencyModuleNames.Add("UnrealEd");
     }
 }

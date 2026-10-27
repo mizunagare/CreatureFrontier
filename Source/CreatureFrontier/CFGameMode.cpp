@@ -11,6 +11,9 @@
 #include "TimerManager.h"
 #include "EngineUtils.h"
 #include "InventoryComponent.h"
+#include "NavigationSystem.h"
+#include "NavigationPath.h"
+#include "GameFramework/CharacterMovementComponent.h"
 
 ACFGameMode::ACFGameMode()
 {
@@ -24,12 +27,63 @@ void ACFGameMode::BeginPlay()
     const bool bSaveWrite = FParse::Param(FCommandLine::Get(), TEXT("CFSaveWrite"));
     const bool bSaveRead = FParse::Param(FCommandLine::Get(), TEXT("CFSaveRead"));
     const bool bInventoryTest = FParse::Param(FCommandLine::Get(), TEXT("CFInventoryTest"));
-    if (!bSaveWrite && !bSaveRead && !bInventoryTest && !FParse::Param(FCommandLine::Get(), TEXT("CFSmokeTest"))) return;
+    const bool bNavTest = FParse::Param(FCommandLine::Get(), TEXT("CFNavTest"));
+    if (!bSaveWrite && !bSaveRead && !bInventoryTest && !bNavTest && !FParse::Param(FCommandLine::Get(), TEXT("CFSmokeTest"))) return;
     FTimerHandle TestStart;
-    GetWorldTimerManager().SetTimer(TestStart, [this, bSaveWrite, bSaveRead, bInventoryTest]()
+    GetWorldTimerManager().SetTimer(TestStart, [this, bSaveWrite, bSaveRead, bInventoryTest, bNavTest]()
     {
         auto* Hero = Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerPawn(this, 0));
         if (!Hero) { FPlatformMisc::RequestExitWithStatus(true, 1); return; }
+        if (bNavTest)
+        {
+            for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It) It->Destroy();
+            Hero->GetCharacterMovement()->DisableMovement();
+            Hero->SetActorLocation(FVector(910,500,40));
+            auto* Attacker = GetWorld()->SpawnActor<ACreatureCharacter>(FVector(690,500,40), FRotator::ZeroRotator);
+            if (!Attacker) { FPlatformMisc::RequestExitWithStatus(true, 2); return; }
+            Attacker->AttackRange = 400;
+            Attacker->Tick(0.1f);
+            const bool bWallBlocked = Hero->Health == 100;
+            Hero->SetActorLocation(FVector(690,800,40));
+            Attacker->Tick(0.1f);
+            const bool bOpenHit = Hero->Health == 90;
+            Attacker->Destroy();
+            Hero->Health = 100;
+            const bool bMelee = bWallBlocked && bOpenHit;
+            UE_LOG(LogTemp, Display, TEXT("CF_MELEE %s wallBlocked=%d openHit=%d"), bMelee ? TEXT("PASS") : TEXT("FAIL"), bWallBlocked, bOpenHit);
+            Hero->SetActorLocation(FVector(1100,500,40));
+            auto* Pet = GetWorld()->SpawnActor<ACreatureCharacter>(FVector(500,500,40), FRotator::ZeroRotator);
+            if (!Pet) { FPlatformMisc::RequestExitWithStatus(true, 2); return; }
+            Pet->Tame(Hero->GetController());
+            auto* Path = UNavigationSystemV1::FindPathToLocationSynchronously(this, Pet->GetActorLocation(), Hero->GetActorLocation(), Pet);
+            const bool bPath = Path && Path->IsValid() && !Path->IsPartial() && Path->PathPoints.Num() >= 3;
+            FHitResult Hit;
+            FCollisionQueryParams Params(SCENE_QUERY_STAT(NavTestBarrier), false, Pet);
+            const bool bBlocked = GetWorld()->LineTraceSingleByChannel(Hit, Pet->GetActorLocation(), Hero->GetActorLocation(), ECC_Visibility, Params) && Hit.GetActor() != Hero;
+            const double Started = GetWorld()->GetTimeSeconds();
+            TSharedRef<FTimerHandle> Poll = MakeShared<FTimerHandle>();
+            GetWorldTimerManager().SetTimer(*Poll, [this, Hero, Pet, bPath, bBlocked, bMelee, Started, Poll, MaxDetour=0.0f]() mutable
+            {
+                MaxDetour = FMath::Max(MaxDetour, FMath::Abs(static_cast<float>(Pet->GetActorLocation().Y)-500.0f));
+                const bool bArrived = Pet->GetDistanceTo(Hero) <= 240.0f;
+                if (!bArrived && GetWorld()->GetTimeSeconds()-Started < 12.0) return;
+                GetWorldTimerManager().ClearTimer(*Poll);
+                const bool bPass = bPath && bBlocked && bArrived && MaxDetour > 100.0f;
+                UE_LOG(LogTemp, Display, TEXT("CF_NAV %s path=%d barrier=%d arrived=%d detour=%.1f"), bPass ? TEXT("PASS") : TEXT("FAIL"), bPath, bBlocked, bArrived, MaxDetour);
+                if (!bPass || !bMelee) { FPlatformMisc::RequestExitWithStatus(false, 7); return; }
+                Hero->SetActorLocation(FVector(-450,0,40));
+                Hero->CommandWork();
+                const int32 MaterialsBefore = Hero->Inventory->Count(EFrontierItem::Material);
+                FTimerHandle WorkCheck;
+                GetWorldTimerManager().SetTimer(WorkCheck, [Hero, Pet, MaterialsBefore]()
+                {
+                    const bool bWorked = Pet->Activity == ECreatureActivity::Work && Hero->Inventory->Count(EFrontierItem::Material) > MaterialsBefore;
+                    UE_LOG(LogTemp, Display, TEXT("CF_NAV_WORK %s materials=%d"), bWorked ? TEXT("PASS") : TEXT("FAIL"), Hero->Inventory->Count(EFrontierItem::Material));
+                    FPlatformMisc::RequestExitWithStatus(false, bWorked ? 0 : 8);
+                }, 12.0f, false);
+            }, 0.1f, true);
+            return;
+        }
         if (bInventoryTest)
         {
             auto* Bag = Hero->Inventory.Get();

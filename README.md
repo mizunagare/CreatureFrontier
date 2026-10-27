@@ -33,7 +33,20 @@ Windows 开发环境已部署并验证：Unreal Engine 5.8、Visual Studio C++ �
 
 HUD 显示玩家生命、资源、伙伴数量、工作数量和准星目标的生命/捕捉概率。
 宠物生命归零后无法捕捉；请先削弱再捕捉。当前迭代以单机为测试目标，
-伙伴绕障碍仍使用直接移动，联机权威校验与导航将在后续完善。
+伙伴跟随、追击和前往工作台使用已烘焙的 Recast 导航网格，每 0.4 秒更新目标。
+宠物近战必须满足三维距离和视线检查，墙体阻挡伤害。当前导航覆盖灰盒地面，
+尚未包含动态建造后的网格更新、跳跃/攀爬或复杂群体避让；联机权威校验仍待完善。
+
+修改测试地图障碍后，通过 Unreal 的 Build Paths 重建导航，或者执行：
+
+```powershell
+& 'D:\Epic\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe' `
+  'D:\myGame\CreatureFrontier.uproject' -run=pythonscript `
+  -script='D:\myGame\Content\Python\build_navigation.py' -nullrhi -unattended -nop4 -nosound
+```
+
+`-CFNavTest` 在实际游戏世界验证方块绕行、跟随到达、远处工作台到达/产出，
+并检查宠物隔墙不能伤害玩家、无遮挡近战能够伤害玩家。
 
 存档保存玩家位置/视角/生命/资源，以及所有宠物的位置、生命、归属、数据定义、
 活动状态与工作点。重复读档替换现有宠物，不会叠加伙伴。

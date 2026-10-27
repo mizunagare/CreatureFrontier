@@ -1,6 +1,8 @@
 #include "CreatureCharacter.h"
 #include "CreatureDefinition.h"
 #include "AIController.h"
+#include "NavigationSystem.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "CFPlayerCharacter.h"
 #include "InventoryComponent.h"
 #include "WorkStation.h"
@@ -20,6 +22,10 @@ ACreatureCharacter::ACreatureCharacter()
     AutoPossessAI = EAutoPossessAI::PlacedInWorldOrSpawned;
     AIControllerClass = AAIController::StaticClass();
     GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
+    GetCapsuleComponent()->SetCanEverAffectNavigation(false);
+    GetCharacterMovement()->bOrientRotationToMovement = true;
+    GetCharacterMovement()->MaxWalkSpeed = 320.0f;
+    bUseControllerRotationYaw = false;
 
     CreatureVisual = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("CreatureVisual"));
     CreatureVisual->SetupAttachment(GetRootComponent());
@@ -35,6 +41,36 @@ ACreatureCharacter::ACreatureCharacter()
     }
 }
 
+void ACreatureCharacter::StopNavigation()
+{
+    if (auto* AI = Cast<AAIController>(GetController())) AI->StopMovement();
+}
+
+void ACreatureCharacter::NavigateTo(const FVector& Destination, float Acceptance)
+{
+    if (GetWorld()->GetTimeSeconds() < NextNavigationUpdate) return;
+    NextNavigationUpdate = GetWorld()->GetTimeSeconds() + 0.4;
+    auto* AI = Cast<AAIController>(GetController());
+    auto* Nav = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
+    if (!AI || !Nav) { StopNavigation(); return; }
+    FNavLocation Projected;
+    if (!Nav->ProjectPointToNavigation(Destination, Projected, FVector(250,250,300)))
+    {
+        StopNavigation();
+        return;
+    }
+    AI->MoveToLocation(Projected.Location, Acceptance, false, true, false, false, nullptr, false);
+}
+
+bool ACreatureCharacter::CanHit(const AActor* Target) const
+{
+    if (!IsValid(Target) || GetDistanceTo(Target) > AttackRange) return false;
+    FHitResult Hit;
+    FCollisionQueryParams Params(SCENE_QUERY_STAT(CreatureMelee), false, this);
+    return !GetWorld()->LineTraceSingleByChannel(Hit, GetActorLocation(), Target->GetActorLocation(), ECC_Visibility, Params)
+        || Hit.GetActor() == Target;
+}
+
 void ACreatureCharacter::BeginPlay()
 {
     Super::BeginPlay();
@@ -47,19 +83,21 @@ void ACreatureCharacter::BeginPlay()
 void ACreatureCharacter::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
-    if (!HasAuthority() || Health <= 0.0f) return;
+    if (!HasAuthority()) return;
+    if (Health <= 0.0f) { StopNavigation(); return; }
 
     AttackCooldown = FMath::Max(0.0f, AttackCooldown - DeltaSeconds);
     if (Disposition == ECreatureDisposition::Tamed)
     {
         ACFPlayerCharacter* OwnerPlayer = Tamer ? Cast<ACFPlayerCharacter>(Tamer->GetPawn()) : nullptr;
-        if (!OwnerPlayer || OwnerPlayer->Health <= 0.0f) return;
+        if (!OwnerPlayer || OwnerPlayer->Health <= 0.0f) { StopNavigation(); return; }
         if (Activity == ECreatureActivity::Work && IsValid(WorkSite))
         {
             const FVector Offset = WorkSite->GetActorLocation() - GetActorLocation();
-            if (Offset.Size2D() > 220.0f) AddMovementInput(Offset.GetSafeNormal2D());
+            if (Offset.Size2D() > 220.0f) { NavigateTo(WorkSite->GetActorLocation(), 35.0f); WorkProgress = 0.0f; }
             else
             {
+                StopNavigation();
                 WorkProgress += DeltaSeconds;
                 if (WorkProgress >= 3.0f) { OwnerPlayer->Inventory->AddItem(EFrontierItem::Material, 1); WorkProgress = 0.0f; }
             }
@@ -77,17 +115,21 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
         SetActivity(Enemy ? ECreatureActivity::Combat : ECreatureActivity::Follow);
         const FVector Destination = Enemy ? Enemy->GetActorLocation() : OwnerPlayer->GetActorLocation();
         const FVector Offset = Destination - GetActorLocation();
-        if (Offset.Size2D() > (Enemy ? AttackRange : 230.0f)) AddMovementInput(Offset.GetSafeNormal2D());
-        else if (Enemy && AttackCooldown <= 0.0f)
+        if (Enemy ? !CanHit(Enemy) : Offset.Size2D() > 230.0f) NavigateTo(Destination, Enemy ? 65.0f : 160.0f);
+        else
         {
-            UGameplayStatics::ApplyDamage(Enemy, Definition ? Definition->BaseAttack : 10.0f, Tamer, this, UDamageType::StaticClass());
-            AttackCooldown = AttackInterval;
+            StopNavigation();
+            if (Enemy && AttackCooldown <= 0.0f)
+            {
+                UGameplayStatics::ApplyDamage(Enemy, Definition ? Definition->BaseAttack : 10.0f, Tamer, this, UDamageType::StaticClass());
+                AttackCooldown = AttackInterval;
+            }
         }
         return;
     }
     APawn* Player = UGameplayStatics::GetPlayerPawn(this, 0);
-    if (!IsValid(Player)) return;
-    if (const auto* Hero = Cast<ACFPlayerCharacter>(Player); Hero && Hero->Health <= 0.0f) return;
+    if (!IsValid(Player)) { StopNavigation(); return; }
+    if (const auto* Hero = Cast<ACFPlayerCharacter>(Player); Hero && Hero->Health <= 0.0f) { StopNavigation(); return; }
 
     const FVector Offset = Player->GetActorLocation() - GetActorLocation();
     const float Distance2D = Offset.Size2D();
@@ -95,17 +137,21 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
     {
         Disposition = ECreatureDisposition::Hostile;
         SetActivity(ECreatureActivity::Combat);
-        if (Distance2D > AttackRange)
+        if (!CanHit(Player))
         {
-            AddMovementInput(Offset.GetSafeNormal2D(), 1.0f);
-            SetActorRotation(Offset.Rotation());
+            NavigateTo(Player->GetActorLocation(), 65.0f);
         }
-        else if (AttackCooldown <= 0.0f)
+        else
         {
-            UGameplayStatics::ApplyDamage(Player, 10.0f, GetController(), this, UDamageType::StaticClass());
-            AttackCooldown = AttackInterval;
+            StopNavigation();
+            if (AttackCooldown <= 0.0f)
+            {
+                UGameplayStatics::ApplyDamage(Player, 10.0f, GetController(), this, UDamageType::StaticClass());
+                AttackCooldown = AttackInterval;
+            }
         }
     }
+    else { StopNavigation(); SetActivity(ECreatureActivity::Idle); }
 }
 
 float ACreatureCharacter::GetHealthRatio() const
