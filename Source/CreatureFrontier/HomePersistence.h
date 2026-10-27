@@ -9,6 +9,7 @@ public:
     explicit FHomeRestoreTransaction(UWorld* InWorld):World(InWorld) {}
     ~FHomeRestoreTransaction();
     bool Stage(UFrontierSaveGame* Save);
+    AHomeModule* Find(FGuid Id) const;
     void Commit();
 private:
     UWorld* World;

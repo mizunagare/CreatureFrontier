@@ -1,5 +1,6 @@
 #include "CreatureCharacter.h"
 #include "CreatureDefinition.h"
+#include "CompanionCargoComponent.h"
 #include "CreatureAffinity.h"
 #include "AIController.h"
 #include "Navigation/PathFollowingComponent.h"
@@ -22,6 +23,8 @@
 ACreatureCharacter::ACreatureCharacter()
 {
     PrimaryActorTick.bCanEverTick = true;
+    CargoInventory=CreateDefaultSubobject<UInventoryComponent>(TEXT("CargoInventory"));
+    Cargo=CreateDefaultSubobject<UCompanionCargoComponent>(TEXT("Cargo"));
     bReplicates = true;
     SetReplicateMovement(true);
     AutoPossessAI = EAutoPossessAI::PlacedInWorldOrSpawned;
@@ -192,6 +195,7 @@ bool ACreatureCharacter::CanHit(const AActor* Target) const
 void ACreatureCharacter::BeginPlay()
 {
     Super::BeginPlay();
+    if(HasAuthority() && !PersistentId.IsValid()) PersistentId=FGuid::NewGuid();
     RefreshAppearance();
     if (HasAuthority() && Definition)
     {
@@ -206,7 +210,8 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
     Super::Tick(DeltaSeconds);
     if (VisualPivot)
     {
-        CargoPack->SetVisibility(CarriedFood>0); CargoPack->SetHiddenInGame(CarriedFood<=0);
+        const bool Carrying=CarriedFood>0 || Cargo->Count()>0;
+        CargoPack->SetVisibility(Carrying); CargoPack->SetHiddenInGame(!Carrying);
         UpdateCreaturePresentation(DeltaSeconds);
         const bool bEffect = Health > 0 && (SpecialWindupRemaining > 0 || SkillPulseRemaining > 0 || GuardRemaining > 0);
         SkillIndicator->SetVisibility(bEffect);
@@ -237,6 +242,7 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
     {
         ACFPlayerCharacter* OwnerPlayer = Tamer ? Cast<ACFPlayerCharacter>(Tamer->GetPawn()) : nullptr;
         if (!OwnerPlayer || OwnerPlayer->Health <= 0.0f) { bGatheringActive=false; ClearCombatOrders(); StopNavigation(); return; }
+        if(!Cargo->ValidateOrder()) return;
         Nutrition = FMath::Max(0.0f,Nutrition - DeltaSeconds*(Activity == ECreatureActivity::Work ? .35f : Activity == ECreatureActivity::Rest ? .04f : .08f));
         if (TickAutoFeeding()) return;
         if (Nutrition <= 0 && Activity == ECreatureActivity::Work)
@@ -264,7 +270,7 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
             }
             return;
         }
-        if (Activity == ECreatureActivity::Work && GetFieldResource()) { TickGathering(DeltaSeconds,OwnerPlayer); return; }
+        if (Activity == ECreatureActivity::Work && GetFieldResource()) { if(!Cargo->TickDelivery(DeltaSeconds,OwnerPlayer)) TickGathering(DeltaSeconds,OwnerPlayer); return; }
         if(Activity==ECreatureActivity::Work && !IsValid(WorkSite)) { StopNavigation(); SetActivity(ECreatureActivity::Follow); OwnerPlayer->Feedback=TEXT("Assigned work target no longer available; companion following"); return; }
         if (Activity == ECreatureActivity::Work && IsValid(WorkSite))
         {

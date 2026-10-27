@@ -6,6 +6,7 @@
 #include "InventoryComponent.h"
 #include "EngineUtils.h"
 #include "CreatureDefinition.h"
+#include "CompanionCargoComponent.h"
 
 AResourceNode* ACreatureCharacter::GetFieldResource() const { return FieldResource.Get(); }
 
@@ -13,13 +14,14 @@ bool ACreatureCharacter::AssignFieldResource(AResourceNode* Node)
 {
     if(!HasAuthority() || Health<=0 || Disposition!=ECreatureDisposition::Tamed || !IsValid(Node) ||
         Node->GetWorld()!=GetWorld() || !Node->Definition || !Node->Definition->IsValidDefinition()) return false;
+    Cargo->CancelOrder();
     ResetGathering(); StopNavigation(); ClearCombatOrders();
     WorkSite=nullptr; FieldResource=Node; bResumeWorkAfterRest=false;
     SetActivity(ECreatureActivity::Work); return true;
 }
 void ACreatureCharacter::CancelFieldResource()
 {
-    FieldResource.Reset(); ResetGathering();
+    FieldResource.Reset(); ResetGathering(); Cargo->CancelOrder();
 }
 
 void ACreatureCharacter::TickGathering(float DeltaSeconds,ACFPlayerCharacter* Recipient)
@@ -68,7 +70,7 @@ void ACreatureCharacter::TickGathering(float DeltaSeconds,ACFPlayerCharacter* Re
         NavigateTo(Approach,35); return;
     }
     StopNavigation(); GatherExpires=GetWorld()->GetTimeSeconds()+8;
-    bGatheringActive=Recipient->Inventory->Count(Node->Definition->OutputItem)<999;
+    bGatheringActive=Cargo->HasOrder()?Cargo->CanReceive(Node->Definition->OutputItem):Recipient->Inventory->Count(Node->Definition->OutputItem)<999;
     const float Efficiency=Field ? (Definition && Definition->WorkSpecialties.Contains(Node->Definition->Specialty)?Definition->WorkSpeed:.5f) : GetWorkEfficiency(WorkSite);
     WorkProgress=FMath::Min(Node->Definition->WorkSeconds,WorkProgress+DeltaSeconds*Efficiency*(Nutrition<20?.5f:1.f));
     if(WorkProgress>=Node->Definition->WorkSeconds && Node->TryHarvest(Recipient,this))
@@ -80,6 +82,7 @@ void ACreatureCharacter::ResetGathering()
 }
 FString ACreatureCharacter::GetGatheringStatus() const
 {
+    const FString CargoStatus=Cargo->Status(); if(!CargoStatus.IsEmpty()) return CargoStatus;
     if(auto* Field=FieldResource.Get())
     {
         const auto* Hero=Tamer?Cast<ACFPlayerCharacter>(Tamer->GetPawn()):nullptr;

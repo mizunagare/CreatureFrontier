@@ -44,6 +44,7 @@ void ACFHUD::DrawHUD()
     DrawText(TEXT("C backpack | F1 controls | Esc pause | Tab team | I journal"),FLinearColor::White,32,150);
     DrawRect(FLinearColor(.02f,.04f,.06f,.88f),18,208,600,52);
     DrawWrappedText(Player->Feedback,FLinearColor::Yellow,32,218,570,2);
+    if(Player->HasDeliverySelection()) DrawText(TEXT("DELIVERY destination selected | E resource -> storage | V away clears"),FLinearColor::Green,32,274);
     const float JourneyY=Canvas->ClipY-200;
     DrawRect(FLinearColor(.02f,.04f,.06f,.88f),18,JourneyY,550,112);
     DrawText(Player->GetObjectiveStatus(),FLinearColor::Green,32,JourneyY+12);
@@ -60,7 +61,7 @@ void ACFHUD::DrawHUD()
     if (auto* Site = Player->TraceFacility(); Site && Site->IsFoodStore())
         DrawText(FString::Printf(TEXT("FOOD STORE %d / 30 | U deposit | O withdraw"),Site->StoredFood),FLinearColor::Yellow,X-130,Y+25);
     if(auto* Node=Player->TraceResource()) DrawText(Node->GetStatus(),FLinearColor::Yellow,X-160,Y+25);
-    if(Player->Storage->TraceCrate() && !Player->Storage->IsOpen()) DrawText(TEXT("STORAGE CRATE | E open within 3m | empty before X"),FLinearColor::Yellow,X-160,Y+25);
+    if(Player->Storage->TraceCrate() && !Player->Storage->IsOpen()) DrawText(TEXT("STORAGE | E open 3m | V delivery destination | empty before X"),FLinearColor::Yellow,X-160,Y+25);
     float RegionY = Canvas->ClipY - 90;
     for (TActorIterator<AWildEncounter> It(GetWorld()); It; ++It)
         if (Player->GetDistanceTo(*It) < 1800)

@@ -3,6 +3,7 @@
 #include "InventoryComponent.h"
 #include "WorkStation.h"
 #include "Camera/CameraComponent.h"
+#include "CompanionCargoComponent.h"
 
 void ACFPlayerCharacter::CraftFood()
 {
@@ -57,6 +58,7 @@ bool ACFPlayerCharacter::WithdrawCompanionCargo(ACreatureCharacter* Pet)
     if(!HasAuthority() || Health<=0 || !IsValid(Pet) || Pet->Tamer!=GetController() || Pet->Disposition!=ECreatureDisposition::Tamed || GetDistanceTo(Pet)>600) return false;
     FHitResult Hit; FCollisionQueryParams Params(SCENE_QUERY_STAT(CargoRecovery),false,this);
     if(GetWorld()->LineTraceSingleByChannel(Hit,GetPawnViewLocation(),Pet->GetActorLocation(),ECC_Visibility,Params) && Hit.GetActor()!=Pet) return false;
+    if(Pet->Cargo->Count()>0) return Pet->Cargo->Recover(this);
     const int32 Amount=FMath::Min(Pet->CarriedFood,999-Inventory->Count(EFrontierItem::Food));
     if(Amount<=0 || !Inventory->AddItem(EFrontierItem::Food,Amount)) return false;
     Pet->CarriedFood-=Amount; Feedback=FString::Printf(TEXT("Recovered %d carried food from companion"),Amount); return true;

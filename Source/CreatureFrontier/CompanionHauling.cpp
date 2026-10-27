@@ -1,9 +1,12 @@
 #include "CreatureCharacter.h"
 #include "WorkStation.h"
 #include "EngineUtils.h"
+#include "CompanionCargoComponent.h"
 
 bool ACreatureCharacter::TickHauling(float DeltaSeconds)
 {
+    // Legacy food hauling cannot silently overwrite/mix retained resource cargo.
+    if(Cargo->Count()>0) { StopNavigation(); return true; }
     auto Park=[this]()
     {
         FVector Waiting=WorkSite->GetActorLocation()+FVector(-180,0,0); Waiting.Z=GetActorLocation().Z;

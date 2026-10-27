@@ -45,6 +45,9 @@ void RunFieldWorkScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
     {
         const bool Loaded=Hero->LoadProgress(TEXT("FieldCross"));
         auto* Pet=Owned(World,Hero); auto* Node=FieldCrystal(World);
+        UE_LOG(LogTemp,Display,TEXT("CF_FIELD_READ_STATE loaded=%d pet=%d node=%d target=%d site=%d activity=%d stock=%d crystal=%d feedback=%s"),
+            Loaded,Pet!=nullptr,Node!=nullptr,Pet && Pet->GetFieldResource()==Node,Pet && Pet->WorkSite!=nullptr,
+            Pet?static_cast<int32>(Pet->Activity):-1,Node?Node->Remaining:-1,Hero->Inventory->Count(EFrontierItem::Crystal),*Hero->Feedback);
         Finish(Loaded && Pet && Node && Pet->GetFieldResource()==Node && !Pet->WorkSite &&
             Pet->Activity==ECreatureActivity::Work && Node->Remaining==0 && Hero->Inventory->Count(EFrontierItem::Crystal)==1,Mode);
         return;

@@ -4,6 +4,7 @@
 #include "FieldWorkScenario.h"
 #include "FieldRecoveryScenario.h"
 #include "StorageScenario.h"
+#include "CargoScenario.h"
 #include "HomeScenario.h"
 #include "ExpeditionScenario.h"
 #include "CFPlayerCharacter.h"
@@ -57,6 +58,13 @@ void ACFGameMode::BeginPlay()
 {
     Super::BeginPlay();
     SeedFrontierResources(GetWorld());
+    const int32 CargoMode=FParse::Param(FCommandLine::Get(),TEXT("CFCargoWrite"))?1:FParse::Param(FCommandLine::Get(),TEXT("CFCargoRead"))?2:FParse::Param(FCommandLine::Get(),TEXT("CFCargoCrystalTest"))?3:0;
+    if(CargoMode || FParse::Param(FCommandLine::Get(),TEXT("CFCargoTest")))
+    {
+        FTimerHandle Start;
+        GetWorldTimerManager().SetTimer(Start,[this,CargoMode](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0))) RunCargoScenario(GetWorld(),Hero,CargoMode);},1.f,false);
+        return;
+    }
     const int32 StorageMode=FParse::Param(FCommandLine::Get(),TEXT("CFStorageWrite"))?1:FParse::Param(FCommandLine::Get(),TEXT("CFStorageRead"))?2:0;
     if(StorageMode || FParse::Param(FCommandLine::Get(),TEXT("CFStorageTest")))
     {

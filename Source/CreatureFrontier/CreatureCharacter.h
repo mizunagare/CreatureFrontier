@@ -16,7 +16,11 @@ class CREATUREFRONTIER_API ACreatureCharacter : public ACharacter
     GENERATED_BODY()
 
 public:
+    friend class UCompanionCargoComponent;
     ACreatureCharacter();
+    UPROPERTY(BlueprintReadOnly) FGuid PersistentId;
+    UPROPERTY(VisibleAnywhere,BlueprintReadOnly) TObjectPtr<class UInventoryComponent> CargoInventory;
+    UPROPERTY(VisibleAnywhere,BlueprintReadOnly) TObjectPtr<class UCompanionCargoComponent> Cargo;
     virtual void OnConstruction(const FTransform& Transform) override;
     UFUNCTION(BlueprintPure, Category="Creature")
     FString GetCreatureName() const;

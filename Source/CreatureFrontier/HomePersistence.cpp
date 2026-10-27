@@ -10,6 +10,11 @@ FHomeRestoreTransaction::~FHomeRestoreTransaction()
 {
     if(!bCommitted) for(auto* Module:Staged) if(IsValid(Module)) Module->Destroy();
 }
+AHomeModule* FHomeRestoreTransaction::Find(FGuid Id) const
+{
+    for(auto* Module:Staged) if(Module->PersistentId==Id) return Module;
+    return nullptr;
+}
 bool FHomeRestoreTransaction::Stage(UFrontierSaveGame* Save)
 {
     if(Save->FormatVersion<18) Save->HomeModules.Reset();

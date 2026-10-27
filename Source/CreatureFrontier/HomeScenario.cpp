@@ -137,7 +137,7 @@ void RunHomeScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
         if(Case==2) for(auto& Record:Bad->HomeModules) if(Record.Definition.Get() && Record.Definition.Get()->Kind==EHomeModuleKind::Roof) { Record.FloorId=FGuid::NewGuid(); break; }
         if(Case==3) Bad->HomeModules[0].Definition=TSoftObjectPtr<UHomeModuleDefinition>(FSoftObjectPath(TEXT("/Game/Missing.Home")));
         if(Case==4) Bad->HomeModules.RemoveAll([](const FHomeModuleRecord& Record){return Record.Transform.GetLocation().Equals(FVector(-400,-600,-30),.01);});
-        if(Case==5) { FCreatureSaveRecord Record; Record.CreatureClass=ACreatureCharacter::StaticClass(); Record.Health=-1; Bad->Creatures.Add(Record); }
+        if(Case==5) { FCreatureSaveRecord Record; Record.Id=FGuid::NewGuid(); Record.CreatureClass=ACreatureCharacter::StaticClass(); Record.Health=-1; Bad->Creatures.Add(Record); }
         if(Case==6) for(auto& Record:Bad->HomeModules) if(Record.Id==FloorBId) { Record.Transform.SetLocation(FVector(400,-800,-40)); break; }
         if(Case==7) Bad->HomeModules[0].PaidMaterials=1000;
         UGameplayStatics::SaveGameToSlot(Bad,TEXT("FrontierHomeInvalid"),0);

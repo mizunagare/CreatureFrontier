@@ -13,6 +13,7 @@
 #include "ResearchComponent.h"
 #include "CraftingCatalog.h"
 #include "FrontierSaveGame.h"
+#include "CompanionCargoComponent.h"
 
 AResourceNode::AResourceNode()
 {
@@ -70,7 +71,9 @@ bool AResourceNode::TryHarvest(ACFPlayerCharacter* Recipient,AActor* Harvester)
     }
     else if(!CanReach(Recipient,300)) return false;
     // The single shared transaction: failed capacity/range/ownership checks spend nothing.
-    if(!Recipient->Inventory->AddItem(Definition->OutputItem,1)) return false;
+    const auto* Pet=Cast<ACreatureCharacter>(Harvester);
+    const bool Added=Pet && Pet->Cargo->HasOrder()?Pet->Cargo->Receive(Definition->OutputItem):Recipient->Inventory->AddItem(Definition->OutputItem,1);
+    if(!Added) return false;
     --Remaining; HarvestCooldown=Definition->HarvestInterval;
     if(Remaining==0) RegrowRemaining=Definition->RegrowSeconds;
     Recipient->Research->RecordHarvest(this);

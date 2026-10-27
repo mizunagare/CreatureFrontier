@@ -22,6 +22,8 @@
 #include "HomeLayout.h"
 #include "HomePersistence.h"
 #include "StorageInteractionComponent.h"
+#include "CompanionCargoComponent.h"
+#include "HomeModule.h"
 #include "ResearchComponent.h"
 
 void ACFPlayerCharacter::CraftSpear() { Equipment->CraftSpear(); }
@@ -31,7 +33,18 @@ void ACFPlayerCharacter::ToggleVest() { Equipment->ToggleVest(); }
 float ACFPlayerCharacter::GetPlayerAttackDamage() const { return AttackDamage+Equipment->GetAttackBonus(); }
 
 void ACFPlayerCharacter::ToggleBuilding() { Building->Toggle(); }
-void ACFPlayerCharacter::CycleBuilding() { Building->Cycle(); }
+void ACFPlayerCharacter::CycleBuilding()
+{
+    if(Building->IsActive()) { Building->Cycle(); return; }
+    if(!HasAuthority() || Health<=0 || UGameplayStatics::IsGamePaused(this)) return;
+    if(auto* Crate=Storage->TraceCrate())
+    {
+        DeliverySelection=Crate; bDeliverySelection=true; int32 Applied=0;
+        for(TActorIterator<ACreatureCharacter> It(GetWorld());It;++It) if(IsCommandTarget(*It) && It->Cargo->Assign(Crate,this)) ++Applied;
+        Feedback=FString::Printf(TEXT("Storage destination selected; E resource orders will carry here | %d current jobs linked | V away from crate clears future selection"),Applied);
+    }
+    else { DeliverySelection.Reset(); bDeliverySelection=false; Feedback=TEXT("Future resource orders use player inventory again; F cancels existing delivery jobs"); }
+}
 void ACFPlayerCharacter::DismantleBuilding() { Building->Dismantle(); }
 
 void ACFPlayerCharacter::QuitGame()
@@ -68,6 +81,7 @@ bool ACFPlayerCharacter::SaveProgress(const FString& Slot)
 {
     if (!HasAuthority() || !GetController()) return false;
     auto* Save = Cast<UFrontierSaveGame>(UGameplayStatics::CreateSaveGameObject(UFrontierSaveGame::StaticClass()));
+    Save->FormatVersion=22;
     Save->MapName = UGameplayStatics::GetCurrentLevelName(this, true);
     Save->PlayerTransform = GetActorTransform();
     Save->ViewRotation = GetController()->GetControlRotation();
@@ -89,6 +103,7 @@ bool ACFPlayerCharacter::SaveProgress(const FString& Slot)
     for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It)
     {
         FCreatureSaveRecord Record;
+        Record.Id=It->PersistentId;
         Record.CreatureClass = It->GetClass();
         Record.Definition = It->Definition.Get();
         Record.Transform = It->GetActorTransform();
@@ -113,6 +128,7 @@ bool ACFPlayerCharacter::SaveProgress(const FString& Slot)
         Record.WorkSiteName = IsValid(It->WorkSite) ? It->WorkSite->GetFName() : NAME_None;
         Record.WorkSiteId = IsValid(It->WorkSite) && It->WorkSite->bPlayerBuilt ? It->WorkSite->PersistentId : FGuid();
         Record.FieldResourceId=It->GetFieldResource()?It->GetFieldResource()->PersistentId:FGuid();
+        It->Cargo->WriteSnapshot(Record);
         Save->Creatures.Add(Record);
     }
     for (TActorIterator<AWildEncounter> It(GetWorld()); It; ++It)
@@ -142,7 +158,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
 {
     if (!HasAuthority() || !GetController()) return false;
     auto* Save = Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot, 0));
-    if (!Save || Save->FormatVersion < 1 || Save->FormatVersion > 21 ||
+    if (!Save || Save->FormatVersion < 1 || Save->FormatVersion > 22 ||
         Save->MapName != UGameplayStatics::GetCurrentLevelName(this, true) ||
         !FMath::IsFinite(Save->Health) || Save->Health < 0 || Save->Health > 100 ||
         Save->Resources < 0 || Save->PlayerTransform.ContainsNaN() || Save->ViewRotation.ContainsNaN())
@@ -207,8 +223,12 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
     }
     FResourceRestoreTransaction ResourceRestore(GetWorld());
     if(!ResourceRestore.Stage(Save)) { Feedback=TEXT("Invalid or unavailable resource snapshot; world unchanged"); return false; }
+    TSet<FGuid> CreatureIds;
     for(auto& Record:Save->Creatures)
     {
+        if(Save->FormatVersion<22) { Record.Id=FGuid::NewGuid(); Record.CargoItems.Reset(); Record.DeliveryCrateId.Invalidate(); Record.bReturningCargo=false; }
+        if(!Record.Id.IsValid() || CreatureIds.Contains(Record.Id)) { Feedback=TEXT("Invalid or duplicate creature identity; world unchanged"); return false; }
+        CreatureIds.Add(Record.Id);
         if(Save->FormatVersion<20) Record.FieldResourceId.Invalidate();
         if(Record.FieldResourceId.IsValid() && (!ResourceRestore.Find(Record.FieldResourceId) || !Record.bOwned || Record.Disposition!=ECreatureDisposition::Tamed || Record.Health<=0 ||
             Record.WorkSiteId.IsValid() || !Record.WorkSiteName.IsNone() ||
@@ -217,6 +237,9 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
     }
     FHomeRestoreTransaction HomeRestore(GetWorld());
     if(!HomeRestore.Stage(Save)) { Feedback=TEXT("Invalid home structure or indoor facility support; world unchanged"); return false; }
+    for(const auto& Record:Save->Creatures)
+        if(!UCompanionCargoComponent::ValidateSnapshot(Record,HomeRestore.Find(Record.DeliveryCrateId)))
+        { Feedback=TEXT("Invalid carried resources or delivery intent; world unchanged"); return false; }
     TArray<ACreatureCharacter*> OldCreatures;
     for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It) OldCreatures.Add(*It);
     TArray<ACreatureCharacter*> Restored;
@@ -253,6 +276,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
             Feedback = TEXT("Could not restore creatures");
             return false;
         }
+        Pet->PersistentId=Record.Id;
         Pet->Definition = LoadedDefinition;
         Pet->EncounterId = Record.EncounterId;
         Pet->Level = Record.Level;
@@ -332,6 +356,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
             Pet->Activity = Record.bOwned ? ECreatureActivity::Follow : ECreatureActivity::Idle;
         Pet->bResumeWorkAfterRest = Record.bResumeWorkAfterRest && Record.bOwned && Pet->Health > 0 && Pet->Activity == ECreatureActivity::Rest &&
             (Pet->GetFieldResource() || (IsValid(Pet->WorkSite) && Pet->WorkSite->RequiredSpecialty != EWorkSpecialty::Feeding));
+        Pet->Cargo->RestoreSnapshot(Record,HomeRestore.Find(Record.DeliveryCrateId));
     }
     CancelMeleeAttack(); Building->Cancel();
     ResourceRestore.Commit();
@@ -351,7 +376,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
     Research->Restore(Save->Research); CaptureComponent->ResetSelection();
     GetCharacterMovement()->SetMovementMode(Health > 0 ? MOVE_Walking : MOVE_None);
     SelectedCompanion.Reset();
-    RosterHighlight.Reset(); bBackpackOpen=false; BackpackRecipe=0; Storage->Close();
+    RosterHighlight.Reset(); bBackpackOpen=false; BackpackRecipe=0; Storage->Close(); DeliverySelection.Reset(); bDeliverySelection=false;
     Journal=Save->Journal; JournalAssets=LoadedJournalAssets; JournalPage=0;
     Objectives=Save->Objectives;
     // Owned survivors in old snapshots prove capture; unseen wild snapshots do not prove discovery.
@@ -386,6 +411,7 @@ float ACFPlayerCharacter::TakeDamage(float Amount, const FDamageEvent& Event, AC
     if (Health <= 0.0f)
     {
         Storage->Close();
+        DeliverySelection.Reset(); bDeliverySelection=false;
         GetCharacterMovement()->StopMovementImmediately(); GetCharacterMovement()->DisableMovement(); StopJumping();
         CancelMeleeAttack();
         Building->Cancel(); bRosterOpen=false; bJournalOpen=false; bBackpackOpen=false;
@@ -457,10 +483,13 @@ void ACFPlayerCharacter::CommandWork()
     GetWorld()->LineTraceSingleByChannel(Hit,Start,Start+FirstPersonCamera->GetForwardVector()*800,ECC_Visibility,Params);
     if(auto* Node=Cast<AResourceNode>(Hit.GetActor()))
     {
+        auto* Crate=DeliverySelection.Get();
+        if(bDeliverySelection && (!IsValid(Crate) || Crate->IsActorBeingDestroyed())) { Feedback=TEXT("Selected delivery crate lost; V clears selection or selects another crate"); return; }
         int32 Assigned=0;
         for(TActorIterator<ACreatureCharacter> It(GetWorld());It;++It)
-            if(IsCommandTarget(*It) && It->AssignFieldResource(Node)) ++Assigned;
-        Feedback=FString::Printf(TEXT("Field resource assigned to %d companions; F cancels. Shared stock, no post required"),Assigned);
+            if(IsCommandTarget(*It) && (!bDeliverySelection || It->CarriedFood==0) && It->AssignFieldResource(Node))
+            { if(bDeliverySelection) It->Cargo->Assign(Crate,this); ++Assigned; }
+        Feedback=FString::Printf(TEXT("Field resource assigned to %d companions | %s | F cancels"),Assigned,bDeliverySelection?TEXT("carry to selected storage"):TEXT("direct player inventory"));
         return;
     }
     AWorkStation* Site = nullptr;

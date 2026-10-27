@@ -30,6 +30,7 @@ USTRUCT()
 struct FCreatureSaveRecord
 {
     GENERATED_BODY()
+    UPROPERTY() FGuid Id;
     UPROPERTY() TSoftClassPtr<ACreatureCharacter> CreatureClass;
     UPROPERTY() TSoftObjectPtr<UCreatureDefinition> Definition;
     UPROPERTY() FTransform Transform;
@@ -50,6 +51,9 @@ struct FCreatureSaveRecord
     UPROPERTY() FName WorkSiteName;
     UPROPERTY() FGuid WorkSiteId;
     UPROPERTY() FGuid FieldResourceId;
+    UPROPERTY() TMap<EFrontierItem,int32> CargoItems;
+    UPROPERTY() FGuid DeliveryCrateId;
+    UPROPERTY() bool bReturningCargo=false;
     UPROPERTY() FName EncounterId;
     UPROPERTY() bool bAlpha = false;
     UPROPERTY() float AlphaCooldown = 3;
@@ -83,6 +87,9 @@ class CREATUREFRONTIER_API UFrontierSaveGame : public USaveGame
 {
     GENERATED_BODY()
 public:
+    // Legacy saves may omit this property when it equals the class default.
+    // Freeze the pre-cargo fallback; writers explicitly set the current version
+    // so future default changes cannot reinterpret an untagged legacy save.
     UPROPERTY() int32 FormatVersion = 21;
     UPROPERTY() FResearchProgress Research;
     UPROPERTY() TArray<FHomeModuleRecord> HomeModules;

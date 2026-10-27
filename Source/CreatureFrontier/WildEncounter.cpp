@@ -23,7 +23,7 @@ AWildEncounter::AWildEncounter()
 void AWildEncounter::BeginPlay()
 {
     Super::BeginPlay();
-    for(const TCHAR* Flag:{TEXT("CFFieldRecoveryTest"),TEXT("CFFieldRecoveryWrite"),TEXT("CFFieldRecoveryRead"),TEXT("CFStorageTest"),TEXT("CFStorageWrite"),TEXT("CFStorageRead")})
+    for(const TCHAR* Flag:{TEXT("CFFieldRecoveryTest"),TEXT("CFFieldRecoveryWrite"),TEXT("CFFieldRecoveryRead"),TEXT("CFStorageTest"),TEXT("CFStorageWrite"),TEXT("CFStorageRead"),TEXT("CFCargoTest"),TEXT("CFCargoWrite"),TEXT("CFCargoRead"),TEXT("CFCargoCrystalTest")})
         if(FParse::Param(FCommandLine::Get(),Flag)) SetActorTickEnabled(false);
     // Existing fixture scenarios own their entire population. The encounter scenario
     // explicitly ticks its own slot, keeping all regression worlds isolated.
@@ -63,14 +63,14 @@ void AWildEncounter::Tick(float DeltaSeconds)
     if (GetResident()) return;
     if (!bWaiting)
     {
-        if (Resident.IsValid() && Resident->Health <= 0) Corpse = Resident;
+        if (Resident.IsValid() && Resident->Health <= 0 && Resident->Disposition!=ECreatureDisposition::Tamed) Corpse = Resident;
         Resident.Reset();
         bWaiting = true;
         Remaining = RespawnSeconds;
     }
     Remaining = FMath::Max(0.0f, Remaining - DeltaSeconds);
     if (Remaining > 0 || !IsSpawnAreaClear()) return;
-    if (Corpse.IsValid()) Corpse->Destroy();
+    if (Corpse.IsValid() && Corpse->Disposition!=ECreatureDisposition::Tamed) Corpse->Destroy();
     Corpse.Reset();
     const FTransform Spawn(GetActorRotation(), GetActorLocation() + FVector(0,0,90));
     auto* Pet = GetWorld()->SpawnActorDeferred<ACreatureCharacter>(ACreatureCharacter::StaticClass(), Spawn,

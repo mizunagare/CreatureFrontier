@@ -43,6 +43,7 @@ public:
     FString GetRecipeStatus(const struct FFrontierRecipe& Recipe) const;
     void ToggleBuilding();
     void CycleBuilding();
+    bool HasDeliverySelection() const { return bDeliverySelection; }
     void DismantleBuilding();
     void CraftCaptureDevice();
     void CraftMedicine();
@@ -151,6 +152,8 @@ protected:
     virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 
 private:
+    TWeakObjectPtr<class AHomeModule> DeliverySelection;
+    bool bDeliverySelection=false;
     FString GetQuickSaveSlot() const;
     bool ClosePauseMenu();
     bool bPauseMenu=false;

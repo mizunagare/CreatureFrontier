@@ -119,7 +119,7 @@ void RunResourceScenario(UWorld* World,ACFPlayerCharacter* Hero)
         if(Case==2) Bad->ResourceNodes[0].RegrowRemaining=5000;
         if(Case==3) Bad->ResourceNodes[0].Definition=TSoftObjectPtr<UResourceDefinition>(FSoftObjectPath(TEXT("/Game/Missing.Resource")));
         if(Case==4) Bad->ResourceNodes[0].HarvestCooldown=100;
-        if(Case==5) { FCreatureSaveRecord Record; Record.CreatureClass=ACreatureCharacter::StaticClass(); Record.Health=-1; Bad->Creatures.Add(Record); }
+        if(Case==5) { FCreatureSaveRecord Record; Record.Id=FGuid::NewGuid(); Record.CreatureClass=ACreatureCharacter::StaticClass(); Record.Health=-1; Bad->Creatures.Add(Record); }
         const FString BadSlot=TEXT("FrontierResourceInvalid");
         UGameplayStatics::SaveGameToSlot(Bad,BadSlot,0);
         Invalid &= !Hero->LoadProgress(BadSlot) && IsValid(Brush) && Brush->Remaining==Capacity && Brush->GetActorEnableCollision() && CountNodes()==7 && Hero->Inventory->Count(EFrontierItem::Material)==7;

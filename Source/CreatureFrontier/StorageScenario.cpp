@@ -135,7 +135,7 @@ void RunStorageScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
         if(Case==4) Record->FloorId=FGuid::NewGuid();
         if(Case==5) { const auto Copy=*Record; Bad->HomeModules.Add(Copy); }
         if(Case==6) Bad->FormatVersion=20;
-        if(Case==7) { FCreatureSaveRecord Broken; Broken.CreatureClass=ACreatureCharacter::StaticClass(); Broken.Health=-1; Bad->Creatures.Add(Broken); }
+        if(Case==7) { FCreatureSaveRecord Broken; Broken.Id=FGuid::NewGuid(); Broken.CreatureClass=ACreatureCharacter::StaticClass(); Broken.Health=-1; Bad->Creatures.Add(Broken); }
         if(Case==8) { FFacilitySaveRecord Overlap; Overlap.Id=FGuid::NewGuid(); Overlap.Transform=FTransform(FRotator::ZeroRotator,FVector(-400,-800,5),FVector(2,1,.7)); Bad->Facilities.Add(Overlap); }
         Invalid &= UGameplayStatics::SaveGameToSlot(Bad,TEXT("StorageInvalid"),0) && !Hero->LoadProgress(TEXT("StorageInvalid")) && IsValid(Live) && Live->PersistentId==CrateId && Snapshot(World,Hero);
     }
