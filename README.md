@@ -4,9 +4,9 @@
 
 ## Windows 独立原型
 
-当前最新本机版本：`D:\myGame\Builds\Windows-Squad\CreatureFrontier.exe`。
+当前最新本机版本：`D:\myGame\Builds\Windows-Roster\CreatureFrontier.exe`。
 双击即可进入测试地图，不需要先打开 Unreal Editor。复制到其他机器时需复制整个
-`Builds\Windows-Squad` 文件夹，不能只复制根目录的启动 EXE。
+`Builds\Windows-Roster` 文件夹，不能只复制根目录的启动 EXE。
 这是 Development 灰盒原型，尚未完成正式美术、内容与性能优化。
 
 战斗更新预览另外输出到 `D:\myGame\Builds\Windows-Combat\CreatureFrontier.exe`，
@@ -20,6 +20,7 @@
 自动照料更新输出到 `D:\myGame\Builds\Windows-Feeding\CreatureFrontier.exe`。
 自动工作循环更新输出到 `D:\myGame\Builds\Windows-WorkCycle\CreatureFrontier.exe`。
 伙伴分工更新输出到 `D:\myGame\Builds\Windows-Squad\CreatureFrontier.exe`。
+队伍面板更新输出到 `D:\myGame\Builds\Windows-Roster\CreatureFrontier.exe`。
 旧存档版本 1–10 可以读取，新版存档版本为 11（包含自动休息后的待复工状态）。
 新版保存后的存档不能交给旧版程序读取；请保留旧存档备份。
 测试脚本默认选择 `Builds` 下最新编译的 Development 程序，也可明确指定：
@@ -56,6 +57,7 @@ Windows 开发环境已部署并验证：Unreal Engine 5.8、Visual Studio C++ �
 - 鼠标右键：捕捉准星指向的宠物（宠物生命值越低，成功率越高）
 - `L`：瞄准 12 米内无遮挡、存活的自有伙伴，切换为单只指令模式
 - `K`：切回全体伙伴指令模式（默认）
+- `Tab`：展开/收起队伍面板；`[` / `]` 浏览伙伴，`Enter` 选择高亮伙伴
 - `F`：召回当前指令范围内的伙伴跟随，并自动攻击玩家周边的野生宠物
 - `E`：靠近出生点后方的工作台（8 米内），分配伙伴采集；到达后每 3 秒产出 1 资源
 - `R`：重新开始当前关卡（玩家倒地后也可使用）
@@ -74,6 +76,12 @@ L/K 决定 F/E/T/Q/G 的指令范围；其他伙伴保留原有任务，因此�
 用 L 重新选择或 K 切回全体；HUD 显示当前范围。选择本身不写入存档，工作分配仍正常保存。
 单只模式读档后需要重新选择，全体模式读档后仍为全体。J 喂食、P 救治仍以准星目标为准。
 G 在单只模式只检查所选伙伴，冷却中不会改让其他伙伴施法。
+
+队伍面板显示所有自有伙伴（包括倒地伙伴）的等级、生命、体力、饱食度、距离、活动与工作类型。
+高亮只是浏览，不会改变任务或指令范围；Enter 才尝试选择，仍需存活、12 米内无遮挡。
+伙伴较多时随高亮自动翻页，首尾循环。读档后清除旧高亮，重新打开面板即可从新伙伴列表浏览。
+面板不会暂停游戏；WASD 与战斗键继续有效，不能在战斗中用它冻结敌人。
+它不是远程救治/喂食、仓储或宠物收纳系统，J/P 仍需瞄准目标。
 
 主动技能消耗 20 体力，蓄力 0.65 秒；伙伴会先尝试进入射程，最多等待 6 秒。
 工作/休息中的伙伴不响应战斗指令，F 可重新启用跟随。F 取消集火和蓄力；
@@ -165,9 +173,14 @@ HUD 显示玩家生命、资源、伙伴数量、工作数量和准星目标的�
 库存/工作/冷却存档、异常库存拒绝和非空食槽拆除保护，使用 `FrontierFeedingAutomation` 测试槽。
 `-CFWorkCycleTest` 验证饥饿等待、手动指令、倒地/设施移除取消、疲劳自动休息、
 待复工存档、真实计时恢复后再次生产，以及旧版休息指令不被自动改写，使用 `FrontierWorkCycleAutomation` 测试槽。
-`-CFSquadTest` 验证单只选择、不同工作分配、局部休息/跟随/集火/技能、无效选择拒绝、
+`-CFSquadTest` 验证队伍名单、面板开关、首尾浏览、确认选择与读档后列表重建、
+单只选择、不同工作分配、局部休息/跟随/集火/技能、无效选择拒绝、
 倒地或失去选择时的安全阻止、全体切换与分工读档，使用 `FrontierSquadAutomation` 测试槽。
 当前打包回归共 16 项，包含上述伙伴分工测试。
+同时添加 `-CFRosterPreview -RenderOffscreen -windowed -ResX=1280 -ResY=720 -norhithread -forcerhibypass "-ExecCmds=t.MaxFPS 60"`（不要使用 `-nullrhi`），
+可生成 11 只伙伴的两页界面截图 `Saved/RosterPreview/team.png` 和 `team_page2.png` 后退出，不写入玩家存档。
+已知显示问题：当前机器 D3D12 离屏截图存在间歇性缺字，上述兼容参数可改善但尚未完全消除。
+名单布局/分页已检查，文字显示稳定性仍需继续排查；普通窗口渲染仍待专项验证，普通游戏渲染配置未改动。
 `-CFWorldTest` 验证谷地场景与防坠落边界、入口到两区的导航连通、真实闲逛位移、
 领地返回/恢复、返程期间伤害与捕捉拒绝、锚点读档及捕捉后脱离生态 AI，使用 `FrontierWorldAutomation` 测试槽。
 `-CFBossTest` 验证范围预警、逃离/跳跃/掩体躲避、伙伴受击与护盾、首领冷却、

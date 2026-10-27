@@ -1,6 +1,40 @@
 #include "CFPlayerCharacter.h"
 #include "CreatureCharacter.h"
 #include "Camera/CameraComponent.h"
+#include "EngineUtils.h"
+
+TArray<ACreatureCharacter*> ACFPlayerCharacter::GetCompanionRoster() const
+{
+    TArray<ACreatureCharacter*> Result;
+    if (!GetController()) return Result;
+    for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It)
+        if (It->Disposition == ECreatureDisposition::Tamed && It->Tamer == GetController()) Result.Add(*It);
+    Result.Sort([](const ACreatureCharacter& A,const ACreatureCharacter& B) { return A.GetName() < B.GetName(); });
+    return Result;
+}
+
+void ACFPlayerCharacter::ToggleRoster()
+{
+    bRosterOpen = !bRosterOpen;
+    if (bRosterOpen && !GetCompanionRoster().Contains(RosterHighlight.Get())) StepRoster(1);
+}
+
+void ACFPlayerCharacter::StepRoster(int32 Direction)
+{
+    if (!bRosterOpen) return;
+    const auto Pets = GetCompanionRoster();
+    if (Pets.IsEmpty()) { RosterHighlight.Reset(); return; }
+    const int32 Current = Pets.IndexOfByKey(RosterHighlight.Get());
+    const int32 Next = Current == INDEX_NONE ? 0 : (Current+Direction+Pets.Num())%Pets.Num();
+    RosterHighlight = Pets[Next];
+}
+
+void ACFPlayerCharacter::NextRosterCompanion() { StepRoster(1); }
+void ACFPlayerCharacter::PreviousRosterCompanion() { StepRoster(-1); }
+void ACFPlayerCharacter::SelectRosterCompanion()
+{
+    if (bRosterOpen) SelectCompanion(RosterHighlight.Get());
+}
 
 bool ACFPlayerCharacter::SelectCompanion(ACreatureCharacter* Pet)
 {

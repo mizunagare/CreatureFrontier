@@ -9,6 +9,12 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "EngineUtils.h"
 #include "HAL/PlatformMisc.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
+#include "Misc/Paths.h"
+#include "HAL/FileManager.h"
+#include "UnrealClient.h"
+#include "TimerManager.h"
 
 void RunSquadScenario(UWorld* World, ACFPlayerCharacter* Hero)
 {
@@ -31,6 +37,31 @@ void RunSquadScenario(UWorld* World, ACFPlayerCharacter* Hero)
     auto* Leaf = Make(ECreatureForm::Leaf,FVector(0,-900,40));
     auto* Stone = Make(ECreatureForm::Stone,FVector(-500,-900,40));
     auto* Ember = Make(ECreatureForm::Ember,FVector(-900,-900,40));
+    if (FParse::Param(FCommandLine::Get(),TEXT("CFRosterPreview")))
+    {
+        for (int32 I=0; I<8; ++I) Make(ECreatureForm::Leaf,FVector(400+I*100,-1500,40));
+        Leaf->WorkSite=Garden; Leaf->SetActivity(ECreatureActivity::Work);
+        Stone->Health=0; Ember->Nutrition=24; Ember->Stamina=33;
+        Hero->ToggleRoster();
+        const FString Root=FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir()/TEXT("RosterPreview"));
+        IFileManager::Get().MakeDirectory(*Root,true);
+        FTimerHandle Shot,Page,SecondShot,Done;
+        World->GetTimerManager().SetTimer(Shot,[Root]() { FScreenshotRequest::RequestScreenshot(Root/TEXT("team.png"),false,false); },3.f,false);
+        World->GetTimerManager().SetTimer(Page,[Hero]() { for(int32 I=0;I<8;++I) Hero->NextRosterCompanion(); },4.f,false);
+        World->GetTimerManager().SetTimer(SecondShot,[Root]() { FScreenshotRequest::RequestScreenshot(Root/TEXT("team_page2.png"),false,false); },6.f,false);
+        World->GetTimerManager().SetTimer(Done,[Root]() { FPlatformMisc::RequestExitWithStatus(false,IFileManager::Get().FileSize(*(Root/TEXT("team.png")))>1000 && IFileManager::Get().FileSize(*(Root/TEXT("team_page2.png")))>1000?0:1); },8.f,false);
+        return;
+    }
+    const auto Roster = Hero->GetCompanionRoster();
+    Hero->NextRosterCompanion();
+    bool RosterPass = !Hero->GetRosterHighlight() && Roster.Num()==3;
+    Hero->ToggleRoster();
+    RosterPass &= Hero->IsRosterOpen() && Hero->GetRosterHighlight()==Roster[0];
+    Hero->PreviousRosterCompanion(); RosterPass &= Hero->GetRosterHighlight()==Roster.Last();
+    Hero->NextRosterCompanion(); RosterPass &= Hero->GetRosterHighlight()==Roster[0];
+    Hero->SelectRosterCompanion(); RosterPass &= Hero->IsCommandTarget(Roster[0]);
+    Hero->ToggleRoster(); Hero->NextRosterCompanion();
+    RosterPass &= !Hero->IsRosterOpen() && Hero->GetRosterHighlight()==Roster[0];
     auto Aim = [&](AActor* Target) { Hero->FirstPersonCamera->SetWorldRotation((Target->GetActorLocation()-Hero->FirstPersonCamera->GetComponentLocation()).Rotation()); };
     Aim(Leaf); Hero->SelectAimedCompanion();
     bool Select = Hero->IsCommandTarget(Leaf) && !Hero->IsCommandTarget(Stone) && !Hero->IsCommandTarget(Ember);
@@ -66,11 +97,14 @@ void RunSquadScenario(UWorld* World, ACFPlayerCharacter* Hero)
     for (TActorIterator<ACreatureCharacter> It(World); It; ++It) if (It->Tamer == Hero->GetController())
     { if (It->Definition->Form == ECreatureForm::Leaf) Leaf = *It; if (It->Definition->Form == ECreatureForm::Stone) Stone = *It; }
     Saved &= Leaf && Stone && Leaf->WorkSite && Leaf->WorkSite->RequiredSpecialty == EWorkSpecialty::Farming && !Hero->IsCommandTarget(Leaf) && !Hero->IsCommandTarget(Stone);
+    RosterPass &= !Hero->GetRosterHighlight() && Hero->GetCompanionRoster().Num()==2;
+    Hero->ToggleRoster(); RosterPass &= Hero->GetRosterHighlight()!=nullptr;
+    Hero->ToggleRoster();
     Hero->CommandFollow(); Saved &= Leaf && Leaf->Activity == ECreatureActivity::Work;
     Hero->ClearCompanionSelection(); Hero->CommandFollow();
     const bool Reset = Leaf && Stone && Leaf->Activity == ECreatureActivity::Follow && Stone->Activity == ECreatureActivity::Follow && !Leaf->WorkSite;
-    const bool Pass = Select && Split && ScopedRest && Combat && Reject && Lost && All && Saved && Reset;
-    UE_LOG(LogTemp,Display,TEXT("CF_SQUAD %s select=%d split=%d rest=%d combat=%d reject=%d lost=%d all=%d save=%d reset=%d"),
-        Pass ? TEXT("PASS") : TEXT("FAIL"),Select,Split,ScopedRest,Combat,Reject,Lost,All,Saved,Reset);
+    const bool Pass = RosterPass && Select && Split && ScopedRest && Combat && Reject && Lost && All && Saved && Reset;
+    UE_LOG(LogTemp,Display,TEXT("CF_SQUAD %s roster=%d select=%d split=%d rest=%d combat=%d reject=%d lost=%d all=%d save=%d reset=%d"),
+        Pass ? TEXT("PASS") : TEXT("FAIL"),RosterPass,Select,Split,ScopedRest,Combat,Reject,Lost,All,Saved,Reset);
     FPlatformMisc::RequestExitWithStatus(false,Pass ? 0 : 1);
 }

@@ -270,6 +270,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
     Inventory->Restore(Save->InventoryStacks);
     GetCharacterMovement()->SetMovementMode(Health > 0 ? MOVE_Walking : MOVE_None);
     SelectedCompanion.Reset();
+    RosterHighlight.Reset();
     Feedback = bSingleCompanionMode ? TEXT("Save restored - select again with L or use K for ALL; commands blocked until then") : TEXT("Save restored - commands target ALL; L selects one companion");
     return true;
 }
@@ -431,6 +432,10 @@ void ACFPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
     PlayerInputComponent->BindKey(EKeys::X, IE_Pressed, this, &ACFPlayerCharacter::DismantleBuilding);
     PlayerInputComponent->BindKey(EKeys::L, IE_Pressed, this, &ACFPlayerCharacter::SelectAimedCompanion);
     PlayerInputComponent->BindKey(EKeys::K, IE_Pressed, this, &ACFPlayerCharacter::ClearCompanionSelection);
+    PlayerInputComponent->BindKey(EKeys::Tab, IE_Pressed, this, &ACFPlayerCharacter::ToggleRoster);
+    PlayerInputComponent->BindKey(EKeys::RightBracket, IE_Pressed, this, &ACFPlayerCharacter::NextRosterCompanion);
+    PlayerInputComponent->BindKey(EKeys::LeftBracket, IE_Pressed, this, &ACFPlayerCharacter::PreviousRosterCompanion);
+    PlayerInputComponent->BindKey(EKeys::Enter, IE_Pressed, this, &ACFPlayerCharacter::SelectRosterCompanion);
 }
 
 void ACFPlayerCharacter::MoveForward(float Value)

@@ -33,6 +33,7 @@ void ACFHUD::DrawHUD()
     DrawText(FString::Printf(TEXT("FOOD %d | 3 craft food (2 materials) | J feed aimed companion"),Player->Inventory->Count(EFrontierItem::Food)),FLinearColor::White,32,268);
     DrawText(TEXT("Trough: aim + U deposit food | O withdraw (up to 5)"),FLinearColor::White,32,294);
     DrawText(Player->GetCommandScopeText(),FLinearColor::Green,32,320);
+    DrawText(TEXT("Tab team roster | [ / ] browse | Enter select"),FLinearColor::White,32,342);
     DrawText(Player->Feedback, FLinearColor::Yellow, 32, 368);
     if (Player->Building->IsActive()) DrawText(Player->Building->GetHint(), FLinearColor::Yellow,32,440);
     if (auto* Site = Player->TraceFacility(); Site && Site->RequiredSpecialty == EWorkSpecialty::Feeding)
@@ -67,5 +68,34 @@ void ACFHUD::DrawHUD()
         }
         if (Creature->SlowRemaining > 0 || Creature->GuardRemaining > 0)
             DrawText(FString::Printf(TEXT("SLOW %.1fs  GUARD %.1fs"), Creature->SlowRemaining, Creature->GuardRemaining), FLinearColor::Yellow, X-130, Y+92);
+    }
+    if (Player->IsRosterOpen())
+    {
+        const auto Pets = Player->GetCompanionRoster();
+        const int32 Highlight = Pets.IndexOfByKey(Player->GetRosterHighlight());
+        const int32 Rows = FMath::Clamp(FMath::FloorToInt((Canvas->ClipY-160)/70),1,8);
+        const int32 Start = Highlight == INDEX_NONE ? 0 : (Highlight/Rows)*Rows;
+        const float Width = FMath::Min(470.f,Canvas->ClipX-36.f), Left = Canvas->ClipX-Width-18;
+        DrawRect(FLinearColor(.015f,.025f,.04f,.96f),Left,18,Width,100+Rows*70);
+        // Draw every background before text: Canvas may batch font glyphs across rows.
+        if (Highlight != INDEX_NONE) DrawRect(FLinearColor(.08f,.22f,.28f,.9f),Left+6,103+(Highlight-Start)*70,Width-12,66);
+        DrawText(FString::Printf(TEXT("TEAM  %d companions | %d-%d"),Pets.Num(),Pets.IsEmpty()?0:Start+1,FMath::Min(Start+Rows,Pets.Num())),FLinearColor::White,Left+14,30);
+        DrawText(TEXT("[ / ] browse | Enter select | Tab close"),FLinearColor::Yellow,Left+14,52);
+        DrawText(TEXT("Live world - NOT paused | selection: 12m + sight"),FLinearColor::White,Left+14,73);
+        if (Pets.IsEmpty()) DrawText(TEXT("No companions yet - capture a wild creature"),FLinearColor::Green,Left+14,110);
+        for (int32 I=Start; I<FMath::Min(Start+Rows,Pets.Num()); ++I)
+        {
+            const auto* Pet = Pets[I]; const float RowY = 103+(I-Start)*70;
+            const auto Color = Pet->Health <= 0 ? FLinearColor(1,.35f,.3f) : FLinearColor::White;
+            DrawText(FString::Printf(TEXT("%s %s Lv%d | %.1fm %s"),I==Highlight?TEXT(">>"):TEXT("  "),*Pet->GetCreatureName(),Pet->Level,Player->GetDistanceTo(Pet)/100,
+                Player->IsCommandTarget(Pet)?TEXT("[COMMAND]"):TEXT("")),Color,Left+14,RowY+3);
+            DrawText(FString::Printf(TEXT("HP %.0f/%.0f | stamina %.0f | food %.0f"),Pet->Health,Pet->GetMaxHealth(),Pet->Stamina,Pet->Nutrition),Color,Left+14,RowY+23);
+            FString Status = UEnum::GetValueAsString(Pet->Activity); Status.RemoveFromStart(TEXT("ECreatureActivity::"));
+            if (Pet->Health <= 0) Status = TEXT("DOWNED - aim + P to treat");
+            else if (Pet->FeedingSite.IsValid()) Status = TEXT("Seeking food");
+            else if (Pet->bResumeWorkAfterRest) Status = TEXT("Auto rest / work pending");
+            if (Pet->WorkSite) { FString Job=UEnum::GetValueAsString(Pet->WorkSite->RequiredSpecialty); Job.RemoveFromStart(TEXT("EWorkSpecialty::")); Status+=TEXT(" | ")+Job; }
+            DrawText(Status,FLinearColor::Green,Left+14,RowY+43);
+        }
     }
 }

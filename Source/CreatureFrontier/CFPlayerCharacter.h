@@ -45,6 +45,13 @@ public:
     void ClearCompanionSelection();
     bool IsCommandTarget(const ACreatureCharacter* Pet) const;
     FString GetCommandScopeText() const;
+    TArray<ACreatureCharacter*> GetCompanionRoster() const;
+    void ToggleRoster();
+    void NextRosterCompanion();
+    void PreviousRosterCompanion();
+    void SelectRosterCompanion();
+    bool IsRosterOpen() const { return bRosterOpen; }
+    ACreatureCharacter* GetRosterHighlight() const { return RosterHighlight.Get(); }
     void CommandFollow();
     void CommandWork();
     void CommandRest();
@@ -82,6 +89,9 @@ protected:
     virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 
 private:
+    void StepRoster(int32 Direction);
+    bool bRosterOpen = false;
+    TWeakObjectPtr<ACreatureCharacter> RosterHighlight;
     TWeakObjectPtr<ACreatureCharacter> SelectedCompanion;
     bool bSingleCompanionMode = false;
     void MoveForward(float Value);
