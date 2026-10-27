@@ -1,6 +1,8 @@
 #include "CFPlayerCharacter.h"
 #include "CreatureCharacter.h"
 #include "InventoryComponent.h"
+#include "WorkStation.h"
+#include "Camera/CameraComponent.h"
 
 void ACFPlayerCharacter::CraftFood()
 {
@@ -28,3 +30,25 @@ bool ACFPlayerCharacter::FeedCompanion(ACreatureCharacter* Pet)
 }
 
 void ACFPlayerCharacter::FeedAimedCompanion() { FeedCompanion(TraceCreature()); }
+
+AWorkStation* ACFPlayerCharacter::TraceFacility() const
+{
+    FHitResult Hit; FCollisionQueryParams Params(SCENE_QUERY_STAT(FacilityAim),false,this);
+    const FVector Start = FirstPersonCamera->GetComponentLocation();
+    GetWorld()->LineTraceSingleByChannel(Hit,Start,Start+FirstPersonCamera->GetForwardVector()*600,ECC_Visibility,Params);
+    return Cast<AWorkStation>(Hit.GetActor());
+}
+
+void ACFPlayerCharacter::DepositTroughFood()
+{
+    auto* Site = TraceFacility();
+    if (!Site || Site->RequiredSpecialty != EWorkSpecialty::Feeding) Feedback = TEXT("Aim at a feeding trough within 6m");
+    else Site->TransferFood(this,true);
+}
+
+void ACFPlayerCharacter::WithdrawTroughFood()
+{
+    auto* Site = TraceFacility();
+    if (!Site || Site->RequiredSpecialty != EWorkSpecialty::Feeding) Feedback = TEXT("Aim at a feeding trough within 6m");
+    else Site->TransferFood(this,false);
+}

@@ -50,6 +50,8 @@ public:
     UPROPERTY(Replicated, BlueprintReadOnly, Category="Care")
     float Stamina = 100.0f;
     UPROPERTY(Replicated, BlueprintReadOnly, Category="Care") float Nutrition = 100;
+    UPROPERTY(Replicated, BlueprintReadOnly, Category="Care") float AutoFeedCooldown = 0;
+    UPROPERTY(BlueprintReadOnly, Category="Care") TWeakObjectPtr<AWorkStation> FeedingSite;
     UPROPERTY(Replicated, BlueprintReadOnly, Category="Combat")
     float SpecialCooldownRemaining = 0.0f;
     UPROPERTY(Replicated, BlueprintReadOnly, Category="Combat")
@@ -115,6 +117,8 @@ protected:
     void OnRep_Activity();
 
 private:
+    bool TickAutoFeeding();
+    double FoodSearchExpires = 0;
     bool TickHabitatReturn();
     void TickRoaming(float DeltaSeconds);
     FVector RoamTarget = FVector::ZeroVector;

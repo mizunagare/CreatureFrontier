@@ -196,9 +196,10 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
     SkillPulseRemaining = FMath::Max(0.0f, SkillPulseRemaining - DeltaSeconds);
     RetaliationRemaining = FMath::Max(0.0f, RetaliationRemaining - DeltaSeconds);
     AlphaCooldown = FMath::Max(0.0f, AlphaCooldown - DeltaSeconds);
+    AutoFeedCooldown = FMath::Max(0.0f,AutoFeedCooldown-DeltaSeconds);
     GetCharacterMovement()->MaxWalkSpeed = (Definition ? Definition->MoveSpeed : 320.0f) * (SlowRemaining > 0 ? 0.5f : 1.0f) *
         (Disposition != ECreatureDisposition::Tamed && Activity == ECreatureActivity::Wander ? .45f : 1.0f);
-    if (Health <= 0.0f) { AlphaWindup = 0; ClearCombatOrders(); StopNavigation(); return; }
+    if (Health <= 0.0f) { FeedingSite.Reset(); AlphaWindup = 0; ClearCombatOrders(); StopNavigation(); return; }
 
     AttackCooldown = FMath::Max(0.0f, AttackCooldown - DeltaSeconds);
     if (Disposition == ECreatureDisposition::Tamed)
@@ -206,6 +207,7 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
         ACFPlayerCharacter* OwnerPlayer = Tamer ? Cast<ACFPlayerCharacter>(Tamer->GetPawn()) : nullptr;
         if (!OwnerPlayer || OwnerPlayer->Health <= 0.0f) { ClearCombatOrders(); StopNavigation(); return; }
         Nutrition = FMath::Max(0.0f,Nutrition - DeltaSeconds*(Activity == ECreatureActivity::Work ? .35f : Activity == ECreatureActivity::Rest ? .04f : .08f));
+        if (TickAutoFeeding()) return;
         if (Nutrition <= 0 && Activity == ECreatureActivity::Work)
         {
             SetActivity(ECreatureActivity::Rest); WorkProgress = 0;
@@ -225,6 +227,7 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
         }
         if (Activity == ECreatureActivity::Work && IsValid(WorkSite))
         {
+            if (WorkSite->RequiredSpecialty == EWorkSpecialty::Feeding) { SetActivity(ECreatureActivity::Rest); return; }
             if (ProgressSite.Get() != WorkSite.Get()) { WorkProgress = 0; ProgressSite = WorkSite; }
             const FVector Offset = WorkSite->GetActorLocation() - GetActorLocation();
             if (Offset.Size2D() > 220.0f) { NavigateTo(WorkSite->GetActorLocation(), 35.0f); WorkProgress = 0.0f; }
@@ -430,6 +433,7 @@ void ACreatureCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
     DOREPLIFETIME(ACreatureCharacter, Experience);
     DOREPLIFETIME(ACreatureCharacter, Stamina);
     DOREPLIFETIME(ACreatureCharacter, Nutrition);
+    DOREPLIFETIME(ACreatureCharacter, AutoFeedCooldown);
     DOREPLIFETIME(ACreatureCharacter, SpecialCooldownRemaining);
     DOREPLIFETIME(ACreatureCharacter, SpecialWindupRemaining);
     DOREPLIFETIME(ACreatureCharacter, SlowRemaining);

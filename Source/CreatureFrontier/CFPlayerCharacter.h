@@ -9,6 +9,7 @@ class UCaptureComponent;
 class ACreatureCharacter;
 class UInventoryComponent;
 class UBaseBuildingComponent;
+class AWorkStation;
 
 UCLASS()
 class CREATUREFRONTIER_API ACFPlayerCharacter : public ACharacter
@@ -32,6 +33,9 @@ public:
     void CraftFood();
     void FeedAimedCompanion();
     bool FeedCompanion(ACreatureCharacter* Pet);
+    AWorkStation* TraceFacility() const;
+    void DepositTroughFood();
+    void WithdrawTroughFood();
     void UseMedicine();
     bool IsNearWorkStation() const;
     FString Feedback;

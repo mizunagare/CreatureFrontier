@@ -54,16 +54,22 @@ void AWorkStation::BeginPlay()
 void AWorkStation::RefreshLabel()
 {
     const bool Farm = RequiredSpecialty == EWorkSpecialty::Farming;
+    const bool Trough = RequiredSpecialty == EWorkSpecialty::Feeding;
+    int32 Index = 0;
     for (const auto& Plant : FarmPlants)
     {
-        Plant->SetVisibility(Farm); Plant->SetHiddenInGame(!Farm);
-        if (Farm)
+        const bool Show = Farm || (Trough && Index < (StoredFood+4)/5);
+        ++Index;
+        Plant->SetVisibility(Show); Plant->SetHiddenInGame(!Show);
+        Plant->SetStaticMesh(LoadObject<UStaticMesh>(nullptr,Farm ? TEXT("/Engine/BasicShapes/Cone.Cone") : TEXT("/Engine/BasicShapes/Sphere.Sphere")));
+        if (Show)
             if (auto* Palette = LoadObject<UMaterialInterface>(nullptr,TEXT("/Game/Materials/M_CreaturePalette.M_CreaturePalette")))
             {
                 auto* Material = UMaterialInstanceDynamic::Create(Palette,this);
-                Material->SetVectorParameterValue(TEXT("Tint"),FLinearColor(.12f,.6f,.08f)); Plant->SetMaterial(0,Material);
+                Material->SetVectorParameterValue(TEXT("Tint"),Farm ? FLinearColor(.12f,.6f,.08f) : FLinearColor(.9f,.4f,.04f)); Plant->SetMaterial(0,Material);
             }
     }
     const FString Name = UEnum::GetValueAsString(RequiredSpecialty).Replace(TEXT("EWorkSpecialty::"), TEXT(""));
-    Label->SetText(FText::FromString(Name + (Farm ? TEXT("\nFOOD GARDEN") : bPlayerBuilt ? TEXT("\nBUILT FACILITY") : TEXT("\nWORK STATION"))));
+    Label->SetText(FText::FromString(Trough ? FString::Printf(TEXT("FEEDING TROUGH\nFOOD %d/30 | U+ O-"),StoredFood) :
+        Name + (Farm ? TEXT("\nFOOD GARDEN") : bPlayerBuilt ? TEXT("\nBUILT FACILITY") : TEXT("\nWORK STATION"))));
 }

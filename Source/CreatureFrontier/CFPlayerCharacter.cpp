@@ -29,7 +29,7 @@ void ACFPlayerCharacter::QuitGame()
 bool ACFPlayerCharacter::IsNearWorkStation() const
 {
     for (TActorIterator<AWorkStation> It(GetWorld()); It; ++It)
-        if (GetDistanceTo(*It) <= 800.0f) return true;
+        if (It->RequiredSpecialty != EWorkSpecialty::Feeding && GetDistanceTo(*It) <= 800.0f) return true;
     return false;
 }
 
@@ -76,6 +76,7 @@ bool ACFPlayerCharacter::SaveProgress(const FString& Slot)
         Record.Experience = It->Experience;
         Record.Stamina = It->Stamina;
         Record.Nutrition = It->Nutrition;
+        Record.AutoFeedCooldown = It->AutoFeedCooldown;
         Record.SpecialCooldown = It->SpecialCooldownRemaining;
         Record.EncounterId = It->EncounterId;
         Record.bAlpha = It->bAlpha;
@@ -104,6 +105,7 @@ bool ACFPlayerCharacter::SaveProgress(const FString& Slot)
         {
             FFacilitySaveRecord Record;
             Record.Transform = It->GetActorTransform(); Record.Id = It->PersistentId; Record.Specialty = It->RequiredSpecialty;
+            Record.StoredFood = It->StoredFood;
             Save->Facilities.Add(Record);
         }
     const bool bSaved = UGameplayStatics::SaveGameToSlot(Save, Slot, 0);
@@ -115,7 +117,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
 {
     if (!HasAuthority() || !GetController()) return false;
     auto* Save = Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot, 0));
-    if (!Save || Save->FormatVersion < 1 || Save->FormatVersion > 9 ||
+    if (!Save || Save->FormatVersion < 1 || Save->FormatVersion > 10 ||
         Save->MapName != UGameplayStatics::GetCurrentLevelName(this, true) ||
         !FMath::IsFinite(Save->Health) || Save->Health < 0 || Save->Health > 100 ||
         Save->Resources < 0 || Save->PlayerTransform.ContainsNaN() || Save->ViewRotation.ContainsNaN())
@@ -144,7 +146,8 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
     for (const auto& Record : Save->Facilities)
     {
         if (!Record.Id.IsValid() || FacilityIds.Contains(Record.Id) || UBaseBuildingComponent::GetCost(Record.Specialty) <= 0 ||
-            !UBaseBuildingComponent::IsBuildTransformValid(Record.Transform))
+            !UBaseBuildingComponent::IsBuildTransformValid(Record.Transform) || Record.StoredFood < 0 || Record.StoredFood > 30 ||
+            (Record.Specialty != EWorkSpecialty::Feeding && Record.StoredFood != 0))
         { Feedback = TEXT("Invalid facility in save"); return false; }
         FacilityIds.Add(Record.Id);
     }
@@ -163,6 +166,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
             (Record.Level < 20 ? Record.Experience >= Record.Level * 100 : Record.Experience != 0) ||
             !FMath::IsFinite(Record.Stamina) || Record.Stamina < 0 || Record.Stamina > 100 ||
             !FMath::IsFinite(Record.Nutrition) || Record.Nutrition < 0 || Record.Nutrition > 100 ||
+            !FMath::IsFinite(Record.AutoFeedCooldown) || Record.AutoFeedCooldown < 0 || Record.AutoFeedCooldown > 10 ||
             !FMath::IsFinite(Record.SpecialCooldown) || Record.SpecialCooldown < 0 || Record.SpecialCooldown > 60 ||
             !FMath::IsFinite(Record.AlphaCooldown) || Record.AlphaCooldown < 0 || Record.AlphaCooldown > 10 ||
             Record.HabitatHome.ContainsNaN() || !FMath::IsFinite(Record.RoamRadius) || Record.RoamRadius < 0 || Record.RoamRadius > 600 ||
@@ -192,6 +196,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
         Pet->Experience = Record.Experience;
         Pet->Stamina = Record.Stamina;
         Pet->Nutrition = Record.Nutrition;
+        Pet->AutoFeedCooldown = Record.AutoFeedCooldown;
         Pet->SpecialCooldownRemaining = Record.SpecialCooldown;
         Pet->AlphaCooldown = Record.AlphaCooldown;
         Pet->bHasHabitat = Record.bHasHabitat && !Record.bOwned;
@@ -236,6 +241,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
             Feedback = TEXT("Could not restore facilities"); return false;
         }
         Site->bPlayerBuilt = true; Site->PersistentId = Record.Id; Site->RequiredSpecialty = Record.Specialty;
+        Site->StoredFood = Record.StoredFood;
         Site->FinishSpawning(Record.Transform);
         RestoredBuilt.Add(Site);
     }
@@ -336,6 +342,7 @@ void ACFPlayerCharacter::CommandWork()
     float Best = 800.0f;
     for (TActorIterator<AWorkStation> It(GetWorld()); It; ++It)
     {
+        if (It->RequiredSpecialty == EWorkSpecialty::Feeding) continue;
         const float Distance = GetDistanceTo(*It);
         if (Distance < Best) { Best = Distance; Site = *It; }
     }
@@ -410,6 +417,8 @@ void ACFPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
     PlayerInputComponent->BindKey(EKeys::Two, IE_Pressed, this, &ACFPlayerCharacter::CraftMedicine);
     PlayerInputComponent->BindKey(EKeys::Three, IE_Pressed, this, &ACFPlayerCharacter::CraftFood);
     PlayerInputComponent->BindKey(EKeys::J, IE_Pressed, this, &ACFPlayerCharacter::FeedAimedCompanion);
+    PlayerInputComponent->BindKey(EKeys::U, IE_Pressed, this, &ACFPlayerCharacter::DepositTroughFood);
+    PlayerInputComponent->BindKey(EKeys::O, IE_Pressed, this, &ACFPlayerCharacter::WithdrawTroughFood);
     PlayerInputComponent->BindKey(EKeys::H, IE_Pressed, this, &ACFPlayerCharacter::UseMedicine);
     PlayerInputComponent->BindKey(EKeys::B, IE_Pressed, this, &ACFPlayerCharacter::ToggleBuilding);
     PlayerInputComponent->BindKey(EKeys::V, IE_Pressed, this, &ACFPlayerCharacter::CycleBuilding);

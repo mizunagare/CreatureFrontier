@@ -21,6 +21,7 @@ struct FCreatureSaveRecord
     UPROPERTY() int32 Experience = 0;
     UPROPERTY() float Stamina = 100.0f;
     UPROPERTY() float Nutrition = 100;
+    UPROPERTY() float AutoFeedCooldown = 0;
     UPROPERTY() float SpecialCooldown = 0.0f;
     UPROPERTY() bool bOwned = false;
     UPROPERTY() ECreatureDisposition Disposition = ECreatureDisposition::Wild;
@@ -52,6 +53,7 @@ struct FFacilitySaveRecord
     UPROPERTY() FTransform Transform;
     UPROPERTY() FGuid Id;
     UPROPERTY() EWorkSpecialty Specialty = EWorkSpecialty::Gathering;
+    UPROPERTY() int32 StoredFood = 0;
 };
 
 UCLASS()
@@ -59,7 +61,7 @@ class CREATUREFRONTIER_API UFrontierSaveGame : public USaveGame
 {
     GENERATED_BODY()
 public:
-    UPROPERTY() int32 FormatVersion = 9;
+    UPROPERTY() int32 FormatVersion = 10;
     UPROPERTY() FString MapName;
     UPROPERTY() FTransform PlayerTransform;
     UPROPERTY() FRotator ViewRotation;

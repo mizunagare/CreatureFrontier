@@ -5,6 +5,7 @@
 #include "InventoryComponent.h"
 #include "BaseBuildingComponent.h"
 #include "WildEncounter.h"
+#include "WorkStation.h"
 #include "Engine/Canvas.h"
 #include "EngineUtils.h"
 
@@ -16,7 +17,7 @@ void ACFHUD::DrawHUD()
     const float X = Canvas->ClipX * 0.5f, Y = Canvas->ClipY * 0.5f;
     DrawLine(X-7, Y, X+7, Y, FLinearColor::White);
     DrawLine(X, Y-7, X, Y+7, FLinearColor::White);
-    DrawRect(FLinearColor(0.02f,0.03f,0.05f,0.85f), 18, 18, 550, 350);
+    DrawRect(FLinearColor(0.02f,0.03f,0.05f,0.85f), 18, 18, 550, 380);
     DrawText(FString::Printf(TEXT("HEALTH %.0f / 100    MATERIALS %d"), Player->Health, Player->Inventory->Count(EFrontierItem::Material)), FLinearColor::White, 32, 30);
     int32 Companions = 0, Working = 0;
     for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It)
@@ -30,8 +31,11 @@ void ACFHUD::DrawHUD()
     DrawText(TEXT("Q focus aimed enemy | G companion special (20 stamina)"), FLinearColor::White, 32, 216);
     DrawText(TEXT("B build mode | V cycle facility | X dismantle (50% refund)"), FLinearColor::White,32,242);
     DrawText(FString::Printf(TEXT("FOOD %d | 3 craft food (2 materials) | J feed aimed companion"),Player->Inventory->Count(EFrontierItem::Food)),FLinearColor::White,32,268);
-    DrawText(Player->Feedback, FLinearColor::Yellow, 32, 308);
-    if (Player->Building->IsActive()) DrawText(Player->Building->GetHint(), FLinearColor::Yellow,32,380);
+    DrawText(TEXT("Trough: aim + U deposit food | O withdraw (up to 5)"),FLinearColor::White,32,294);
+    DrawText(Player->Feedback, FLinearColor::Yellow, 32, 338);
+    if (Player->Building->IsActive()) DrawText(Player->Building->GetHint(), FLinearColor::Yellow,32,410);
+    if (auto* Site = Player->TraceFacility(); Site && Site->RequiredSpecialty == EWorkSpecialty::Feeding)
+        DrawText(FString::Printf(TEXT("TROUGH %d / 30 FOOD | U deposit | O withdraw"),Site->StoredFood),FLinearColor::Yellow,X-130,Y+25);
     float RegionY = Canvas->ClipY - 90;
     for (TActorIterator<AWildEncounter> It(GetWorld()); It; ++It)
         if (Player->GetDistanceTo(*It) < 1800)
@@ -52,6 +56,7 @@ void ACFHUD::DrawHUD()
             FLinearColor::White, X-130, Y+25);
         if (Creature->Disposition == ECreatureDisposition::Tamed)
         {
+            if (Creature->FeedingSite.IsValid()) DrawText(TEXT("SEEKING FOOD - assignment will resume"),FLinearColor::Yellow,X-130,Y-50);
             DrawText(FString::Printf(TEXT("XP %d/%d  Stamina %.0f%%  Satiety %.0f%%  %s"), Creature->Experience, Creature->Level*100,
                 Creature->Stamina,Creature->Nutrition, *UEnum::GetValueAsString(Creature->Activity)), FLinearColor::Green, X-130, Y+48);
             DrawText(FString::Printf(TEXT("%s | cooldown %.1fs %s"), *Creature->GetSpecialName(), Creature->SpecialCooldownRemaining,

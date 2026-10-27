@@ -40,6 +40,7 @@ enum class EWorkSpecialty : uint8
     Mining,
     Farming,
     Crafting,
-    Transport
+    Transport,
+    Feeding
 };
 

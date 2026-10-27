@@ -14,7 +14,7 @@ UBaseBuildingComponent::UBaseBuildingComponent() { PrimaryComponentTick.bCanEver
 
 int32 UBaseBuildingComponent::GetCost(EWorkSpecialty Specialty)
 {
-    return Specialty == EWorkSpecialty::Gathering ? 10 : Specialty == EWorkSpecialty::Mining ? 12 : Specialty == EWorkSpecialty::Crafting ? 15 : Specialty == EWorkSpecialty::Farming ? 18 : 0;
+    return Specialty == EWorkSpecialty::Gathering ? 10 : Specialty == EWorkSpecialty::Mining ? 12 : Specialty == EWorkSpecialty::Crafting ? 15 : Specialty == EWorkSpecialty::Farming ? 18 : Specialty == EWorkSpecialty::Feeding ? 12 : 0;
 }
 
 bool UBaseBuildingComponent::IsBuildTransformValid(const FTransform& Transform)
@@ -63,7 +63,7 @@ void UBaseBuildingComponent::Cycle()
 {
     if (!bActive) return;
     Selected = Selected == EWorkSpecialty::Gathering ? EWorkSpecialty::Mining : Selected == EWorkSpecialty::Mining ? EWorkSpecialty::Crafting :
-        Selected == EWorkSpecialty::Crafting ? EWorkSpecialty::Farming : EWorkSpecialty::Gathering;
+        Selected == EWorkSpecialty::Crafting ? EWorkSpecialty::Farming : Selected == EWorkSpecialty::Farming ? EWorkSpecialty::Feeding : EWorkSpecialty::Gathering;
     UpdatePlacement();
 }
 
@@ -146,6 +146,7 @@ bool UBaseBuildingComponent::DismantleStation(AWorkStation* Station)
     auto* Hero = Cast<ACFPlayerCharacter>(GetOwner());
     if (!Hero || !Hero->HasAuthority() || Hero->Health <= 0 || !IsValid(Station) || !Station->bPlayerBuilt || Hero->GetDistanceTo(Station) > 600) return false;
     const int32 Refund = GetCost(Station->RequiredSpecialty)/2;
+    if (Station->StoredFood > 0) { Hero->Feedback = TEXT("Withdraw food with O before dismantling the trough"); return false; }
     if (!Hero->Inventory->AddItem(EFrontierItem::Material,Refund)) { Hero->Feedback = TEXT("Make inventory space for dismantle refund"); return false; }
     for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It)
         if (It->WorkSite == Station) { It->WorkSite = nullptr; It->SetActivity(ECreatureActivity::Follow); }

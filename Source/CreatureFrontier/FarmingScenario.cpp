@@ -21,6 +21,8 @@
 #include "HAL/PlatformMisc.h"
 #include "HAL/FileManager.h"
 #include "Misc/Paths.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 #include "UnrealClient.h"
 
 static UCreatureDefinition* FindFarmer(UWorld* World)
@@ -127,11 +129,14 @@ void RunFarmingScenario(UWorld* World, ACFPlayerCharacter* Hero)
 
 void RunFarmPreview(UWorld* World, ACFPlayerCharacter* Hero)
 {
+    const bool Trough = FParse::Param(FCommandLine::Get(),TEXT("CFTroughPreview"));
     auto* Definition = FindFarmer(World);
     Hero->SetActorLocation(FVector(-350,-1050,40)); Hero->GetCharacterMovement()->DisableMovement();
-    Hero->Inventory->Restore({{EFrontierItem::Material,100}}); Hero->Building->Selected = EWorkSpecialty::Farming;
+    Hero->Inventory->Restore({{EFrontierItem::Material,100},{EFrontierItem::Food,15}});
+    Hero->Building->Selected = Trough ? EWorkSpecialty::Feeding : EWorkSpecialty::Farming;
     auto* Garden = Hero->Building->BuildAt(FTransform(FRotator::ZeroRotator,FVector(0,-700,-15),FVector(2,1,.7)));
     if (!Garden || !Definition) { FPlatformMisc::RequestExitWithStatus(false,1); return; }
+    if (Trough) { Garden->TransferFood(Hero,true); Garden->TransferFood(Hero,true); Garden->TransferFood(Hero,true); }
     auto* Pet = World->SpawnActorDeferred<ACreatureCharacter>(ACreatureCharacter::StaticClass(),FTransform(FRotator(0,-37,0),FVector(-160,-700,40)),nullptr,nullptr,ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
     Pet->Definition = Definition; Pet->FinishSpawning(FTransform(FRotator(0,-37,0),FVector(-160,-700,40))); Pet->Tame(Hero->GetController());
     for (TActorIterator<ACreatureCharacter> It(World); It; ++It) { It->SetActorTickEnabled(false); It->GetCharacterMovement()->DisableMovement(); }
@@ -141,7 +146,7 @@ void RunFarmPreview(UWorld* World, ACFPlayerCharacter* Hero)
     Camera->SetActorLocation(Eye); Camera->SetActorRotation((FVector(0,-700,20)-Eye).Rotation()); Camera->GetCameraComponent()->FieldOfView = 65;
     if (PC) { if (PC->GetHUD()) PC->GetHUD()->bShowHUD = false; PC->SetViewTarget(Camera); }
     if (auto* Label = Garden->FindComponentByClass<UTextRenderComponent>()) Label->SetWorldRotation(FRotator(0,(Eye-Label->GetComponentLocation()).Rotation().Yaw,0));
-    const FString Path = FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir()/TEXT("FarmPreview/farm_garden.png"));
+    const FString Path = FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir()/(Trough ? TEXT("FarmPreview/feeding_trough.png") : TEXT("FarmPreview/farm_garden.png")));
     IFileManager::Get().MakeDirectory(*FPaths::GetPath(Path),true);
     FTimerHandle Shot,End;
     World->GetTimerManager().SetTimer(Shot,[Path]() { FScreenshotRequest::RequestScreenshot(Path,false,false); },4.0f,false);

@@ -7,6 +7,7 @@
 #include "BuildingScenario.h"
 #include "WorldScenario.h"
 #include "FarmingScenario.h"
+#include "FeedingScenario.h"
 #include "CaptureComponent.h"
 #include "CreatureCharacter.h"
 #include "CreatureDefinition.h"
@@ -48,12 +49,14 @@ void ACFGameMode::BeginPlay()
     const bool bWorldPreview = FParse::Param(FCommandLine::Get(), TEXT("CFWorldPreview"));
     const bool bFarmingTest = FParse::Param(FCommandLine::Get(), TEXT("CFFarmingTest"));
     const bool bFarmPreview = FParse::Param(FCommandLine::Get(), TEXT("CFFarmPreview"));
-    if (!bSaveWrite && !bSaveRead && !bInventoryTest && !bNavTest && !bCareTest && !bSpeciesTest && !bCombatTest && !bEncounterTest && !bBossTest && !bBuildingTest && !bWorldTest && !bWorldPreview && !bFarmingTest && !bFarmPreview && !FParse::Param(FCommandLine::Get(), TEXT("CFSmokeTest"))) return;
+    const bool bFeedingTest = FParse::Param(FCommandLine::Get(), TEXT("CFFeedingTest"));
+    if (!bSaveWrite && !bSaveRead && !bInventoryTest && !bNavTest && !bCareTest && !bSpeciesTest && !bCombatTest && !bEncounterTest && !bBossTest && !bBuildingTest && !bWorldTest && !bWorldPreview && !bFarmingTest && !bFarmPreview && !bFeedingTest && !FParse::Param(FCommandLine::Get(), TEXT("CFSmokeTest"))) return;
     FTimerHandle TestStart;
-    GetWorldTimerManager().SetTimer(TestStart, [this, bSaveWrite, bSaveRead, bInventoryTest, bNavTest, bCareTest, bSpeciesTest, bCombatTest, bEncounterTest, bBossTest, bBuildingTest, bWorldTest, bWorldPreview, bFarmingTest, bFarmPreview]()
+    GetWorldTimerManager().SetTimer(TestStart, [this, bSaveWrite, bSaveRead, bInventoryTest, bNavTest, bCareTest, bSpeciesTest, bCombatTest, bEncounterTest, bBossTest, bBuildingTest, bWorldTest, bWorldPreview, bFarmingTest, bFarmPreview, bFeedingTest]()
     {
         auto* Hero = Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerPawn(this, 0));
         if (!Hero) { FPlatformMisc::RequestExitWithStatus(true, 1); return; }
+        if (bFeedingTest) { RunFeedingScenario(GetWorld(),Hero); return; }
         if (bFarmPreview) { RunFarmPreview(GetWorld(),Hero); return; }
         if (bFarmingTest) { RunFarmingScenario(GetWorld(),Hero); return; }
         if (bWorldPreview) { RunValleyPreview(GetWorld(),Hero); return; }

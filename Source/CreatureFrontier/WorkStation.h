@@ -16,6 +16,9 @@ public:
     EWorkSpecialty RequiredSpecialty = EWorkSpecialty::Gathering;
     UPROPERTY(BlueprintReadOnly, Category="Building") bool bPlayerBuilt = false;
     UPROPERTY(BlueprintReadOnly, Category="Building") FGuid PersistentId;
+    UPROPERTY(BlueprintReadOnly, Category="Feeding") int32 StoredFood = 0;
+    bool TransferFood(class ACFPlayerCharacter* Hero, bool Deposit);
+    bool ServeFood(class ACreatureCharacter* Pet);
 private:
     void RefreshLabel();
     UPROPERTY() TObjectPtr<class UTextRenderComponent> Label;
