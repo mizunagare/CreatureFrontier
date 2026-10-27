@@ -15,6 +15,7 @@ public:
     UFUNCTION(BlueprintCallable) bool AddItem(EFrontierItem Item, int32 Amount);
     bool GrantItems(const TMap<EFrontierItem,int32>& Items);
     bool Transact(const TMap<EFrontierItem,int32>& Inputs,const TMap<EFrontierItem,int32>& Outputs);
+    bool TransferTo(UInventoryComponent* Destination,const TMap<EFrontierItem,int32>& Items);
     UFUNCTION(BlueprintCallable) bool Consume(EFrontierItem Item, int32 Amount);
     UFUNCTION(BlueprintCallable) bool Craft(EFrontierItem Output);
     static int32 CraftCost(EFrontierItem Output);

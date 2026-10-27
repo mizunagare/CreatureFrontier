@@ -21,6 +21,7 @@
 #include "HomeBuildingComponent.h"
 #include "HomeLayout.h"
 #include "HomePersistence.h"
+#include "StorageInteractionComponent.h"
 #include "ResearchComponent.h"
 
 void ACFPlayerCharacter::CraftSpear() { Equipment->CraftSpear(); }
@@ -141,7 +142,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
 {
     if (!HasAuthority() || !GetController()) return false;
     auto* Save = Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot, 0));
-    if (!Save || Save->FormatVersion < 1 || Save->FormatVersion > 20 ||
+    if (!Save || Save->FormatVersion < 1 || Save->FormatVersion > 21 ||
         Save->MapName != UGameplayStatics::GetCurrentLevelName(this, true) ||
         !FMath::IsFinite(Save->Health) || Save->Health < 0 || Save->Health > 100 ||
         Save->Resources < 0 || Save->PlayerTransform.ContainsNaN() || Save->ViewRotation.ContainsNaN())
@@ -350,7 +351,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
     Research->Restore(Save->Research); CaptureComponent->ResetSelection();
     GetCharacterMovement()->SetMovementMode(Health > 0 ? MOVE_Walking : MOVE_None);
     SelectedCompanion.Reset();
-    RosterHighlight.Reset(); bBackpackOpen=false; BackpackRecipe=0;
+    RosterHighlight.Reset(); bBackpackOpen=false; BackpackRecipe=0; Storage->Close();
     Journal=Save->Journal; JournalAssets=LoadedJournalAssets; JournalPage=0;
     Objectives=Save->Objectives;
     // Owned survivors in old snapshots prove capture; unseen wild snapshots do not prove discovery.
@@ -368,6 +369,8 @@ void ACFPlayerCharacter::RestartLevel()
 void ACFPlayerCharacter::BeginPlay()
 {
     Super::BeginPlay();
+    // Starter supplies belong to a new player, never to a generic container.
+    Inventory->Restore({{EFrontierItem::Material,6},{EFrontierItem::CaptureDevice,5},{EFrontierItem::Medicine,1},{EFrontierItem::Food,3}});
     InitializeRespawnAnchor();
     CaptureComponent->OnCaptureResolved.AddDynamic(this, &ACFPlayerCharacter::CaptureResolved);
     GetWorldTimerManager().SetTimer(ObservationTimer,this,&ACFPlayerCharacter::ObserveAimedCreature,.4f,true);
@@ -382,6 +385,7 @@ float ACFPlayerCharacter::TakeDamage(float Amount, const FDamageEvent& Event, AC
     Feedback = Health <= 0.0f ? TEXT("Downed - R respawns at base without resetting the world | F9 load") : TEXT("Taking damage!");
     if (Health <= 0.0f)
     {
+        Storage->Close();
         GetCharacterMovement()->StopMovementImmediately(); GetCharacterMovement()->DisableMovement(); StopJumping();
         CancelMeleeAttack();
         Building->Cancel(); bRosterOpen=false; bJournalOpen=false; bBackpackOpen=false;
@@ -447,6 +451,7 @@ void ACFPlayerCharacter::CommandSpecial()
 void ACFPlayerCharacter::CommandWork()
 {
     if (!HasAuthority() || Health <= 0 || UGameplayStatics::IsGamePaused(this) || Building->IsActive()) return;
+    if(Storage->TryOpenAimed()) return;
     FHitResult Hit; FCollisionQueryParams Params(SCENE_QUERY_STAT(FieldOrder),false,this);
     const FVector Start=FirstPersonCamera->GetComponentLocation();
     GetWorld()->LineTraceSingleByChannel(Hit,Start,Start+FirstPersonCamera->GetForwardVector()*800,ECC_Visibility,Params);
@@ -513,6 +518,7 @@ ACFPlayerCharacter::ACFPlayerCharacter()
     Building = CreateDefaultSubobject<UBaseBuildingComponent>(TEXT("Building"));
     HomeBuilding = CreateDefaultSubobject<UHomeBuildingComponent>(TEXT("HomeBuilding"));
     Research = CreateDefaultSubobject<UResearchComponent>(TEXT("Research"));
+    Storage = CreateDefaultSubobject<UStorageInteractionComponent>(TEXT("Storage"));
     Equipment = CreateDefaultSubobject<UPlayerEquipmentComponent>(TEXT("Equipment"));
 }
 
@@ -541,6 +547,9 @@ void ACFPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
     PlayerInputComponent->BindKey(EKeys::Down, IE_Pressed, this, &ACFPlayerCharacter::PauseMenuNext).bExecuteWhenPaused=true;
     PlayerInputComponent->BindKey(EKeys::F1, IE_Pressed, this, &ACFPlayerCharacter::ToggleHelp);
     PlayerInputComponent->BindKey(EKeys::C, IE_Pressed, this, &ACFPlayerCharacter::ToggleBackpack);
+    PlayerInputComponent->BindKey(EKeys::BackSpace, IE_Pressed, Storage.Get(), &UStorageInteractionComponent::WithdrawOne);
+    PlayerInputComponent->BindKey(EKeys::Right, IE_Pressed, Storage.Get(), &UStorageInteractionComponent::DepositStack);
+    PlayerInputComponent->BindKey(EKeys::Left, IE_Pressed, Storage.Get(), &UStorageInteractionComponent::WithdrawStack);
     PlayerInputComponent->BindKey(EKeys::Y, IE_Pressed, this, &ACFPlayerCharacter::PetAimedCompanion);
     PlayerInputComponent->BindKey(EKeys::M, IE_Pressed, this, &ACFPlayerCharacter::GatherAimedResource);
     PlayerInputComponent->BindKey(EKeys::Zero, IE_Pressed, CaptureComponent.Get(), &UCaptureComponent::ToggleDevice);

@@ -11,6 +11,7 @@ class CREATUREFRONTIER_API ACFHUD : public AHUD
 public:
     virtual void DrawHUD() override;
 private:
+    void DrawStorage(ACFPlayerCharacter* Player);
     void DrawWrappedText(const FString& Text,FLinearColor Color,float X,float Y,float Width,int32 MaxLines);
     void DrawPauseMenu(ACFPlayerCharacter* Player);
     void DrawControlHelp(ACFPlayerCharacter* Player);

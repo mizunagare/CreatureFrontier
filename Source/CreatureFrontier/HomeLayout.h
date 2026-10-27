@@ -11,6 +11,7 @@ struct FHomeModuleRecord
     UPROPERTY() FGuid FloorId;
     UPROPERTY() int32 PaidMaterials=0;
     UPROPERTY() TMap<EFrontierItem,int32> PaidExtraItems;
+    UPROPERTY() TMap<EFrontierItem,int32> StoredItems;
     UPROPERTY() TSoftObjectPtr<UHomeModuleDefinition> Definition;
     UPROPERTY() FTransform Transform;
 };

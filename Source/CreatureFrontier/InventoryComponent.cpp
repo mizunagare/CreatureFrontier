@@ -3,10 +3,24 @@
 
 UInventoryComponent::UInventoryComponent()
 {
-    Stacks.Add(EFrontierItem::Material, 6);
-    Stacks.Add(EFrontierItem::CaptureDevice, 5);
-    Stacks.Add(EFrontierItem::Medicine, 1);
-    Stacks.Add(EFrontierItem::Food, 3);
+}
+
+bool UInventoryComponent::TransferTo(UInventoryComponent* Destination,const TMap<EFrontierItem,int32>& Items)
+{
+    if(!IsInGameThread() || !IsValid(Destination) || Destination==this || Items.IsEmpty() || !Validate(Items) ||
+        !GetOwner() || !GetOwner()->HasAuthority() || GetOwner()->IsActorBeingDestroyed() ||
+        !Destination->GetOwner() || !Destination->GetOwner()->HasAuthority() || Destination->GetOwner()->IsActorBeingDestroyed() ||
+        GetWorld()!=Destination->GetWorld() || !Validate(Stacks) || !Validate(Destination->Stacks)) return false;
+    auto SourceAfter=Stacks; auto DestinationAfter=Destination->Stacks;
+    for(const auto& Entry:Items)
+    {
+        if(Entry.Value<=0 || Entry.Value>SourceAfter.FindRef(Entry.Key) || Entry.Value>StackLimit-DestinationAfter.FindRef(Entry.Key)) return false;
+        SourceAfter.FindOrAdd(Entry.Key)-=Entry.Value;
+        DestinationAfter.FindOrAdd(Entry.Key)+=Entry.Value;
+    }
+    // Both copies are validated before either live container changes. No callbacks
+    // or fallible operation between commits on the authoritative game thread.
+    Stacks=MoveTemp(SourceAfter); Destination->Stacks=MoveTemp(DestinationAfter); return true;
 }
 
 int32 UInventoryComponent::Count(EFrontierItem Item) const { return Stacks.FindRef(Item); }

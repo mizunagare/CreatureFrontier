@@ -3,6 +3,7 @@
 #include "ResourceScenario.h"
 #include "FieldWorkScenario.h"
 #include "FieldRecoveryScenario.h"
+#include "StorageScenario.h"
 #include "HomeScenario.h"
 #include "ExpeditionScenario.h"
 #include "CFPlayerCharacter.h"
@@ -56,6 +57,13 @@ void ACFGameMode::BeginPlay()
 {
     Super::BeginPlay();
     SeedFrontierResources(GetWorld());
+    const int32 StorageMode=FParse::Param(FCommandLine::Get(),TEXT("CFStorageWrite"))?1:FParse::Param(FCommandLine::Get(),TEXT("CFStorageRead"))?2:0;
+    if(StorageMode || FParse::Param(FCommandLine::Get(),TEXT("CFStorageTest")))
+    {
+        FTimerHandle Start;
+        GetWorldTimerManager().SetTimer(Start,[this,StorageMode](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0))) RunStorageScenario(GetWorld(),Hero,StorageMode);},1.f,false);
+        return;
+    }
     const int32 RecoveryMode=FParse::Param(FCommandLine::Get(),TEXT("CFFieldRecoveryWrite"))?1:FParse::Param(FCommandLine::Get(),TEXT("CFFieldRecoveryRead"))?2:0;
     if(RecoveryMode || FParse::Param(FCommandLine::Get(),TEXT("CFFieldRecoveryTest")))
     {

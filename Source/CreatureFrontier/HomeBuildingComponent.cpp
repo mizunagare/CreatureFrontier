@@ -30,7 +30,7 @@ void UHomeBuildingComponent::Cancel() { if(IsValid(Preview)) Preview->Destroy();
 void UHomeBuildingComponent::EndPlay(const EEndPlayReason::Type Reason) { Cancel(); Super::EndPlay(Reason); }
 void UHomeBuildingComponent::Cycle()
 {
-    Selected=static_cast<EHomeModuleKind>((static_cast<int32>(Selected)+1)%5); StartPreview();
+    Selected=static_cast<EHomeModuleKind>((static_cast<int32>(Selected)+1)%6); StartPreview();
 }
 void UHomeBuildingComponent::Rotate() { YawStep=1-YawStep; UpdatePreview(); }
 bool UHomeBuildingComponent::ValidatePlacement(const FTransform& Transform,FGuid FloorId,FString& Reason) const
@@ -75,6 +75,8 @@ bool UHomeBuildingComponent::Dismantle(AHomeModule* Module)
 {
     auto* Hero=Cast<ACFPlayerCharacter>(GetOwner());
     if(!Hero || !Hero->HasAuthority() || Hero->Health<=0 || UGameplayStatics::IsGamePaused(this) || !IsValid(Module) || Module->IsActorBeingDestroyed() || Module->bPreview || !Module->Definition || Hero->GetDistanceTo(Module)>600) return false;
+    if(Module->GetKind()==EHomeModuleKind::Storage)
+        for(const auto& Stack:Module->StorageInventory->GetStacks()) if(Stack.Value>0) { Hero->Feedback=TEXT("Empty the storage crate before dismantling"); return false; }
     for(const auto& Cost:Module->PaidExtraItems) if(Cost.Key==EFrontierItem::Material || Cost.Key>=EFrontierItem::Count || Cost.Value<=0 || Cost.Value>999) return false;
     auto Layout=HomeLayout::Collect(GetWorld()); Layout.RemoveAll([Module](const FHomeModuleRecord& Record){return Record.Id==Module->PersistentId;});
     FString Reason;
@@ -114,7 +116,7 @@ void UHomeBuildingComponent::UpdatePreview()
         Position.Z=-30;
     }
     else Position.Z=Selected==EHomeModuleKind::Floor?-40:280;
-    if(Selected==EHomeModuleKind::Lantern) Position=FVector(FMath::GridSnap(Hit.ImpactPoint.X,100.),FMath::GridSnap(Hit.ImpactPoint.Y,100.),-30);
+    if(Selected==EHomeModuleKind::Lantern || Selected==EHomeModuleKind::Storage) Position=FVector(FMath::GridSnap(Hit.ImpactPoint.X,100.),FMath::GridSnap(Hit.ImpactPoint.Y,100.),-30);
     Placement=FTransform(FRotator(0,Wall?YawStep*90:0,0),Position);
     bValid=ValidatePlacement(Placement,SupportingFloor,Status);
     Preview->SetActorTransform(Placement); Preview->SetActorHiddenInGame(false); Preview->SetPreviewTint(bValid);

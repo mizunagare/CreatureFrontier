@@ -7,6 +7,7 @@
 #include "WorldLoot.h"
 #include "CreatureCharacter.h"
 #include "CFPlayerCharacter.h"
+#include "InventoryComponent.h"
 
 namespace
 {
@@ -28,12 +29,13 @@ bool HomeLayout::IsCanonical(const FHomeModuleRecord& Record)
         !Record.Transform.GetRotation().IsNormalized() || !Record.Transform.GetScale3D().Equals(FVector::OneVector,.001)) return false;
     const FVector Position=Record.Transform.GetLocation(); const auto Rotation=Record.Transform.Rotator();
     for(const auto& Cost:Record.PaidExtraItems) if(Cost.Key==EFrontierItem::Material || Cost.Key>=EFrontierItem::Count || Cost.Value<=0 || Cost.Value>999) return false;
+    if(!UInventoryComponent::Validate(Record.StoredItems) || (Definition->Kind!=EHomeModuleKind::Storage && !Record.StoredItems.IsEmpty())) return false;
     if(FVector::Dist2D(Position,UBaseBuildingComponent::BaseOrigin())>1200 || !FMath::IsNearlyZero(Rotation.Pitch,.01) || !FMath::IsNearlyZero(Rotation.Roll,.01)) return false;
     if(IsWall(Definition->Kind))
         return FMath::IsNearlyEqual(Position.Z,-30.,.01) &&
             ((FMath::IsNearlyZero(Rotation.Yaw,.01) && Grid(Position.X,400) && Grid(Position.Y-200,400)) ||
              (FMath::IsNearlyEqual(Rotation.Yaw,90.,.01) && Grid(Position.X-200,400) && Grid(Position.Y,400)));
-    if(Definition->Kind==EHomeModuleKind::Lantern) return FMath::IsNearlyZero(Rotation.Yaw,.01) && Grid(Position.X,100) && Grid(Position.Y,100) && FMath::IsNearlyEqual(Position.Z,-30.,.01);
+    if(Definition->Kind==EHomeModuleKind::Lantern || Definition->Kind==EHomeModuleKind::Storage) return FMath::IsNearlyZero(Rotation.Yaw,.01) && Grid(Position.X,100) && Grid(Position.Y,100) && FMath::IsNearlyEqual(Position.Z,-30.,.01);
     return FMath::IsNearlyZero(Rotation.Yaw,.01) && Grid(Position.X,400) && Grid(Position.Y,400) &&
         FMath::IsNearlyEqual(Position.Z,Definition->Kind==EHomeModuleKind::Floor?-40.:280.,.01);
 }
@@ -64,10 +66,11 @@ bool HomeLayout::Validate(const TArray<FHomeModuleRecord>& Records,FString& Reas
                   (WallAt(Records,FVector(Center.X-200,Center.Y,-30),90) && WallAt(Records,FVector(Center.X+200,Center.Y,-30),90))))
             { Reason=TEXT("Roof requires two opposite walls on its floor"); return false; }
         }
-        else if(Kind==EHomeModuleKind::Lantern)
+        else if(Kind==EHomeModuleKind::Lantern || Kind==EHomeModuleKind::Storage)
         {
-            if(FMath::Abs(Position.X-Center.X)>170 || FMath::Abs(Position.Y-Center.Y)>170)
-            { Reason=TEXT("Lantern must fit inside its supporting floor"); return false; }
+            const float Inset=Kind==EHomeModuleKind::Storage?145:170;
+            if(FMath::Abs(Position.X-Center.X)>Inset || FMath::Abs(Position.Y-Center.Y)>Inset)
+            { Reason=TEXT("Furniture must fit inside its supporting floor"); return false; }
         }
         else
         {
@@ -101,6 +104,7 @@ TArray<FHomeModuleRecord> HomeLayout::Collect(UWorld* World)
     {
         FHomeModuleRecord Record; Record.Id=It->PersistentId; Record.FloorId=It->FloorId;
         Record.Definition=It->Definition.Get(); Record.Transform=It->GetActorTransform(); Record.PaidMaterials=It->PaidMaterials; Record.PaidExtraItems=It->PaidExtraItems; Result.Add(Record);
+        if(It->GetKind()==EHomeModuleKind::Storage) Result.Last().StoredItems=It->StorageInventory->GetStacks();
     }
     return Result;
 }

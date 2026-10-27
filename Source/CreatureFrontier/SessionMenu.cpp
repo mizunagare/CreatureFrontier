@@ -4,6 +4,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
+#include "StorageInteractionComponent.h"
 
 FString ACFPlayerCharacter::GetQuickSaveSlot() const
 {
@@ -26,14 +27,15 @@ void ACFPlayerCharacter::TogglePauseMenu()
         ClosePauseMenu(); return;
     }
     if(!UGameplayStatics::SetGamePaused(this,true)) { Feedback=TEXT("Pause is unavailable in this game mode"); return; }
+    Storage->Close();
     CancelMeleeAttack(); Building->Cancel(); StopJumping(); GetCharacterMovement()->StopMovementImmediately(); ConsumeMovementInputVector();
     bRosterOpen=false; bJournalOpen=false; bHelpVisible=false; bBackpackOpen=false;
     bPauseMenu=true; bPauseConfirmation=false; PauseSelection=0;
     Feedback=TEXT("Paused - world simulation stopped. Save before quitting");
 }
 
-void ACFPlayerCharacter::PauseMenuNext() { if(bPauseMenu) { PauseSelection=(PauseSelection+1)%5; bPauseConfirmation=false; } else StepBackpackRecipe(1); }
-void ACFPlayerCharacter::PauseMenuPrevious() { if(bPauseMenu) { PauseSelection=(PauseSelection+4)%5; bPauseConfirmation=false; } else StepBackpackRecipe(-1); }
+void ACFPlayerCharacter::PauseMenuNext() { if(bPauseMenu) { PauseSelection=(PauseSelection+1)%5; bPauseConfirmation=false; } else if(Storage->IsOpen()) Storage->Step(1); else StepBackpackRecipe(1); }
+void ACFPlayerCharacter::PauseMenuPrevious() { if(bPauseMenu) { PauseSelection=(PauseSelection+4)%5; bPauseConfirmation=false; } else if(Storage->IsOpen()) Storage->Step(-1); else StepBackpackRecipe(-1); }
 void ACFPlayerCharacter::ToggleHelp()
 {
     if(bPauseMenu) return;
@@ -56,7 +58,7 @@ void ACFPlayerCharacter::QuickLoad()
 
 void ACFPlayerCharacter::ConfirmInterfaceAction()
 {
-    if(!bPauseMenu) { if(bBackpackOpen) CraftBackpackRecipe(); else SelectRosterCompanion(); return; }
+    if(!bPauseMenu) { if(Storage->IsOpen()) Storage->DepositOne(); else if(bBackpackOpen) CraftBackpackRecipe(); else SelectRosterCompanion(); return; }
     switch(PauseSelection)
     {
         case 0: ClosePauseMenu(); break;

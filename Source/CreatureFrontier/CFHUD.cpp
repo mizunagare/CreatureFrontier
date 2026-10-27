@@ -11,6 +11,8 @@
 #include "WorkStation.h"
 #include "ResourceNode.h"
 #include "ResearchComponent.h"
+#include "StorageInteractionComponent.h"
+#include "HomeModule.h"
 #include "Engine/Canvas.h"
 #include "EngineUtils.h"
 
@@ -20,7 +22,7 @@ void ACFHUD::DrawHUD()
     auto* Player = Cast<ACFPlayerCharacter>(GetOwningPawn());
     if (!Canvas || !Player) return;
     if(Player->IsPauseMenuOpen()) { DrawPauseMenu(Player); return; }
-    if(!Player->IsBackpackOpen() && !Player->IsHelpVisible() && !Player->IsJournalOpen() && !Player->IsRosterOpen())
+    if(!Player->Storage->IsOpen() && !Player->IsBackpackOpen() && !Player->IsHelpVisible() && !Player->IsJournalOpen() && !Player->IsRosterOpen())
     {
         const float Left=FMath::Max(530.f,Canvas->ClipX-620);
         DrawRect(FLinearColor(.02f,.035f,.06f,.88f),Left,18,600,72);
@@ -58,6 +60,7 @@ void ACFHUD::DrawHUD()
     if (auto* Site = Player->TraceFacility(); Site && Site->IsFoodStore())
         DrawText(FString::Printf(TEXT("FOOD STORE %d / 30 | U deposit | O withdraw"),Site->StoredFood),FLinearColor::Yellow,X-130,Y+25);
     if(auto* Node=Player->TraceResource()) DrawText(Node->GetStatus(),FLinearColor::Yellow,X-160,Y+25);
+    if(Player->Storage->TraceCrate() && !Player->Storage->IsOpen()) DrawText(TEXT("STORAGE CRATE | E open within 3m | empty before X"),FLinearColor::Yellow,X-160,Y+25);
     float RegionY = Canvas->ClipY - 90;
     for (TActorIterator<AWildEncounter> It(GetWorld()); It; ++It)
         if (Player->GetDistanceTo(*It) < 1800)
@@ -97,6 +100,7 @@ void ACFHUD::DrawHUD()
     }
     if(Player->IsHelpVisible()) DrawControlHelp(Player);
     if(Player->IsBackpackOpen()) DrawBackpack(Player);
+    if(Player->Storage->IsOpen()) DrawStorage(Player);
     if (Player->IsJournalOpen())
     {
         const auto& Entries=Player->GetJournal();

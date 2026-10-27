@@ -4,6 +4,7 @@
 #include "FrontierSaveGame.h"
 #include "EngineUtils.h"
 #include "ResearchComponent.h"
+#include "InventoryComponent.h"
 
 FHomeRestoreTransaction::~FHomeRestoreTransaction()
 {
@@ -16,6 +17,11 @@ bool FHomeRestoreTransaction::Stage(UFrontierSaveGame* Save)
     for(auto& Record:Save->HomeModules) if(!Record.Definition.LoadSynchronous()) return false;
     for(auto& Record:Save->HomeModules)
     {
+        if(Save->FormatVersion<21)
+        {
+            if(Record.Definition.Get()->Kind==EHomeModuleKind::Storage) return false;
+            Record.StoredItems.Reset();
+        }
         if(Save->FormatVersion<19)
         {
             if(Record.Definition.Get()->Kind==EHomeModuleKind::Lantern) return false;
@@ -28,6 +34,18 @@ bool FHomeRestoreTransaction::Stage(UFrontierSaveGame* Save)
     for(const auto& Record:Save->HomeModules) if(!HomeLayout::ValidateTerrain(World,Record,Reason)) return false;
     for(const auto& Facility:Save->Facilities)
         if(!HomeLayout::SupportsFacility(Facility.Transform,Save->HomeModules)) return false;
+    // Validate saved containers against the SAVED facilities, not the old live
+    // world which this transaction will replace. Floor contact is allowed.
+    for(const auto& Record:Save->HomeModules) if(Record.Definition.Get()->Kind==EHomeModuleKind::Storage)
+        for(const auto& Facility:Save->Facilities)
+        {
+            const FBox FacilityBounds=FBox(FVector(-50),FVector(50)).TransformBy(Facility.Transform.ToMatrixWithScale());
+            for(const auto& Part:AHomeModule::Parts(EHomeModuleKind::Storage))
+            {
+                const FVector Center=Record.Transform.GetLocation()+Part.Center;
+                if(FBox(Center-Part.Extent+FVector(1),Center+Part.Extent-FVector(1)).Intersect(FacilityBounds)) return false;
+            }
+        }
     for(const auto& Record:Save->HomeModules)
     {
         auto* Module=World->SpawnActorDeferred<AHomeModule>(AHomeModule::StaticClass(),Record.Transform,nullptr,nullptr,ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
@@ -36,6 +54,7 @@ bool FHomeRestoreTransaction::Stage(UFrontierSaveGame* Save)
         Module->PaidMaterials=Record.PaidMaterials;
         Module->PaidExtraItems=Record.PaidExtraItems;
         Module->bStaged=true; Module->SetActorEnableCollision(false); Module->FinishSpawning(Record.Transform); Staged.Add(Module);
+        if(!Module->StorageInventory->Restore(Record.StoredItems)) return false;
     }
     return true;
 }

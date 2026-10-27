@@ -23,7 +23,7 @@ AWildEncounter::AWildEncounter()
 void AWildEncounter::BeginPlay()
 {
     Super::BeginPlay();
-    for(const TCHAR* Flag:{TEXT("CFFieldRecoveryTest"),TEXT("CFFieldRecoveryWrite"),TEXT("CFFieldRecoveryRead")})
+    for(const TCHAR* Flag:{TEXT("CFFieldRecoveryTest"),TEXT("CFFieldRecoveryWrite"),TEXT("CFFieldRecoveryRead"),TEXT("CFStorageTest"),TEXT("CFStorageWrite"),TEXT("CFStorageRead")})
         if(FParse::Param(FCommandLine::Get(),Flag)) SetActorTickEnabled(false);
     // Existing fixture scenarios own their entire population. The encounter scenario
     // explicitly ticks its own slot, keeping all regression worlds isolated.
