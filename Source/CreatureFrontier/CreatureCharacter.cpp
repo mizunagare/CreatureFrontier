@@ -207,6 +207,7 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
     RetaliationRemaining = FMath::Max(0.0f, RetaliationRemaining - DeltaSeconds);
     AlphaCooldown = FMath::Max(0.0f, AlphaCooldown - DeltaSeconds);
     AutoFeedCooldown = FMath::Max(0.0f,AutoFeedCooldown-DeltaSeconds);
+    PettingCooldown=FMath::Max(0.f,PettingCooldown-DeltaSeconds);
     GetCharacterMovement()->MaxWalkSpeed = (Definition ? Definition->MoveSpeed : 320.0f) * (SlowRemaining > 0 ? 0.5f : 1.0f) *
         (Disposition != ECreatureDisposition::Tamed && Activity == ECreatureActivity::Wander ? .45f : 1.0f);
     if (Health <= 0.0f) { bResumeWorkAfterRest = false; FeedingSite.Reset(); AlphaWindup = 0; ClearCombatOrders(); StopNavigation(); return; }
@@ -392,6 +393,7 @@ float ACreatureCharacter::TakeDamage(float DamageAmount, FDamageEvent const& Dam
     {
         Health = FMath::Max(0.0f, Health - Applied);
         HitPoseRemaining=.2f;
+        AffectionPoseRemaining=0;
         if(Attacker)
         {
             auto* Observer=Attacker->Tamer?Cast<ACFPlayerCharacter>(Attacker->Tamer->GetPawn()):Tamer?Cast<ACFPlayerCharacter>(Tamer->GetPawn()):nullptr;
@@ -463,6 +465,8 @@ void ACreatureCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
     DOREPLIFETIME(ACreatureCharacter, bAlpha);
     DOREPLIFETIME(ACreatureCharacter, AlphaCooldown);
     DOREPLIFETIME(ACreatureCharacter, AlphaWindup);
+    DOREPLIFETIME(ACreatureCharacter, BondPoints);
+    DOREPLIFETIME(ACreatureCharacter, PettingCooldown);
     DOREPLIFETIME(ACreatureCharacter, Level);
     DOREPLIFETIME(ACreatureCharacter, Experience);
     DOREPLIFETIME(ACreatureCharacter, Stamina);

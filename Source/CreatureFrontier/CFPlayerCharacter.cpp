@@ -95,6 +95,7 @@ bool ACFPlayerCharacter::SaveProgress(const FString& Slot)
         Record.RoamRadius = It->RoamRadius; Record.LeashRadius = It->LeashRadius;
         Record.bOwned = It->Tamer == GetController();
         Record.CarriedFood=It->CarriedFood;
+        Record.BondPoints=It->BondPoints; Record.PettingCooldown=It->PettingCooldown;
         Record.Disposition = It->Disposition;
         Record.Activity = It->Activity;
         Record.WorkSiteName = IsValid(It->WorkSite) ? It->WorkSite->GetFName() : NAME_None;
@@ -128,7 +129,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
 {
     if (!HasAuthority() || !GetController()) return false;
     auto* Save = Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot, 0));
-    if (!Save || Save->FormatVersion < 1 || Save->FormatVersion > 15 ||
+    if (!Save || Save->FormatVersion < 1 || Save->FormatVersion > 16 ||
         Save->MapName != UGameplayStatics::GetCurrentLevelName(this, true) ||
         !FMath::IsFinite(Save->Health) || Save->Health < 0 || Save->Health > 100 ||
         Save->Resources < 0 || Save->PlayerTransform.ContainsNaN() || Save->ViewRotation.ContainsNaN())
@@ -195,6 +196,8 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
         UCreatureDefinition* LoadedDefinition = Record.Definition.LoadSynchronous();
         if (!CreatureClass || CreatureClass->HasAnyClassFlags(CLASS_Abstract) ||
             (Save->FormatVersion>=15 && (Record.CarriedFood<0 || Record.CarriedFood>3 || (Record.CarriedFood>0 && (!Record.bOwned || Record.Disposition!=ECreatureDisposition::Tamed)))) ||
+            (Save->FormatVersion>=16 && (Record.BondPoints<0 || Record.BondPoints>100 || !FMath::IsFinite(Record.PettingCooldown) || Record.PettingCooldown<0 || Record.PettingCooldown>30 ||
+                ((Record.BondPoints>0 || Record.PettingCooldown>0) && (!Record.bOwned || Record.Disposition!=ECreatureDisposition::Tamed)))) ||
             (!Record.Definition.IsNull() && !LoadedDefinition) || Record.Transform.ContainsNaN() ||
             !FMath::IsFinite(Record.Health) || Record.Health < 0 ||
             Record.Level < 1 || Record.Level > 20 || Record.Experience < 0 ||
@@ -242,6 +245,8 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
         Pet->Disposition = Record.Disposition;
         Pet->Tamer = Record.bOwned ? GetController() : nullptr;
         Pet->CarriedFood=Save->FormatVersion>=15?Record.CarriedFood:0;
+        Pet->BondPoints=Save->FormatVersion>=16?Record.BondPoints:0;
+        Pet->PettingCooldown=Save->FormatVersion>=16?Record.PettingCooldown:0;
         Pet->Activity = Record.Activity;
         for (TActorIterator<AWorkStation> It(GetWorld()); It; ++It)
             if (!Record.WorkSiteId.IsValid() && !It->bPlayerBuilt && It->GetFName() == Record.WorkSiteName) { Pet->WorkSite = *It; break; }
@@ -485,6 +490,7 @@ void ACFPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
     PlayerInputComponent->BindKey(EKeys::Down, IE_Pressed, this, &ACFPlayerCharacter::PauseMenuNext).bExecuteWhenPaused=true;
     PlayerInputComponent->BindKey(EKeys::F1, IE_Pressed, this, &ACFPlayerCharacter::ToggleHelp);
     PlayerInputComponent->BindKey(EKeys::C, IE_Pressed, this, &ACFPlayerCharacter::ToggleBackpack);
+    PlayerInputComponent->BindKey(EKeys::Y, IE_Pressed, this, &ACFPlayerCharacter::PetAimedCompanion);
     PlayerInputComponent->BindKey(EKeys::One, IE_Pressed, this, &ACFPlayerCharacter::CraftCaptureDevice);
     PlayerInputComponent->BindKey(EKeys::Two, IE_Pressed, this, &ACFPlayerCharacter::CraftMedicine);
     PlayerInputComponent->BindKey(EKeys::Three, IE_Pressed, this, &ACFPlayerCharacter::CraftFood);

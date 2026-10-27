@@ -44,6 +44,7 @@ $cases = @(
     @{Flag='CFBackpackTest'; Marker='CF_BACKPACK PASS'},
     @{Flag='CFAnimationTest'; Marker='CF_ANIMATION PASS'},
     @{Flag='CFAffinityTest'; Marker='CF_AFFINITY PASS'},
+    @{Flag='CFAffectionTest'; Marker='CF_AFFECTION PASS'},
     @{Flag='CFSaveWrite'; Marker='CF_SAVE_WRITE PASS'},
     @{Flag='CFSaveRead'; Marker='CF_SAVE_READ PASS'},
     @{Flag='CFNavTest'; Marker='CF_NAV_WORK PASS'}

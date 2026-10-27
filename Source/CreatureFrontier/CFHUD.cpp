@@ -68,6 +68,7 @@ void ACFHUD::DrawHUD()
             FLinearColor::White, X-130, Y+25);
         if (Creature->Disposition == ECreatureDisposition::Tamed)
         {
+            DrawText(FString::Printf(TEXT("BOND %d/100 %s | Y pet (2.5m) | wait %.0fs"),Creature->BondPoints,*Creature->GetBondLabel(),FMath::CeilToFloat(Creature->PettingCooldown)),FLinearColor::Green,X-30,Y+165);
             if(Creature->CarriedFood>0 || (Creature->WorkSite && Creature->WorkSite->RequiredSpecialty==EWorkSpecialty::Transport))
                 DrawText(FString::Printf(TEXT("TRANSPORT cargo %d/3 food | Z recover within 6m"),Creature->CarriedFood),FLinearColor::Yellow,X-130,Y-125);
             if (Creature->bResumeWorkAfterRest)

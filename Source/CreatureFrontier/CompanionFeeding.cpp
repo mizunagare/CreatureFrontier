@@ -24,6 +24,7 @@ bool ACFPlayerCharacter::FeedCompanion(ACreatureCharacter* Pet)
     if (!Inventory->Consume(EFrontierItem::Food,1)) { Feedback = TEXT("No food - farm or craft with 3 at base"); return false; }
     Pet->Nutrition = FMath::Min(100.0f,Pet->Nutrition+35);
     Pet->Stamina = FMath::Min(100.0f,Pet->Stamina+15);
+    Pet->AddBond(3);
     NextFeedTime = GetWorld()->GetTimeSeconds()+3;
     Feedback = TEXT("Fed companion: +35 satiety, +15 stamina. E: resume work | F: follow");
     return true;

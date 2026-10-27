@@ -44,6 +44,8 @@ public:
     void CraftFood();
     void FeedAimedCompanion();
     bool FeedCompanion(ACreatureCharacter* Pet);
+    bool PetCompanion(ACreatureCharacter* Pet);
+    void PetAimedCompanion();
     AWorkStation* TraceFacility() const;
     void DepositTroughFood();
     void WithdrawTroughFood();

@@ -26,6 +26,11 @@ public:
     virtual void Tick(float DeltaSeconds) override;
     void UpdateCreaturePresentation(float DeltaSeconds);
     FName GetVisualState() const { return VisualState; }
+    UPROPERTY(Replicated,BlueprintReadOnly,Category="Care") int32 BondPoints=0;
+    UPROPERTY(Replicated,BlueprintReadOnly,Category="Care") float PettingCooldown=0;
+    void AddBond(int32 Amount);
+    void RespondToPetting();
+    FString GetBondLabel() const;
     UPROPERTY()
     TObjectPtr<AWorkStation> WorkSite;
 
@@ -125,6 +130,7 @@ protected:
 private:
     FName VisualState=TEXT("Idle");
     float PoseTime=0, RestPoseBlend=0, StrikePoseRemaining=0, HitPoseRemaining=0;
+    float AffectionPoseRemaining=0;
     FVector StrikeDirectionLocal=FVector::ForwardVector;
     void BeginStrikePose(const AActor* Target=nullptr);
     TArray<FTransform> NeutralFeet, NeutralAccents, NeutralEyes, NeutralPupils;

@@ -46,6 +46,7 @@ void ACFHUD::DrawControlHelp(ACFPlayerCharacter* Player)
         TEXT("F follow | E nearest work facility (8m)"),
         TEXT("T rest | P treat aimed companion"),
         TEXT("J feed aimed companion | H heal yourself"),
+        TEXT("Y pet companion (2.5m, safe, follow / rest)"),
         TEXT("B build | V cycle facility | X dismantle"),
         TEXT("C backpack / recipes | 1 craft device (3)"),
         TEXT("2 craft medicine (5) | 3 craft food (2)"),

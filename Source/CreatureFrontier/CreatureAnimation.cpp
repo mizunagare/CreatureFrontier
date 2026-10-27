@@ -26,7 +26,7 @@ void ACreatureCharacter::UpdateCreaturePresentation(float DeltaSeconds)
         !FeedingSite.IsValid() && FVector::Dist2D(GetActorLocation(),WorkSite->GetActorLocation())<=220;
     const bool Charging=!Dead && (SpecialWindupRemaining>0 || AlphaWindup>0);
     VisualState=Dead?TEXT("Downed"):HitPoseRemaining>0?TEXT("Hurt"):Charging?TEXT("Charging"):StrikePoseRemaining>0?TEXT("Striking"):
-        Resting?TEXT("Resting"):Moving?TEXT("Moving"):Working?TEXT("Working"):TEXT("Idle");
+        AffectionPoseRemaining>0?TEXT("Affection"):Resting?TEXT("Resting"):Moving?TEXT("Moving"):Working?TEXT("Working"):TEXT("Idle");
     RestPoseBlend=FMath::FInterpTo(RestPoseBlend,VisualState==TEXT("Resting")?1.f:0.f,Step,8.f);
     const bool Stone=Definition && Definition->Form==ECreatureForm::Stone;
     const float Gait=Time*(Stone?7.f:11.f);
@@ -36,6 +36,7 @@ void ACreatureCharacter::UpdateCreaturePresentation(float DeltaSeconds)
     FRotator Rotation(0,0,Moving?FMath::Sin(Gait)*2*Motion:0);
     FVector Scale(1+RestPoseBlend*.05f,1,1-RestPoseBlend*.28f+Breath*.006f);
     if(VisualState==TEXT("Working")) { Rotation.Pitch=FMath::Sin(Time*6)*8; Location.Z+=FMath::Abs(FMath::Sin(Time*6))*2; }
+    if(VisualState==TEXT("Affection")) { Rotation.Roll=FMath::Sin(Time*8)*9; Location.Z+=FMath::Abs(FMath::Sin(Time*8))*3; }
     if(VisualState==TEXT("Charging")) { Rotation.Pitch=-12; Location.Z-=8; Scale.Z-=.08f; }
     if(VisualState==TEXT("Striking"))
     {
@@ -43,7 +44,7 @@ void ACreatureCharacter::UpdateCreaturePresentation(float DeltaSeconds)
         Location+=StrikeDirectionLocal*(Pulse*18); Rotation.Yaw=StrikeDirectionLocal.Rotation().Yaw; Rotation.Pitch-=Pulse*15;
     }
     if(VisualState==TEXT("Hurt")) { Location.X-=FMath::Sin(PI*FMath::Clamp(HitPoseRemaining/.2f,0.f,1.f))*9; Rotation.Roll+=8; }
-    if(Dead) { Location=FVector::ZeroVector; Rotation=FRotator(0,0,65); Scale=FVector::OneVector; StrikePoseRemaining=0; HitPoseRemaining=0; }
+    if(Dead) { Location=FVector::ZeroVector; Rotation=FRotator(0,0,65); Scale=FVector::OneVector; StrikePoseRemaining=0; HitPoseRemaining=0; AffectionPoseRemaining=0; }
     VisualPivot->SetRelativeLocationAndRotation(Location,Rotation); VisualPivot->SetRelativeScale3D(Scale);
     for(int32 Index=0;Index<Feet.Num() && Index<NeutralFeet.Num();++Index)
     {
@@ -65,7 +66,7 @@ void ACreatureCharacter::UpdateCreaturePresentation(float DeltaSeconds)
     }
     // Squash both eye whites and pupils together: no detached pupils while blinking.
     const float BlinkPhase=FMath::Fmod(Time,4.3f);
-    const float EyeOpen=Dead?1.f:RestPoseBlend>.7f?.12f:BlinkPhase<.14f?.08f:1.f;
+    const float EyeOpen=Dead?1.f:(RestPoseBlend>.7f || AffectionPoseRemaining>0)?.12f:BlinkPhase<.14f?.08f:1.f;
     for(int32 Index=0;Index<EyeParts.Num() && Index<NeutralEyes.Num();++Index)
     {
         FTransform Eye=NeutralEyes[Index],Pupil=NeutralPupils[Index];
@@ -74,4 +75,5 @@ void ACreatureCharacter::UpdateCreaturePresentation(float DeltaSeconds)
     }
     StrikePoseRemaining=FMath::Max(0.f,StrikePoseRemaining-Step);
     HitPoseRemaining=FMath::Max(0.f,HitPoseRemaining-Step);
+    AffectionPoseRemaining=FMath::Max(0.f,AffectionPoseRemaining-Step);
 }

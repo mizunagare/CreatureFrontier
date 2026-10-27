@@ -4,9 +4,9 @@
 
 ## Windows 独立原型
 
-当前最新本机版本：`D:\myGame\Builds\Windows-Affinity\CreatureFrontier.exe`。
+当前最新本机版本：`D:\myGame\Builds\Windows-Affection\CreatureFrontier.exe`。
 双击即可进入测试地图，不需要先打开 Unreal Editor。复制到其他机器时需复制整个
-`Builds\Windows-Affinity` 文件夹，不能只复制根目录的启动 EXE。
+`Builds\Windows-Affection` 文件夹，不能只复制根目录的启动 EXE。
 这是 Development 灰盒原型，尚未完成正式美术、内容与性能优化。
 
 战斗更新预览另外输出到 `D:\myGame\Builds\Windows-Combat\CreatureFrontier.exe`，
@@ -31,10 +31,11 @@
 背包与制作面板更新输出到 `D:\myGame\Builds\Windows-Backpack\CreatureFrontier.exe`。
 宠物程序化动作更新输出到 `D:\myGame\Builds\Windows-Animation\CreatureFrontier.exe`。
 族系克制更新输出到 `D:\myGame\Builds\Windows-Affinity\CreatureFrontier.exe`。
+日常互动更新输出到 `D:\myGame\Builds\Windows-Affection\CreatureFrontier.exe`。
 菜单为键盘操作；帮助、队伍和图鉴面板不会暂停，只有 Esc 菜单暂停世界。
 使用 `-CFSessionTest -CFSessionPreview -RenderOffscreen` 可运行菜单测试并在当前程序的
 `Saved/SessionPreview/` 生成暂停、帮助、常驻 HUD 三张检查图；请勿同时使用 `-nullrhi`。
-旧存档版本 1–14 可以读取，新版存档版本为 15（包含农圃库存、伙伴携带食物及已有进度）。
+旧存档版本 1–15 可以读取，新版存档版本为 16（增加伙伴亲密度与抚摸剩余冷却）。
 新版保存后的存档不能交给旧版程序读取；请保留旧存档备份。
 测试脚本默认选择 `Builds` 下最新编译的 Development 程序，也可明确指定：
 `.\Scripts\Test-Packaged.ps1 -BuildRoot D:\myGame\Builds\Windows-Combat`。
@@ -321,9 +322,18 @@ HUD 显示玩家生命、资源、伙伴数量、工作数量和准星目标的�
 `-CFLogisticsTest` 验证真实寻路取货/卸货/进食、满食槽不取货、部分卸货、途中反复读档守恒、
 改派保留、背包容量与倒地回收、携带食物应急进食、自动休息复工、非法库存/携带量拒绝和旧档迁移，
 使用 `FrontierLogisticsAutomation` 等独立测试槽。
-当前打包回归共 26 项，包含伙伴分工、图鉴、新手目标、基地重生、装备、近战、食物物流、暂停菜单、背包制作、宠物动作与族系战斗测试。
+当前打包回归共 27 项，包含伙伴分工、图鉴、新手目标、基地重生、装备、近战、食物物流、暂停菜单、背包制作、宠物动作、族系战斗与日常互动测试。
 `-CFBackpackTest` 使用独立的 `FrontierBackpackAutomation` 测试槽，验证五配方实际消耗、重复装备、缺料/满格/距离/倒地拒绝、面板互斥和存档恢复。
 追加 `-CFBackpackPreview -RenderOffscreen`（不加 nullrhi）可在当前程序的 `Saved/BackpackPreview/backpack.png` 生成检查图。
+
+### 日常互动与亲密度
+
+Y 抚摸瞄准的存活自有伙伴：距离 2.5 米内、无遮挡、伙伴没有工作/战斗/技能目标，且伙伴 6 米内没有活跃野生生物。暂停或玩家倒地时不能互动。
+成功抚摸亲密度 +2，并回应短暂闭眼摇摆；每只伙伴冷却 30 秒。手动喂食成功亲密度 +3，自动食槽进食不额外增加亲密度。
+亲密度上限 100，20/60/100 显示 Familiar / Bonded / Devoted 阶段，目前只记录关系，不增加攻击、经验、体力或工作效率；抚摸本身不消耗物品、不治疗。
+冷却与亲密度随 F5/F9 保存恢复；抚摸动作本身不保存。旧版 1–15 读档从 0 亲密度、无抚摸冷却开始，保留已有伙伴和进度。
+格式 16 存档不能交给旧版程序读取，请保留旧目录和备份。越界、非有限冷却或野生生物携带亲密度的存档会被拒绝，保留当前世界。
+`-CFAffectionTest` 使用独立测试槽，检查互动条件、亲密度上限、喂食、回应、冷却持久化、非法数据拒绝与旧档迁移；追加 `-CFAffectionPreview -RenderOffscreen` 可生成 `Saved/AffectionPreview/petting.png`。
 
 ### 族系战斗
 
@@ -340,7 +350,7 @@ HUD 显示玩家生命、资源、伙伴数量、工作数量和准星目标的�
 没有属性免疫，领地返程保护、视线/范围检查、友军排除、技能体力与冷却规则保持不变，克制不直接改变捕捉概率或工作效率。
 瞄准野生生物可见当前指令组的优势/受抗/正常人数；只统计存活且属于当前指令组的伙伴，不表示它们能立刻参战或技能就绪（远处、工作、休息伙伴也会计入）。
 L 单选与 K 全队会改变该提示；瞄准伙伴或查看已发现物种的图鉴，可读其族系关系。战斗反馈显示实际伤害及 STRONG / RESISTED / NORMAL 倍率。
-此为平衡规则更新，存档仍为 15；旧快照生命与进度不重算，之后的战斗采用新规则。
+此平衡规则不增加存档字段；旧快照生命与进度不重算，之后的战斗采用新规则。
 `-CFAffinityTest` 使用独立 `FrontierAffinityAutomation` 槽，验证九组合、护盾、普通伤害、返程/倒地保护、真实普攻/技能/溅射/首领伤害、指令组提示与读档后克制。
 追加 `-CFAffinityPreview -RenderOffscreen`（不加 nullrhi）可生成 `Saved/AffinityPreview/matchup.png` 和 `journal.png`。
 
@@ -350,7 +360,7 @@ L 单选与 K 全队会改变该提示；瞄准伙伴或查看已发现物种的
 石系步频较慢，身体的动作只作用于可见模型；碰撞胶囊、导航、攻击距离、伤害时机与库存生产规则不变。
 扑击朝实际目标方向偏移；死亡优先显示倒地姿态，复活或任务切换后按当前活动恢复相应姿态，不累计部件变换。
 首领地面预警圈和技能圈挂在根节点，不跟随身体倾斜；携带食物包仍跟随身体。
-动作相位、眨眼和短时受击/扑击不写入存档，版本仍为 15。当前不是骨骼动画、完整动作状态机或动画驱动命中系统。
+动作相位、眨眼和短时受击/扑击不写入存档。当前不是骨骼动画、完整动作状态机或动画驱动命中系统。
 `-CFAnimationTest` 使用 `FrontierAnimationAutomation` 独立测试槽，检查三物种姿态、真实 AI 攻击触发、反复更新无漂移、碰撞/导航/预警圈隔离及读档重建。
 追加 `-CFAnimationPreview -RenderOffscreen`（不加 nullrhi）可在当前程序的 `Saved/AnimationPreview/poses.png` 生成姿态检查图。
 
