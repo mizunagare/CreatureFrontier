@@ -40,7 +40,7 @@ public:
     TObjectPtr<AController> Tamer;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="AI", meta=(ClampMin="0.0"))
-    float AggroRange = 1400.0f;
+    float AggroRange = 650.0f;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="AI", meta=(ClampMin="0.0"))
     float AttackRange = 150.0f;

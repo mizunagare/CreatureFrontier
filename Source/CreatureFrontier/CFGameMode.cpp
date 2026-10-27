@@ -67,10 +67,14 @@ void ACFGameMode::BeginPlay()
                 MaxDetour = FMath::Max(MaxDetour, FMath::Abs(static_cast<float>(Pet->GetActorLocation().Y)-500.0f));
                 const bool bArrived = Pet->GetDistanceTo(Hero) <= 240.0f;
                 if (!bArrived && GetWorld()->GetTimeSeconds()-Started < 12.0) return;
-                GetWorldTimerManager().ClearTimer(*Poll);
                 const bool bPass = bPath && bBlocked && bArrived && MaxDetour > 100.0f;
                 UE_LOG(LogTemp, Display, TEXT("CF_NAV %s path=%d barrier=%d arrived=%d detour=%.1f"), bPass ? TEXT("PASS") : TEXT("FAIL"), bPath, bBlocked, bArrived, MaxDetour);
-                if (!bPass || !bMelee) { FPlatformMisc::RequestExitWithStatus(false, 7); return; }
+                if (!bPass || !bMelee)
+                {
+                    GetWorldTimerManager().ClearTimer(*Poll);
+                    FPlatformMisc::RequestExitWithStatus(false, 7);
+                    return;
+                }
                 Hero->SetActorLocation(FVector(-450,0,40));
                 Hero->CommandWork();
                 const int32 MaterialsBefore = Hero->Inventory->Count(EFrontierItem::Material);
@@ -81,6 +85,8 @@ void ACFGameMode::BeginPlay()
                     UE_LOG(LogTemp, Display, TEXT("CF_NAV_WORK %s materials=%d"), bWorked ? TEXT("PASS") : TEXT("FAIL"), Hero->Inventory->Count(EFrontierItem::Material));
                     FPlatformMisc::RequestExitWithStatus(false, bWorked ? 0 : 8);
                 }, 12.0f, false);
+                // Clear only after the final capture access: clearing destroys this delegate.
+                GetWorldTimerManager().ClearTimer(*Poll);
             }, 0.1f, true);
             return;
         }

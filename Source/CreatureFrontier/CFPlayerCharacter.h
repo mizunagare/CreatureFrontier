@@ -31,6 +31,7 @@ public:
     void CommandFollow();
     void CommandWork();
     void RestartLevel();
+    void QuitGame();
     bool SaveProgress(const FString& Slot = TEXT("FrontierSlot"));
     bool LoadProgress(const FString& Slot = TEXT("FrontierSlot"));
     void QuickSave();

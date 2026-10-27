@@ -32,16 +32,23 @@ player_start.set_actor_label("Player Start")
 
 sun = spawn(unreal.DirectionalLight, (0, 0, 1000), unreal.Rotator(-45, -35, 0))
 sun.set_actor_label("Sun")
-sun.light_component.set_editor_property("intensity", 8.0)
+sun.light_component.set_mobility(unreal.ComponentMobility.MOVABLE)
+sun.light_component.set_editor_property("intensity", 30000.0)
+sun.light_component.set_editor_property("atmosphere_sun_light", True)
 
 sky = spawn(unreal.SkyLight, (0, 0, 500))
 sky.set_actor_label("Sky Light")
+sky.light_component.set_mobility(unreal.ComponentMobility.MOVABLE)
 sky.light_component.set_editor_property("intensity", 1.0)
+sky.light_component.set_editor_property("real_time_capture", True)
+spawn(unreal.SkyAtmosphere, (0, 0, 0))
+fog = spawn(unreal.ExponentialHeightFog, (0, 0, -50))
+fog.get_component_by_class(unreal.ExponentialHeightFogComponent).set_editor_property("fog_density", 0.008)
 
 for index, location in enumerate(((700, 0, 90), (1250, 450, 90), (1500, -550, 90))):
     creature = spawn(unreal.CreatureCharacter, location)
     creature.set_actor_label(f"Wild Creature {index + 1}")
-    creature.set_editor_property("aggro_range", 1400.0)
+    creature.set_editor_property("aggro_range", 650.0)
 
 unreal.EditorLevelLibrary.save_all_dirty_levels()
 unreal.log(f"Creature Frontier prototype map created: {MAP_PATH}")

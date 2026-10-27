@@ -2,6 +2,24 @@
 
 原创第一人称生物捕捉 RPG 原型。玩法重点是捕捉伙伴，并与伙伴共同生活、工作和战斗。
 
+## Windows 独立原型
+
+本机打包位置：`D:\myGame\Builds\Windows\CreatureFrontier.exe`。
+双击即可进入测试地图，不需要先打开 Unreal Editor。复制到其他机器时需复制整个
+`Builds\Windows` 文件夹，不能只复制根目录的启动 EXE。
+这是 Development 灰盒原型，尚未完成正式美术、内容与性能优化。
+
+重新打包和验证（在项目根目录执行）：
+
+```powershell
+.\Scripts\Package-Windows.ps1
+.\Scripts\Test-Packaged.ps1
+```
+
+测试脚本直接运行打包后的程序，验证捕捉/工作、背包制作、跨进程存档、导航绕障碍和近战遮挡。
+每个测试必须出现日志成功标记，单看进程退出码不能判定通过。
+构建产物与测试日志分别在 `Builds/Windows`、`Saved/PackagedTests`，均不提交 Git。
+
 ## 当前状态
 
 Windows 开发环境已部署并验证：Unreal Engine 5.8、Visual Studio C++ 工具链、
@@ -21,6 +39,7 @@ Windows 开发环境已部署并验证：Unreal Engine 5.8、Visual Studio C++ �
 - `F`：召回所有伙伴跟随，并自动攻击玩家周边的野生宠物
 - `E`：靠近出生点后方的工作台（8 米内），分配伙伴采集；到达后每 3 秒产出 1 资源
 - `R`：重新开始当前关卡（玩家倒地后也可使用）
+- `Esc`：退出游戏（退出前需自行按 F5 保存）
 - `F5`：保存当前进度；`F9`：读取进度（包括重新打开游戏之后）
 - `1`：工作台 8 米内消耗 3 材料制作 1 个捕捉装置
 - `2`：工作台 8 米内消耗 5 材料制作 1 份治疗药

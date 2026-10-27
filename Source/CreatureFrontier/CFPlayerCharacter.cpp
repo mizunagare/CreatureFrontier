@@ -4,6 +4,7 @@
 #include "Components/CapsuleComponent.h"
 #include "CreatureCharacter.h"
 #include "Kismet/GameplayStatics.h"
+#include "Kismet/KismetSystemLibrary.h"
 #include "EngineUtils.h"
 #include "WorkStation.h"
 #include "FrontierSaveGame.h"
@@ -13,6 +14,11 @@
 
 void ACFPlayerCharacter::QuickSave() { SaveProgress(); }
 void ACFPlayerCharacter::QuickLoad() { LoadProgress(); }
+
+void ACFPlayerCharacter::QuitGame()
+{
+    UKismetSystemLibrary::QuitGame(this, Cast<APlayerController>(GetController()), EQuitPreference::Quit, false);
+}
 
 bool ACFPlayerCharacter::IsNearWorkStation() const
 {
@@ -215,6 +221,7 @@ void ACFPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
     PlayerInputComponent->BindKey(EKeys::F, IE_Pressed, this, &ACFPlayerCharacter::CommandFollow);
     PlayerInputComponent->BindKey(EKeys::E, IE_Pressed, this, &ACFPlayerCharacter::CommandWork);
     PlayerInputComponent->BindKey(EKeys::R, IE_Pressed, this, &ACFPlayerCharacter::RestartLevel);
+    PlayerInputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &ACFPlayerCharacter::QuitGame);
     PlayerInputComponent->BindKey(EKeys::F5, IE_Pressed, this, &ACFPlayerCharacter::QuickSave);
     PlayerInputComponent->BindKey(EKeys::F9, IE_Pressed, this, &ACFPlayerCharacter::QuickLoad);
     PlayerInputComponent->BindKey(EKeys::One, IE_Pressed, this, &ACFPlayerCharacter::CraftCaptureDevice);
