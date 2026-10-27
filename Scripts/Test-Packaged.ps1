@@ -47,6 +47,9 @@ $cases = @(
     @{Flag='CFAffectionTest'; Marker='CF_AFFECTION PASS'},
     @{Flag='CFFormationTest'; Marker='CF_FORMATION PASS'; Repeats=3},
     @{Flag='CFResourceTest'; Marker='CF_RESOURCE PASS'},
+    @{Flag='CFHomeTest'; Marker='CF_HOME PASS'},
+    @{Flag='CFHomeWrite'; Marker='CF_HOME_WRITE PASS'},
+    @{Flag='CFHomeRead'; Marker='CF_HOME_READ PASS'},
     @{Flag='CFSaveWrite'; Marker='CF_SAVE_WRITE PASS'},
     @{Flag='CFSaveRead'; Marker='CF_SAVE_READ PASS'},
     @{Flag='CFNavTest'; Marker='CF_NAV_WORK PASS'}

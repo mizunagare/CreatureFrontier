@@ -1,0 +1,253 @@
+#include "HomeScenario.h"
+#include "HomeBuildingComponent.h"
+#include "HomeModule.h"
+#include "HomeLayout.h"
+#include "BaseBuildingComponent.h"
+#include "CFPlayerCharacter.h"
+#include "CreatureCharacter.h"
+#include "CreatureDefinition.h"
+#include "WorkStation.h"
+#include "ResourceNode.h"
+#include "InventoryComponent.h"
+#include "FrontierSaveGame.h"
+#include "Camera/CameraComponent.h"
+#include "GameFramework/CharacterMovementComponent.h"
+#include "Kismet/GameplayStatics.h"
+#include "EngineUtils.h"
+#include "NavigationSystem.h"
+#include "NavigationPath.h"
+#include "TimerManager.h"
+#include "HAL/PlatformMisc.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
+#include "Misc/Paths.h"
+#include "UnrealClient.h"
+#include "Components/BoxComponent.h"
+
+UHomeMovementProbe::UHomeMovementProbe() { PrimaryComponentTick.bCanEverTick=true; }
+void UHomeMovementProbe::TickComponent(float DeltaTime,ELevelTick TickType,FActorComponentTickFunction* Tick)
+{
+    Super::TickComponent(DeltaTime,TickType,Tick);
+    if(auto* Pawn=Cast<APawn>(GetOwner());Pawn && !Direction.IsNearlyZero()) Pawn->AddMovementInput(Direction);
+}
+
+namespace
+{
+AHomeModule* Find(UWorld* World,EHomeModuleKind Kind,FVector Position)
+{
+    for(TActorIterator<AHomeModule> It(World);It;++It)
+        if(!It->bPreview && It->GetKind()==Kind && It->GetActorLocation().Equals(Position,.01)) return *It;
+    return nullptr;
+}
+AResourceNode* Brush(UWorld* World)
+{
+    for(TActorIterator<AResourceNode> It(World);It;++It) if(It->PersistentId==FGuid(0xCF170000,0,0,1)) return *It;
+    return nullptr;
+}
+AHomeModule* Build(ACFPlayerCharacter* Hero,EHomeModuleKind Kind,FVector Position,FGuid Floor=FGuid(),double Yaw=0)
+{
+    Hero->HomeBuilding->Selected=Kind;
+    auto* Result=Hero->HomeBuilding->BuildAt(FTransform(FRotator(0,Yaw,0),Position),Floor);
+    if(!Result) UE_LOG(LogTemp,Warning,TEXT("CF_HOME build rejected %d %s: %s"),static_cast<int32>(Kind),*Position.ToString(),*Hero->Feedback);
+    return Result;
+}
+bool SnapshotOK(UWorld* World,ACFPlayerCharacter* Hero)
+{
+    const auto Layout=HomeLayout::Collect(World); FString Reason; TSet<FGuid> Ids; int32 Indoor=0;
+    for(const auto& Record:Layout) Ids.Add(Record.Id);
+    for(TActorIterator<AWorkStation> It(World);It;++It) if(It->bPlayerBuilt)
+        if(FMath::IsNearlyEqual(It->GetActorLocation().Z,5.,.01) && HomeLayout::SupportsFacility(It->GetActorTransform(),Layout)) ++Indoor;
+    auto* Source=Brush(World);
+    return Layout.Num()==10 && Ids.Num()==10 && HomeLayout::Validate(Layout,Reason) && Indoor==1 &&
+        Hero->Inventory->Count(EFrontierItem::Material)==116 && Source && Source->Remaining==7;
+}
+bool PathInside(UWorld* World,ACFPlayerCharacter* Hero)
+{
+    auto* Path=UNavigationSystemV1::FindPathToLocationSynchronously(World,FVector(-400,-1250,40),FVector(-400,-800,60),Hero);
+    return Path && Path->IsValid() && !Path->IsPartial() && !Path->PathPoints.IsEmpty() && Path->PathPoints.Last().Z<100;
+}
+}
+
+void RunHomeScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
+{
+    const FString CrossSlot=TEXT("FrontierHomeCrossProcess");
+    if(Mode==2)
+    {
+        const bool Pass=Hero->LoadProgress(CrossSlot) && SnapshotOK(World,Hero) && Hero->LoadProgress(CrossSlot) && SnapshotOK(World,Hero);
+        UE_LOG(LogTemp,Display,TEXT("CF_HOME_READ %s modules=%d"),Pass?TEXT("PASS"):TEXT("FAIL"),HomeLayout::Collect(World).Num());
+        FPlatformMisc::RequestExitWithStatus(false,Pass?0:1); return;
+    }
+    UCreatureDefinition* Leaf=nullptr;
+    for(TActorIterator<ACreatureCharacter> It(World);It;++It)
+    { if(It->Definition && It->Definition->Form==ECreatureForm::Leaf) Leaf=It->Definition; It->Destroy(); }
+    if(!Leaf || !Brush(World)) { UE_LOG(LogTemp,Error,TEXT("CF_HOME FAIL fixture")); FPlatformMisc::RequestExitWithStatus(false,1); return; }
+    Hero->GetCharacterMovement()->DisableMovement(); Hero->SetActorLocation(FVector(-350,-1150,40));
+    Hero->Inventory->Restore({{EFrontierItem::Material,200}});
+    Hero->FirstPersonCamera->SetWorldRotation((FVector(-400,-800,-50)-Hero->FirstPersonCamera->GetComponentLocation()).Rotation());
+    Hero->Building->Toggle(); Hero->Building->SwitchCategory(); Hero->Attack();
+    Hero->Building->Cycle(); Hero->Building->RotateHome();
+    const bool Rotated=Hero->HomeBuilding->GetPreview() && FMath::IsNearlyEqual(Hero->HomeBuilding->GetPreview()->GetActorRotation().Yaw,90.,.01);
+    Hero->Building->RotateHome(); Hero->Building->Cycle(); Hero->Building->Cycle(); Hero->Building->Cycle(); Hero->CaptureTarget();
+    auto* FloorA=Find(World,EHomeModuleKind::Floor,FVector(-400,-800,-40));
+    bool Input=Rotated && FloorA && !Hero->Building->IsActive() && Hero->Inventory->Count(EFrontierItem::Material)==192;
+    if(!Input) { UE_LOG(LogTemp,Error,TEXT("CF_HOME FAIL input %s"),*Hero->Feedback); FPlatformMisc::RequestExitWithStatus(false,1); return; }
+    const FGuid FloorAId=FloorA->PersistentId;
+    bool Reject=!Build(Hero,EHomeModuleKind::Floor,FVector(-400,-800,-40)) &&
+        !Build(Hero,EHomeModuleKind::Floor,FVector(-350,-800,-40)) &&
+        !Build(Hero,EHomeModuleKind::Roof,FVector(-400,-800,280),FloorAId) && Hero->Inventory->Count(EFrontierItem::Material)==192;
+    auto* Blocker=World->SpawnActor<ACreatureCharacter>(FVector(0,-800,40),FRotator::ZeroRotator);
+    Reject &= !Build(Hero,EHomeModuleKind::Floor,FVector(0,-800,-40)); Blocker->Destroy();
+    auto* FloorB=Build(Hero,EHomeModuleKind::Floor,FVector(0,-800,-40));
+    if(!FloorB) { FPlatformMisc::RequestExitWithStatus(false,1); return; }
+    const FGuid FloorBId=FloorB->PersistentId;
+    bool Built=Build(Hero,EHomeModuleKind::Doorway,FVector(-400,-1000,-30),FloorAId) &&
+        Build(Hero,EHomeModuleKind::Wall,FVector(-400,-600,-30),FloorAId) &&
+        Build(Hero,EHomeModuleKind::Wall,FVector(-600,-800,-30),FloorAId,90) &&
+        Build(Hero,EHomeModuleKind::Wall,FVector(0,-1000,-30),FloorBId) &&
+        Build(Hero,EHomeModuleKind::Wall,FVector(0,-600,-30),FloorBId) &&
+        Build(Hero,EHomeModuleKind::Wall,FVector(200,-800,-30),FloorBId,90) &&
+        Build(Hero,EHomeModuleKind::Roof,FVector(-400,-800,280),FloorAId) &&
+        Build(Hero,EHomeModuleKind::Roof,FVector(0,-800,280),FloorBId);
+    Hero->Building->Selected=EWorkSpecialty::Gathering;
+    auto* Indoor=Hero->Building->BuildAt(FTransform(FRotator::ZeroRotator,FVector(0,-800,5),FVector(2,1,.7)));
+    Built &= Indoor && Hero->Inventory->Count(EFrontierItem::Material)==116 && HomeLayout::Collect(World).Num()==10;
+    if(!Built) { UE_LOG(LogTemp,Error,TEXT("CF_HOME FAIL room %s"),*Hero->Feedback); FPlatformMisc::RequestExitWithStatus(false,1); return; }
+    auto* Source=Brush(World); Source->SetActorLocation(FVector(-200,-900,0)); Source->Remaining=7; Source->Refresh();
+    if(Mode==1)
+    {
+        const bool Pass=SnapshotOK(World,Hero) && Hero->SaveProgress(CrossSlot);
+        UE_LOG(LogTemp,Display,TEXT("CF_HOME_WRITE %s"),Pass?TEXT("PASS"):TEXT("FAIL")); FPlatformMisc::RequestExitWithStatus(false,Pass?0:1); return;
+    }
+    Reject &= !Hero->HomeBuilding->Dismantle(FloorA) && !Hero->HomeBuilding->Dismantle(Find(World,EHomeModuleKind::Wall,FVector(-400,-600,-30)));
+    Hero->Inventory->Restore({{EFrontierItem::Material,999}});
+    Reject &= !Hero->HomeBuilding->Dismantle(Find(World,EHomeModuleKind::Roof,FVector(-400,-800,280)));
+    Hero->Inventory->Restore({{EFrontierItem::Material,116}});
+    const FString Slot=TEXT("FrontierHomeAutomation");
+    bool Saved=Hero->SaveProgress(Slot) && Hero->LoadProgress(Slot) && SnapshotOK(World,Hero) && Hero->LoadProgress(Slot) && SnapshotOK(World,Hero);
+    UGameplayStatics::SetGamePaused(World,true);
+    Saved &= Hero->LoadProgress(Slot) && SnapshotOK(World,Hero) && UGameplayStatics::IsGamePaused(World);
+    UGameplayStatics::SetGamePaused(World,false);
+    bool Invalid=true;
+    for(int32 Case=0;Case<8;++Case)
+    {
+        auto* LiveFloor=Find(World,EHomeModuleKind::Floor,FVector(-400,-800,-40));
+        auto* Bad=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot,0));
+        if(Case==0) { const auto Duplicate=Bad->HomeModules[0]; Bad->HomeModules.Add(Duplicate); }
+        if(Case==1) Bad->HomeModules[0].Transform.AddToTranslation(FVector(0,0,100));
+        if(Case==2) for(auto& Record:Bad->HomeModules) if(Record.Definition.Get() && Record.Definition.Get()->Kind==EHomeModuleKind::Roof) { Record.FloorId=FGuid::NewGuid(); break; }
+        if(Case==3) Bad->HomeModules[0].Definition=TSoftObjectPtr<UHomeModuleDefinition>(FSoftObjectPath(TEXT("/Game/Missing.Home")));
+        if(Case==4) Bad->HomeModules.RemoveAll([](const FHomeModuleRecord& Record){return Record.Transform.GetLocation().Equals(FVector(-400,-600,-30),.01);});
+        if(Case==5) { FCreatureSaveRecord Record; Record.CreatureClass=ACreatureCharacter::StaticClass(); Record.Health=-1; Bad->Creatures.Add(Record); }
+        if(Case==6) for(auto& Record:Bad->HomeModules) if(Record.Id==FloorBId) { Record.Transform.SetLocation(FVector(400,-800,-40)); break; }
+        if(Case==7) Bad->HomeModules[0].PaidMaterials=1000;
+        UGameplayStatics::SaveGameToSlot(Bad,TEXT("FrontierHomeInvalid"),0);
+        Invalid &= !Hero->LoadProgress(TEXT("FrontierHomeInvalid")) && IsValid(LiveFloor) && LiveFloor->GetActorEnableCollision() && SnapshotOK(World,Hero);
+    }
+    auto* TerrainBlock=World->SpawnActor<AActor>(); auto* TerrainBox=NewObject<UBoxComponent>(TerrainBlock);
+    TerrainBlock->SetRootComponent(TerrainBox); TerrainBox->SetBoxExtent(FVector(80,20,80)); TerrainBox->SetCollisionObjectType(ECC_WorldStatic);
+    TerrainBox->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics); TerrainBox->SetCollisionResponseToAllChannels(ECR_Block); TerrainBox->SetCanEverAffectNavigation(false);
+    TerrainBox->RegisterComponent(); TerrainBlock->SetActorLocation(FVector(-400,-600,80));
+    Invalid &= !Hero->LoadProgress(Slot) && SnapshotOK(World,Hero); TerrainBlock->Destroy();
+    auto* PaidRoof=Find(World,EHomeModuleKind::Roof,FVector(0,-800,280));
+    auto* RoofDefinition=PaidRoof->Definition.Get(); const int32 OriginalCost=RoofDefinition->MaterialCost;
+    RoofDefinition->MaterialCost=14;
+    bool PaidRefund=Hero->HomeBuilding->Dismantle(PaidRoof) && Hero->Inventory->Count(EFrontierItem::Material)==121;
+    RoofDefinition->MaterialCost=OriginalCost;
+    PaidRefund &= Build(Hero,EHomeModuleKind::Roof,FVector(0,-800,280),FloorBId) && Hero->Inventory->Count(EFrontierItem::Material)==111;
+    PaidRefund &= Hero->LoadProgress(Slot) && SnapshotOK(World,Hero);
+    // A floor with no walls still cannot be pulled out from under an indoor station.
+    Hero->SetActorLocation(FVector(350,-1050,40));
+    bool Support=Hero->HomeBuilding->Dismantle(Find(World,EHomeModuleKind::Roof,FVector(0,-800,280))) &&
+        Hero->HomeBuilding->Dismantle(Find(World,EHomeModuleKind::Wall,FVector(0,-1000,-30))) &&
+        Hero->HomeBuilding->Dismantle(Find(World,EHomeModuleKind::Wall,FVector(0,-600,-30))) &&
+        Hero->HomeBuilding->Dismantle(Find(World,EHomeModuleKind::Wall,FVector(200,-800,-30)));
+    auto* LiveB=Find(World,EHomeModuleKind::Floor,FVector(0,-800,-40));
+    Support &= !Hero->HomeBuilding->Dismantle(LiveB);
+    for(TActorIterator<AWorkStation> It(World);It;++It) if(It->bPlayerBuilt) Support &= Hero->Building->DismantleStation(*It);
+    Support &= Hero->HomeBuilding->Dismantle(LiveB) && Hero->LoadProgress(Slot) && SnapshotOK(World,Hero);
+    auto* Legacy=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot,0)); Legacy->FormatVersion=17; Legacy->Facilities.Reset();
+    FFacilitySaveRecord LegacySite; LegacySite.Id=FGuid::NewGuid(); LegacySite.Specialty=EWorkSpecialty::Gathering;
+    LegacySite.Transform=FTransform(FRotator::ZeroRotator,FVector(0,-800,-14),FVector(2,1,.7)); Legacy->Facilities.Add(LegacySite);
+    UGameplayStatics::SaveGameToSlot(Legacy,TEXT("FrontierHomeLegacy"),0);
+    bool Migration=Hero->LoadProgress(TEXT("FrontierHomeLegacy")) && HomeLayout::Collect(World).IsEmpty() && Hero->Inventory->Count(EFrontierItem::Material)==116 && Brush(World)->Remaining==7;
+    int32 LegacySites=0;
+    for(TActorIterator<AWorkStation> It(World);It;++It) if(It->bPlayerBuilt && FMath::IsNearlyEqual(It->GetActorLocation().Z,-14.,.01)) ++LegacySites;
+    Migration &= LegacySites==1;
+    Migration &= Hero->LoadProgress(Slot) && SnapshotOK(World,Hero);
+    Hero->GetCharacterMovement()->DisableMovement(); Hero->SetActorLocation(FVector(-400,-1250,40));
+    bool Sealed=Hero->HomeBuilding->Dismantle(Find(World,EHomeModuleKind::Roof,FVector(-400,-800,280))) &&
+        Hero->HomeBuilding->Dismantle(Find(World,EHomeModuleKind::Doorway,FVector(-400,-1000,-30))) &&
+        Build(Hero,EHomeModuleKind::Wall,FVector(-400,-1000,-30),FloorAId) && Build(Hero,EHomeModuleKind::Roof,FVector(-400,-800,280),FloorAId);
+    const bool Baseline=Input && Reject && Built && Saved && Invalid && PaidRefund && Support && Migration && Sealed;
+    UE_LOG(LogTemp,Display,TEXT("CF_HOME checks input=%d reject=%d build=%d saved=%d invalid=%d paid_refund=%d support=%d migration=%d sealed=%d"),Input,Reject,Built,Saved,Invalid,PaidRefund,Support,Migration,Sealed);
+    const bool Preview=FParse::Param(FCommandLine::Get(),TEXT("CFHomePreview"));
+    auto* Movement=NewObject<UHomeMovementProbe>(Hero); Movement->RegisterComponent();
+    TSharedRef<FTimerHandle> Poll=MakeShared<FTimerHandle>();
+    World->GetTimerManager().SetTimer(*Poll,[World,Hero,Leaf,FloorAId,Baseline,Preview,Movement,Poll,Phase=0,Started=World->GetTimeSeconds(),Pass=true,Pet=static_cast<ACreatureCharacter*>(nullptr),WorkBefore=0]() mutable
+    {
+        const float Elapsed=World->GetTimeSeconds()-Started;
+        auto Advance=[&](int32 Next){ Phase=Next; Started=World->GetTimeSeconds(); };
+        if(Phase==0 && Elapsed>=2)
+        {
+            FHitResult Hit; FCollisionQueryParams Params(SCENE_QUERY_STAT(HomeClosed),false,Hero);
+            const bool Wall=World->LineTraceSingleByChannel(Hit,FVector(-400,-1200,80),FVector(-400,-800,80),ECC_Visibility,Params) && Cast<AHomeModule>(Hit.GetActor());
+            Pass &= Wall && !PathInside(World,Hero);
+            Pass &= Hero->HomeBuilding->Dismantle(Find(World,EHomeModuleKind::Roof,FVector(-400,-800,280))) &&
+                Hero->HomeBuilding->Dismantle(Find(World,EHomeModuleKind::Wall,FVector(-400,-1000,-30))) &&
+                Build(Hero,EHomeModuleKind::Doorway,FVector(-400,-1000,-30),FloorAId) && Build(Hero,EHomeModuleKind::Roof,FVector(-400,-800,280),FloorAId);
+            Advance(1); return;
+        }
+        if(Phase==1 && Elapsed>=2)
+        {
+            Pass &= PathInside(World,Hero);
+            Hero->GetCharacterMovement()->SetMovementMode(MOVE_Walking); Hero->GetController()->SetControlRotation(FRotator(0,90,0)); Movement->Direction=FVector(0,1,0); Advance(2);
+        }
+        if(Phase==2)
+        {
+            if(Hero->GetActorLocation().Y<-880 && Elapsed<6) return;
+            Pass &= Hero->GetActorLocation().Y>-950 && Hero->GetActorLocation().Z>50;
+            Hero->GetCharacterMovement()->StopMovementImmediately(); Movement->Direction=FVector(0,-1,0); Advance(3); return;
+        }
+        if(Phase==3)
+        {
+            if(Hero->GetActorLocation().Y>-1200 && Elapsed<6) return;
+            Pass &= Hero->GetActorLocation().Y<-1100;
+            Movement->Direction=FVector::ZeroVector; Hero->GetCharacterMovement()->DisableMovement(); Hero->SetActorLocation(FVector(-400,-680,60)); Hero->GetController()->SetControlRotation(FRotator(0,90,0));
+            const FTransform Transform(FVector(-400,-1350,40));
+            Pet=World->SpawnActorDeferred<ACreatureCharacter>(ACreatureCharacter::StaticClass(),Transform,nullptr,nullptr,ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+            Pet->Definition=Leaf; Pet->FinishSpawning(Transform); Pet->Tame(Hero->GetController()); Pet->SetActivity(ECreatureActivity::Follow); Advance(4); return;
+        }
+        if(Phase==4)
+        {
+            if((Pet->GetActorLocation().Y<-950 || FVector::Dist2D(Pet->GetActorLocation(),Pet->GetFollowDestination())>40 || Pet->GetVelocity().Size2D()>15) && Elapsed<10) return;
+            Pass &= Pet->GetActorLocation().Y>-950 && Pet->GetActorLocation().Z>50 && FVector::Dist2D(Pet->GetActorLocation(),Pet->GetFollowDestination())<=40;
+            for(TActorIterator<AWorkStation> It(World);It;++It) if(It->bPlayerBuilt) Pet->WorkSite=*It;
+            Pet->SetActivity(ECreatureActivity::Work); WorkBefore=Hero->Inventory->Count(EFrontierItem::Material); Advance(5); return;
+        }
+        if(Phase==5)
+        {
+            if(Hero->Inventory->Count(EFrontierItem::Material)==WorkBefore && Elapsed<8) return;
+            Pass &= Hero->Inventory->Count(EFrontierItem::Material)==WorkBefore+1 && Brush(World)->Remaining==6 && Pet->Experience==1;
+            Hero->CommandFollow(); Hero->SetActorLocation(FVector(-400,-1250,40)); Hero->GetController()->SetControlRotation(FRotator(0,-90,0)); Advance(6); return;
+        }
+        if(Phase==6)
+        {
+            if(Pet->GetActorLocation().Y>-1050 && Elapsed<10) return;
+            Pass &= Pet->GetActorLocation().Y<-1050;
+            const bool Final=Baseline && Pass;
+            UE_LOG(LogTemp,Display,TEXT("CF_HOME %s physics_navigation_work=%d hero=%s pet=%s"),Final?TEXT("PASS"):TEXT("FAIL"),Pass,*Hero->GetActorLocation().ToString(),*Pet->GetActorLocation().ToString());
+            FTimerHandle ActivePoll=*Poll;
+            if(Preview && Final)
+            {
+                Hero->FirstPersonCamera->bUsePawnControlRotation=false; Hero->FirstPersonCamera->SetAbsolute(true,true,false);
+                Hero->FirstPersonCamera->SetWorldLocation(FVector(-1050,-1450,380)); Hero->FirstPersonCamera->SetWorldRotation((FVector(-200,-800,80)-Hero->FirstPersonCamera->GetComponentLocation()).Rotation());
+                FTimerHandle Exterior,Interior,Done;
+                World->GetTimerManager().SetTimer(Exterior,[](){FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir()/TEXT("HomeExterior.png"),false,false);},1.f,false);
+                World->GetTimerManager().SetTimer(Interior,[Hero](){Hero->FirstPersonCamera->SetWorldLocation(FVector(-400,-900,150)); Hero->FirstPersonCamera->SetWorldRotation((FVector(0,-760,80)-Hero->FirstPersonCamera->GetComponentLocation()).Rotation()); FTimerHandle Shot; Hero->GetWorldTimerManager().SetTimer(Shot,[](){FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir()/TEXT("HomeInterior.png"),false,false);},.5f,false);},2.f,false);
+                World->GetTimerManager().SetTimer(Done,[](){FPlatformMisc::RequestExitWithStatus(false,0);},4.f,false);
+            }
+            else FPlatformMisc::RequestExitWithStatus(false,Final?0:1);
+            World->GetTimerManager().ClearTimer(ActivePoll);
+        }
+    },.05f,true);
+}

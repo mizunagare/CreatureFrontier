@@ -36,6 +36,7 @@ public:
     void ToggleVest();
     float GetPlayerAttackDamage() const;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Building") TObjectPtr<UBaseBuildingComponent> Building;
+    UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Category="Building") TObjectPtr<class UHomeBuildingComponent> HomeBuilding;
     void ToggleBuilding();
     void CycleBuilding();
     void DismantleBuilding();

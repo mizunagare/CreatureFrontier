@@ -18,6 +18,8 @@ public:
     void Cycle();
     void Confirm();
     void Dismantle();
+    void SwitchCategory();
+    void RotateHome();
     bool IsActive() const { return bActive; }
     FString GetHint() const;
     static int32 GetCost(EWorkSpecialty Specialty);
@@ -30,6 +32,7 @@ public:
 private:
     bool UpdatePlacement();
     bool bActive = false;
+    bool bHomeMode=false;
     bool bValid = false;
     FString Status;
     FTransform Placement;

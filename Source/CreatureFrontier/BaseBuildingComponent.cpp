@@ -9,6 +9,8 @@
 #include "Components/StaticMeshComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "EngineUtils.h"
+#include "HomeBuildingComponent.h"
+#include "HomeModule.h"
 
 UBaseBuildingComponent::UBaseBuildingComponent() { PrimaryComponentTick.bCanEverTick = true; }
 
@@ -22,7 +24,7 @@ bool UBaseBuildingComponent::IsBuildTransformValid(const FTransform& Transform)
     const FVector Position = Transform.GetLocation();
     const FRotator Rotation = Transform.Rotator();
     return !Transform.ContainsNaN() && Transform.GetScale3D().Equals(FVector(2,1,.7),.001) &&
-        FVector::Dist2D(Position, BaseOrigin()) <= 1200 && FMath::Abs(Position.Z - (BaseOrigin().Z + 35)) <= 2 &&
+        FVector::Dist2D(Position, BaseOrigin()) <= 1200 && (FMath::Abs(Position.Z - (BaseOrigin().Z + 35)) <= 2 || FMath::IsNearlyEqual(Position.Z,5.,.01)) &&
         FMath::IsNearlyZero(Rotation.Pitch,.01) && FMath::IsNearlyZero(Rotation.Roll,.01) &&
         FMath::IsNearlyEqual(Rotation.Yaw, FMath::GridSnap(Rotation.Yaw,90.0),.01) &&
         FMath::IsNearlyEqual(Position.X,FMath::GridSnap(Position.X,100.0),.01) &&
@@ -48,11 +50,13 @@ void UBaseBuildingComponent::Toggle()
         Mesh->SetMaterial(0, PreviewMaterial);
     }
     UpdatePlacement();
-    Hero->Feedback = TEXT("Build mode: V select | LMB place | RMB/B cancel | X dismantle");
+    Hero->Feedback = TEXT("Build: 8 facility/home | V select | LMB place | RMB/B cancel | X dismantle");
 }
 
 void UBaseBuildingComponent::Cancel()
 {
+    if(auto* Hero=Cast<ACFPlayerCharacter>(GetOwner())) Hero->HomeBuilding->Cancel();
+    bHomeMode=false;
     bActive = false; bValid = false;
     if (IsValid(Preview)) Preview->Destroy();
     Preview = nullptr; PreviewMaterial = nullptr;
@@ -63,9 +67,22 @@ void UBaseBuildingComponent::EndPlay(const EEndPlayReason::Type Reason) { Cancel
 void UBaseBuildingComponent::Cycle()
 {
     if (!bActive) return;
+    if(bHomeMode) { CastChecked<ACFPlayerCharacter>(GetOwner())->HomeBuilding->Cycle(); return; }
     Selected = Selected == EWorkSpecialty::Gathering ? EWorkSpecialty::Mining : Selected == EWorkSpecialty::Mining ? EWorkSpecialty::Crafting :
         Selected == EWorkSpecialty::Crafting ? EWorkSpecialty::Farming : Selected == EWorkSpecialty::Farming ? EWorkSpecialty::Feeding : Selected==EWorkSpecialty::Feeding ? EWorkSpecialty::Transport : EWorkSpecialty::Gathering;
     UpdatePlacement();
+}
+
+void UBaseBuildingComponent::SwitchCategory()
+{
+    if(!bActive) return;
+    auto* Hero=CastChecked<ACFPlayerCharacter>(GetOwner()); bHomeMode=!bHomeMode;
+    if(Preview) Preview->SetActorHiddenInGame(bHomeMode);
+    if(bHomeMode) Hero->HomeBuilding->StartPreview(); else { Hero->HomeBuilding->Cancel(); UpdatePlacement(); }
+}
+void UBaseBuildingComponent::RotateHome()
+{
+    if(bActive && bHomeMode) CastChecked<ACFPlayerCharacter>(GetOwner())->HomeBuilding->Rotate();
 }
 
 bool UBaseBuildingComponent::ValidatePlacement(const FTransform& Transform, FString& Reason) const
@@ -91,7 +108,9 @@ bool UBaseBuildingComponent::ValidatePlacement(const FTransform& Transform, FStr
         const FVector Corner = Transform.GetLocation() + Transform.GetRotation().RotateVector(FVector(X,Y,0));
         FHitResult Ground;
         if (!GetWorld()->LineTraceSingleByChannel(Ground,Corner+FVector(0,0,10),Corner-FVector(0,0,45),ECC_Visibility,Params) ||
-            Ground.ImpactNormal.Z < .98 || FMath::Abs(Ground.ImpactPoint.Z - BaseOrigin().Z) > 2)
+            Ground.ImpactNormal.Z < .98 || !((FMath::Abs(Ground.ImpactPoint.Z - BaseOrigin().Z) <= 2 && FMath::Abs(Transform.GetLocation().Z+15)<=2) ||
+                (FMath::IsNearlyEqual(Transform.GetLocation().Z,5.,.01) && FMath::IsNearlyEqual(Ground.ImpactPoint.Z,-30.,.01) &&
+                 Cast<AHomeModule>(Ground.GetActor()) && CastChecked<AHomeModule>(Ground.GetActor())->GetKind()==EHomeModuleKind::Floor)))
         { Reason = TEXT("Need flat support under every corner"); return false; }
     }
     Reason = TEXT("Ready to build");
@@ -122,6 +141,7 @@ void UBaseBuildingComponent::TickComponent(float DeltaTime,ELevelTick TickType,F
     if (!bActive) return;
     const auto* Hero = Cast<ACFPlayerCharacter>(GetOwner());
     if (!Hero || Hero->Health <= 0) { Cancel(); return; }
+    if(bHomeMode) { Hero->HomeBuilding->UpdatePreview(); return; }
     UpdatePlacement();
 }
 
@@ -140,7 +160,12 @@ AWorkStation* UBaseBuildingComponent::BuildAt(const FTransform& Transform)
     return Site;
 }
 
-void UBaseBuildingComponent::Confirm() { if (bActive && UpdatePlacement()) BuildAt(Placement); }
+void UBaseBuildingComponent::Confirm()
+{
+    if(!bActive) return;
+    if(bHomeMode) { CastChecked<ACFPlayerCharacter>(GetOwner())->HomeBuilding->Confirm(); return; }
+    if(UpdatePlacement()) BuildAt(Placement);
+}
 
 bool UBaseBuildingComponent::DismantleStation(AWorkStation* Station)
 {
@@ -163,15 +188,18 @@ void UBaseBuildingComponent::Dismantle()
     FHitResult Hit;
     FCollisionQueryParams Params(SCENE_QUERY_STAT(DismantleAim),false,Hero);
     if (IsValid(Preview)) Params.AddIgnoredActor(Preview);
+    if(auto* Ghost=Hero->HomeBuilding->GetPreview()) Params.AddIgnoredActor(Ghost);
     const FVector Start = Hero->FirstPersonCamera->GetComponentLocation();
     GetWorld()->LineTraceSingleByChannel(Hit,Start,Start+Hero->FirstPersonCamera->GetForwardVector()*600,ECC_Visibility,Params);
     auto* Site = Cast<AWorkStation>(Hit.GetActor());
+    if(auto* Module=Cast<AHomeModule>(Hit.GetActor())) { Hero->HomeBuilding->Dismantle(Module); return; }
     if (!Site || !Site->bPlayerBuilt) Hero->Feedback = TEXT("Aim at a player-built facility within 6m (original stations are protected)");
     else DismantleStation(Site);
 }
 
 FString UBaseBuildingComponent::GetHint() const
 {
-    return FString::Printf(TEXT("BUILD %s (%d materials) | V cycle | LMB place | RMB cancel\n%s"),
-        *UEnum::GetValueAsString(Selected),GetCost(Selected),*Status);
+    if(bHomeMode) return CastChecked<ACFPlayerCharacter>(GetOwner())->HomeBuilding->GetHint();
+    return FString::Printf(TEXT("FACILITY %s (%d) | V select | 8 home\n%s"),
+        *UEnum::GetDisplayValueAsText(Selected).ToString(),GetCost(Selected),*Status);
 }

@@ -7,6 +7,7 @@
 #include "CreatureJournalTypes.h"
 #include "ObjectiveTypes.h"
 #include "EquipmentTypes.h"
+#include "HomeLayout.h"
 #include "FrontierSaveGame.generated.h"
 
 class ACreatureCharacter;
@@ -81,7 +82,8 @@ class CREATUREFRONTIER_API UFrontierSaveGame : public USaveGame
 {
     GENERATED_BODY()
 public:
-    UPROPERTY() int32 FormatVersion = 17;
+    UPROPERTY() int32 FormatVersion = 18;
+    UPROPERTY() TArray<FHomeModuleRecord> HomeModules;
     UPROPERTY() TArray<FResourceSaveRecord> ResourceNodes;
     UPROPERTY() FPlayerEquipmentState Equipment;
     UPROPERTY() FFrontierObjectiveProgress Objectives;

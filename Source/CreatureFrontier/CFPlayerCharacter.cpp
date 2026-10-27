@@ -18,6 +18,9 @@
 #include "PlayerEquipmentComponent.h"
 #include "ResourceNode.h"
 #include "ResourcePersistence.h"
+#include "HomeBuildingComponent.h"
+#include "HomeLayout.h"
+#include "HomePersistence.h"
 
 void ACFPlayerCharacter::CraftSpear() { Equipment->CraftSpear(); }
 void ACFPlayerCharacter::CraftVest() { Equipment->CraftVest(); }
@@ -76,6 +79,7 @@ bool ACFPlayerCharacter::SaveProgress(const FString& Slot)
     Save->Journal = Journal;
     Save->Objectives = Objectives;
     Save->Equipment=Equipment->GetState();
+    Save->HomeModules=HomeLayout::Collect(GetWorld());
     for(TActorIterator<AResourceNode> It(GetWorld());It;++It)
     {
         FResourceSaveRecord Record;
@@ -138,7 +142,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
 {
     if (!HasAuthority() || !GetController()) return false;
     auto* Save = Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot, 0));
-    if (!Save || Save->FormatVersion < 1 || Save->FormatVersion > 17 ||
+    if (!Save || Save->FormatVersion < 1 || Save->FormatVersion > 18 ||
         Save->MapName != UGameplayStatics::GetCurrentLevelName(this, true) ||
         !FMath::IsFinite(Save->Health) || Save->Health < 0 || Save->Health > 100 ||
         Save->Resources < 0 || Save->PlayerTransform.ContainsNaN() || Save->ViewRotation.ContainsNaN())
@@ -197,6 +201,8 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
     }
     FResourceRestoreTransaction ResourceRestore(GetWorld());
     if(!ResourceRestore.Stage(Save)) { Feedback=TEXT("Invalid or unavailable resource snapshot; world unchanged"); return false; }
+    FHomeRestoreTransaction HomeRestore(GetWorld());
+    if(!HomeRestore.Stage(Save)) { Feedback=TEXT("Invalid home structure or indoor facility support; world unchanged"); return false; }
     TArray<ACreatureCharacter*> OldCreatures;
     for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It) OldCreatures.Add(*It);
     TArray<ACreatureCharacter*> Restored;
@@ -310,6 +316,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
     }
     CancelMeleeAttack(); Building->Cancel();
     ResourceRestore.Commit();
+    HomeRestore.Commit();
     for (auto* Site : OldBuilt) Site->Destroy();
     for (auto* Drop : OldLoot) Drop->Destroy();
     for (auto* Pet : OldCreatures) Pet->Destroy();
@@ -474,6 +481,7 @@ ACFPlayerCharacter::ACFPlayerCharacter()
     CaptureComponent = CreateDefaultSubobject<UCaptureComponent>(TEXT("CaptureComponent"));
     Inventory = CreateDefaultSubobject<UInventoryComponent>(TEXT("Inventory"));
     Building = CreateDefaultSubobject<UBaseBuildingComponent>(TEXT("Building"));
+    HomeBuilding = CreateDefaultSubobject<UHomeBuildingComponent>(TEXT("HomeBuilding"));
     Equipment = CreateDefaultSubobject<UPlayerEquipmentComponent>(TEXT("Equipment"));
 }
 
@@ -513,6 +521,8 @@ void ACFPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
     PlayerInputComponent->BindKey(EKeys::H, IE_Pressed, this, &ACFPlayerCharacter::UseMedicine);
     PlayerInputComponent->BindKey(EKeys::B, IE_Pressed, this, &ACFPlayerCharacter::ToggleBuilding);
     PlayerInputComponent->BindKey(EKeys::V, IE_Pressed, this, &ACFPlayerCharacter::CycleBuilding);
+    PlayerInputComponent->BindKey(EKeys::Eight, IE_Pressed, Building.Get(), &UBaseBuildingComponent::SwitchCategory);
+    PlayerInputComponent->BindKey(EKeys::Nine, IE_Pressed, Building.Get(), &UBaseBuildingComponent::RotateHome);
     PlayerInputComponent->BindKey(EKeys::X, IE_Pressed, this, &ACFPlayerCharacter::DismantleBuilding);
     PlayerInputComponent->BindKey(EKeys::L, IE_Pressed, this, &ACFPlayerCharacter::SelectAimedCompanion);
     PlayerInputComponent->BindKey(EKeys::K, IE_Pressed, this, &ACFPlayerCharacter::ClearCompanionSelection);

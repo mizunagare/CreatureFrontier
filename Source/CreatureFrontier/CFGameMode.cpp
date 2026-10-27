@@ -1,6 +1,7 @@
 #include "CFGameMode.h"
 #include "ResourceNode.h"
 #include "ResourceScenario.h"
+#include "HomeScenario.h"
 #include "CFPlayerCharacter.h"
 #include "CFHUD.h"
 #include "CombatScenario.h"
@@ -52,6 +53,12 @@ void ACFGameMode::BeginPlay()
 {
     Super::BeginPlay();
     SeedFrontierResources(GetWorld());
+    const int32 HomeMode=FParse::Param(FCommandLine::Get(),TEXT("CFHomeWrite"))?1:FParse::Param(FCommandLine::Get(),TEXT("CFHomeRead"))?2:0;
+    if(HomeMode || FParse::Param(FCommandLine::Get(),TEXT("CFHomeTest")))
+    {
+        FTimerHandle HomeStart;
+        GetWorldTimerManager().SetTimer(HomeStart,[this,HomeMode](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0))) RunHomeScenario(GetWorld(),Hero,HomeMode);},1.f,false); return;
+    }
     if(FParse::Param(FCommandLine::Get(),TEXT("CFResourceTest")))
     {
         FTimerHandle ResourceStart;

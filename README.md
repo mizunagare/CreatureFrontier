@@ -2,21 +2,31 @@
 
 原创第一人称生物捕捉 RPG 原型。玩法重点是捕捉伙伴，并与伙伴共同生活、工作和战斗。
 
-## 有限资源采集（格式 17）
+## 模块化房间（格式 18）
+
+正常游戏不会自动赠送房屋；先采集材料，再按 `B` 建造、`8` 切换设施/房屋、`V` 选模块、`9` 切换墙向。
+瞄准地面放地板，瞄准地板/相连墙放墙、门洞和屋顶；`LMB` 放置，`RMB/B` 取消，`X` 拆除。
+地板/墙/门洞/屋顶分别消耗 8/6/8/10 材料；拆除按实际支付成本返还一半。
+墙依附地板，屋顶需要两面相对墙；不能拆掉最后支撑，也不能抽走室内设施下的地板。
+玩家和伙伴使用真实碰撞/导航穿门，设施可放到地板上；当前仍限原基地 12 米内、单层 4 米网格。
+格式 18 保存模块 GUID、支撑、位置和支付成本，兼容读取 1–17。多层、窗、楼梯、可开关门和正式材质/室内照明尚未实现。
+具体规则、边界与预览命令见 [房屋建造说明](Docs/HOME_BUILDING.md)。
+
+## 有限资源采集（格式 17 起）
 
 基地附近与外围各有草丛、矿点和废料，共六处。`M` 手采，`E` 分派伙伴按工作站类型寻找匹配资源。
 草丛 24 份，耗尽后按未暂停的游戏时间 180 秒恢复；矿点 30 份、废料 18 份，耗尽不刷新。
 玩家与伙伴共用节点库存和 0.8 秒冷却；只有成功入包才扣资源。背包满、隔墙、过远、无资源均不产出或发经验。
 伙伴需真实寻路到资源点；制造站当前是有限废料回收，玩家配方制作不变。
 三类产物暂统一为材料、直接进入玩家背包，不是完整材料运输/仓储/制造系统。
-格式 17 保存节点 GUID、库存与两个计时；1–16 旧档初始化默认资源布局，离线不恢复库存。
+格式 17 起保存节点 GUID、库存与两个计时；1–16 旧档初始化默认资源布局，离线不恢复库存。
 详细规则、迁移语义、限制与复验入口见 [资源采集说明](Docs/RESOURCES.md)。
 
 ## Windows 独立原型
 
-当前最新本机版本：`D:\myGame\Builds\Windows-Resources\CreatureFrontier.exe`。
+当前最新本机版本：`D:\myGame\Builds\Windows-Home\CreatureFrontier.exe`。
 双击即可进入测试地图，不需要先打开 Unreal Editor。复制到其他机器时需复制整个
-`Builds\Windows-Resources` 文件夹，不能只复制根目录的启动 EXE。
+`Builds\Windows-Home` 文件夹，不能只复制根目录的启动 EXE。
 这是 Development 灰盒原型，尚未完成正式美术、内容与性能优化。
 
 战斗更新预览另外输出到 `D:\myGame\Builds\Windows-Combat\CreatureFrontier.exe`，
@@ -44,13 +54,14 @@
 日常互动更新输出到 `D:\myGame\Builds\Windows-Affection\CreatureFrontier.exe`。
 分散跟随更新输出到 `D:\myGame\Builds\Windows-Formation\CreatureFrontier.exe`。
 有限资源采集更新输出到 `D:\myGame\Builds\Windows-Resources\CreatureFrontier.exe`。
+模块房间更新输出到 `D:\myGame\Builds\Windows-Home\CreatureFrontier.exe`。
 菜单为键盘操作；帮助、队伍和图鉴面板不会暂停，只有 Esc 菜单暂停世界。
 使用 `-CFSessionTest -CFSessionPreview -RenderOffscreen` 可运行菜单测试并在当前程序的
 `Saved/SessionPreview/` 生成暂停、帮助、常驻 HUD 三张检查图；请勿同时使用 `-nullrhi`。
-旧存档版本 1–16 可以读取，新版存档版本为 17（增加有限资源库存、共享冷却与恢复时间）。
+旧存档版本 1–17 可以读取，新版存档版本为 18（增加模块房间、支撑关系和实际支付成本）。
 新版保存后的存档不能交给旧版程序读取；请保留旧存档备份。
 测试脚本默认选择 `Builds` 下最新编译的 Development 程序，也可明确指定：
-`.\Scripts\Test-Packaged.ps1 -BuildRoot D:\myGame\Builds\Windows-Resources`。
+`.\Scripts\Test-Packaged.ps1 -BuildRoot D:\myGame\Builds\Windows-Home`。
 每个测试限时 60 秒，超时只结束该脚本启动的测试进程。
 每次回归使用 `Saved/PackagedTests/<时间戳-随机标识>/` 下的新日志，避免读取上次运行的成功标记。
 
