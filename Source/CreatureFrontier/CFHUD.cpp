@@ -25,7 +25,7 @@ void ACFHUD::DrawHUD()
         if (It->Tamer == Player->GetController()) { ++Companions; if (It->Activity == ECreatureActivity::Work) ++Working; }
     DrawText(FString::Printf(TEXT("COMPANIONS %d    WORKING %d"), Companions, Working), FLinearColor::Green, 32, 57);
     DrawText(TEXT("WASD move | Space jump | LMB hit | RMB capture"), FLinearColor::White, 32, 84);
-    DrawText(TEXT("F follow | E work | R restart | F5 save | F9 load"), FLinearColor::White, 32, 108);
+    DrawText(TEXT("F follow | E work | R downed respawn | F5 save | F9 load"), FLinearColor::White, 32, 108);
     DrawText(FString::Printf(TEXT("DEVICES %d    MEDICINE %d"), Player->Inventory->Count(EFrontierItem::CaptureDevice), Player->Inventory->Count(EFrontierItem::Medicine)), FLinearColor::White, 32, 136);
     DrawText(TEXT("1 craft device (3) | 2 craft medicine (5) | H heal"), FLinearColor::White, 32, 162);
     DrawText(TEXT("T rest at base | P treat aimed companion | Esc exit"), FLinearColor::White, 32, 190);
@@ -40,6 +40,8 @@ void ACFHUD::DrawHUD()
     DrawText(Player->GetObjectiveStatus(),FLinearColor::Green,32,474);
     DrawText(Player->GetObjectiveHint(),FLinearColor::White,32,503);
     DrawText(Player->GetObjectiveRewardText(),FLinearColor::Yellow,32,532);
+    if(Player->Health<=0) DrawText(TEXT("DOWNED | R: base respawn | F9: load save"),FLinearColor::Red,X-150,Y-100);
+    else if(Player->GetRespawnProtectionRemaining()>0) DrawText(FString::Printf(TEXT("RESPAWN SHIELD %.1fs | attacks end it"),Player->GetRespawnProtectionRemaining()),FLinearColor::Green,X-150,Y-100);
     if (Player->Building->IsActive()) DrawText(Player->Building->GetHint(), FLinearColor::Yellow,32,440);
     if (auto* Site = Player->TraceFacility(); Site && Site->RequiredSpecialty == EWorkSpecialty::Feeding)
         DrawText(FString::Printf(TEXT("TROUGH %d / 30 FOOD | U deposit | O withdraw"),Site->StoredFood),FLinearColor::Yellow,X-130,Y+25);

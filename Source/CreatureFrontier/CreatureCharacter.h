@@ -8,6 +8,7 @@
 class UCreatureDefinition;
 class UStaticMeshComponent;
 class AWorkStation;
+class ACFPlayerCharacter;
 
 UCLASS(Blueprintable)
 class CREATUREFRONTIER_API ACreatureCharacter : public ACharacter
@@ -65,6 +66,7 @@ public:
     bool OrderAttack(ACreatureCharacter* Target);
     bool RequestSpecial(ACreatureCharacter* Target);
     void ClearCombatOrders();
+    void HandlePlayerDowned(const ACFPlayerCharacter* Player);
     bool IsSpecialReady() const;
     FString GetSpecialName() const;
     UFUNCTION(BlueprintPure, Category="Progression")

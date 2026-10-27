@@ -290,6 +290,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
     GetController()->SetControlRotation(Save->ViewRotation);
     GetCharacterMovement()->StopMovementImmediately();
     Health = Save->Health;
+    RespawnProtectionUntil=0;
     Inventory->Restore(Save->InventoryStacks);
     GetCharacterMovement()->SetMovementMode(Health > 0 ? MOVE_Walking : MOVE_None);
     SelectedCompanion.Reset();
@@ -311,17 +312,24 @@ void ACFPlayerCharacter::RestartLevel()
 void ACFPlayerCharacter::BeginPlay()
 {
     Super::BeginPlay();
+    InitializeRespawnAnchor();
     CaptureComponent->OnCaptureResolved.AddDynamic(this, &ACFPlayerCharacter::CaptureResolved);
     GetWorldTimerManager().SetTimer(ObservationTimer,this,&ACFPlayerCharacter::ObserveAimedCreature,.4f,true);
 }
 
 float ACFPlayerCharacter::TakeDamage(float Amount, const FDamageEvent& Event, AController* EventInstigator, AActor* Causer)
 {
-    if (!HasAuthority() || Health <= 0.0f) return 0.0f;
+    if (!HasAuthority() || Health <= 0.0f || !FMath::IsFinite(Amount) || Amount<=0) return 0.0f;
+    if(GetRespawnProtectionRemaining()>0) { Feedback=TEXT("Base respawn protection - attacking ends the shield"); return 0; }
     const float Applied = FMath::Min(Health, FMath::Max(0.0f, Amount));
     Health -= Applied;
-    Feedback = Health <= 0.0f ? TEXT("Downed - press R to restart") : TEXT("Taking damage!");
-    if (Health <= 0.0f) GetCharacterMovement()->DisableMovement();
+    Feedback = Health <= 0.0f ? TEXT("Downed - R respawns at base without resetting the world | F9 load") : TEXT("Taking damage!");
+    if (Health <= 0.0f)
+    {
+        GetCharacterMovement()->StopMovementImmediately(); GetCharacterMovement()->DisableMovement(); StopJumping();
+        Building->Cancel(); bRosterOpen=false; bJournalOpen=false;
+        for(TActorIterator<ACreatureCharacter> It(GetWorld());It;++It) It->HandlePlayerDowned(this);
+    }
     return Applied;
 }
 
@@ -329,6 +337,7 @@ void ACFPlayerCharacter::CaptureResolved(ACreatureCharacter* Creature, bool bSuc
 {
     if (HasAuthority() && IsValid(Creature) && Health>0)
     {
+        RespawnProtectionUntil=0;
         RecordJournal(Creature->Definition,bSucceeded && Creature->Disposition==ECreatureDisposition::Tamed && Creature->Tamer==GetController());
         if(bSucceeded) RecordAlphaResolution(Creature);
     }
@@ -347,6 +356,7 @@ void ACFPlayerCharacter::CommandFollow()
 void ACFPlayerCharacter::CommandFocus()
 {
     if (!HasAuthority() || Health <= 0) return;
+    RespawnProtectionUntil=0;
     auto* Target = TraceCreature();
     if (!Target || Target->Health <= 0 || Target->Disposition == ECreatureDisposition::Tamed)
     { Feedback = TEXT("Aim at a living wild creature to focus attacks"); return; }
@@ -359,6 +369,7 @@ void ACFPlayerCharacter::CommandFocus()
 void ACFPlayerCharacter::CommandSpecial()
 {
     if (!HasAuthority() || Health <= 0) return;
+    RespawnProtectionUntil=0;
     auto* Aimed = TraceCreature();
     ACreatureCharacter* BestPet = nullptr;
     ACreatureCharacter* BestTarget = nullptr;
@@ -450,7 +461,7 @@ void ACFPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
     PlayerInputComponent->BindKey(EKeys::P, IE_Pressed, this, &ACFPlayerCharacter::HealCompanion);
     PlayerInputComponent->BindKey(EKeys::Q, IE_Pressed, this, &ACFPlayerCharacter::CommandFocus);
     PlayerInputComponent->BindKey(EKeys::G, IE_Pressed, this, &ACFPlayerCharacter::CommandSpecial);
-    PlayerInputComponent->BindKey(EKeys::R, IE_Pressed, this, &ACFPlayerCharacter::RestartLevel);
+    PlayerInputComponent->BindKey(EKeys::R, IE_Pressed, this, &ACFPlayerCharacter::RequestRespawn);
     PlayerInputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &ACFPlayerCharacter::QuitGame);
     PlayerInputComponent->BindKey(EKeys::F5, IE_Pressed, this, &ACFPlayerCharacter::QuickSave);
     PlayerInputComponent->BindKey(EKeys::F9, IE_Pressed, this, &ACFPlayerCharacter::QuickLoad);
@@ -510,6 +521,7 @@ void ACFPlayerCharacter::Attack()
 {
     if (Building->IsActive()) { Building->Confirm(); return; }
     if (Health <= 0.0f || GetWorld()->GetTimeSeconds() < NextAttackTime) return;
+    RespawnProtectionUntil=0;
     NextAttackTime = GetWorld()->GetTimeSeconds() + 0.4;
     if (ACreatureCharacter* Creature = TraceCreature())
     {
@@ -523,6 +535,7 @@ void ACFPlayerCharacter::CaptureTarget()
 {
     if (Building->IsActive()) { Building->Cancel(); return; }
     if (Health <= 0.0f) return;
+    RespawnProtectionUntil=0;
     if (ACreatureCharacter* Creature = TraceCreature())
     {
         CaptureComponent->TryCapture(Creature);

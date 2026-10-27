@@ -4,9 +4,9 @@
 
 ## Windows 独立原型
 
-当前最新本机版本：`D:\myGame\Builds\Windows-Journey\CreatureFrontier.exe`。
+当前最新本机版本：`D:\myGame\Builds\Windows-Respawn\CreatureFrontier.exe`。
 双击即可进入测试地图，不需要先打开 Unreal Editor。复制到其他机器时需复制整个
-`Builds\Windows-Journey` 文件夹，不能只复制根目录的启动 EXE。
+`Builds\Windows-Respawn` 文件夹，不能只复制根目录的启动 EXE。
 这是 Development 灰盒原型，尚未完成正式美术、内容与性能优化。
 
 战斗更新预览另外输出到 `D:\myGame\Builds\Windows-Combat\CreatureFrontier.exe`，
@@ -23,6 +23,7 @@
 队伍面板更新输出到 `D:\myGame\Builds\Windows-Roster\CreatureFrontier.exe`。
 伙伴图鉴更新输出到 `D:\myGame\Builds\Windows-Journal\CreatureFrontier.exe`。
 新手旅程更新输出到 `D:\myGame\Builds\Windows-Journey\CreatureFrontier.exe`。
+基地重生更新输出到 `D:\myGame\Builds\Windows-Respawn\CreatureFrontier.exe`。
 旧存档版本 1–12 可以读取，新版存档版本为 13（包含旅程计数/领奖状态、图鉴历史及已有的待复工状态）。
 新版保存后的存档不能交给旧版程序读取；请保留旧存档备份。
 测试脚本默认选择 `Builds` 下最新编译的 Development 程序，也可明确指定：
@@ -64,7 +65,7 @@ Windows 开发环境已部署并验证：Unreal Engine 5.8、Visual Studio C++ �
 - `N`：当前新手目标达成后领取奖励，推进到下一步
 - `F`：召回当前指令范围内的伙伴跟随，并自动攻击玩家周边的野生宠物
 - `E`：靠近出生点后方的工作台（8 米内），分配伙伴采集；到达后每 3 秒产出 1 资源
-- `R`：重新开始当前关卡（玩家倒地后也可使用）
+- `R`：倒地后在原基地附近安全位置重生，保留当前世界；存活时不执行
 - `Esc`：退出游戏（退出前需自行按 F5 保存）
 - `F5`：保存当前进度；`F9`：读取进度（包括重新打开游戏之后）
 - `1`：工作台 8 米内消耗 3 材料制作 1 个捕捉装置
@@ -96,7 +97,7 @@ G 在单只模式只检查所选伙伴，冷却中不会改让其他伙伴施法
 
 按 I 打开图鉴，PageUp/PageDown 首尾循环浏览；图鉴与 Tab 队伍面板互斥，都不暂停世界。
 图鉴记录不会因伙伴死亡或移除而丢失，但仍需 F5 保存。F9 恢复所选存档快照，
-不会把当前未保存的图鉴进度合并进旧存档；R 重开后也需要 F9 才能恢复。
+不会把当前未保存的图鉴进度合并进旧存档；退出程序后需 F9 恢复，R 重生则保留当前图鉴。
 版本 1–11 的旧存档仅从自有伙伴补全捕捉记录，不把全地图未观察的野生生物算作发现。
 存档校验拒绝重复条目、无效物种引用和超过 128 条的异常列表，不覆盖当前世界/图鉴。
 当前没有图鉴肖像、发现奖励或收集任务，仍属基础探索进度版本。
@@ -130,6 +131,28 @@ F5 将背包、生产/首领进度与领奖状态一起保存；F9 一并回滚�
 
 `-CFObjectiveTest -CFObjectivePreview -RenderOffscreen -windowed -ResX=1280 -ResY=720 -norhithread -forcerhibypass "-ExecCmds=t.MaxFPS 60"`
 可生成 `Saved/JourneyPreview/ready.png` 和 `complete.png`，使用独立测试存档，不覆盖玩家存档。
+
+## 倒地与基地重生
+
+R 现在是倒地重生，不再重开地图；存活时按 R 不能免费回血或传送。
+倒地会停止移动、关闭建造预览与面板，取消伙伴未完成的战斗蓄力，不返还已消耗的体力或冷却。
+野生敌人停止追击并清除报复记忆，但不会被治疗、搬走或重新生成。
+
+按 R 时先检查地图出生点，再搜索原基地周围最多 12 米的候选位置；需要平地支撑、
+角色胶囊不与实体相交，并与同高度附近的存活野生敌人保持至少 8 米。
+如果全部候选点都被占用或不安全，重生失败并保持当前世界，玩家可以 F9 读取此前的安全存档。
+当前基地位置沿用 Starter Valley 固定原点；尚未支持可放置床位、自定义检查点和其他地图。
+
+成功后玩家恢复 100 生命，得到 3 秒短暂伤害保护；左键攻击、右键捕捉、Q 集火或 G 技能会结束保护。
+保护不治疗伙伴，也不让伙伴无敌；F 跟随后伙伴的自动协战沿用原规则。
+存活战斗伙伴取消集火并改为自行跟随，不会瞬移；工作/休息地点和待复工状态保留。
+倒地伙伴仍留在原地，需用 P 救治。背包、图鉴、新手目标、设施库存、野生生命和地面战利品均保留，
+不会补充捕捉装置、药物或食物；当前原型没有玩家死亡掉包/资源扣除惩罚。
+
+R 本身不自动写盘，仍需 F5 保存。F9 读取倒地存档后可以再按 R 重生；
+临时保护不存入快照，读档始终清除保护，存档格式继续使用 13。
+`-CFRespawnTest -CFRespawnPreview -RenderOffscreen -windowed -ResX=1280 -ResY=720 -norhithread -forcerhibypass "-ExecCmds=t.MaxFPS 60"`
+可输出 `Saved/RespawnPreview/downed.png` 与 `respawn.png`，不覆盖玩家存档。
 
 主动技能消耗 20 体力，蓄力 0.65 秒；伙伴会先尝试进入射程，最多等待 6 秒。
 工作/休息中的伙伴不响应战斗指令，F 可重新启用跟随。F 取消集火和蓄力；
@@ -197,7 +220,7 @@ HUD 显示玩家生命、资源、伙伴数量、工作数量和准星目标的�
 活动状态与工作点。重复读档替换现有宠物，不会叠加伙伴。
 存档位于 `Saved/SaveGames/FrontierSlot.sav`，是当前地图的单机快照；
 手动按 F9 恢复，暂不自动加载。读取不兼容地图或版本时会保留当前世界并显示错误提示。
-`R` 重开不删除磁盘存档，仍可通过 F9 恢复。
+`R` 重生不删除或回滚磁盘存档，F9 则会明确替换当前世界为存档快照。
 
 跨进程存档测试可分别添加 `-CFSaveWrite` 和 `-CFSaveRead` 启动游戏；
 使用独立的 `FrontierAutomationSlot`，不覆盖玩家的 `FrontierSlot`。
@@ -230,7 +253,10 @@ HUD 显示玩家生命、资源、伙伴数量、工作数量和准星目标的�
 `-CFObjectiveTest` 验证五步推进、提前/重复/倒地领取拒绝、真实伙伴产出与满包停滞、
 整组奖励容量校验、精英击败/捕捉、奖励快照回滚、异常状态拒绝和旧版本迁移，
 使用 `FrontierObjectiveAutomation` 等独立测试槽。
-当前打包回归共 18 项，包含伙伴分工、图鉴与新手目标测试。
+`-CFRespawnTest` 验证存活拒绝、死亡清理、落点全堵拒绝/敌人避让、世界与伙伴状态保留、
+保护到期与攻击/指令取消、倒地快照重生、读档清除保护以及反复读档不复制人口/设施/战利品，
+使用 `FrontierRespawnDeadAutomation` 等独立测试槽。
+当前打包回归共 19 项，包含伙伴分工、图鉴、新手目标与基地重生测试。
 同时添加 `-CFRosterPreview -RenderOffscreen -windowed -ResX=1280 -ResY=720 -norhithread -forcerhibypass "-ExecCmds=t.MaxFPS 60"`（不要使用 `-nullrhi`），
 可生成 11 只伙伴的两页界面截图 `Saved/RosterPreview/team.png` 和 `team_page2.png` 后退出，不写入玩家存档。
 已知显示问题：当前机器 D3D12 离屏截图存在间歇性缺字，上述兼容参数可改善但尚未完全消除。

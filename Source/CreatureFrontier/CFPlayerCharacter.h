@@ -80,6 +80,9 @@ public:
     void CommandFocus();
     void CommandSpecial();
     void RestartLevel();
+    bool RespawnAtBase();
+    void RequestRespawn() { RespawnAtBase(); }
+    float GetRespawnProtectionRemaining() const;
     void QuitGame();
     bool SaveProgress(const FString& Slot = TEXT("FrontierSlot"));
     bool LoadProgress(const FString& Slot = TEXT("FrontierSlot"));
@@ -110,6 +113,10 @@ protected:
     virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 
 private:
+    void InitializeRespawnAnchor();
+    bool FindRespawnLocation(FVector& Location) const;
+    FTransform RespawnAnchor;
+    double RespawnProtectionUntil = 0;
     UPROPERTY() FFrontierObjectiveProgress Objectives;
     void RecordJournal(UCreatureDefinition* Definition,bool bCaptured);
     UPROPERTY() TArray<FCreatureJournalEntry> Journal;
