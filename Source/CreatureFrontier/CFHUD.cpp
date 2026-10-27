@@ -56,6 +56,8 @@ void ACFHUD::DrawHUD()
             FLinearColor::White, X-130, Y+25);
         if (Creature->Disposition == ECreatureDisposition::Tamed)
         {
+            if (Creature->bResumeWorkAfterRest)
+                DrawText(TEXT("AUTO REST - resumes at 80 stamina / 20 satiety / 80% HP"),FLinearColor::Yellow,X-130,Y-70);
             if (Creature->FeedingSite.IsValid()) DrawText(TEXT("SEEKING FOOD - assignment will resume"),FLinearColor::Yellow,X-130,Y-50);
             DrawText(FString::Printf(TEXT("XP %d/%d  Stamina %.0f%%  Satiety %.0f%%  %s"), Creature->Experience, Creature->Level*100,
                 Creature->Stamina,Creature->Nutrition, *UEnum::GetValueAsString(Creature->Activity)), FLinearColor::Green, X-130, Y+48);

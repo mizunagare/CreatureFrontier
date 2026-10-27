@@ -22,6 +22,7 @@ struct FCreatureSaveRecord
     UPROPERTY() float Stamina = 100.0f;
     UPROPERTY() float Nutrition = 100;
     UPROPERTY() float AutoFeedCooldown = 0;
+    UPROPERTY() bool bResumeWorkAfterRest = false;
     UPROPERTY() float SpecialCooldown = 0.0f;
     UPROPERTY() bool bOwned = false;
     UPROPERTY() ECreatureDisposition Disposition = ECreatureDisposition::Wild;
@@ -61,7 +62,7 @@ class CREATUREFRONTIER_API UFrontierSaveGame : public USaveGame
 {
     GENERATED_BODY()
 public:
-    UPROPERTY() int32 FormatVersion = 10;
+    UPROPERTY() int32 FormatVersion = 11;
     UPROPERTY() FString MapName;
     UPROPERTY() FTransform PlayerTransform;
     UPROPERTY() FRotator ViewRotation;

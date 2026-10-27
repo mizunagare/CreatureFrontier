@@ -32,6 +32,7 @@ $cases = @(
     @{Flag='CFWorldTest'; Marker='CF_WORLD PASS'},
     @{Flag='CFFarmingTest'; Marker='CF_FARM PASS'},
     @{Flag='CFFeedingTest'; Marker='CF_FEED PASS'},
+    @{Flag='CFWorkCycleTest'; Marker='CF_WORK_CYCLE PASS'},
     @{Flag='CFSaveWrite'; Marker='CF_SAVE_WRITE PASS'},
     @{Flag='CFSaveRead'; Marker='CF_SAVE_READ PASS'},
     @{Flag='CFNavTest'; Marker='CF_NAV_WORK PASS'}

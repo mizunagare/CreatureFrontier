@@ -4,9 +4,9 @@
 
 ## Windows 独立原型
 
-本机打包位置：`D:\myGame\Builds\Windows\CreatureFrontier.exe`。
+当前最新本机版本：`D:\myGame\Builds\Windows-WorkCycle\CreatureFrontier.exe`。
 双击即可进入测试地图，不需要先打开 Unreal Editor。复制到其他机器时需复制整个
-`Builds\Windows` 文件夹，不能只复制根目录的启动 EXE。
+`Builds\Windows-WorkCycle` 文件夹，不能只复制根目录的启动 EXE。
 这是 Development 灰盒原型，尚未完成正式美术、内容与性能优化。
 
 战斗更新预览另外输出到 `D:\myGame\Builds\Windows-Combat\CreatureFrontier.exe`，
@@ -18,7 +18,8 @@
 谷地场景更新输出到 `D:\myGame\Builds\Windows-Valley\CreatureFrontier.exe`。
 耕作与照料更新输出到 `D:\myGame\Builds\Windows-Farming\CreatureFrontier.exe`。
 自动照料更新输出到 `D:\myGame\Builds\Windows-Feeding\CreatureFrontier.exe`。
-旧存档版本 1–9 可以读取，新版存档版本为 10（包含食槽库存和自动进食冷却）。
+自动工作循环更新输出到 `D:\myGame\Builds\Windows-WorkCycle\CreatureFrontier.exe`。
+旧存档版本 1–10 可以读取，新版存档版本为 11（包含自动休息后的待复工状态）。
 新版保存后的存档不能交给旧版程序读取；请保留旧存档备份。
 测试脚本默认选择 `Builds` 下最新编译的 Development 程序，也可明确指定：
 `.\Scripts\Test-Packaged.ps1 -BuildRoot D:\myGame\Builds\Windows-Combat`。
@@ -153,6 +154,8 @@ HUD 显示玩家生命、资源、伙伴数量、工作数量和准星目标的�
 使用 `FrontierFarmingAutomation` 与 `FrontierLegacyFoodAutomation` 测试槽。
 `-CFFeedingTest` 验证食槽存取/容量、单次消耗与冷却、自动取食后返回生产、超时回退、
 库存/工作/冷却存档、异常库存拒绝和非空食槽拆除保护，使用 `FrontierFeedingAutomation` 测试槽。
+`-CFWorkCycleTest` 验证饥饿等待、手动指令、倒地/设施移除取消、疲劳自动休息、
+待复工存档、真实计时恢复后再次生产，以及旧版休息指令不被自动改写，使用 `FrontierWorkCycleAutomation` 测试槽。
 `-CFWorldTest` 验证谷地场景与防坠落边界、入口到两区的导航连通、真实闲逛位移、
 领地返回/恢复、返程期间伤害与捕捉拒绝、锚点读档及捕捉后脱离生态 AI，使用 `FrontierWorldAutomation` 测试槽。
 `-CFBossTest` 验证范围预警、逃离/跳跃/掩体躲避、伙伴受击与护盾、首领冷却、
@@ -238,12 +241,25 @@ B/V 选择 Feeding 食槽，花费 12 材料建造。瞄准 6 米内无遮挡食
 伙伴走近食槽后，消耗 1 食物恢复 35 饱食度和 15 体力，单个伙伴自动进食冷却 3 秒。
 工作地点与工作/休息/跟随任务不变，进食结束后继续原任务。一次寻路超过 8 秒或库存被其他伙伴吃空时，
 回退原任务并等待 5 秒后重试，避免无限等待；找不到食槽时每 2 秒重新检查。
-饥饿导致的旧停工状态仍需 E 重新分工；充足补给的食槽能在饥饿停工前自动照料。
+新版因疲劳或饥饿暂停的工作会记录待复工状态，恢复后自动继续；旧档中的普通休息仍需 E 重新分工。
 
 食槽不作为 E 工作分配点或配方制作点。非空食槽不能拆除，需先用 O 取回全部食物；
 空槽可拆除返还 6 材料。库存与自动进食冷却随快照保存，临时寻路目标在读档后重新选择。
 食槽画面可用 `-CFFarmPreview -CFTroughPreview -RenderOffscreen -windowed -ResX=1280 -ResY=720`
 离屏输出到 `Saved/FarmPreview/feeding_trough.png`，不操作桌面输入或写入玩家存档。
+
+## 自动休息与复工
+
+工作伙伴体力耗尽，或因饱食度降到 0 停工时，保留原工作设施并进入自动休息。
+靠近该设施后沿用每秒恢复 12 体力、6 生命的基地恢复；满足体力至少 80、饱食度至少 20、
+生命至少最大值 80% 三项条件后自动复工。没有食物时会等待补给，而不是在饥饿状态反复开工。
+自动食槽、手动 J 喂食与这套恢复规则配合；食槽库存仍需玩家补充，农圃产出仍进入玩家背包。
+
+T 手动休息会取消待复工，保持休息直到新的指令；F 跟随、E 重新分工同样覆盖旧的待复工状态。
+自动休息期间体力至少 3 时可接受 Q 集火，取消工作并加入战斗；原有的手动休息保护不变。
+伙伴倒地或原设施被拆除会取消待复工，不会在救治后无条件自行上岗。
+待复工状态与工作设施关联一起保存，读档后继续恢复。版本 1–10 没有该字段，按普通休息处理，
+避免把用户旧存档中的手动休息误判为自动任务；可按 E 重新分工后使用新循环。
 
 使用 `-CFFarmPreview -RenderOffscreen -windowed -ResX=1280 -ResY=720` 可离屏生成
 `Saved/FarmPreview/farm_garden.png` 并自动退出，预览不修改玩家存档。

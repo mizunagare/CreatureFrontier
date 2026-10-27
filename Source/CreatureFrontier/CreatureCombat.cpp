@@ -15,10 +15,12 @@ bool ACreatureCharacter::HasClearSight(const AActor* Target) const
 
 bool ACreatureCharacter::OrderAttack(ACreatureCharacter* Target)
 {
+    const bool AutoRest = Activity == ECreatureActivity::Rest && bResumeWorkAfterRest && Stamina >= 3;
     if (!HasAuthority() || Health <= 0 || Disposition != ECreatureDisposition::Tamed ||
-        Activity == ECreatureActivity::Work || Activity == ECreatureActivity::Rest || !IsValid(Target) ||
+        Activity == ECreatureActivity::Work || (Activity == ECreatureActivity::Rest && !AutoRest) || !IsValid(Target) ||
         Target->Health <= 0 || Target->Disposition == ECreatureDisposition::Tamed || Target->Activity == ECreatureActivity::ReturnHome) return false;
     FocusTarget = Target;
+    if (AutoRest) WorkSite = nullptr;
     SetActivity(ECreatureActivity::Combat);
     return true;
 }

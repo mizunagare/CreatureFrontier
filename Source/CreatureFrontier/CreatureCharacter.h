@@ -51,6 +51,7 @@ public:
     float Stamina = 100.0f;
     UPROPERTY(Replicated, BlueprintReadOnly, Category="Care") float Nutrition = 100;
     UPROPERTY(Replicated, BlueprintReadOnly, Category="Care") float AutoFeedCooldown = 0;
+    UPROPERTY(Replicated, BlueprintReadOnly, Category="Work") bool bResumeWorkAfterRest = false;
     UPROPERTY(BlueprintReadOnly, Category="Care") TWeakObjectPtr<AWorkStation> FeedingSite;
     UPROPERTY(Replicated, BlueprintReadOnly, Category="Combat")
     float SpecialCooldownRemaining = 0.0f;

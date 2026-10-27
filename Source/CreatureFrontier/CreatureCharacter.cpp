@@ -199,7 +199,7 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
     AutoFeedCooldown = FMath::Max(0.0f,AutoFeedCooldown-DeltaSeconds);
     GetCharacterMovement()->MaxWalkSpeed = (Definition ? Definition->MoveSpeed : 320.0f) * (SlowRemaining > 0 ? 0.5f : 1.0f) *
         (Disposition != ECreatureDisposition::Tamed && Activity == ECreatureActivity::Wander ? .45f : 1.0f);
-    if (Health <= 0.0f) { FeedingSite.Reset(); AlphaWindup = 0; ClearCombatOrders(); StopNavigation(); return; }
+    if (Health <= 0.0f) { bResumeWorkAfterRest = false; FeedingSite.Reset(); AlphaWindup = 0; ClearCombatOrders(); StopNavigation(); return; }
 
     AttackCooldown = FMath::Max(0.0f, AttackCooldown - DeltaSeconds);
     if (Disposition == ECreatureDisposition::Tamed)
@@ -210,11 +210,14 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
         if (TickAutoFeeding()) return;
         if (Nutrition <= 0 && Activity == ECreatureActivity::Work)
         {
+            bResumeWorkAfterRest = IsValid(WorkSite) && WorkSite->RequiredSpecialty != EWorkSpecialty::Feeding;
             SetActivity(ECreatureActivity::Rest); WorkProgress = 0;
             OwnerPlayer->Feedback = TEXT("A companion is hungry. J: feed aimed companion | 3: craft food at base");
         }
         if (Activity == ECreatureActivity::Rest)
         {
+            if (bResumeWorkAfterRest && (!IsValid(WorkSite) || WorkSite->RequiredSpecialty == EWorkSpecialty::Feeding))
+            { bResumeWorkAfterRest = false; WorkSite = nullptr; SetActivity(ECreatureActivity::Follow); return; }
             if (IsValid(WorkSite) && GetDistanceTo(WorkSite) > 220.0f)
             {
                 NavigateTo(WorkSite->GetActorLocation(), 35.0f);
@@ -223,6 +226,11 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
             StopNavigation();
             Stamina = FMath::Min(100.0f, Stamina + DeltaSeconds * (IsValid(WorkSite) ? 12.0f : 4.0f));
             if (IsValid(WorkSite)) Health = FMath::Min(GetMaxHealth(), Health + DeltaSeconds * 6.0f);
+            if (bResumeWorkAfterRest && Stamina >= 80 && Nutrition >= 20 && Health >= GetMaxHealth()*.8f)
+            {
+                SetActivity(ECreatureActivity::Work);
+                OwnerPlayer->Feedback = TEXT("Recovered companion resumed its assigned work");
+            }
             return;
         }
         if (Activity == ECreatureActivity::Work && IsValid(WorkSite))
@@ -237,9 +245,10 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
                 Stamina = FMath::Max(0.0f, Stamina - DeltaSeconds * 1.5f);
                 if (Stamina <= 0.0f)
                 {
+                    bResumeWorkAfterRest = true;
                     SetActivity(ECreatureActivity::Rest);
                     WorkProgress = 0.0f;
-                    OwnerPlayer->Feedback = TEXT("A companion is exhausted and resting at base");
+                    OwnerPlayer->Feedback = TEXT("Companion resting; work resumes at 80 stamina, 20 satiety and 80% health");
                     return;
                 }
                 WorkProgress += DeltaSeconds * GetWorkEfficiency(WorkSite) * (Nutrition < 20 ? .5f : 1.0f);
@@ -375,6 +384,7 @@ float ACreatureCharacter::TakeDamage(float DamageAmount, FDamageEvent const& Dam
         }
         if (Health <= 0.0f)
         {
+            bResumeWorkAfterRest = false;
             AlphaWindup = 0;
             SetActivity(ECreatureActivity::Rest);
             StopNavigation();
@@ -400,6 +410,7 @@ void ACreatureCharacter::SetActivity(ECreatureActivity NewActivity)
 {
     if (HasAuthority() && (NewActivity == ECreatureActivity::Work || NewActivity == ECreatureActivity::Rest)) ClearCombatOrders();
     if (!HasAuthority() || Activity == NewActivity) return;
+    if (NewActivity != ECreatureActivity::Rest) bResumeWorkAfterRest = false;
     if (NewActivity != ECreatureActivity::Work) WorkProgress = 0;
     Activity = NewActivity;
     OnRep_Activity();
@@ -434,6 +445,7 @@ void ACreatureCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
     DOREPLIFETIME(ACreatureCharacter, Stamina);
     DOREPLIFETIME(ACreatureCharacter, Nutrition);
     DOREPLIFETIME(ACreatureCharacter, AutoFeedCooldown);
+    DOREPLIFETIME(ACreatureCharacter, bResumeWorkAfterRest);
     DOREPLIFETIME(ACreatureCharacter, SpecialCooldownRemaining);
     DOREPLIFETIME(ACreatureCharacter, SpecialWindupRemaining);
     DOREPLIFETIME(ACreatureCharacter, SlowRemaining);

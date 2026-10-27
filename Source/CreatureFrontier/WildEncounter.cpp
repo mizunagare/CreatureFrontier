@@ -26,7 +26,7 @@ void AWildEncounter::BeginPlay()
     // Existing fixture scenarios own their entire population. The encounter scenario
     // explicitly ticks its own slot, keeping all regression worlds isolated.
     for (const TCHAR* Flag : {TEXT("CFSmokeTest"), TEXT("CFInventoryTest"), TEXT("CFCareTest"),
-        TEXT("CFSpeciesTest"), TEXT("CFCombatTest"), TEXT("CFSaveWrite"), TEXT("CFSaveRead"), TEXT("CFNavTest"), TEXT("CFEncounterTest"), TEXT("CFBossTest"), TEXT("CFBuildingTest"), TEXT("CFWorldTest"), TEXT("CFWorldPreview"), TEXT("CFFarmingTest"), TEXT("CFFarmPreview"), TEXT("CFFeedingTest")})
+        TEXT("CFSpeciesTest"), TEXT("CFCombatTest"), TEXT("CFSaveWrite"), TEXT("CFSaveRead"), TEXT("CFNavTest"), TEXT("CFEncounterTest"), TEXT("CFBossTest"), TEXT("CFBuildingTest"), TEXT("CFWorldTest"), TEXT("CFWorldPreview"), TEXT("CFFarmingTest"), TEXT("CFFarmPreview"), TEXT("CFFeedingTest"), TEXT("CFWorkCycleTest")})
         if (FParse::Param(FCommandLine::Get(), Flag)) { SetActorTickEnabled(false); break; }
     if (auto* Sign = FindComponentByClass<UTextRenderComponent>())
     {

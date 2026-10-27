@@ -77,6 +77,7 @@ bool ACFPlayerCharacter::SaveProgress(const FString& Slot)
         Record.Stamina = It->Stamina;
         Record.Nutrition = It->Nutrition;
         Record.AutoFeedCooldown = It->AutoFeedCooldown;
+        Record.bResumeWorkAfterRest = It->bResumeWorkAfterRest;
         Record.SpecialCooldown = It->SpecialCooldownRemaining;
         Record.EncounterId = It->EncounterId;
         Record.bAlpha = It->bAlpha;
@@ -117,7 +118,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
 {
     if (!HasAuthority() || !GetController()) return false;
     auto* Save = Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot, 0));
-    if (!Save || Save->FormatVersion < 1 || Save->FormatVersion > 10 ||
+    if (!Save || Save->FormatVersion < 1 || Save->FormatVersion > 11 ||
         Save->MapName != UGameplayStatics::GetCurrentLevelName(this, true) ||
         !FMath::IsFinite(Save->Health) || Save->Health < 0 || Save->Health > 100 ||
         Save->Resources < 0 || Save->PlayerTransform.ContainsNaN() || Save->ViewRotation.ContainsNaN())
@@ -253,6 +254,8 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
             for (auto* Site : RestoredBuilt) if (Site->PersistentId == Record.WorkSiteId) { Pet->WorkSite = Site; break; }
         if (Pet->Activity == ECreatureActivity::Work && !IsValid(Pet->WorkSite))
             Pet->Activity = Record.bOwned ? ECreatureActivity::Follow : ECreatureActivity::Idle;
+        Pet->bResumeWorkAfterRest = Record.bResumeWorkAfterRest && Record.bOwned && Pet->Health > 0 && Pet->Activity == ECreatureActivity::Rest &&
+            IsValid(Pet->WorkSite) && Pet->WorkSite->RequiredSpecialty != EWorkSpecialty::Feeding;
     }
     Building->Cancel();
     for (auto* Site : OldBuilt) Site->Destroy();
@@ -365,7 +368,7 @@ void ACFPlayerCharacter::CommandRest()
     int32 Count = 0;
     for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It)
         if (It->Tamer == GetController() && It->Health > 0)
-        { It->WorkSite = Site; It->SetActivity(ECreatureActivity::Rest); ++Count; }
+        { It->bResumeWorkAfterRest = false; It->WorkSite = Site; It->SetActivity(ECreatureActivity::Rest); ++Count; }
     Feedback = FString::Printf(TEXT("%d companions returning to base to recover health and stamina"), Count);
 }
 
