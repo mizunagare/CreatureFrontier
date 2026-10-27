@@ -112,6 +112,9 @@ public:
 
     UFUNCTION(BlueprintCallable, Category="Combat")
     void Attack();
+    void CancelMeleeAttack();
+    bool IsMeleePending() const { return bMeleePending; }
+    float GetPlayerMeleeRange() const;
 
     UFUNCTION(BlueprintCallable, Category="Creature")
     void CaptureTarget();
@@ -120,6 +123,12 @@ protected:
     virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 
 private:
+    void ResolveMeleeStrike();
+    FTimerHandle MeleeTimer;
+    bool bMeleePending=false;
+    bool bPendingSpear=false;
+    float PendingMeleeDamage=0;
+    float PendingMeleeRange=0;
     void InitializeRespawnAnchor();
     bool FindRespawnLocation(FVector& Location) const;
     FTransform RespawnAnchor;

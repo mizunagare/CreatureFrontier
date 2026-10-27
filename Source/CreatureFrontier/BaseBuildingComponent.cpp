@@ -32,6 +32,7 @@ bool UBaseBuildingComponent::IsBuildTransformValid(const FTransform& Transform)
 void UBaseBuildingComponent::Toggle()
 {
     auto* Hero = Cast<ACFPlayerCharacter>(GetOwner());
+    if(Hero) Hero->CancelMeleeAttack();
     if (bActive) { Cancel(); return; }
     if (!Hero || Hero->Health <= 0 || !Hero->HasAuthority()) return;
     bActive = true;

@@ -53,7 +53,7 @@ bool ACFPlayerCharacter::RespawnAtBase()
     if(!FindRespawnLocation(Location)) { Feedback=TEXT("Base is blocked or unsafe - F9 can restore an earlier save"); return false; }
     // The live world is preserved. Cancel combat, not work assignments or health/cooldowns.
     for(TActorIterator<ACreatureCharacter> It(GetWorld());It;++It) It->HandlePlayerDowned(this);
-    Building->Cancel(); bRosterOpen=false; bJournalOpen=false;
+    CancelMeleeAttack(); Building->Cancel(); bRosterOpen=false; bJournalOpen=false;
     GetCharacterMovement()->StopMovementImmediately(); StopJumping();
     SetActorLocationAndRotation(Location,FRotator(0,RespawnAnchor.Rotator().Yaw,0),false,nullptr,ETeleportType::TeleportPhysics);
     GetController()->SetControlRotation(FRotator(0,RespawnAnchor.Rotator().Yaw,0));

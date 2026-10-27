@@ -18,6 +18,7 @@ public:
     void ToggleSpear();
     void ToggleVest();
     void PlayAttack();
+    void StopAttackVisual() { SwingRemaining=0; }
     void RefreshVisual();
     bool IsWeaponVisible() const;
     float GetAttackBonus() const;

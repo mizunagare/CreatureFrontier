@@ -40,6 +40,7 @@ bool UPlayerEquipmentComponent::Validate(const FPlayerEquipmentState& Candidate)
 bool UPlayerEquipmentComponent::Restore(const FPlayerEquipmentState& NewState)
 {
     if(!GetOwner() || !GetOwner()->HasAuthority() || !Validate(NewState)) return false;
+    if(auto* Hero=Cast<ACFPlayerCharacter>(GetOwner())) Hero->CancelMeleeAttack();
     State=NewState; SwingRemaining=0; RefreshVisual(); return true;
 }
 float UPlayerEquipmentComponent::GetAttackBonus() const { return State.bOwnSpear && State.bSpearEquipped?FMath::Clamp(SpearAttackBonus,0.f,100.f):0; }
@@ -62,6 +63,7 @@ void UPlayerEquipmentComponent::ToggleSpear()
 {
     auto* Hero=Cast<ACFPlayerCharacter>(GetOwner()); if(!Hero || !Hero->HasAuthority() || Hero->Health<=0) return;
     if(!State.bOwnSpear) { Hero->Feedback=TEXT("Craft a spear first: 4 near a work station"); return; }
+    Hero->CancelMeleeAttack();
     State.bSpearEquipped=!State.bSpearEquipped; SwingRemaining=0; RefreshVisual(); Hero->Feedback=State.bSpearEquipped?TEXT("Spear equipped"):TEXT("Spear unequipped");
 }
 void UPlayerEquipmentComponent::ToggleVest()

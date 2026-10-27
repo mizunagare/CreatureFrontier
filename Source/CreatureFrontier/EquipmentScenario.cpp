@@ -36,7 +36,7 @@ void RunEquipmentScenario(UWorld* World,ACFPlayerCharacter* Hero)
     bool Armor=BareDamage==20 && FMath::IsNearlyEqual(ArmoredDamage,16.f) && FMath::IsNearlyEqual(Hero->Health,64.f);
     auto* Enemy=World->SpawnActor<ACreatureCharacter>(FVector(-50,-400,40),FRotator::ZeroRotator); Enemy->Level=6; Enemy->Health=200; Enemy->SetActorTickEnabled(false); Enemy->GetCharacterMovement()->DisableMovement();
     const FRotator Aim=(Enemy->GetActorLocation()-Hero->FirstPersonCamera->GetComponentLocation()).Rotation(); Hero->GetController()->SetControlRotation(Aim); Hero->FirstPersonCamera->SetWorldRotation(Aim);
-    Hero->Attack(); bool Attack=Enemy->Health==165;
+    Hero->Attack(); const bool Early=Enemy->Health==200 && Hero->IsMeleePending();
     TArray<UStaticMeshComponent*> Pieces; Hero->GetComponents(Pieces);
     bool Visual=Gear->GetWeaponParts().Num()==2; Gear->TickComponent(.1f,LEVELTICK_All,nullptr);
     UE_LOG(LogTemp,Display,TEXT("CF_EQUIPMENT_VISUAL count=%d"),Gear->GetWeaponParts().Num());
@@ -45,9 +45,14 @@ void RunEquipmentScenario(UWorld* World,ACFPlayerCharacter* Hero)
         UE_LOG(LogTemp,Display,TEXT("CF_EQUIPMENT_PART %s collision=%d nav=%d parentX=%.2f"),*Piece->GetName(),static_cast<int32>(Piece->GetCollisionEnabled()),Piece->CanEverAffectNavigation(),Piece->GetAttachParent()->GetRelativeLocation().X);
         Visual &= Piece->GetCollisionEnabled()==ECollisionEnabled::NoCollision && !Piece->CanEverAffectNavigation() && Piece->GetAttachParent()->GetRelativeLocation().X>20;
     }
+    const int32 MeshCount=Pieces.Num();
+    FTimerHandle SpearHit;
+    World->GetTimerManager().SetTimer(SpearHit,[World,Hero,Enemy,Gates,Craft,Toggle,Armor,Visual,Early,MeshCount]()
+    {
+    auto* Gear=Hero->Equipment.Get(); const bool Attack=Early && Enemy->Health==165;
     const FString Slot=TEXT("FrontierEquipmentAutomation");
     bool Saved=Hero->SaveProgress(Slot) && Hero->LoadProgress(Slot) && Hero->LoadProgress(Slot) && Hero->GetPlayerAttackDamage()==35 && FMath::IsNearlyEqual(Gear->GetDamageReduction(),.2f) && Hero->Inventory->Count(EFrontierItem::Material)==80;
-    TArray<UStaticMeshComponent*> RestoredPieces; Hero->GetComponents(RestoredPieces); Saved &= RestoredPieces.Num()==Pieces.Num() && Gear->IsWeaponVisible();
+    TArray<UStaticMeshComponent*> RestoredPieces; Hero->GetComponents(RestoredPieces); Saved &= RestoredPieces.Num()==MeshCount && Gear->IsWeaponVisible();
     auto* Invalid=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot,0)); Invalid->Equipment.bOwnSpear=false;
     UGameplayStatics::SaveGameToSlot(Invalid,TEXT("FrontierEquipmentInvalid"),0);
     bool Validation=!Hero->LoadProgress(TEXT("FrontierEquipmentInvalid")) && Hero->GetPlayerAttackDamage()==35 && Hero->Inventory->Count(EFrontierItem::Material)==80;
@@ -69,6 +74,7 @@ void RunEquipmentScenario(UWorld* World,ACFPlayerCharacter* Hero)
         if(Target)
         {
             Target->SetActorTickEnabled(false); Target->GetCharacterMovement()->DisableMovement();
+            Target->SetActorLocation(Hero->GetActorLocation()+FVector(150,0,0));
             const float Before=Target->Health; Hero->ToggleSpear();
             const FRotator Aim=(Target->GetActorLocation()-Hero->FirstPersonCamera->GetComponentLocation()).Rotation(); Hero->GetController()->SetControlRotation(Aim); Hero->FirstPersonCamera->SetWorldRotation(Aim);
             Hero->Attack(); Bare=FMath::IsNearlyEqual(Before-Target->Health,25.f) && !Hero->Equipment->IsWeaponVisible(); Hero->ToggleSpear();
@@ -87,4 +93,5 @@ void RunEquipmentScenario(UWorld* World,ACFPlayerCharacter* Hero)
         }
         FPlatformMisc::RequestExitWithStatus(false,Pass?0:1);
     },.6f,false);
+    },.2f,false);
 }

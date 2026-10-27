@@ -290,7 +290,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
         Pet->bResumeWorkAfterRest = Record.bResumeWorkAfterRest && Record.bOwned && Pet->Health > 0 && Pet->Activity == ECreatureActivity::Rest &&
             IsValid(Pet->WorkSite) && Pet->WorkSite->RequiredSpecialty != EWorkSpecialty::Feeding;
     }
-    Building->Cancel();
+    CancelMeleeAttack(); Building->Cancel();
     for (auto* Site : OldBuilt) Site->Destroy();
     for (auto* Drop : OldLoot) Drop->Destroy();
     for (auto* Pet : OldCreatures) Pet->Destroy();
@@ -338,6 +338,7 @@ float ACFPlayerCharacter::TakeDamage(float Amount, const FDamageEvent& Event, AC
     if (Health <= 0.0f)
     {
         GetCharacterMovement()->StopMovementImmediately(); GetCharacterMovement()->DisableMovement(); StopJumping();
+        CancelMeleeAttack();
         Building->Cancel(); bRosterOpen=false; bJournalOpen=false;
         Equipment->RefreshVisual();
         for(TActorIterator<ACreatureCharacter> It(GetWorld());It;++It) It->HandlePlayerDowned(this);
@@ -534,25 +535,11 @@ ACreatureCharacter* ACFPlayerCharacter::TraceCreature() const
     return Cast<ACreatureCharacter>(Hit.GetActor());
 }
 
-void ACFPlayerCharacter::Attack()
-{
-    if (Building->IsActive()) { Building->Confirm(); return; }
-    if (Health <= 0.0f || GetWorld()->GetTimeSeconds() < NextAttackTime) return;
-    RespawnProtectionUntil=0;
-    NextAttackTime = GetWorld()->GetTimeSeconds() + 0.4;
-    Equipment->PlayAttack();
-    if (ACreatureCharacter* Creature = TraceCreature())
-    {
-        if (Creature->Disposition == ECreatureDisposition::Tamed) return;
-        const float Applied = UGameplayStatics::ApplyDamage(Creature, GetPlayerAttackDamage(), GetController(), this, UDamageType::StaticClass());
-        Feedback = Applied > 0 ? TEXT("Hit! Right mouse: capture before health reaches zero") : TEXT("Creature retreating - wait for it to return home");
-    }
-}
-
 void ACFPlayerCharacter::CaptureTarget()
 {
     if (Building->IsActive()) { Building->Cancel(); return; }
     if (Health <= 0.0f) return;
+    CancelMeleeAttack();
     RespawnProtectionUntil=0;
     if (ACreatureCharacter* Creature = TraceCreature())
     {
