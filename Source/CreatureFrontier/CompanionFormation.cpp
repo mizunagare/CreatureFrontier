@@ -2,21 +2,74 @@
 #include "CFPlayerCharacter.h"
 #include "Components/CapsuleComponent.h"
 #include "EngineUtils.h"
+#include "NavigationSystem.h"
+#include "NavigationPath.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
+
+namespace FrontierFollowPath
+{
+const ACharacter* Blocker(const ACreatureCharacter* Self,FVector Start,FVector End)
+{
+    Start.Z=0; End.Z=0;
+    const ACharacter* Result=nullptr; float Nearest=MAX_flt;
+    for(TActorIterator<ACharacter> It(Self->GetWorld());It;++It)
+    {
+        if(*It==Self || !It->GetCapsuleComponent() || It->GetCapsuleComponent()->GetCollisionEnabled()==ECollisionEnabled::NoCollision) continue;
+        if(FMath::Abs(It->GetActorLocation().Z-Self->GetActorLocation().Z)>Self->GetCapsuleComponent()->GetScaledCapsuleHalfHeight()+It->GetCapsuleComponent()->GetScaledCapsuleHalfHeight()) continue;
+        FVector Position=It->GetActorLocation(); Position.Z=0;
+        if(FVector::DotProduct(End-Start,Start-Position)>=0) continue;
+        const float Radius=Self->GetCapsuleComponent()->GetScaledCapsuleRadius()+It->GetCapsuleComponent()->GetScaledCapsuleRadius()+12;
+        const float Distance=FVector::DistSquared2D(Start,Position);
+        if(Distance<Nearest && FVector::Dist2D(Position,FMath::ClosestPointOnSegment(Position,Start,End))<Radius)
+        { Result=*It; Nearest=Distance; }
+    }
+    return Result;
+}
+bool ClearPath(const ACreatureCharacter* Self,const UNavigationPath* Path)
+{
+    if(!Path || !Path->IsValid() || Path->IsPartial() || Path->PathPoints.Num()<2) return false;
+    for(int32 Index=1;Index<Path->PathPoints.Num();++Index)
+        if(Blocker(Self,Path->PathPoints[Index-1],Path->PathPoints[Index])) return false;
+    return true;
+}
+}
+
+const ACharacter* ACreatureCharacter::FindFollowPathBlocker(const FVector& Destination) const
+{
+    return FrontierFollowPath::Blocker(this,GetActorLocation(),Destination);
+}
+bool ACreatureCharacter::FindFollowPathDetour(const FVector& Destination,const ACharacter* Blocker,FVector& Out) const
+{
+    auto* Nav=FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
+    if(!Nav || !IsValid(Blocker) || GetDistanceTo(Blocker)>350) return false;
+    const float Radius=GetCapsuleComponent()->GetScaledCapsuleRadius()+Blocker->GetCapsuleComponent()->GetScaledCapsuleRadius()+80;
+    float Best=MAX_flt;
+    for(int32 Index=0;Index<16;++Index)
+    {
+        const float Angle=(Index%8)*PI/4;
+        const float SearchRadius=Radius+(Index/8)*200;
+        const FVector Candidate=Blocker->GetActorLocation()+FVector(FMath::Cos(Angle),FMath::Sin(Angle),0)*SearchRadius;
+        FNavLocation Projected;
+        if(!Nav->ProjectPointToNavigation(Candidate,Projected,FVector(80,80,200))) continue;
+        auto* Approach=UNavigationSystemV1::FindPathToLocationSynchronously(GetWorld(),GetActorLocation(),Projected.Location,const_cast<ACreatureCharacter*>(this));
+        if(!FrontierFollowPath::ClearPath(this,Approach)) continue;
+        auto* Departure=UNavigationSystemV1::FindPathToLocationSynchronously(GetWorld(),Projected.Location,Destination,const_cast<ACreatureCharacter*>(this));
+        if(!FrontierFollowPath::ClearPath(this,Departure)) continue;
+        const float Cost=Approach->GetPathLength()+Departure->GetPathLength();
+        if(Cost<Best) { Best=Cost; Out=Projected.Location; }
+    }
+    if(Best<MAX_flt && FParse::Param(FCommandLine::Get(),TEXT("CFFormationTrace")))
+        UE_LOG(LogTemp,Display,TEXT("CF_FOLLOW_DETOUR pet=%s via=%s goal=%s length=%.1f"),*GetName(),*Out.ToString(),*Destination.ToString(),Best);
+    return Best<MAX_flt;
+}
 
 bool ACreatureCharacter::HasClearFollowApproach(const FVector& Destination) const
 {
-    if(FVector::Dist2D(GetActorLocation(),Destination)>220) return false;
-    FVector Start=GetActorLocation(),End=Destination; Start.Z=0; End.Z=0;
-    for(TActorIterator<ACharacter> It(GetWorld());It;++It)
-    {
-        if(*It==this || !It->GetCapsuleComponent() || It->GetCapsuleComponent()->GetCollisionEnabled()==ECollisionEnabled::NoCollision) continue;
-        if(FMath::Abs(It->GetActorLocation().Z-GetActorLocation().Z)>GetCapsuleComponent()->GetScaledCapsuleHalfHeight()+It->GetCapsuleComponent()->GetScaledCapsuleHalfHeight()) continue;
-        FVector Position=It->GetActorLocation(); Position.Z=0;
-        if(FVector::DotProduct(End-Start,Start-Position)>=0) continue; // Moving away is safe even when capsules are touching.
-        const float Radius=GetCapsuleComponent()->GetScaledCapsuleRadius()+It->GetCapsuleComponent()->GetScaledCapsuleRadius()+12;
-        if(FVector::Dist2D(Position,FMath::ClosestPointOnSegment(Position,Start,End))<Radius) return false;
-    }
-    return true;
+    // Local steering needs a clear LOOKAHEAD corridor, not proximity to the final goal.
+    // Otherwise expanded RVO radii can deadlock a physically clear approach outside docking range.
+    const FVector LookAhead=GetActorLocation()+(Destination-GetActorLocation()).GetClampedToMaxSize2D(220.f);
+    return !FindFollowPathBlocker(LookAhead);
 }
 
 FVector ACreatureCharacter::FindFollowApproach(const FVector& Destination) const
@@ -24,9 +77,6 @@ FVector ACreatureCharacter::FindFollowApproach(const FVector& Destination) const
     FVector Start=GetActorLocation(),End=Destination; Start.Z=0; End.Z=0;
     const float Length=FVector::Dist2D(Start,End);
     if(Length>350 || Length<1) return Destination;
-    const FVector Direction=(End-Start).GetSafeNormal2D();
-    const FVector Perpendicular(-Direction.Y,Direction.X,0);
-    const ACharacter* Blocker=nullptr; float First=MAX_flt;
     for(TActorIterator<ACharacter> It(GetWorld());It;++It)
     {
         if(*It==this || !It->GetCapsuleComponent() || It->GetCapsuleComponent()->GetCollisionEnabled()==ECollisionEnabled::NoCollision) continue;
@@ -38,16 +88,10 @@ FVector ACreatureCharacter::FindFollowApproach(const FVector& Destination) const
             FVector Away=(End-Position).GetSafeNormal2D(); if(Away.IsNearlyZero()) Away=FVector::RightVector;
             FVector Alternate=Position+Away*(Radius+60); Alternate.Z=Destination.Z; return Alternate;
         }
-        if(FVector::DotProduct(End-Start,Start-Position)>=0) continue;
-        const float Along=FVector::DotProduct(Position-Start,Direction);
-        if(Along<First && FVector::Dist2D(Position,FMath::ClosestPointOnSegment(Position,Start,End))<Radius)
-        { Blocker=*It; First=Along; }
     }
-    if(!Blocker) return Destination;
-    const float AwaySide=FVector::DotProduct(Blocker->GetActorLocation()-GetActorLocation(),Perpendicular)>=0?-1.f:1.f;
-    const float Radius=GetCapsuleComponent()->GetScaledCapsuleRadius()+Blocker->GetCapsuleComponent()->GetScaledCapsuleRadius()+70;
-    FVector Waypoint=Blocker->GetActorLocation()+Perpendicular*(AwaySide*Radius); Waypoint.Z=Destination.Z;
-    return Waypoint;
+    // Segment blockers are resolved from the REAL nav path in NavigateTo. A perpendicular
+    // raw ray waypoint here can lie inside static geometry and project onto our current poly.
+    return Destination;
 }
 
 FVector ACreatureCharacter::GetFollowDestination() const

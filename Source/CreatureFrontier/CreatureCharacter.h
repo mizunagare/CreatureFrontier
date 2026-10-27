@@ -133,6 +133,11 @@ protected:
     void OnRep_Activity();
 
 private:
+    const ACharacter* FindFollowPathBlocker(const FVector& Destination) const;
+    bool FindFollowPathDetour(const FVector& Destination,const ACharacter* Blocker,FVector& Out) const;
+    bool bHasFollowPathDetour=false;
+    FVector FollowPathDetour=FVector::ZeroVector, FollowPathDetourGoal=FVector::ZeroVector;
+    double FollowPathDetourExpires=0, NextFollowDetourSearch=0;
     TWeakObjectPtr<class AResourceNode> FieldResource;
     void TickGathering(float DeltaSeconds,ACFPlayerCharacter* Recipient);
     void ResetGathering();

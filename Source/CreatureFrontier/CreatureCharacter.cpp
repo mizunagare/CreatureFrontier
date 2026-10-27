@@ -148,6 +148,7 @@ float ACreatureCharacter::GetWorkEfficiency(const AWorkStation* Site) const
 
 void ACreatureCharacter::StopNavigation()
 {
+    bHasFollowPathDetour=false;
     if (auto* AI = Cast<AAIController>(GetController())) AI->StopMovement();
 }
 
@@ -158,8 +159,19 @@ void ACreatureCharacter::NavigateTo(const FVector& Destination, float Acceptance
     auto* AI = Cast<AAIController>(GetController());
     auto* Nav = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
     if (!AI || !Nav) { StopNavigation(); return; }
+    const double Now=GetWorld()->GetTimeSeconds();
+    if(Activity!=ECreatureActivity::Follow || FVector::Dist2D(GetActorLocation(),FollowPathDetour)<30 ||
+        FVector::Dist2D(Destination,FollowPathDetourGoal)>100 || Now>FollowPathDetourExpires) bHasFollowPathDetour=false;
+    if(Activity==ECreatureActivity::Follow && !bHasFollowPathDetour && Now>=NextFollowDetourSearch && AI->GetMoveStatus()==EPathFollowingStatus::Moving)
+        if(const auto* Blocker=FindFollowPathBlocker(AI->GetImmediateMoveDestination()))
+        {
+            NextFollowDetourSearch=Now+1;
+            if(FindFollowPathDetour(Destination,Blocker,FollowPathDetour))
+            { bHasFollowPathDetour=true; FollowPathDetourGoal=Destination; FollowPathDetourExpires=Now+4; }
+        }
+    const FVector NavigationGoal=bHasFollowPathDetour?FollowPathDetour:Destination;
     FNavLocation Projected;
-    if (!Nav->ProjectPointToNavigation(Destination, Projected, FVector(250,250,300)))
+    if (!Nav->ProjectPointToNavigation(NavigationGoal, Projected, FVector(250,250,300)))
     {
         const APawn* FollowOwner=Activity==ECreatureActivity::Follow && Tamer?Tamer->GetPawn():nullptr;
         if(!FollowOwner || !Nav->ProjectPointToNavigation(FollowOwner->GetActorLocation(),Projected,FVector(250,250,300)))
@@ -304,9 +316,12 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
         SetActivity(Enemy ? ECreatureActivity::Combat : ECreatureActivity::Follow);
         if(GetCharacterMovement()->bUseRVOAvoidance!=(Enemy==nullptr)) GetCharacterMovement()->SetAvoidanceEnabled(Enemy==nullptr);
         const FVector Destination = Enemy ? Enemy->GetActorLocation() : GetFollowDestination();
-        // Weight 1 bypasses self-steering but remains registered as an obstacle.
-        // Only use this precise docking mode when the real capsule corridor is clear.
-        GetCharacterMovement()->SetRVOAvoidanceWeight(!Enemy && HasClearFollowApproach(Destination)?1.f:.5f);
+        // A nav path may bend back through a companion even when the final-goal ray is clear.
+        // Bypass self-steering only if BOTH desired and actual path directions have a clear local corridor.
+        const auto* FollowAI=Cast<AAIController>(GetController());
+        const bool ClearSegment=!FollowAI || FollowAI->GetMoveStatus()!=EPathFollowingStatus::Moving ||
+            HasClearFollowApproach(FollowAI->GetImmediateMoveDestination());
+        GetCharacterMovement()->SetRVOAvoidanceWeight(!Enemy && HasClearFollowApproach(Destination) && ClearSegment?1.f:.5f);
         const FVector Offset = Destination - GetActorLocation();
         if (Enemy ? !CanHit(Enemy) : Offset.Size2D() > 25.0f) NavigateTo(Destination, Enemy ? 65.0f : 15.0f);
         else

@@ -2,6 +2,10 @@
 
 原创第一人称生物捕捉 RPG 原型。玩法重点是捕捉伙伴，并与伙伴共同生活、工作和战斗。
 
+本轮修复已复现的伙伴绕行/停靠停滞，加入局部前视、真实路径段避让与经过导航验证的短绕行。
+已执行默认不限帧十次、48 项排列/帧率矩阵、原 40 进程回归和四次图形检查；存档仍为 20。
+诊断入口、失败候选与验收边界见 [跟随说明](Docs/FOLLOWING.md)，不代表任意规模或复杂布局已稳定。
+
 ## 水晶探索回路（格式 19）
 
 带伙伴前往东北 Crystal Rise，在精英附近用 `M` 采有限水晶；只有真实采样才解锁研究入口。
@@ -35,9 +39,9 @@
 
 ## Windows 独立原型
 
-当前最新本机版本：`D:\myGame\Builds\Windows-FieldWork-Final\CreatureFrontier.exe`。
+当前最新本机版本：`D:\myGame\Builds\Windows-FollowLookahead\CreatureFrontier.exe`。
 双击即可进入测试地图，不需要先打开 Unreal Editor。复制到其他机器时需复制整个
-`Builds\Windows-FieldWork-Final` 文件夹，不能只复制根目录的启动 EXE。
+`Builds\Windows-FollowLookahead` 文件夹，不能只复制根目录的启动 EXE。
 这是 Development 灰盒原型，尚未完成正式美术、内容与性能优化。
 
 战斗更新预览另外输出到 `D:\myGame\Builds\Windows-Combat\CreatureFrontier.exe`，
@@ -68,13 +72,14 @@
 模块房间更新输出到 `D:\myGame\Builds\Windows-Home\CreatureFrontier.exe`。
 水晶探索更新输出到 `D:\myGame\Builds\Windows-Expedition\CreatureFrontier.exe`。
 野外工作令更新输出到 `D:\myGame\Builds\Windows-FieldWork-Final\CreatureFrontier.exe`。
+跟随路径恢复更新输出到 `D:\myGame\Builds\Windows-FollowLookahead\CreatureFrontier.exe`。
 菜单为键盘操作；帮助、队伍和图鉴面板不会暂停，只有 Esc 菜单暂停世界。
 使用 `-CFSessionTest -CFSessionPreview -RenderOffscreen` 可运行菜单测试并在当前程序的
 `Saved/SessionPreview/` 生成暂停、帮助、常驻 HUD 三张检查图；请勿同时使用 `-nullrhi`。
 旧存档版本 1–19 可以读取，新版存档版本为 20（保留研究、物品、灯及节点预算，增加野外资源目标与恢复意图）。
 新版保存后的存档不能交给旧版程序读取；请保留旧存档备份。
 测试脚本默认选择 `Builds` 下最新编译的 Development 程序，也可明确指定：
-`.\Scripts\Test-Packaged.ps1 -BuildRoot D:\myGame\Builds\Windows-FieldWork-Final`。
+`.\Scripts\Test-Packaged.ps1 -BuildRoot D:\myGame\Builds\Windows-FollowLookahead`。
 每个测试限时 60 秒，超时只结束该脚本启动的测试进程。
 每次回归使用 `Saved/PackagedTests/<时间戳-随机标识>/` 下的新日志，避免读取上次运行的成功标记。
 
@@ -359,7 +364,7 @@ HUD 显示玩家生命、资源、伙伴数量、工作数量和准星目标的�
 `-CFLogisticsTest` 验证真实寻路取货/卸货/进食、满食槽不取货、部分卸货、途中反复读档守恒、
 改派保留、背包容量与倒地回收、携带食物应急进食、自动休息复工、非法库存/携带量拒绝和旧档迁移，
 使用 `FrontierLogisticsAutomation` 等独立测试槽。
-当前打包回归共 28 项，包含伙伴分工、图鉴、新手目标、基地重生、装备、近战、食物物流、暂停菜单、背包制作、宠物动作、族系战斗、日常互动与分散跟随测试。
+当前原打包回归为 38 类检查、40 个独立进程（跟随重复三次），包含伙伴分工、图鉴、目标、重生、装备、近战、物流、菜单、背包、动作、互动、跟随、资源、房屋、野外工作与水晶探索。另有独立跟随排列/帧率矩阵，不作为自动 CI。
 `-CFBackpackTest` 使用独立的 `FrontierBackpackAutomation` 测试槽，验证五配方实际消耗、重复装备、缺料/满格/距离/倒地拒绝、面板互斥和存档恢复。
 追加 `-CFBackpackPreview -RenderOffscreen`（不加 nullrhi）可在当前程序的 `Saved/BackpackPreview/backpack.png` 生成检查图。
 
@@ -370,12 +375,13 @@ HUD 显示玩家生命、资源、伙伴数量、工作数量和准星目标的�
 从玩家正前方返回时，若直线会穿过玩家碰撞体，先导航到侧向过渡位置，再回到身后站位；不会通过关闭碰撞来穿过玩家。
 只分配存活且处于 Follow / Idle 的自有伙伴；工作、休息、战斗和倒地伙伴不占位置，不改变 L/K 指令选择规则。
 使用原有导航网格真实绕障，不瞬移；跟随时启用局部角色避让，工作/休息/战斗不启用此跟随避让。站位投影或寻路请求失败时尝试原有靠近玩家的跟随方式，并保留停靠距离。复杂拥堵仍可能发生，不保证固定几何阵型。
-近目标且实际碰撞胶囊通道畅通时使用精确停靠，不再被额外放大的避让半径反复推开；仍注册为其他跟随者的障碍，仍通过导航与碰撞移动。
-若近处伙伴或其他角色挡住实际通道，会先使用绕行点；站位被占用时尝试旁侧位置，贴身时允许朝远离阻挡者的方向脱离，不关闭碰撞。
-站位为运行时安排，读档后重新计算，存档仍为 16；不改变生命、体力消耗、亲密度、经验、背包或携带物规则。
+目标方向与实际下一导航段的前方 2.2 米物理通道均畅通时使用精确行走，不因终点尚远而一直受扩大的避让半径排斥；仍注册为其他跟随者的障碍，仍通过导航与碰撞移动。
+实际路径被角色挡住时，低频搜索经进出两段导航验证的短绕行点并暂时保持，不使用可能落进掩体的垂直几何拐点；站位被占用时仍可暂时旁站，不关闭碰撞。
+站位和绕行缓存为运行时安排，读档后重新计算；当前存档仍为 20，本轮不增加字段，不改变生命、体力消耗、亲密度、经验、背包或携带物规则。
 `-CFFormationTest` 使用独立槽 `FrontierFormationAutomation` 检查六位置布局/状态排除、三物种真实绕障、分散停靠、玩家移动转向、状态守恒和读档；追加 `-CFFormationPreview -RenderOffscreen` 可生成冻结概览图 `Saved/FormationPreview/followers.png`。
 更大规模编队、狭窄通道排队、稳定个体编号和跟随性能优化仍待开发。
 常规回归会将跟随场景独立重复 3 次（日志带 -1/-2/-3），到达判定要求目标 30 厘米内且速度低于 10 厘米/秒，再检查停靠间距；不以仍在交叉移动的中间帧判定停靠成功。
+独立矩阵：`.\Scripts\Test-FormationMatrix.ps1 -BuildRoot D:\myGame\Builds\Windows-FollowLookahead -FrameCaps @(0,30,60,120) -Trace`，共六排列 × 四上限 × 两次，48 项；要求实际中心/两翼配置一致并到达正式槽位，不能把临时避让目标当作停靠成功。
 
 ### 日常互动与亲密度
 

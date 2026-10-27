@@ -16,18 +16,27 @@
 #include "Misc/Parse.h"
 #include "Misc/CommandLine.h"
 #include "TimerManager.h"
+#include "AIController.h"
 
 void RunFormationScenario(UWorld* World,ACFPlayerCharacter* Hero)
 {
     TMap<ECreatureForm,UCreatureDefinition*> Definitions;
     for(TActorIterator<ACreatureCharacter> It(World);It;++It) { if(It->Definition) Definitions.Add(It->Definition->Form,It->Definition); It->Destroy(); }
     if(Definitions.Num()!=3) { UE_LOG(LogTemp,Error,TEXT("CF_FORMATION FAIL fixtures")); FPlatformMisc::RequestExitWithStatus(false,1); return; }
+    int32 Lead=0; const bool ExplicitLead=FParse::Value(FCommandLine::Get(),TEXT("CFFormationLead="),Lead);
+    const bool Reverse=FParse::Param(FCommandLine::Get(),TEXT("CFFormationReverse"));
+    if(Lead<0 || Lead>2) { UE_LOG(LogTemp,Error,TEXT("CF_FORMATION FAIL invalid lead form")); FPlatformMisc::RequestExitWithStatus(false,1); return; }
     Hero->GetCharacterMovement()->DisableMovement(); Hero->SetActorLocation(FVector(1100,500,40)); Hero->GetController()->SetControlRotation(FRotator::ZeroRotator);
     TArray<ACreatureCharacter*> Pets,Excluded;
     for(int32 Index=0;Index<9;++Index)
     {
         const FTransform Transform(FVector(300,100+Index*120,40));
-        auto* Pet=World->SpawnActorDeferred<ACreatureCharacter>(ACreatureCharacter::StaticClass(),Transform,nullptr,nullptr,ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+        FActorSpawnParameters Spawn; Spawn.bDeferConstruction=true; Spawn.SpawnCollisionHandlingOverride=ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+        // Keep construction/tick order Leaf, Ember, Stone. Permute roster roles through names,
+        // matching the cooked build's reverse-generated names rather than swapping definitions.
+        const int32 Rank=(Reverse?(Lead-Index%3+3):(Index%3-Lead+3))%3;
+        if(ExplicitLead) Spawn.Name=FName(*FString::Printf(TEXT("FormationFixture_%02d"),(Index/3)*3+Rank));
+        auto* Pet=World->SpawnActor<ACreatureCharacter>(ACreatureCharacter::StaticClass(),Transform,Spawn);
         Pet->Definition=Definitions.FindRef(static_cast<ECreatureForm>(Index%3)); Pet->FinishSpawning(Transform); Pet->Tame(Hero->GetController()); Pet->SetActorTickEnabled(false);
         if(Index<6) Pets.Add(Pet);
         else { Pet->SetActivity(Index==6?ECreatureActivity::Work:ECreatureActivity::Rest); if(Index==8) Pet->Health=0; Excluded.Add(Pet); }
@@ -61,9 +70,10 @@ void RunFormationScenario(UWorld* World,ACFPlayerCharacter* Hero)
         Pet->BondPoints=12; Pet->CarriedFood=2; Pet->SetActorTickEnabled(true);
     }
     auto* Path=Center?UNavigationSystemV1::FindPathToLocationSynchronously(World,Center->GetActorLocation(),Center->GetFollowDestination(),Center):nullptr;
+    UE_LOG(LogTemp,Display,TEXT("CF_FORMATION_FIXTURE lead=%d center=%d named=%d reverse=%d"),Lead,Center && Center->Definition?static_cast<int32>(Center->Definition->Form):-1,ExplicitLead,Reverse);
     const bool PathValid=Path && Path->IsValid() && !Path->IsPartial() && Path->PathPoints.Num()>=3;
     const int32 Materials=Hero->Inventory->Count(EFrontierItem::Material);
-    struct FTrial { int32 Phase=0; double Started=0; float Detour=0; TArray<FVector> Previous; };
+    struct FTrial { int32 Phase=0; double Started=0,NextTrace=0; float Detour=0; TArray<FVector> Previous; };
     auto Trial=MakeShared<FTrial>(); Trial->Started=World->GetTimeSeconds(); auto Poll=MakeShared<FTimerHandle>();
     World->GetTimerManager().SetTimer(*Poll,[World,Hero,Pets,Center,Layout,PathValid,Materials,Trial,Poll]()
     {
@@ -72,8 +82,29 @@ void RunFormationScenario(UWorld* World,ACFPlayerCharacter* Hero)
         FTimerHandle ActivePoll=*Poll;
         if(Center && Trial->Phase==0) Trial->Detour=FMath::Max(Trial->Detour,FMath::Abs(static_cast<float>(Center->GetActorLocation().Y)-500));
         bool Arrived=true;
-        for(auto* Pet:Pets) Arrived &= FVector::Dist2D(Pet->GetActorLocation(),Pet->GetFollowDestination())<=30 && Pet->GetVelocity().Size2D()<10;
+        const auto Ordered=Hero->GetCompanionRoster();
+        const FRotator Facing(0,Hero->GetController()->GetControlRotation().Yaw,0);
+        for(auto* Pet:Pets)
+        {
+            const int32 Slot=Ordered.IndexOfByKey(Pet);
+            const float Side=Slot%3==0?0.f:Slot%3==1?-130.f:130.f;
+            const FVector Nominal=Hero->GetActorLocation()+Facing.RotateVector(FVector(-170.f-(Slot/3)*150.f,Side,0));
+            // A temporary avoidance/occupied-slot waypoint is not evidence of docking in formation.
+            Arrived &= Slot!=INDEX_NONE && FVector::Dist2D(Pet->GetActorLocation(),Nominal)<=30 && Pet->GetVelocity().Size2D()<10;
+        }
         const double Elapsed=World->GetTimeSeconds()-Trial->Started;
+        if(FParse::Param(FCommandLine::Get(),TEXT("CFFormationTrace")) && Elapsed>=Trial->NextTrace)
+        {
+            Trial->NextTrace=Elapsed+.5;
+            for(int32 Index=0;Index<Pets.Num();++Index)
+            {
+                auto* Pet=Pets[Index]; auto* AI=Cast<AAIController>(Pet->GetController());
+                UE_LOG(LogTemp,Display,TEXT("CF_FORMATION_TRACE phase=%d t=%.2f pet=%d name=%s pos=%s goal=%s velocity=%s segment=%s rvo=%.1f dt=%.4f"),
+                    Trial->Phase,Elapsed,Index,*Pet->GetName(),*Pet->GetActorLocation().ToString(),*Pet->GetFollowDestination().ToString(),
+                    *Pet->GetVelocity().ToString(),*(AI?AI->GetImmediateMoveDestination():FVector::ZeroVector).ToString(),
+                    Pet->GetCharacterMovement()->GetRVOAvoidanceWeight(),World->GetDeltaSeconds());
+            }
+        }
         if(Elapsed<2 || (!Arrived && Elapsed<12)) return;
         bool Spaced=true,Stats=Hero->Inventory->Count(EFrontierItem::Material)==Materials;
         for(int32 A=0;A<Pets.Num();++A)
@@ -96,7 +127,7 @@ void RunFormationScenario(UWorld* World,ACFPlayerCharacter* Hero)
         {
             for(auto* Pet:Pets) Trial->Previous.Add(Pet->GetActorLocation());
             Hero->SetActorLocation(FVector(1100,-50,40)); Hero->GetController()->SetControlRotation(FRotator(0,90,0));
-            Trial->Phase=1; Trial->Started=World->GetTimeSeconds(); return;
+            Trial->Phase=1; Trial->Started=World->GetTimeSeconds(); Trial->NextTrace=0; return;
         }
         bool Moved=true;
         for(int32 Index=0;Index<Pets.Num();++Index) Moved &= FVector::Dist2D(Pets[Index]->GetActorLocation(),Trial->Previous[Index])>200 && Pets[Index]->GetFollowDestination().Y<Hero->GetActorLocation().Y;
