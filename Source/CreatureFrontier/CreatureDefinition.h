@@ -16,6 +16,20 @@ public:
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Identity", meta=(MultiLine=true))
     FText Description;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Appearance")
+    ECreatureForm Form = ECreatureForm::Leaf;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Appearance")
+    FLinearColor BodyColor = FLinearColor(0.16f, 0.6f, 0.3f);
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Appearance")
+    FLinearColor AccentColor = FLinearColor(0.5f, 0.9f, 0.2f);
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Appearance")
+    TObjectPtr<class UMaterialInterface> PaletteMaterial;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Stats", meta=(ClampMin="100", ClampMax="600"))
+    float MoveSpeed = 320.0f;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Stats", meta=(ClampMin="0.4", ClampMax="5"))
+    float AttackSeconds = 1.2f;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Work", meta=(ClampMin="0.5", ClampMax="3"))
+    float WorkSpeed = 1.5f;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Stats", meta=(ClampMin="1"))
     int32 BaseMaxHealth = 100;

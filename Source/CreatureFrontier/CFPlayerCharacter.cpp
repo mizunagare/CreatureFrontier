@@ -202,7 +202,8 @@ void ACFPlayerCharacter::CommandWork()
     for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It)
         if (It->Tamer == GetController() && It->Health > 0.0f)
         { It->WorkSite = Site; It->SetActivity(ECreatureActivity::Work); }
-    Feedback = TEXT("Companions assigned to gather resources");
+    Feedback = FString::Printf(TEXT("Assigned: %s. Matching specialties work faster"),
+        *UEnum::GetValueAsString(Site->RequiredSpecialty));
 }
 
 void ACFPlayerCharacter::CommandRest()

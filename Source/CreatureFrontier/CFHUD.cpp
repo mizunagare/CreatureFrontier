@@ -28,8 +28,8 @@ void ACFHUD::DrawHUD()
     DrawText(Player->Feedback, FLinearColor::Yellow, 32, 222);
     if (auto* Creature = Player->TraceCreature())
     {
-        DrawText(FString::Printf(TEXT("%s  Lv%d  HP %.0f/%.0f  Capture %.0f%%"),
-            Creature->Disposition == ECreatureDisposition::Tamed ? TEXT("Companion") : TEXT("Wild creature"),
+        DrawText(FString::Printf(TEXT("%s (%s)  Lv%d  HP %.0f/%.0f  Capture %.0f%%"),
+            *Creature->GetCreatureName(), Creature->Disposition == ECreatureDisposition::Tamed ? TEXT("Companion") : TEXT("Wild"),
             Creature->Level, Creature->Health, Creature->GetMaxHealth(), Player->CaptureComponent->CalculateCaptureChance(Creature)*100.0f),
             FLinearColor::White, X-130, Y+25);
         if (Creature->Disposition == ECreatureDisposition::Tamed)

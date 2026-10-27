@@ -10,6 +10,8 @@
 #include "Components/CapsuleComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
+#include "Components/SceneComponent.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "Kismet/GameplayStatics.h"
 #include "Net/UnrealNetwork.h"
 #include "UObject/ConstructorHelpers.h"
@@ -27,18 +29,97 @@ ACreatureCharacter::ACreatureCharacter()
     GetCharacterMovement()->MaxWalkSpeed = 320.0f;
     bUseControllerRotationYaw = false;
 
+    VisualPivot = CreateDefaultSubobject<USceneComponent>(TEXT("VisualPivot"));
+    VisualPivot->SetupAttachment(GetRootComponent());
     CreatureVisual = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("CreatureVisual"));
-    CreatureVisual->SetupAttachment(GetRootComponent());
-    CreatureVisual->SetRelativeLocation(FVector(0.0f, 0.0f, -10.0f));
-    CreatureVisual->SetRelativeScale3D(FVector(0.75f, 0.55f, 0.8f));
+    CreatureVisual->SetupAttachment(VisualPivot);
+    CreatureVisual->SetRelativeLocation(FVector(0, 0, -28));
+    CreatureVisual->SetRelativeScale3D(FVector(0.9f, 0.72f, 0.95f));
     CreatureVisual->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
     static ConstructorHelpers::FObjectFinder<UStaticMesh> SphereMesh(
         TEXT("/Engine/BasicShapes/Sphere.Sphere"));
     if (SphereMesh.Succeeded())
     {
+        SphereShape = SphereMesh.Object;
         CreatureVisual->SetStaticMesh(SphereMesh.Object);
     }
+    static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeMesh(TEXT("/Engine/BasicShapes/Cube.Cube"));
+    static ConstructorHelpers::FObjectFinder<UStaticMesh> ConeMesh(TEXT("/Engine/BasicShapes/Cone.Cone"));
+    CubeShape = CubeMesh.Object;
+    auto Part = [this](const TCHAR* Name, UStaticMesh* ShapeMesh, FVector Location, FVector Scale, FRotator Rotation=FRotator::ZeroRotator)
+    {
+        auto* Piece = CreateDefaultSubobject<UStaticMeshComponent>(Name);
+        Piece->SetupAttachment(VisualPivot);
+        Piece->SetStaticMesh(ShapeMesh);
+        Piece->SetRelativeLocation(Location);
+        Piece->SetRelativeScale3D(Scale);
+        Piece->SetRelativeRotation(Rotation);
+        Piece->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+        Piece->SetCanEverAffectNavigation(false);
+        return Piece;
+    };
+    AccentParts.Add(Part(TEXT("LeafLeft"), ConeMesh.Object, FVector(-5,-22,42), FVector(.24,.14,.7), FRotator(0,0,-18)));
+    AccentParts.Add(Part(TEXT("LeafRight"), ConeMesh.Object, FVector(-5,22,42), FVector(.24,.14,.7), FRotator(0,0,18)));
+    AccentParts.Add(Part(TEXT("EmberTail"), ConeMesh.Object, FVector(-68,0,-28), FVector(.35,.35,1.0), FRotator(-90,0,0)));
+    AccentParts.Add(Part(TEXT("EmberSail"), ConeMesh.Object, FVector(-12,0,29), FVector(.38,.18,.55)));
+    AccentParts.Add(Part(TEXT("StoneLeft"), ConeMesh.Object, FVector(10,-25,24), FVector(.28,.28,.55)));
+    AccentParts.Add(Part(TEXT("StoneCenter"), ConeMesh.Object, FVector(-8,0,35), FVector(.35,.35,.7)));
+    AccentParts.Add(Part(TEXT("StoneRight"), ConeMesh.Object, FVector(10,25,24), FVector(.28,.28,.55)));
+    EyeParts.Add(Part(TEXT("EyeLeft"), SphereShape, FVector(38,-19,-4), FVector(.22,.2,.25)));
+    EyeParts.Add(Part(TEXT("EyeRight"), SphereShape, FVector(38,19,-4), FVector(.22,.2,.25)));
+    Pupils.Add(Part(TEXT("PupilLeft"), SphereShape, FVector(47,-19,-3), FVector(.09,.11,.15)));
+    Pupils.Add(Part(TEXT("PupilRight"), SphereShape, FVector(47,19,-3), FVector(.09,.11,.15)));
+    Feet.Add(Part(TEXT("FootFL"), SphereShape, FVector(24,-22,-75), FVector(.32,.25,.2)));
+    Feet.Add(Part(TEXT("FootFR"), SphereShape, FVector(24,22,-75), FVector(.32,.25,.2)));
+    Feet.Add(Part(TEXT("FootBL"), SphereShape, FVector(-24,-22,-75), FVector(.32,.25,.2)));
+    Feet.Add(Part(TEXT("FootBR"), SphereShape, FVector(-24,22,-75), FVector(.32,.25,.2)));
+}
+
+void ACreatureCharacter::OnConstruction(const FTransform& Transform)
+{
+    Super::OnConstruction(Transform);
+    RefreshAppearance();
+}
+
+void ACreatureCharacter::RefreshAppearance()
+{
+    const ECreatureForm Form = Definition ? Definition->Form : ECreatureForm::Leaf;
+    CreatureVisual->SetStaticMesh(Form == ECreatureForm::Stone ? CubeShape : SphereShape);
+    CreatureVisual->SetRelativeScale3D(Form == ECreatureForm::Stone ? FVector(.9,.8,.75) : FVector(.9,.72,.95));
+    for (int32 Index=0; Index<AccentParts.Num(); ++Index)
+    {
+        const bool bShow = Form == ECreatureForm::Leaf ? Index < 2 : Form == ECreatureForm::Ember ? Index >= 2 && Index < 4 : Index >= 4;
+        AccentParts[Index]->SetVisibility(bShow);
+        AccentParts[Index]->SetHiddenInGame(!bShow);
+    }
+    if (!Definition || !Definition->PaletteMaterial) return;
+    auto MakeColor = [this](FLinearColor Color)
+    {
+        auto* Material = UMaterialInstanceDynamic::Create(Definition->PaletteMaterial, this);
+        Material->SetVectorParameterValue(TEXT("Tint"), Color);
+        return Material;
+    };
+    auto* Body = MakeColor(Definition->BodyColor);
+    auto* Accent = MakeColor(Definition->AccentColor);
+    auto* White = MakeColor(FLinearColor(.95f,.96f,.9f));
+    auto* Black = MakeColor(FLinearColor(.008f,.015f,.025f));
+    CreatureVisual->SetMaterial(0, Body);
+    for (const auto& Piece : AccentParts) Piece->SetMaterial(0, Accent);
+    for (const auto& Piece : Feet) Piece->SetMaterial(0, Accent);
+    for (const auto& Piece : EyeParts) Piece->SetMaterial(0, White);
+    for (const auto& Piece : Pupils) Piece->SetMaterial(0, Black);
+}
+
+FString ACreatureCharacter::GetCreatureName() const
+{
+    return Definition && !Definition->DisplayName.IsEmpty() ? Definition->DisplayName.ToString() : TEXT("Wildling");
+}
+
+float ACreatureCharacter::GetWorkEfficiency(const AWorkStation* Site) const
+{
+    if (!Definition || !Site) return 1.0f;
+    return Definition->WorkSpecialties.Contains(Site->RequiredSpecialty) ? Definition->WorkSpeed : 0.5f;
 }
 
 void ACreatureCharacter::StopNavigation()
@@ -74,15 +155,25 @@ bool ACreatureCharacter::CanHit(const AActor* Target) const
 void ACreatureCharacter::BeginPlay()
 {
     Super::BeginPlay();
+    RefreshAppearance();
     if (HasAuthority() && Definition)
     {
         Health = GetMaxHealth();
+        GetCharacterMovement()->MaxWalkSpeed = Definition->MoveSpeed;
+        AttackInterval = Definition->AttackSeconds;
     }
 }
 
 void ACreatureCharacter::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
+    if (VisualPivot)
+    {
+        const float Speed = GetVelocity().Size2D();
+        const float Bob = Health > 0 ? FMath::Sin(GetWorld()->GetTimeSeconds()*(Speed > 10 ? 10.0f : 2.2f))*(Speed > 10 ? 3.0f : 0.8f) : 0;
+        VisualPivot->SetRelativeLocation(FVector(0,0,Bob));
+        VisualPivot->SetRelativeRotation(FRotator(0,0,Health <= 0 ? 65.0f : 0));
+    }
     if (!HasAuthority()) return;
     if (Health <= 0.0f) { StopNavigation(); return; }
 
@@ -118,7 +209,7 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
                     OwnerPlayer->Feedback = TEXT("A companion is exhausted and resting at base");
                     return;
                 }
-                WorkProgress += DeltaSeconds;
+                WorkProgress += DeltaSeconds * GetWorkEfficiency(WorkSite);
                 if (WorkProgress >= 3.0f)
                 {
                     if (OwnerPlayer->Inventory->AddItem(EFrontierItem::Material, 1)) AddExperience(1);

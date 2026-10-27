@@ -3,6 +3,9 @@
 #include "CFHUD.h"
 #include "CaptureComponent.h"
 #include "CreatureCharacter.h"
+#include "CreatureDefinition.h"
+#include "Components/StaticMeshComponent.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "WorkStation.h"
 #include "Kismet/GameplayStatics.h"
 #include "Misc/CommandLine.h"
@@ -30,12 +33,71 @@ void ACFGameMode::BeginPlay()
     const bool bInventoryTest = FParse::Param(FCommandLine::Get(), TEXT("CFInventoryTest"));
     const bool bNavTest = FParse::Param(FCommandLine::Get(), TEXT("CFNavTest"));
     const bool bCareTest = FParse::Param(FCommandLine::Get(), TEXT("CFCareTest"));
-    if (!bSaveWrite && !bSaveRead && !bInventoryTest && !bNavTest && !bCareTest && !FParse::Param(FCommandLine::Get(), TEXT("CFSmokeTest"))) return;
+    const bool bSpeciesTest = FParse::Param(FCommandLine::Get(), TEXT("CFSpeciesTest"));
+    if (!bSaveWrite && !bSaveRead && !bInventoryTest && !bNavTest && !bCareTest && !bSpeciesTest && !FParse::Param(FCommandLine::Get(), TEXT("CFSmokeTest"))) return;
     FTimerHandle TestStart;
-    GetWorldTimerManager().SetTimer(TestStart, [this, bSaveWrite, bSaveRead, bInventoryTest, bNavTest, bCareTest]()
+    GetWorldTimerManager().SetTimer(TestStart, [this, bSaveWrite, bSaveRead, bInventoryTest, bNavTest, bCareTest, bSpeciesTest]()
     {
         auto* Hero = Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerPawn(this, 0));
         if (!Hero) { FPlatformMisc::RequestExitWithStatus(true, 1); return; }
+        if (bSpeciesTest)
+        {
+            TArray<ACreatureCharacter*> Pets;
+            TSet<FString> Names;
+            bool bData = true, bAppearance = true, bSpecialty = true;
+            Hero->SetActorLocation(FVector(-450,0,40));
+            Hero->GetCharacterMovement()->DisableMovement();
+            for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It)
+            {
+                auto* Pet = *It;
+                if (!Pet->Definition) { bData = false; continue; }
+                Names.Add(Pet->GetCreatureName());
+                bData &= Pet->Health == Pet->GetMaxHealth() && Pet->GetCharacterMovement()->MaxWalkSpeed == Pet->Definition->MoveSpeed &&
+                    FMath::IsNearlyEqual(Hero->CaptureComponent->CalculateCaptureChance(Pet), Pet->Definition->BaseCaptureRate);
+                auto* Material = Cast<UMaterialInstanceDynamic>(Pet->CreatureVisual->GetMaterial(0));
+                TArray<UStaticMeshComponent*> Pieces;
+                Pet->GetComponents(Pieces);
+                int32 Visible = 0;
+                for (const auto* Piece : Pieces) if (Piece->IsVisible()) ++Visible;
+                bAppearance &= Material && Material->K2_GetVectorParameterValue(TEXT("Tint")).Equals(Pet->Definition->BodyColor, 0.01f) && Visible >= 11;
+                AWorkStation* Matching = nullptr;
+                AWorkStation* Other = nullptr;
+                for (TActorIterator<AWorkStation> Site(GetWorld()); Site; ++Site)
+                    if (Pet->Definition->WorkSpecialties.Contains(Site->RequiredSpecialty)) Matching = *Site;
+                    else Other = *Site;
+                bSpecialty &= Matching && Other && Pet->GetWorkEfficiency(Matching) > Pet->GetWorkEfficiency(Other);
+                if (!Matching) continue;
+                Pet->Tame(Hero->GetController());
+                Pet->SetActorLocation(Matching->GetActorLocation()+FVector(0,180,40));
+                Pet->WorkSite = Matching;
+                Pet->SetActivity(ECreatureActivity::Work);
+                Pets.Add(Pet);
+            }
+            bData &= Names.Num() == 3 && Pets.Num() == 3;
+            FTimerHandle SpeciesCheck;
+            GetWorldTimerManager().SetTimer(SpeciesCheck, [Hero, Pets, bData, bAppearance, bSpecialty]()
+            {
+                bool bWork = Pets.Num() == 3;
+                for (const auto* Pet : Pets) bWork &= Pet->Experience >= 2;
+                const FString Slot = TEXT("FrontierSpeciesAutomation");
+                const bool bSaved = Hero->SaveProgress(Slot);
+                const bool bLoaded = Hero->LoadProgress(Slot);
+                TSet<FString> RestoredNames;
+                bool bMaterials = true;
+                for (TActorIterator<ACreatureCharacter> It(Hero->GetWorld()); It; ++It)
+                {
+                    if (!It->Definition || It->Tamer != Hero->GetController()) continue;
+                    RestoredNames.Add(It->GetCreatureName());
+                    auto* Material = Cast<UMaterialInstanceDynamic>(It->CreatureVisual->GetMaterial(0));
+                    bMaterials &= Material && Material->K2_GetVectorParameterValue(TEXT("Tint")).Equals(It->Definition->BodyColor, 0.01f);
+                }
+                const bool bPersist = bSaved && bLoaded && RestoredNames.Num() == 3 && bMaterials;
+                const bool bPass = bData && bAppearance && bSpecialty && bWork && bPersist;
+                UE_LOG(LogTemp, Display, TEXT("CF_SPECIES %s data=%d appearance=%d specialty=%d work=%d persist=%d"), bPass ? TEXT("PASS") : TEXT("FAIL"), bData, bAppearance, bSpecialty, bWork, bPersist);
+                FPlatformMisc::RequestExitWithStatus(false, bPass ? 0 : 10);
+            }, 6.5f, false);
+            return;
+        }
         if (bCareTest)
         {
             for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It) It->Destroy();

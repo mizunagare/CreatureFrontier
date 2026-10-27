@@ -16,6 +16,11 @@ class CREATUREFRONTIER_API ACreatureCharacter : public ACharacter
 
 public:
     ACreatureCharacter();
+    virtual void OnConstruction(const FTransform& Transform) override;
+    UFUNCTION(BlueprintPure, Category="Creature")
+    FString GetCreatureName() const;
+    UFUNCTION(BlueprintPure, Category="Work")
+    float GetWorkEfficiency(const AWorkStation* Site) const;
 
     virtual void Tick(float DeltaSeconds) override;
     UPROPERTY()
@@ -86,6 +91,14 @@ protected:
     void OnRep_Activity();
 
 private:
+    void RefreshAppearance();
+    UPROPERTY() TObjectPtr<class USceneComponent> VisualPivot;
+    UPROPERTY() TArray<TObjectPtr<UStaticMeshComponent>> AccentParts;
+    UPROPERTY() TArray<TObjectPtr<UStaticMeshComponent>> EyeParts;
+    UPROPERTY() TArray<TObjectPtr<UStaticMeshComponent>> Pupils;
+    UPROPERTY() TArray<TObjectPtr<UStaticMeshComponent>> Feet;
+    UPROPERTY() TObjectPtr<class UStaticMesh> SphereShape;
+    UPROPERTY() TObjectPtr<class UStaticMesh> CubeShape;
     void NavigateTo(const FVector& Destination, float Acceptance);
     void StopNavigation();
     bool CanHit(const AActor* Target) const;

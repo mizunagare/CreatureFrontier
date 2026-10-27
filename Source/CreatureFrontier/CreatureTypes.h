@@ -23,6 +23,14 @@ enum class ECreatureActivity : uint8
 };
 
 UENUM(BlueprintType)
+enum class ECreatureForm : uint8
+{
+    Leaf,
+    Ember,
+    Stone
+};
+
+UENUM(BlueprintType)
 enum class EWorkSpecialty : uint8
 {
     None,
