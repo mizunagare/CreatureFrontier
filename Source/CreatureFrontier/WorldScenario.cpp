@@ -54,6 +54,7 @@ void RunEcologyScenario(UWorld* World, ACFPlayerCharacter* Hero)
         MaxTravel = FMath::Max(MaxTravel,Travel); Within &= Travel < Resident->RoamRadius+100;
         if (MaxTravel < 35 && World->GetTimeSeconds()-Started < 8) return;
         const bool Roam = MaxTravel >= 35 && Within;
+        UE_LOG(LogTemp,Display,TEXT("CF_WORLD_ROAM travel=%.2f within=%d radius=%.1f location=%s home=%s"),MaxTravel,Within,Resident->RoamRadius,*Resident->GetActorLocation().ToString(),*Home.ToString());
         const FString Slot = TEXT("FrontierWorldAutomation");
         bool Saved = Hero->SaveProgress(Slot) && Hero->LoadProgress(Slot);
         auto* Returning = Site->GetResident();

@@ -236,7 +236,7 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
     if (Disposition == ECreatureDisposition::Tamed)
     {
         ACFPlayerCharacter* OwnerPlayer = Tamer ? Cast<ACFPlayerCharacter>(Tamer->GetPawn()) : nullptr;
-        if (!OwnerPlayer || OwnerPlayer->Health <= 0.0f) { ClearCombatOrders(); StopNavigation(); return; }
+        if (!OwnerPlayer || OwnerPlayer->Health <= 0.0f) { bGatheringActive=false; ClearCombatOrders(); StopNavigation(); return; }
         Nutrition = FMath::Max(0.0f,Nutrition - DeltaSeconds*(Activity == ECreatureActivity::Work ? .35f : Activity == ECreatureActivity::Rest ? .04f : .08f));
         if (TickAutoFeeding()) return;
         if (Nutrition <= 0 && Activity == ECreatureActivity::Work)
@@ -248,7 +248,7 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
         if (Activity == ECreatureActivity::Rest)
         {
             if (bResumeWorkAfterRest && !GetFieldResource() && (!IsValid(WorkSite) || WorkSite->RequiredSpecialty == EWorkSpecialty::Feeding))
-            { bResumeWorkAfterRest = false; WorkSite = nullptr; SetActivity(ECreatureActivity::Follow); return; }
+            { bResumeWorkAfterRest = false; WorkSite = nullptr; StopNavigation(); SetActivity(ECreatureActivity::Follow); OwnerPlayer->Feedback=TEXT("Assigned work target no longer available; companion following"); return; }
             if (IsValid(WorkSite) && GetDistanceTo(WorkSite) > 220.0f)
             {
                 NavigateTo(WorkSite->GetActorLocation(), 35.0f);
@@ -265,7 +265,7 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
             return;
         }
         if (Activity == ECreatureActivity::Work && GetFieldResource()) { TickGathering(DeltaSeconds,OwnerPlayer); return; }
-        if(Activity==ECreatureActivity::Work && !IsValid(WorkSite)) { SetActivity(ECreatureActivity::Follow); return; }
+        if(Activity==ECreatureActivity::Work && !IsValid(WorkSite)) { StopNavigation(); SetActivity(ECreatureActivity::Follow); OwnerPlayer->Feedback=TEXT("Assigned work target no longer available; companion following"); return; }
         if (Activity == ECreatureActivity::Work && IsValid(WorkSite))
         {
             if (WorkSite->RequiredSpecialty == EWorkSpecialty::Feeding) { SetActivity(ECreatureActivity::Rest); return; }

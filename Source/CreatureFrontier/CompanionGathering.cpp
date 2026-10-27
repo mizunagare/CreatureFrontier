@@ -83,10 +83,13 @@ FString ACreatureCharacter::GetGatheringStatus() const
     if(auto* Field=FieldResource.Get())
     {
         const auto* Hero=Tamer?Cast<ACFPlayerCharacter>(Tamer->GetPawn()):nullptr;
+        if(Hero && Hero->Health<=0) return TEXT("FIELD JOB: owner down; paused without settling stock | F cancels");
         if(Activity==ECreatureActivity::Rest) return TEXT("FIELD JOB: resting here; no field healing | feed/treat as needed | F cancels");
+        if(Field->Remaining<=0) return TEXT("FIELD JOB: waiting for stock | ")+Field->GetStatus()+TEXT(" | F cancels");
+        if(GatherRetry>0) return FString::Printf(TEXT("FIELD JOB: route timeout; retry in %.1fs | F cancels"),GatherRetry);
         if(Hero && Field->Definition && Hero->Inventory->Count(Field->Definition->OutputItem)>=999)
-            return TEXT("FIELD JOB: inventory full; ready work retained | F cancels");
-        return TEXT("FIELD JOB: ")+Field->GetStatus()+TEXT(" | F cancels; exhausted stock waits");
+            return TEXT("FIELD JOB: inventory full; stock and work retained | F cancels");
+        return (bGatheringActive?FString(TEXT("FIELD JOB: gathering | ")):FString(TEXT("FIELD JOB: travelling / blocked; 8s attempt | ")))+Field->GetStatus()+TEXT(" | F cancels");
     }
     if(Activity!=ECreatureActivity::Work || !WorkSite || WorkSite->RequiredSpecialty==EWorkSpecialty::Farming ||
         WorkSite->RequiredSpecialty==EWorkSpecialty::Transport || WorkSite->RequiredSpecialty==EWorkSpecialty::Feeding) return FString();

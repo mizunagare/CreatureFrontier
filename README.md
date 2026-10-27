@@ -2,8 +2,10 @@
 
 原创第一人称生物捕捉 RPG 原型。玩法重点是捕捉伙伴，并与伙伴共同生活、工作和战斗。
 
-本轮修复已复现的伙伴绕行/停靠停滞，加入局部前视、真实路径段避让与经过导航验证的短绕行。
-已执行默认不限帧十次、48 项排列/帧率矩阵、原 40 进程回归和四次图形检查；存档仍为 20。
+本轮补清楚野外工作前往/超时重试/采集/等待/暂停状态，目标丢失先停止旧导航再退出任务。
+受阻读档、开门后真实到达才结算、工作/休息中的目标销毁已按固定场景验证；最终 41 类/43 进程回归与两张图形检查通过，存档仍为 20。详细规则见 [野外工作令](Docs/FIELD_WORK.md)。
+首轮巡游专项曾偶发失败，复测通过但根因未定位，仍列为后续排查项。
+上轮跟随修正执行了默认不限帧十次、48 项排列/帧率矩阵、40 进程回归和四次图形检查。
 诊断入口、失败候选与验收边界见 [跟随说明](Docs/FOLLOWING.md)，不代表任意规模或复杂布局已稳定。
 
 ## 水晶探索回路（格式 19）
@@ -39,9 +41,9 @@
 
 ## Windows 独立原型
 
-当前最新本机版本：`D:\myGame\Builds\Windows-FollowLookahead\CreatureFrontier.exe`。
+当前最新本机版本：`D:\myGame\Builds\Windows-FieldRecovery-Final\CreatureFrontier.exe`。
 双击即可进入测试地图，不需要先打开 Unreal Editor。复制到其他机器时需复制整个
-`Builds\Windows-FollowLookahead` 文件夹，不能只复制根目录的启动 EXE。
+`Builds\Windows-FieldRecovery-Final` 文件夹，不能只复制根目录的启动 EXE。
 这是 Development 灰盒原型，尚未完成正式美术、内容与性能优化。
 
 战斗更新预览另外输出到 `D:\myGame\Builds\Windows-Combat\CreatureFrontier.exe`，
@@ -73,13 +75,14 @@
 水晶探索更新输出到 `D:\myGame\Builds\Windows-Expedition\CreatureFrontier.exe`。
 野外工作令更新输出到 `D:\myGame\Builds\Windows-FieldWork-Final\CreatureFrontier.exe`。
 跟随路径恢复更新输出到 `D:\myGame\Builds\Windows-FollowLookahead\CreatureFrontier.exe`。
+野外受阻恢复更新输出到 `D:\myGame\Builds\Windows-FieldRecovery-Final\CreatureFrontier.exe`。
 菜单为键盘操作；帮助、队伍和图鉴面板不会暂停，只有 Esc 菜单暂停世界。
 使用 `-CFSessionTest -CFSessionPreview -RenderOffscreen` 可运行菜单测试并在当前程序的
 `Saved/SessionPreview/` 生成暂停、帮助、常驻 HUD 三张检查图；请勿同时使用 `-nullrhi`。
 旧存档版本 1–19 可以读取，新版存档版本为 20（保留研究、物品、灯及节点预算，增加野外资源目标与恢复意图）。
 新版保存后的存档不能交给旧版程序读取；请保留旧存档备份。
 测试脚本默认选择 `Builds` 下最新编译的 Development 程序，也可明确指定：
-`.\Scripts\Test-Packaged.ps1 -BuildRoot D:\myGame\Builds\Windows-FollowLookahead`。
+`.\Scripts\Test-Packaged.ps1 -BuildRoot D:\myGame\Builds\Windows-FieldRecovery-Final`。
 每个测试限时 60 秒，超时只结束该脚本启动的测试进程。
 每次回归使用 `Saved/PackagedTests/<时间戳-随机标识>/` 下的新日志，避免读取上次运行的成功标记。
 
@@ -364,7 +367,7 @@ HUD 显示玩家生命、资源、伙伴数量、工作数量和准星目标的�
 `-CFLogisticsTest` 验证真实寻路取货/卸货/进食、满食槽不取货、部分卸货、途中反复读档守恒、
 改派保留、背包容量与倒地回收、携带食物应急进食、自动休息复工、非法库存/携带量拒绝和旧档迁移，
 使用 `FrontierLogisticsAutomation` 等独立测试槽。
-当前原打包回归为 38 类检查、40 个独立进程（跟随重复三次），包含伙伴分工、图鉴、目标、重生、装备、近战、物流、菜单、背包、动作、互动、跟随、资源、房屋、野外工作与水晶探索。另有独立跟随排列/帧率矩阵，不作为自动 CI。
+当前打包回归为 41 类检查、43 个独立进程（跟随重复三次），包含伙伴分工、图鉴、目标、重生、装备、近战、物流、菜单、背包、动作、互动、跟随、资源、房屋、野外工作/受阻恢复与水晶探索。另有独立跟随排列/帧率矩阵，不作为自动 CI。
 `-CFBackpackTest` 使用独立的 `FrontierBackpackAutomation` 测试槽，验证五配方实际消耗、重复装备、缺料/满格/距离/倒地拒绝、面板互斥和存档恢复。
 追加 `-CFBackpackPreview -RenderOffscreen`（不加 nullrhi）可在当前程序的 `Saved/BackpackPreview/backpack.png` 生成检查图。
 
