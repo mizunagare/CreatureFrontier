@@ -4,9 +4,9 @@
 
 ## Windows 独立原型
 
-当前最新本机版本：`D:\myGame\Builds\Windows-Backpack\CreatureFrontier.exe`。
+当前最新本机版本：`D:\myGame\Builds\Windows-Animation\CreatureFrontier.exe`。
 双击即可进入测试地图，不需要先打开 Unreal Editor。复制到其他机器时需复制整个
-`Builds\Windows-Backpack` 文件夹，不能只复制根目录的启动 EXE。
+`Builds\Windows-Animation` 文件夹，不能只复制根目录的启动 EXE。
 这是 Development 灰盒原型，尚未完成正式美术、内容与性能优化。
 
 战斗更新预览另外输出到 `D:\myGame\Builds\Windows-Combat\CreatureFrontier.exe`，
@@ -29,6 +29,7 @@
 食物运输更新输出到 `D:\myGame\Builds\Windows-Logistics\CreatureFrontier.exe`。
 暂停菜单与精简 HUD 更新输出到 `D:\myGame\Builds\Windows-Session\CreatureFrontier.exe`。
 背包与制作面板更新输出到 `D:\myGame\Builds\Windows-Backpack\CreatureFrontier.exe`。
+宠物程序化动作更新输出到 `D:\myGame\Builds\Windows-Animation\CreatureFrontier.exe`。
 菜单为键盘操作；帮助、队伍和图鉴面板不会暂停，只有 Esc 菜单暂停世界。
 使用 `-CFSessionTest -CFSessionPreview -RenderOffscreen` 可运行菜单测试并在当前程序的
 `Saved/SessionPreview/` 生成暂停、帮助、常驻 HUD 三张检查图；请勿同时使用 `-nullrhi`。
@@ -319,9 +320,22 @@ HUD 显示玩家生命、资源、伙伴数量、工作数量和准星目标的�
 `-CFLogisticsTest` 验证真实寻路取货/卸货/进食、满食槽不取货、部分卸货、途中反复读档守恒、
 改派保留、背包容量与倒地回收、携带食物应急进食、自动休息复工、非法库存/携带量拒绝和旧档迁移，
 使用 `FrontierLogisticsAutomation` 等独立测试槽。
-当前打包回归共 24 项，包含伙伴分工、图鉴、新手目标、基地重生、装备、近战、食物物流、暂停菜单与背包制作测试。
+当前打包回归共 25 项，包含伙伴分工、图鉴、新手目标、基地重生、装备、近战、食物物流、暂停菜单、背包制作与宠物动作测试。
 `-CFBackpackTest` 使用独立的 `FrontierBackpackAutomation` 测试槽，验证五配方实际消耗、重复装备、缺料/满格/距离/倒地拒绝、面板互斥和存档恢复。
 追加 `-CFBackpackPreview -RenderOffscreen`（不加 nullrhi）可在当前程序的 `Saved/BackpackPreview/backpack.png` 生成检查图。
+
+### 宠物动作（程序化灰盒）
+
+三种原创几何宠物加入四足交替步态、呼吸/眨眼、耳叶/尾部轻摆、休息蜷伏闭眼、近设施工作动作、技能蓄力、短促扑击与受击反馈。
+石系步频较慢，身体的动作只作用于可见模型；碰撞胶囊、导航、攻击距离、伤害时机与库存生产规则不变。
+扑击朝实际目标方向偏移；死亡优先显示倒地姿态，复活或任务切换后按当前活动恢复相应姿态，不累计部件变换。
+首领地面预警圈和技能圈挂在根节点，不跟随身体倾斜；携带食物包仍跟随身体。
+动作相位、眨眼和短时受击/扑击不写入存档，版本仍为 15。当前不是骨骼动画、完整动作状态机或动画驱动命中系统。
+`-CFAnimationTest` 使用 `FrontierAnimationAutomation` 独立测试槽，检查三物种姿态、真实 AI 攻击触发、反复更新无漂移、碰撞/导航/预警圈隔离及读档重建。
+追加 `-CFAnimationPreview -RenderOffscreen`（不加 nullrhi）可在当前程序的 `Saved/AnimationPreview/poses.png` 生成姿态检查图。
+
+### 其他回归与离屏检查
+
 同时添加 `-CFRosterPreview -RenderOffscreen -windowed -ResX=1280 -ResY=720 -norhithread -forcerhibypass "-ExecCmds=t.MaxFPS 60"`（不要使用 `-nullrhi`），
 可生成 11 只伙伴的两页界面截图 `Saved/RosterPreview/team.png` 和 `team_page2.png` 后退出，不写入玩家存档。
 已知显示问题：当前机器 D3D12 离屏截图存在间歇性缺字，上述兼容参数可改善但尚未完全消除。

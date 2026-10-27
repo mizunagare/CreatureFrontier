@@ -12,6 +12,7 @@ bool ACreatureCharacter::TickAlphaAttack(float DeltaSeconds, APawn* Target)
         AlphaWindup = FMath::Max(0.0f, AlphaWindup - DeltaSeconds);
         if (AlphaWindup <= 0)
         {
+            BeginStrikePose();
             for (TActorIterator<APawn> It(GetWorld()); It; ++It)
             {
                 auto* Pet = Cast<ACreatureCharacter>(*It);

@@ -111,6 +111,7 @@ void ACreatureCharacter::ResolveSpecial()
     const float Damage = GetAttackDamage() * (Definition ? Definition->SpecialDamageScale : 2.0f);
     UGameplayStatics::ApplyDamage(Target, Damage, Tamer, this, UDamageType::StaticClass());
     SkillPulseRemaining = 0.3f;
+    BeginStrikePose(Target);
     const ECreatureForm Form = Definition ? Definition->Form : ECreatureForm::Leaf;
     if (Form == ECreatureForm::Leaf) Target->SlowRemaining = FMath::Max(Target->SlowRemaining, 4.0f);
     if (Form == ECreatureForm::Stone) GuardRemaining = 5.0f;

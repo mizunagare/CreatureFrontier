@@ -18,6 +18,7 @@
 #include "LogisticsScenario.h"
 #include "SessionScenario.h"
 #include "BackpackScenario.h"
+#include "AnimationScenario.h"
 #include "CaptureComponent.h"
 #include "CreatureCharacter.h"
 #include "CreatureDefinition.h"
@@ -67,6 +68,12 @@ void ACFGameMode::BeginPlay()
     const bool bRespawnTest = FParse::Param(FCommandLine::Get(), TEXT("CFRespawnTest"));
     const bool bEquipmentTest = FParse::Param(FCommandLine::Get(), TEXT("CFEquipmentTest"));
     const bool bMeleeTest = FParse::Param(FCommandLine::Get(), TEXT("CFMeleeTest"));
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFAnimationTest")))
+    {
+        FTimerHandle AnimationStart;
+        GetWorldTimerManager().SetTimer(AnimationStart,[this]() { if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0))) RunAnimationScenario(GetWorld(),Hero); },1.f,false);
+        return;
+    }
     if(FParse::Param(FCommandLine::Get(),TEXT("CFBackpackTest")))
     {
         FTimerHandle BackpackStart;

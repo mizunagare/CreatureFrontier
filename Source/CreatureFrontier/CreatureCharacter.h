@@ -24,6 +24,8 @@ public:
     float GetWorkEfficiency(const AWorkStation* Site) const;
 
     virtual void Tick(float DeltaSeconds) override;
+    void UpdateCreaturePresentation(float DeltaSeconds);
+    FName GetVisualState() const { return VisualState; }
     UPROPERTY()
     TObjectPtr<AWorkStation> WorkSite;
 
@@ -121,6 +123,11 @@ protected:
     void OnRep_Activity();
 
 private:
+    FName VisualState=TEXT("Idle");
+    float PoseTime=0, RestPoseBlend=0, StrikePoseRemaining=0, HitPoseRemaining=0;
+    FVector StrikeDirectionLocal=FVector::ForwardVector;
+    void BeginStrikePose(const AActor* Target=nullptr);
+    TArray<FTransform> NeutralFeet, NeutralAccents, NeutralEyes, NeutralPupils;
     bool TickHauling(float DeltaSeconds);
     TWeakObjectPtr<AWorkStation> HaulTarget;
     TWeakObjectPtr<AWorkStation> HaulPost;

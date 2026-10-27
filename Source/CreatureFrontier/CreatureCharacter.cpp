@@ -37,6 +37,7 @@ ACreatureCharacter::ACreatureCharacter()
     CreatureVisual->SetRelativeLocation(FVector(0, 0, -28));
     CreatureVisual->SetRelativeScale3D(FVector(0.9f, 0.72f, 0.95f));
     CreatureVisual->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    CreatureVisual->SetCanEverAffectNavigation(false);
 
     static ConstructorHelpers::FObjectFinder<UStaticMesh> SphereMesh(
         TEXT("/Engine/BasicShapes/Sphere.Sphere"));
@@ -84,6 +85,13 @@ ACreatureCharacter::ACreatureCharacter()
     AlphaWarning = Part(TEXT("AlphaWarning"), CylinderMesh.Object, FVector(0,0,-84), FVector(7.6,7.6,.02));
     AlphaWarning->SetVisibility(false);
     AlphaWarning->SetHiddenInGame(true);
+    // Ground telegraphs must not follow breathing, crouching or strike poses.
+    SkillIndicator->SetupAttachment(GetRootComponent());
+    AlphaWarning->SetupAttachment(GetRootComponent());
+    for(const auto& Piece:Feet) NeutralFeet.Add(Piece->GetRelativeTransform());
+    for(const auto& Piece:AccentParts) NeutralAccents.Add(Piece->GetRelativeTransform());
+    for(const auto& Piece:EyeParts) NeutralEyes.Add(Piece->GetRelativeTransform());
+    for(const auto& Piece:Pupils) NeutralPupils.Add(Piece->GetRelativeTransform());
 }
 
 void ACreatureCharacter::OnConstruction(const FTransform& Transform)
@@ -180,10 +188,7 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
     if (VisualPivot)
     {
         CargoPack->SetVisibility(CarriedFood>0); CargoPack->SetHiddenInGame(CarriedFood<=0);
-        const float Speed = GetVelocity().Size2D();
-        const float Bob = Health > 0 ? FMath::Sin(GetWorld()->GetTimeSeconds()*(Speed > 10 ? 10.0f : 2.2f))*(Speed > 10 ? 3.0f : 0.8f) : 0;
-        VisualPivot->SetRelativeLocation(FVector(0,0,Bob));
-        VisualPivot->SetRelativeRotation(FRotator(0,0,Health <= 0 ? 65.0f : 0));
+        UpdateCreaturePresentation(DeltaSeconds);
         const bool bEffect = Health > 0 && (SpecialWindupRemaining > 0 || SkillPulseRemaining > 0 || GuardRemaining > 0);
         SkillIndicator->SetVisibility(bEffect);
         SkillIndicator->SetHiddenInGame(!bEffect);
@@ -295,6 +300,7 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
             {
                 if (Stamina < 3.0f) { WorkSite = nullptr; SetActivity(ECreatureActivity::Rest); return; }
                 Stamina -= 3.0f;
+                BeginStrikePose(Enemy);
                 UGameplayStatics::ApplyDamage(Enemy, GetAttackDamage(), Tamer, this, UDamageType::StaticClass());
                 AttackCooldown = AttackInterval;
             }
@@ -336,6 +342,7 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
             StopNavigation();
             if (AttackCooldown <= 0.0f)
             {
+                BeginStrikePose(Target);
                 UGameplayStatics::ApplyDamage(Target, GetAttackDamage(), GetController(), this, UDamageType::StaticClass());
                 AttackCooldown = AttackInterval;
             }
@@ -381,6 +388,7 @@ float ACreatureCharacter::TakeDamage(float DamageAmount, FDamageEvent const& Dam
     if (HasAuthority() && Applied > 0)
     {
         Health = FMath::Max(0.0f, Health - Applied);
+        HitPoseRemaining=.2f;
         if (Disposition != ECreatureDisposition::Tamed && Health > 0)
         {
             APawn* Aggressor = Cast<APawn>(DamageCauser);
