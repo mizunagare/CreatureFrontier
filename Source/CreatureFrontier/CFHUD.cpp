@@ -2,6 +2,7 @@
 #include "CFPlayerCharacter.h"
 #include "CreatureCharacter.h"
 #include "CreatureDefinition.h"
+#include "CreatureAffinity.h"
 #include "PlayerEquipmentComponent.h"
 #include "CaptureComponent.h"
 #include "InventoryComponent.h"
@@ -79,6 +80,7 @@ void ACFHUD::DrawHUD()
         }
         if (Creature->SlowRemaining > 0 || Creature->GuardRemaining > 0)
             DrawText(FString::Printf(TEXT("SLOW %.1fs  GUARD %.1fs"), Creature->SlowRemaining, Creature->GuardRemaining), FLinearColor::Yellow, X-130, Y+92);
+        DrawText(Creature->Disposition==ECreatureDisposition::Tamed?CreatureAffinity::Describe(Creature->Definition):Player->GetGroupMatchupText(Creature),FLinearColor(.7f,.9f,1),X-130,Y+140);
     }
     if(Player->IsHelpVisible()) DrawControlHelp(Player);
     if(Player->IsBackpackOpen()) DrawBackpack(Player);
@@ -109,6 +111,7 @@ void ACFHUD::DrawHUD()
                     DrawText(FString::Printf(TEXT("Range %.1fm | cooldown %.0fs | cost 20 stamina"),Definition->SpecialRange/100,Definition->SpecialCooldownSeconds),FLinearColor::White,Left+14,244);
                 }
                 else DrawText(TEXT("Capture to unlock base stats, work and skill notes"),FLinearColor::White,Left+14,166);
+                DrawText(CreatureAffinity::Describe(Definition),FLinearColor(.7f,.9f,1),Left+14,270);
                 TArray<FString> Words; Definition->Description.ToString().ParseIntoArrayWS(Words);
                 FString Line; float DescY=290;
                 for (const auto& Word:Words)

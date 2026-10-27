@@ -4,9 +4,9 @@
 
 ## Windows 独立原型
 
-当前最新本机版本：`D:\myGame\Builds\Windows-Animation\CreatureFrontier.exe`。
+当前最新本机版本：`D:\myGame\Builds\Windows-Affinity\CreatureFrontier.exe`。
 双击即可进入测试地图，不需要先打开 Unreal Editor。复制到其他机器时需复制整个
-`Builds\Windows-Animation` 文件夹，不能只复制根目录的启动 EXE。
+`Builds\Windows-Affinity` 文件夹，不能只复制根目录的启动 EXE。
 这是 Development 灰盒原型，尚未完成正式美术、内容与性能优化。
 
 战斗更新预览另外输出到 `D:\myGame\Builds\Windows-Combat\CreatureFrontier.exe`，
@@ -30,6 +30,7 @@
 暂停菜单与精简 HUD 更新输出到 `D:\myGame\Builds\Windows-Session\CreatureFrontier.exe`。
 背包与制作面板更新输出到 `D:\myGame\Builds\Windows-Backpack\CreatureFrontier.exe`。
 宠物程序化动作更新输出到 `D:\myGame\Builds\Windows-Animation\CreatureFrontier.exe`。
+族系克制更新输出到 `D:\myGame\Builds\Windows-Affinity\CreatureFrontier.exe`。
 菜单为键盘操作；帮助、队伍和图鉴面板不会暂停，只有 Esc 菜单暂停世界。
 使用 `-CFSessionTest -CFSessionPreview -RenderOffscreen` 可运行菜单测试并在当前程序的
 `Saved/SessionPreview/` 生成暂停、帮助、常驻 HUD 三张检查图；请勿同时使用 `-nullrhi`。
@@ -320,9 +321,28 @@ HUD 显示玩家生命、资源、伙伴数量、工作数量和准星目标的�
 `-CFLogisticsTest` 验证真实寻路取货/卸货/进食、满食槽不取货、部分卸货、途中反复读档守恒、
 改派保留、背包容量与倒地回收、携带食物应急进食、自动休息复工、非法库存/携带量拒绝和旧档迁移，
 使用 `FrontierLogisticsAutomation` 等独立测试槽。
-当前打包回归共 25 项，包含伙伴分工、图鉴、新手目标、基地重生、装备、近战、食物物流、暂停菜单、背包制作与宠物动作测试。
+当前打包回归共 26 项，包含伙伴分工、图鉴、新手目标、基地重生、装备、近战、食物物流、暂停菜单、背包制作、宠物动作与族系战斗测试。
 `-CFBackpackTest` 使用独立的 `FrontierBackpackAutomation` 测试槽，验证五配方实际消耗、重复装备、缺料/满格/距离/倒地拒绝、面板互斥和存档恢复。
 追加 `-CFBackpackPreview -RenderOffscreen`（不加 nullrhi）可在当前程序的 `Saved/BackpackPreview/backpack.png` 生成检查图。
+
+### 族系战斗
+
+三种原创族系采用叶克石、石克焰、焰克叶的循环；下表为攻击方对防守方的伤害倍率。
+
+| 攻击方 / 防守方 | Leaf 叶 | Ember 焰 | Stone 石 |
+| --- | --- | --- | --- |
+| Leaf 叶 | 1 | 0.75 | 1.5 |
+| Ember 焰 | 1.5 | 1 | 0.75 |
+| Stone 石 | 0.75 | 1.5 | 1 |
+
+生物普攻、主动技能、溅射和首领地震共用受伤入口；范围内每个目标按自身族系分别结算，之后再乘石系护盾的 0.5 减伤。
+玩家徒手/长矛、环境和没有族系定义的生物伤害保持正常；玩家承受的伤害不额外乘族系倍率。
+没有属性免疫，领地返程保护、视线/范围检查、友军排除、技能体力与冷却规则保持不变，克制不直接改变捕捉概率或工作效率。
+瞄准野生生物可见当前指令组的优势/受抗/正常人数；只统计存活且属于当前指令组的伙伴，不表示它们能立刻参战或技能就绪（远处、工作、休息伙伴也会计入）。
+L 单选与 K 全队会改变该提示；瞄准伙伴或查看已发现物种的图鉴，可读其族系关系。战斗反馈显示实际伤害及 STRONG / RESISTED / NORMAL 倍率。
+此为平衡规则更新，存档仍为 15；旧快照生命与进度不重算，之后的战斗采用新规则。
+`-CFAffinityTest` 使用独立 `FrontierAffinityAutomation` 槽，验证九组合、护盾、普通伤害、返程/倒地保护、真实普攻/技能/溅射/首领伤害、指令组提示与读档后克制。
+追加 `-CFAffinityPreview -RenderOffscreen`（不加 nullrhi）可生成 `Saved/AffinityPreview/matchup.png` 和 `journal.png`。
 
 ### 宠物动作（程序化灰盒）
 

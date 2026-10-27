@@ -58,6 +58,7 @@ public:
     void ClearCompanionSelection();
     bool IsCommandTarget(const ACreatureCharacter* Pet) const;
     FString GetCommandScopeText() const;
+    FString GetGroupMatchupText(const ACreatureCharacter* Target) const;
     void ObserveAimedCreature();
     bool ObserveCreature(ACreatureCharacter* Creature);
     bool HasJournalEntry(const UCreatureDefinition* Definition,bool bRequireCaptured=false) const;

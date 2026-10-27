@@ -1,5 +1,6 @@
 #include "CreatureCharacter.h"
 #include "CreatureDefinition.h"
+#include "CreatureAffinity.h"
 #include "AIController.h"
 #include "NavigationSystem.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -384,11 +385,19 @@ float ACreatureCharacter::TakeDamage(float DamageAmount, FDamageEvent const& Dam
     AController* EventInstigator, AActor* DamageCauser)
 {
     if (Activity == ECreatureActivity::ReturnHome && Disposition != ECreatureDisposition::Tamed) return 0;
-    const float Applied = FMath::Min(Health, FMath::Max(0.0f, DamageAmount) * (GuardRemaining > 0 ? 0.5f : 1.0f));
+    const auto* Attacker=Cast<ACreatureCharacter>(DamageCauser);
+    const float Affinity=CreatureAffinity::Multiplier(Attacker?Attacker->Definition.Get():nullptr,Definition);
+    const float Applied = FMath::Min(Health, FMath::Max(0.0f, DamageAmount) * Affinity * (GuardRemaining > 0 ? 0.5f : 1.0f));
     if (HasAuthority() && Applied > 0)
     {
         Health = FMath::Max(0.0f, Health - Applied);
         HitPoseRemaining=.2f;
+        if(Attacker)
+        {
+            auto* Observer=Attacker->Tamer?Cast<ACFPlayerCharacter>(Attacker->Tamer->GetPawn()):Tamer?Cast<ACFPlayerCharacter>(Tamer->GetPawn()):nullptr;
+            if(Observer && Observer->Health>0)
+                Observer->Feedback=FString::Printf(TEXT("%s -> %s: %.1f damage | %s x%.2f"),*Attacker->GetCreatureName(),*GetCreatureName(),Applied,Affinity>1?TEXT("STRONG"):Affinity<1?TEXT("RESISTED"):TEXT("NORMAL"),Affinity);
+        }
         if (Disposition != ECreatureDisposition::Tamed && Health > 0)
         {
             APawn* Aggressor = Cast<APawn>(DamageCauser);
