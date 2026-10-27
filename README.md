@@ -12,7 +12,8 @@
 战斗更新预览另外输出到 `D:\myGame\Builds\Windows-Combat\CreatureFrontier.exe`，
 以便保留正在运行的旧版。这个目录有独立存档；需要迁移旧进度时，先退出两个程序，
 再复制旧目录 `CreatureFrontier/Saved/SaveGames` 到新目录的相同位置。
-旧存档版本 1–3 可以读取，新版存档版本为 4。
+野外遭遇更新输出到 `D:\myGame\Builds\Windows-Encounters\CreatureFrontier.exe`。
+旧存档版本 1–4 可以读取，新版存档版本为 5（包含栖息地刷新状态）。
 测试脚本默认选择 `Builds` 下最新编译的 Development 程序，也可明确指定：
 `.\Scripts\Test-Packaged.ps1 -BuildRoot D:\myGame\Builds\Windows-Combat`。
 每个测试限时 60 秒，超时只结束该脚本启动的测试进程。
@@ -135,6 +136,23 @@ HUD 显示玩家生命、资源、伙伴数量、工作数量和准星目标的�
 使用 `FrontierSpeciesAutomation` 测试槽。
 `-CFCombatTest` 验证集火、三种技能、消耗/冷却、遮挡、溅射防友伤、反击和冷却读档，
 使用 `FrontierCombatAutomation` 测试槽。
+`-CFEncounterTest` 验证等级刷新、捕捉保留、近距离防刷新、击败重生、倒计时读档与人口去重，
+使用 `FrontierEncounterAutomation` 测试槽。
+
+## 可重复野外遭遇
+
+现有灰盒地图增加两个可重复栖息地，底部 HUD 在附近显示居民生命与刷新倒计时：
+
+- Meadow Grove：地图左前方 `(-1500,1400)`，Lv2 Mosskip，捕捉或击败后 60 秒补充。
+- Crystal Rise：地图右前方 `(1500,1400)`，Lv5 Craglet 精英，240 生命、26 攻击，180 秒补充。
+
+这是首领遭遇的基础精英版本，暂未加入专属首领技能、正式生态地形和战利品表。
+玩家距离刷新点不足 10 米，或其他活体进入 2 米出生空间时，刷新暂缓。
+每个点只维护一只野生居民；捕捉所得伙伴不会被刷新清除，死亡居民会在补充时清理。
+F5/F9 保存与恢复居民关联和剩余刷新时间；退出游戏期间倒计时不推进。
+旧存档没有刷新记录时，新栖息地从可生成状态开始。生成点固定，
+初版三只野生生物仍保持原样，暂不纳入刷新人口。
+可用 `Content/Python/create_wild_encounters.py` 幂等添加或更新这两个点。
 
 玩法冒烟测试（运行约 6 秒后自动退出，日志中应出现 `CF_SMOKE PASS`）：
 

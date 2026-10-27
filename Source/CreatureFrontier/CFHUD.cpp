@@ -3,6 +3,7 @@
 #include "CreatureCharacter.h"
 #include "CaptureComponent.h"
 #include "InventoryComponent.h"
+#include "WildEncounter.h"
 #include "Engine/Canvas.h"
 #include "EngineUtils.h"
 
@@ -27,6 +28,13 @@ void ACFHUD::DrawHUD()
     DrawText(TEXT("T rest at base | P treat aimed companion | Esc exit"), FLinearColor::White, 32, 190);
     DrawText(TEXT("Q focus aimed enemy | G companion special (20 stamina)"), FLinearColor::White, 32, 216);
     DrawText(Player->Feedback, FLinearColor::Yellow, 32, 252);
+    float RegionY = Canvas->ClipY - 90;
+    for (TActorIterator<AWildEncounter> It(GetWorld()); It; ++It)
+        if (Player->GetDistanceTo(*It) < 1800)
+        {
+            DrawText(It->GetStatus(), It->bBoss ? FLinearColor(1,0.5f,0.2f) : FLinearColor::Green, 32, RegionY);
+            RegionY += 22;
+        }
     if (auto* Creature = Player->TraceCreature())
     {
         DrawText(FString::Printf(TEXT("%s (%s)  Lv%d  HP %.0f/%.0f  Capture %.0f%%"),

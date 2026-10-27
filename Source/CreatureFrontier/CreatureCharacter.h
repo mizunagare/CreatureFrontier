@@ -32,6 +32,8 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Creature")
     TObjectPtr<UCreatureDefinition> Definition;
 
+    UPROPERTY(BlueprintReadOnly, Category="Encounter") FName EncounterId;
+
     UPROPERTY(ReplicatedUsing=OnRep_Health, BlueprintReadOnly, Category="Creature")
     float Health = 100.0f;
     UPROPERTY(Replicated, BlueprintReadOnly, Category="Progression")

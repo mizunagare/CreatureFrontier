@@ -10,6 +10,7 @@
 #include "FrontierSaveGame.h"
 #include "CreatureDefinition.h"
 #include "InventoryComponent.h"
+#include "WildEncounter.h"
 #include "GameFramework/CharacterMovementComponent.h"
 
 void ACFPlayerCharacter::QuickSave() { SaveProgress(); }
@@ -70,12 +71,15 @@ bool ACFPlayerCharacter::SaveProgress(const FString& Slot)
         Record.Experience = It->Experience;
         Record.Stamina = It->Stamina;
         Record.SpecialCooldown = It->SpecialCooldownRemaining;
+        Record.EncounterId = It->EncounterId;
         Record.bOwned = It->Tamer == GetController();
         Record.Disposition = It->Disposition;
         Record.Activity = It->Activity;
         Record.WorkSiteName = IsValid(It->WorkSite) ? It->WorkSite->GetFName() : NAME_None;
         Save->Creatures.Add(Record);
     }
+    for (TActorIterator<AWildEncounter> It(GetWorld()); It; ++It)
+        Save->EncounterTimers.Add(It->EncounterId, It->GetSavedRemaining());
     const bool bSaved = UGameplayStatics::SaveGameToSlot(Save, Slot, 0);
     Feedback = bSaved ? TEXT("Saved - F9 to restore") : TEXT("Save failed");
     return bSaved;
@@ -85,7 +89,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
 {
     if (!HasAuthority() || !GetController()) return false;
     auto* Save = Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot, 0));
-    if (!Save || Save->FormatVersion < 1 || Save->FormatVersion > 4 ||
+    if (!Save || Save->FormatVersion < 1 || Save->FormatVersion > 5 ||
         Save->MapName != UGameplayStatics::GetCurrentLevelName(this, true) ||
         !FMath::IsFinite(Save->Health) || Save->Health < 0 || Save->Health > 100 ||
         Save->Resources < 0 || Save->PlayerTransform.ContainsNaN() || Save->ViewRotation.ContainsNaN())
@@ -102,6 +106,9 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
         Feedback = TEXT("Invalid inventory in save");
         return false;
     }
+    for (const auto& Entry : Save->EncounterTimers)
+        if (Entry.Key.IsNone() || !FMath::IsFinite(Entry.Value) || Entry.Value < 0 || Entry.Value > 600)
+        { Feedback = TEXT("Invalid encounter timer in save"); return false; }
     TArray<ACreatureCharacter*> OldCreatures;
     for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It) OldCreatures.Add(*It);
     TArray<ACreatureCharacter*> Restored;
@@ -131,6 +138,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
             return false;
         }
         Pet->Definition = LoadedDefinition;
+        Pet->EncounterId = Record.EncounterId;
         Pet->Level = Record.Level;
         Pet->FinishSpawning(Record.Transform);
         Pet->Health = FMath::Min(Pet->GetMaxHealth(), Record.Health);
@@ -147,6 +155,8 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
         Restored.Add(Pet);
     }
     for (auto* Pet : OldCreatures) Pet->Destroy();
+    for (TActorIterator<AWildEncounter> It(GetWorld()); It; ++It)
+        It->RestorePopulation(Save->EncounterTimers.FindRef(It->EncounterId));
     SetActorTransform(Save->PlayerTransform, false, nullptr, ETeleportType::TeleportPhysics);
     GetController()->SetControlRotation(Save->ViewRotation);
     GetCharacterMovement()->StopMovementImmediately();

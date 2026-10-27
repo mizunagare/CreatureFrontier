@@ -2,6 +2,7 @@
 #include "CFPlayerCharacter.h"
 #include "CFHUD.h"
 #include "CombatScenario.h"
+#include "EncounterScenario.h"
 #include "CaptureComponent.h"
 #include "CreatureCharacter.h"
 #include "CreatureDefinition.h"
@@ -36,12 +37,14 @@ void ACFGameMode::BeginPlay()
     const bool bCareTest = FParse::Param(FCommandLine::Get(), TEXT("CFCareTest"));
     const bool bSpeciesTest = FParse::Param(FCommandLine::Get(), TEXT("CFSpeciesTest"));
     const bool bCombatTest = FParse::Param(FCommandLine::Get(), TEXT("CFCombatTest"));
-    if (!bSaveWrite && !bSaveRead && !bInventoryTest && !bNavTest && !bCareTest && !bSpeciesTest && !bCombatTest && !FParse::Param(FCommandLine::Get(), TEXT("CFSmokeTest"))) return;
+    const bool bEncounterTest = FParse::Param(FCommandLine::Get(), TEXT("CFEncounterTest"));
+    if (!bSaveWrite && !bSaveRead && !bInventoryTest && !bNavTest && !bCareTest && !bSpeciesTest && !bCombatTest && !bEncounterTest && !FParse::Param(FCommandLine::Get(), TEXT("CFSmokeTest"))) return;
     FTimerHandle TestStart;
-    GetWorldTimerManager().SetTimer(TestStart, [this, bSaveWrite, bSaveRead, bInventoryTest, bNavTest, bCareTest, bSpeciesTest, bCombatTest]()
+    GetWorldTimerManager().SetTimer(TestStart, [this, bSaveWrite, bSaveRead, bInventoryTest, bNavTest, bCareTest, bSpeciesTest, bCombatTest, bEncounterTest]()
     {
         auto* Hero = Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerPawn(this, 0));
         if (!Hero) { FPlatformMisc::RequestExitWithStatus(true, 1); return; }
+        if (bEncounterTest) { RunEncounterScenario(GetWorld(), Hero); return; }
         if (bCombatTest) { RunCompanionCombatScenario(GetWorld(), Hero); return; }
         if (bSpeciesTest)
         {
