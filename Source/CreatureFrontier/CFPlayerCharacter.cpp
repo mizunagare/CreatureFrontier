@@ -7,6 +7,7 @@
 #include "Kismet/KismetSystemLibrary.h"
 #include "EngineUtils.h"
 #include "WorkStation.h"
+#include "BaseBuildingComponent.h"
 #include "FrontierSaveGame.h"
 #include "CreatureDefinition.h"
 #include "InventoryComponent.h"
@@ -16,6 +17,9 @@
 
 void ACFPlayerCharacter::QuickSave() { SaveProgress(); }
 void ACFPlayerCharacter::QuickLoad() { LoadProgress(); }
+void ACFPlayerCharacter::ToggleBuilding() { Building->Toggle(); }
+void ACFPlayerCharacter::CycleBuilding() { Building->Cycle(); }
+void ACFPlayerCharacter::DismantleBuilding() { Building->Dismantle(); }
 
 void ACFPlayerCharacter::QuitGame()
 {
@@ -79,6 +83,7 @@ bool ACFPlayerCharacter::SaveProgress(const FString& Slot)
         Record.Disposition = It->Disposition;
         Record.Activity = It->Activity;
         Record.WorkSiteName = IsValid(It->WorkSite) ? It->WorkSite->GetFName() : NAME_None;
+        Record.WorkSiteId = IsValid(It->WorkSite) && It->WorkSite->bPlayerBuilt ? It->WorkSite->PersistentId : FGuid();
         Save->Creatures.Add(Record);
     }
     for (TActorIterator<AWildEncounter> It(GetWorld()); It; ++It)
@@ -91,6 +96,13 @@ bool ACFPlayerCharacter::SaveProgress(const FString& Slot)
         Record.Medicine = It->Medicine;
         Save->Loot.Add(Record);
     }
+    for (TActorIterator<AWorkStation> It(GetWorld()); It; ++It)
+        if (It->bPlayerBuilt)
+        {
+            FFacilitySaveRecord Record;
+            Record.Transform = It->GetActorTransform(); Record.Id = It->PersistentId; Record.Specialty = It->RequiredSpecialty;
+            Save->Facilities.Add(Record);
+        }
     const bool bSaved = UGameplayStatics::SaveGameToSlot(Save, Slot, 0);
     Feedback = bSaved ? TEXT("Saved - F9 to restore") : TEXT("Save failed");
     return bSaved;
@@ -100,7 +112,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
 {
     if (!HasAuthority() || !GetController()) return false;
     auto* Save = Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot, 0));
-    if (!Save || Save->FormatVersion < 1 || Save->FormatVersion > 6 ||
+    if (!Save || Save->FormatVersion < 1 || Save->FormatVersion > 7 ||
         Save->MapName != UGameplayStatics::GetCurrentLevelName(this, true) ||
         !FMath::IsFinite(Save->Health) || Save->Health < 0 || Save->Health > 100 ||
         Save->Resources < 0 || Save->PlayerTransform.ContainsNaN() || Save->ViewRotation.ContainsNaN())
@@ -123,6 +135,15 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
     for (const auto& Record : Save->Loot)
         if (Record.Transform.ContainsNaN() || Record.Materials < 0 || Record.Materials > 999 || Record.Medicine < 0 || Record.Medicine > 999)
         { Feedback = TEXT("Invalid loot in save"); return false; }
+    TSet<FGuid> FacilityIds;
+    if (Save->Facilities.Num() > 20) { Feedback = TEXT("Invalid facility count in save"); return false; }
+    for (const auto& Record : Save->Facilities)
+    {
+        if (!Record.Id.IsValid() || FacilityIds.Contains(Record.Id) || UBaseBuildingComponent::GetCost(Record.Specialty) <= 0 ||
+            !UBaseBuildingComponent::IsBuildTransformValid(Record.Transform))
+        { Feedback = TEXT("Invalid facility in save"); return false; }
+        FacilityIds.Add(Record.Id);
+    }
     TArray<ACreatureCharacter*> OldCreatures;
     for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It) OldCreatures.Add(*It);
     TArray<ACreatureCharacter*> Restored;
@@ -169,9 +190,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
         Pet->Tamer = Record.bOwned ? GetController() : nullptr;
         Pet->Activity = Record.Activity;
         for (TActorIterator<AWorkStation> It(GetWorld()); It; ++It)
-            if (It->GetFName() == Record.WorkSiteName) { Pet->WorkSite = *It; break; }
-        if (Pet->Activity == ECreatureActivity::Work && !Pet->WorkSite)
-            Pet->Activity = Record.bOwned ? ECreatureActivity::Follow : ECreatureActivity::Idle;
+            if (!Record.WorkSiteId.IsValid() && !It->bPlayerBuilt && It->GetFName() == Record.WorkSiteName) { Pet->WorkSite = *It; break; }
         Restored.Add(Pet);
     }
     TArray<AWorldLoot*> OldLoot, RestoredLoot;
@@ -190,6 +209,34 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
         Drop->Medicine = Record.Medicine;
         RestoredLoot.Add(Drop);
     }
+    TArray<AWorkStation*> OldBuilt, RestoredBuilt;
+    for (TActorIterator<AWorkStation> It(GetWorld()); It; ++It) if (It->bPlayerBuilt) OldBuilt.Add(*It);
+    for (const auto& Record : Save->Facilities)
+    {
+        auto* Site = GetWorld()->SpawnActorDeferred<AWorkStation>(AWorkStation::StaticClass(),Record.Transform,nullptr,nullptr,
+            ESpawnActorCollisionHandlingMethod::AlwaysSpawn,ESpawnActorScaleMethod::OverrideRootScale);
+        if (!Site)
+        {
+            for (auto* Staged : Restored) Staged->Destroy();
+            for (auto* Staged : RestoredLoot) Staged->Destroy();
+            for (auto* Staged : RestoredBuilt) Staged->Destroy();
+            Feedback = TEXT("Could not restore facilities"); return false;
+        }
+        Site->bPlayerBuilt = true; Site->PersistentId = Record.Id; Site->RequiredSpecialty = Record.Specialty;
+        Site->FinishSpawning(Record.Transform);
+        RestoredBuilt.Add(Site);
+    }
+    for (int32 Index=0; Index<Restored.Num(); ++Index)
+    {
+        auto* Pet = Restored[Index];
+        const auto& Record = Save->Creatures[Index];
+        if (Record.WorkSiteId.IsValid())
+            for (auto* Site : RestoredBuilt) if (Site->PersistentId == Record.WorkSiteId) { Pet->WorkSite = Site; break; }
+        if (Pet->Activity == ECreatureActivity::Work && !IsValid(Pet->WorkSite))
+            Pet->Activity = Record.bOwned ? ECreatureActivity::Follow : ECreatureActivity::Idle;
+    }
+    Building->Cancel();
+    for (auto* Site : OldBuilt) Site->Destroy();
     for (auto* Drop : OldLoot) Drop->Destroy();
     for (auto* Pet : OldCreatures) Pet->Destroy();
     for (TActorIterator<AWildEncounter> It(GetWorld()); It; ++It)
@@ -322,6 +369,7 @@ ACFPlayerCharacter::ACFPlayerCharacter()
 
     CaptureComponent = CreateDefaultSubobject<UCaptureComponent>(TEXT("CaptureComponent"));
     Inventory = CreateDefaultSubobject<UInventoryComponent>(TEXT("Inventory"));
+    Building = CreateDefaultSubobject<UBaseBuildingComponent>(TEXT("Building"));
 }
 
 void ACFPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -348,6 +396,9 @@ void ACFPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
     PlayerInputComponent->BindKey(EKeys::One, IE_Pressed, this, &ACFPlayerCharacter::CraftCaptureDevice);
     PlayerInputComponent->BindKey(EKeys::Two, IE_Pressed, this, &ACFPlayerCharacter::CraftMedicine);
     PlayerInputComponent->BindKey(EKeys::H, IE_Pressed, this, &ACFPlayerCharacter::UseMedicine);
+    PlayerInputComponent->BindKey(EKeys::B, IE_Pressed, this, &ACFPlayerCharacter::ToggleBuilding);
+    PlayerInputComponent->BindKey(EKeys::V, IE_Pressed, this, &ACFPlayerCharacter::CycleBuilding);
+    PlayerInputComponent->BindKey(EKeys::X, IE_Pressed, this, &ACFPlayerCharacter::DismantleBuilding);
 }
 
 void ACFPlayerCharacter::MoveForward(float Value)
@@ -382,6 +433,7 @@ ACreatureCharacter* ACFPlayerCharacter::TraceCreature() const
 
 void ACFPlayerCharacter::Attack()
 {
+    if (Building->IsActive()) { Building->Confirm(); return; }
     if (Health <= 0.0f || GetWorld()->GetTimeSeconds() < NextAttackTime) return;
     NextAttackTime = GetWorld()->GetTimeSeconds() + 0.4;
     if (ACreatureCharacter* Creature = TraceCreature())
@@ -394,6 +446,7 @@ void ACFPlayerCharacter::Attack()
 
 void ACFPlayerCharacter::CaptureTarget()
 {
+    if (Building->IsActive()) { Building->Cancel(); return; }
     if (Health <= 0.0f) return;
     if (ACreatureCharacter* Creature = TraceCreature())
     {

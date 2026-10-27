@@ -16,8 +16,10 @@ if ($TimeoutSeconds -lt 10 -or $TimeoutSeconds -gt 60) { throw 'TimeoutSeconds m
 Write-Host "Testing build: $BuildRoot"
 $exePath = Join-Path $BuildRoot 'CreatureFrontier\Binaries\Win64\CreatureFrontier.exe'
 if (-not (Test-Path -LiteralPath $exePath)) { throw "Development game executable not found: $exePath" }
-$testLogRoot = Join-Path $projectRoot 'Saved\PackagedTests'
+$runName = (Get-Date -Format 'yyyyMMdd-HHmmss') + '-' + [Guid]::NewGuid().ToString('N').Substring(0,8)
+$testLogRoot = Join-Path $projectRoot (Join-Path 'Saved\PackagedTests' $runName)
 New-Item -ItemType Directory -Path $testLogRoot -Force | Out-Null
+Write-Host "Fresh test logs: $testLogRoot"
 $cases = @(
     @{Flag='CFSmokeTest'; Marker='CF_SMOKE PASS'},
     @{Flag='CFInventoryTest'; Marker='CF_INVENTORY PASS'},
@@ -26,6 +28,7 @@ $cases = @(
     @{Flag='CFCombatTest'; Marker='CF_COMBAT PASS'},
     @{Flag='CFEncounterTest'; Marker='CF_ENCOUNTER PASS'},
     @{Flag='CFBossTest'; Marker='CF_BOSS PASS'},
+    @{Flag='CFBuildingTest'; Marker='CF_BUILD PASS'},
     @{Flag='CFSaveWrite'; Marker='CF_SAVE_WRITE PASS'},
     @{Flag='CFSaveRead'; Marker='CF_SAVE_READ PASS'},
     @{Flag='CFNavTest'; Marker='CF_NAV_WORK PASS'}

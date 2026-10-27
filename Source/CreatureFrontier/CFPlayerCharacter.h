@@ -8,6 +8,7 @@ class UCameraComponent;
 class UCaptureComponent;
 class ACreatureCharacter;
 class UInventoryComponent;
+class UBaseBuildingComponent;
 
 UCLASS()
 class CREATUREFRONTIER_API ACFPlayerCharacter : public ACharacter
@@ -22,6 +23,10 @@ public:
     float Health = 100.0f;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Inventory")
     TObjectPtr<UInventoryComponent> Inventory;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Building") TObjectPtr<UBaseBuildingComponent> Building;
+    void ToggleBuilding();
+    void CycleBuilding();
+    void DismantleBuilding();
     void CraftCaptureDevice();
     void CraftMedicine();
     void UseMedicine();

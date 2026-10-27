@@ -35,5 +35,5 @@ void AWorkStation::BeginPlay()
 void AWorkStation::RefreshLabel()
 {
     const FString Name = UEnum::GetValueAsString(RequiredSpecialty).Replace(TEXT("EWorkSpecialty::"), TEXT(""));
-    Label->SetText(FText::FromString(Name + TEXT("\nWORK STATION")));
+    Label->SetText(FText::FromString(Name + (bPlayerBuilt ? TEXT("\nBUILT FACILITY") : TEXT("\nWORK STATION"))));
 }

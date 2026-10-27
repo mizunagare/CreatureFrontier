@@ -14,6 +14,8 @@ public:
     virtual void BeginPlay() override;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Work")
     EWorkSpecialty RequiredSpecialty = EWorkSpecialty::Gathering;
+    UPROPERTY(BlueprintReadOnly, Category="Building") bool bPlayerBuilt = false;
+    UPROPERTY(BlueprintReadOnly, Category="Building") FGuid PersistentId;
 private:
     void RefreshLabel();
     UPROPERTY() TObjectPtr<class UTextRenderComponent> Label;
