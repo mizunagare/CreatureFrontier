@@ -96,6 +96,7 @@ bool ACFPlayerCharacter::SaveProgress(const FString& Slot)
         Record.bHasHabitat = It->bHasHabitat; Record.HabitatHome = It->HabitatHome;
         Record.RoamRadius = It->RoamRadius; Record.LeashRadius = It->LeashRadius;
         Record.bOwned = It->Tamer == GetController();
+        Record.CarriedFood=It->CarriedFood;
         Record.Disposition = It->Disposition;
         Record.Activity = It->Activity;
         Record.WorkSiteName = IsValid(It->WorkSite) ? It->WorkSite->GetFName() : NAME_None;
@@ -129,7 +130,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
 {
     if (!HasAuthority() || !GetController()) return false;
     auto* Save = Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot, 0));
-    if (!Save || Save->FormatVersion < 1 || Save->FormatVersion > 14 ||
+    if (!Save || Save->FormatVersion < 1 || Save->FormatVersion > 15 ||
         Save->MapName != UGameplayStatics::GetCurrentLevelName(this, true) ||
         !FMath::IsFinite(Save->Health) || Save->Health < 0 || Save->Health > 100 ||
         Save->Resources < 0 || Save->PlayerTransform.ContainsNaN() || Save->ViewRotation.ContainsNaN())
@@ -181,7 +182,8 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
     {
         if (!Record.Id.IsValid() || FacilityIds.Contains(Record.Id) || UBaseBuildingComponent::GetCost(Record.Specialty) <= 0 ||
             !UBaseBuildingComponent::IsBuildTransformValid(Record.Transform) || Record.StoredFood < 0 || Record.StoredFood > 30 ||
-            (Record.Specialty != EWorkSpecialty::Feeding && Record.StoredFood != 0))
+            (Record.Specialty != EWorkSpecialty::Feeding && Record.Specialty != EWorkSpecialty::Farming && Record.StoredFood != 0) ||
+            (Save->FormatVersion<15 && ((Record.Specialty==EWorkSpecialty::Farming && Record.StoredFood!=0) || Record.Specialty==EWorkSpecialty::Transport)))
         { Feedback = TEXT("Invalid facility in save"); return false; }
         FacilityIds.Add(Record.Id);
     }
@@ -194,6 +196,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
         UClass* CreatureClass = Record.CreatureClass.LoadSynchronous();
         UCreatureDefinition* LoadedDefinition = Record.Definition.LoadSynchronous();
         if (!CreatureClass || CreatureClass->HasAnyClassFlags(CLASS_Abstract) ||
+            (Save->FormatVersion>=15 && (Record.CarriedFood<0 || Record.CarriedFood>3 || (Record.CarriedFood>0 && (!Record.bOwned || Record.Disposition!=ECreatureDisposition::Tamed)))) ||
             (!Record.Definition.IsNull() && !LoadedDefinition) || Record.Transform.ContainsNaN() ||
             !FMath::IsFinite(Record.Health) || Record.Health < 0 ||
             Record.Level < 1 || Record.Level > 20 || Record.Experience < 0 ||
@@ -240,6 +243,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
                 if (It->EncounterId == Record.EncounterId) { Pet->bHasHabitat = true; Pet->HabitatHome = It->GetActorLocation()+FVector(0,0,90); break; }
         Pet->Disposition = Record.Disposition;
         Pet->Tamer = Record.bOwned ? GetController() : nullptr;
+        Pet->CarriedFood=Save->FormatVersion>=15?Record.CarriedFood:0;
         Pet->Activity = Record.Activity;
         for (TActorIterator<AWorkStation> It(GetWorld()); It; ++It)
             if (!Record.WorkSiteId.IsValid() && !It->bPlayerBuilt && It->GetFName() == Record.WorkSiteName) { Pet->WorkSite = *It; break; }
@@ -503,6 +507,7 @@ void ACFPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
     PlayerInputComponent->BindKey(EKeys::Five, IE_Pressed, this, &ACFPlayerCharacter::CraftVest);
     PlayerInputComponent->BindKey(EKeys::Six, IE_Pressed, this, &ACFPlayerCharacter::ToggleSpear);
     PlayerInputComponent->BindKey(EKeys::Seven, IE_Pressed, this, &ACFPlayerCharacter::ToggleVest);
+    PlayerInputComponent->BindKey(EKeys::Z, IE_Pressed, this, &ACFPlayerCharacter::WithdrawAimedCargo);
 }
 
 void ACFPlayerCharacter::MoveForward(float Value)

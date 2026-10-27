@@ -68,12 +68,13 @@ void RunWorkCycleScenario(UWorld* World, ACFPlayerCharacter* Hero)
     World->GetTimerManager().SetTimer(Complete,[World,Hero,Pet,Slot,Hunger,Manual,Downed,Removed,Exhausted,Saved]()
     {
         const bool Cycle = !Pet->bResumeWorkAfterRest && Pet->Activity == ECreatureActivity::Work && Pet->Stamina > 60 &&
-            Pet->Health >= Pet->GetMaxHealth()*.8f && Hero->Inventory->Count(EFrontierItem::Food) > 0;
+            Pet->Health >= Pet->GetMaxHealth()*.8f && Pet->WorkSite && Pet->WorkSite->StoredFood>0;
         auto* Legacy = Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot,0));
         bool Migration = Legacy != nullptr;
         if (Legacy)
         {
             Legacy->FormatVersion = 10; for (auto& Record : Legacy->Creatures) Record.bResumeWorkAfterRest = false;
+            for(auto& Facility:Legacy->Facilities) if(Facility.Specialty==EWorkSpecialty::Farming) Facility.StoredFood=0;
             Migration &= UGameplayStatics::SaveGameToSlot(Legacy,TEXT("FrontierLegacyWorkCycleAutomation"),0) && Hero->LoadProgress(TEXT("FrontierLegacyWorkCycleAutomation"));
             for (TActorIterator<ACreatureCharacter> It(World); It; ++It) if (It->Tamer == Hero->GetController())
             { It->Stamina = 100; It->Health = It->GetMaxHealth(); It->Nutrition = 100; It->Tick(0); Migration &= !It->bResumeWorkAfterRest && It->Activity == ECreatureActivity::Rest; }

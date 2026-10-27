@@ -42,13 +42,25 @@ AWorkStation* ACFPlayerCharacter::TraceFacility() const
 void ACFPlayerCharacter::DepositTroughFood()
 {
     auto* Site = TraceFacility();
-    if (!Site || Site->RequiredSpecialty != EWorkSpecialty::Feeding) Feedback = TEXT("Aim at a feeding trough within 6m");
+    if (!Site || !Site->IsFoodStore()) Feedback = TEXT("Aim at a garden or feeding trough within 6m");
     else Site->TransferFood(this,true);
 }
 
 void ACFPlayerCharacter::WithdrawTroughFood()
 {
     auto* Site = TraceFacility();
-    if (!Site || Site->RequiredSpecialty != EWorkSpecialty::Feeding) Feedback = TEXT("Aim at a feeding trough within 6m");
+    if (!Site || !Site->IsFoodStore()) Feedback = TEXT("Aim at a garden or feeding trough within 6m");
     else Site->TransferFood(this,false);
 }
+
+bool ACFPlayerCharacter::WithdrawCompanionCargo(ACreatureCharacter* Pet)
+{
+    if(!HasAuthority() || Health<=0 || !IsValid(Pet) || Pet->Tamer!=GetController() || Pet->Disposition!=ECreatureDisposition::Tamed || GetDistanceTo(Pet)>600) return false;
+    FHitResult Hit; FCollisionQueryParams Params(SCENE_QUERY_STAT(CargoRecovery),false,this);
+    if(GetWorld()->LineTraceSingleByChannel(Hit,GetPawnViewLocation(),Pet->GetActorLocation(),ECC_Visibility,Params) && Hit.GetActor()!=Pet) return false;
+    const int32 Amount=FMath::Min(Pet->CarriedFood,999-Inventory->Count(EFrontierItem::Food));
+    if(Amount<=0 || !Inventory->AddItem(EFrontierItem::Food,Amount)) return false;
+    Pet->CarriedFood-=Amount; Feedback=FString::Printf(TEXT("Recovered %d carried food from companion"),Amount); return true;
+}
+void ACFPlayerCharacter::WithdrawAimedCargo()
+{ if(!WithdrawCompanionCargo(TraceCreature())) Feedback=TEXT("Aim at your companion within 6m with cargo and inventory space"); }

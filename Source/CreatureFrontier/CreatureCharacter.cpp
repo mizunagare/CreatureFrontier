@@ -71,6 +71,8 @@ ACreatureCharacter::ACreatureCharacter()
     EyeParts.Add(Part(TEXT("EyeRight"), SphereShape, FVector(38,19,-4), FVector(.22,.2,.25)));
     Pupils.Add(Part(TEXT("PupilLeft"), SphereShape, FVector(47,-19,-3), FVector(.09,.11,.15)));
     Pupils.Add(Part(TEXT("PupilRight"), SphereShape, FVector(47,19,-3), FVector(.09,.11,.15)));
+    CargoPack=Part(TEXT("FoodCargo"),CubeMesh.Object,FVector(-10,45,-20),FVector(.3,.25,.3));
+    CargoPack->SetVisibility(false); CargoPack->SetHiddenInGame(true);
     Feet.Add(Part(TEXT("FootFL"), SphereShape, FVector(24,-22,-75), FVector(.32,.25,.2)));
     Feet.Add(Part(TEXT("FootFR"), SphereShape, FVector(24,22,-75), FVector(.32,.25,.2)));
     Feet.Add(Part(TEXT("FootBL"), SphereShape, FVector(-24,-22,-75), FVector(.32,.25,.2)));
@@ -119,6 +121,7 @@ void ACreatureCharacter::RefreshAppearance()
     for (const auto& Piece : Pupils) Piece->SetMaterial(0, Black);
     SkillIndicator->SetMaterial(0, Accent);
     AlphaWarning->SetMaterial(0, MakeColor(FLinearColor(1,.12f,.02f)));
+    CargoPack->SetMaterial(0,MakeColor(FLinearColor(.85f,.4f,.05f)));
 }
 
 FString ACreatureCharacter::GetCreatureName() const
@@ -176,6 +179,7 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
     Super::Tick(DeltaSeconds);
     if (VisualPivot)
     {
+        CargoPack->SetVisibility(CarriedFood>0); CargoPack->SetHiddenInGame(CarriedFood<=0);
         const float Speed = GetVelocity().Size2D();
         const float Bob = Health > 0 ? FMath::Sin(GetWorld()->GetTimeSeconds()*(Speed > 10 ? 10.0f : 2.2f))*(Speed > 10 ? 3.0f : 0.8f) : 0;
         VisualPivot->SetRelativeLocation(FVector(0,0,Bob));
@@ -236,6 +240,7 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
         if (Activity == ECreatureActivity::Work && IsValid(WorkSite))
         {
             if (WorkSite->RequiredSpecialty == EWorkSpecialty::Feeding) { SetActivity(ECreatureActivity::Rest); return; }
+            if(WorkSite->RequiredSpecialty==EWorkSpecialty::Transport) { TickHauling(DeltaSeconds); return; }
             if (ProgressSite.Get() != WorkSite.Get()) { WorkProgress = 0; ProgressSite = WorkSite; }
             const FVector Offset = WorkSite->GetActorLocation() - GetActorLocation();
             if (Offset.Size2D() > 220.0f) { NavigateTo(WorkSite->GetActorLocation(), 35.0f); WorkProgress = 0.0f; }
@@ -256,7 +261,7 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
                 const float Interval = Farm ? 6.0f : 3.0f;
                 if (WorkProgress >= Interval)
                 {
-                    if (OwnerPlayer->Inventory->AddItem(Farm ? EFrontierItem::Food : EFrontierItem::Material, 1))
+                    if (Farm ? WorkSite->AdjustFoodStock(1) : OwnerPlayer->Inventory->AddItem(EFrontierItem::Material,1))
                     { OwnerPlayer->RecordCompanionProduction(this,Farm ? EFrontierItem::Food : EFrontierItem::Material); AddExperience(1); WorkProgress = 0; }
                     else WorkProgress = Interval; // Ready harvest stays pending while inventory is full.
                 }

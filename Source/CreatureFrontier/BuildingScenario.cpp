@@ -29,7 +29,7 @@ void RunBuildingScenario(UWorld* World, ACFPlayerCharacter* Hero)
     Hero->FirstPersonCamera->SetWorldRotation((FVector(0,-700,-50)-Hero->FirstPersonCamera->GetComponentLocation()).Rotation());
     Builder->Toggle();
     const bool Preview = Builder->IsActive();
-    Builder->Cycle(); Builder->Cycle(); Builder->Cycle(); Builder->Cycle(); Builder->Cycle();
+    Builder->Cycle(); Builder->Cycle(); Builder->Cycle(); Builder->Cycle(); Builder->Cycle(); Builder->Cycle();
     Hero->Attack(); // Real LMB route must place rather than fire.
     Hero->CaptureTarget(); // Real RMB route cancels without consuming a capture device.
     AWorkStation* Gather = nullptr;

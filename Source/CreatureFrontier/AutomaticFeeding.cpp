@@ -10,6 +10,11 @@ bool ACreatureCharacter::TickAutoFeeding()
     for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It)
         if (It->Disposition != ECreatureDisposition::Tamed && It->Health > 0 && It->Activity != ECreatureActivity::ReturnHome && GetDistanceTo(*It) < 600)
         { FeedingSite.Reset(); return false; }
+    if(CarriedFood>0)
+    {
+        --CarriedFood; Nutrition=FMath::Min(100.f,Nutrition+35); Stamina=FMath::Min(100.f,Stamina+15);
+        AutoFeedCooldown=3; FeedingSite.Reset(); StopNavigation(); return true;
+    }
     auto* Site = FeedingSite.Get();
     if (Site && (Site->StoredFood <= 0 || GetWorld()->GetTimeSeconds() > FoodSearchExpires))
     { FeedingSite.Reset(); AutoFeedCooldown = 5; return false; }

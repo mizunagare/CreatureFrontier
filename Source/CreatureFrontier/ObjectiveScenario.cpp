@@ -57,9 +57,9 @@ void RunObjectiveScenario(UWorld* World,ACFPlayerCharacter* Hero)
     auto* Garden=Hero->Building->BuildAt(FTransform(FRotator::ZeroRotator,FVector(0,-700,-15),FVector(2,1,.7)));
     if(!Garden) { FPlatformMisc::RequestExitWithStatus(false,1); return; }
     Pet->WorkSite=Garden; Pet->SetActorLocation(Garden->GetActorLocation()+FVector(0,180,55));
-    SetStack(EFrontierItem::Food,999); Pet->Tick(4); Production &= Hero->GetObjectives().FarmFood==0;
-    Hero->Inventory->Consume(EFrontierItem::Food,1); Pet->Tick(0); Production &= Hero->GetObjectives().FarmFood==1;
-    Hero->Inventory->Consume(EFrontierItem::Food,1); Pet->Tick(4); Production &= Hero->GetObjectives().FarmFood==2;
+    SetStack(EFrontierItem::Food,999); Garden->StoredFood=30; Pet->Tick(4); Production &= Hero->GetObjectives().FarmFood==0;
+    Garden->AdjustFoodStock(-1); Pet->Tick(0); Production &= Hero->GetObjectives().FarmFood==1;
+    Garden->AdjustFoodStock(-1); Pet->Tick(4); Production &= Hero->GetObjectives().FarmFood==2;
     Hero->Health=0; Hero->ClaimObjectiveReward(); bool Life=Hero->GetObjectives().Claimed==3 && Hero->Inventory->Count(EFrontierItem::Medicine)==0;
     Hero->Health=100; Hero->ClaimObjectiveReward(); Life &= Hero->GetObjectives().Claimed==4 && Hero->Inventory->Count(EFrontierItem::Medicine)==2;
     auto* Normal=World->SpawnActor<ACreatureCharacter>(FVector(1400,-1400,40),FRotator::ZeroRotator);
@@ -95,6 +95,7 @@ void RunObjectiveScenario(UWorld* World,ACFPlayerCharacter* Hero)
     Invalid->Objectives.Claimed=3; Invalid->Objectives.WorkMaterials=0;
     UGameplayStatics::SaveGameToSlot(Invalid,TEXT("FrontierObjectiveInvalid"),0); Validation &= !Hero->LoadProgress(TEXT("FrontierObjectiveInvalid")) && Hero->GetObjectives().Claimed==5;
     auto* Legacy=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot,0)); Legacy->FormatVersion=12;
+    for(auto& Facility:Legacy->Facilities) if(Facility.Specialty==EWorkSpecialty::Farming) Facility.StoredFood=0;
     UGameplayStatics::SaveGameToSlot(Legacy,TEXT("FrontierObjectiveLegacy"),0);
     bool Migration=Hero->LoadProgress(TEXT("FrontierObjectiveLegacy")) && Hero->GetObjectives().Claimed==0 && Hero->GetObjectives().WorkMaterials==0 && Hero->GetObjectives().FarmFood==0 && !Hero->GetObjectives().bAlphaResolved && Hero->GetObjectiveProgress(0)==1 && Hero->GetObjectiveProgress(1)==1;
     auto* CapturedAlpha=World->SpawnActor<ACreatureCharacter>(FVector(-800,-1000,40),FRotator::ZeroRotator); CapturedAlpha->bAlpha=true;
@@ -102,6 +103,7 @@ void RunObjectiveScenario(UWorld* World,ACFPlayerCharacter* Hero)
     CapturedAlpha->Tame(Hero->GetController()); Hero->CaptureResolved(CapturedAlpha,true); Alpha &= Hero->GetObjectives().bAlphaResolved;
     Hero->SaveProgress(TEXT("FrontierObjectiveOwnedAlpha"));
     auto* OwnedLegacy=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("FrontierObjectiveOwnedAlpha"),0)); OwnedLegacy->FormatVersion=12;
+    for(auto& Facility:OwnedLegacy->Facilities) if(Facility.Specialty==EWorkSpecialty::Farming) Facility.StoredFood=0;
     UGameplayStatics::SaveGameToSlot(OwnedLegacy,TEXT("FrontierObjectiveOwnedAlpha"),0);
     Migration &= Hero->LoadProgress(TEXT("FrontierObjectiveOwnedAlpha")) && Hero->GetObjectives().bAlphaResolved && Hero->GetObjectives().Claimed==0;
     const bool Pass=Sequence && Production && Capacity && Life && Alpha && Snapshot && Validation && Migration;

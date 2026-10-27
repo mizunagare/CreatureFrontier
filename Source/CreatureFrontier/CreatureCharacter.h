@@ -54,6 +54,7 @@ public:
     UPROPERTY(Replicated, BlueprintReadOnly, Category="Care") float AutoFeedCooldown = 0;
     UPROPERTY(Replicated, BlueprintReadOnly, Category="Work") bool bResumeWorkAfterRest = false;
     UPROPERTY(BlueprintReadOnly, Category="Care") TWeakObjectPtr<AWorkStation> FeedingSite;
+    UPROPERTY(BlueprintReadOnly,Category="Transport") int32 CarriedFood=0;
     UPROPERTY(Replicated, BlueprintReadOnly, Category="Combat")
     float SpecialCooldownRemaining = 0.0f;
     UPROPERTY(Replicated, BlueprintReadOnly, Category="Combat")
@@ -120,6 +121,11 @@ protected:
     void OnRep_Activity();
 
 private:
+    bool TickHauling(float DeltaSeconds);
+    TWeakObjectPtr<AWorkStation> HaulTarget;
+    TWeakObjectPtr<AWorkStation> HaulPost;
+    double HaulExpires=0;
+    float HaulRetry=0;
     bool TickAutoFeeding();
     double FoodSearchExpires = 0;
     bool TickHabitatReturn();
@@ -129,6 +135,7 @@ private:
     float RoamPause = 1;
     bool TickAlphaAttack(float DeltaSeconds, APawn* Target);
     UPROPERTY() TObjectPtr<UStaticMeshComponent> AlphaWarning;
+    UPROPERTY() TObjectPtr<UStaticMeshComponent> CargoPack;
     bool HasClearSight(const AActor* Target) const;
     bool TickSpecial(float DeltaSeconds);
     void ResolveSpecial();

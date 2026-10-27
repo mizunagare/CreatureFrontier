@@ -33,7 +33,7 @@ void ACFHUD::DrawHUD()
     DrawText(TEXT("Q focus aimed enemy | G companion special (20 stamina)"), FLinearColor::White, 32, 216);
     DrawText(TEXT("B build mode | V cycle facility | X dismantle (50% refund)"), FLinearColor::White,32,242);
     DrawText(FString::Printf(TEXT("FOOD %d | 3 craft food (2 materials) | J feed aimed companion"),Player->Inventory->Count(EFrontierItem::Food)),FLinearColor::White,32,268);
-    DrawText(TEXT("Trough: aim + U deposit food | O withdraw (up to 5)"),FLinearColor::White,32,294);
+    DrawText(TEXT("Garden/trough: U store | O take | Z recover pet cargo"),FLinearColor::White,32,294);
     DrawText(Player->GetCommandScopeText(),FLinearColor::Green,32,320);
     DrawText(TEXT("Tab team | [ / ] browse | Enter select | I journal"),FLinearColor::White,32,342);
     DrawText(Player->Feedback, FLinearColor::Yellow, 32, 368);
@@ -48,8 +48,8 @@ void ACFHUD::DrawHUD()
     if(Player->Health<=0) DrawText(TEXT("DOWNED | R: base respawn | F9: load save"),FLinearColor::Red,X-150,Y-100);
     else if(Player->GetRespawnProtectionRemaining()>0) DrawText(FString::Printf(TEXT("RESPAWN SHIELD %.1fs | attacks end it"),Player->GetRespawnProtectionRemaining()),FLinearColor::Green,X-150,Y-100);
     if (Player->Building->IsActive()) DrawText(Player->Building->GetHint(), FLinearColor::Yellow,32,440);
-    if (auto* Site = Player->TraceFacility(); Site && Site->RequiredSpecialty == EWorkSpecialty::Feeding)
-        DrawText(FString::Printf(TEXT("TROUGH %d / 30 FOOD | U deposit | O withdraw"),Site->StoredFood),FLinearColor::Yellow,X-130,Y+25);
+    if (auto* Site = Player->TraceFacility(); Site && Site->IsFoodStore())
+        DrawText(FString::Printf(TEXT("FOOD STORE %d / 30 | U deposit | O withdraw"),Site->StoredFood),FLinearColor::Yellow,X-130,Y+25);
     float RegionY = Canvas->ClipY - 90;
     for (TActorIterator<AWildEncounter> It(GetWorld()); It; ++It)
         if (Player->GetDistanceTo(*It) < 1800)
@@ -70,6 +70,8 @@ void ACFHUD::DrawHUD()
             FLinearColor::White, X-130, Y+25);
         if (Creature->Disposition == ECreatureDisposition::Tamed)
         {
+            if(Creature->CarriedFood>0 || (Creature->WorkSite && Creature->WorkSite->RequiredSpecialty==EWorkSpecialty::Transport))
+                DrawText(FString::Printf(TEXT("TRANSPORT cargo %d/3 food | Z recover within 6m"),Creature->CarriedFood),FLinearColor::Yellow,X-130,Y-125);
             if (Creature->bResumeWorkAfterRest)
                 DrawText(TEXT("AUTO REST - resumes at 80 stamina / 20 satiety / 80% HP"),FLinearColor::Yellow,X-130,Y-70);
             if (Creature->FeedingSite.IsValid()) DrawText(TEXT("SEEKING FOOD - assignment will resume"),FLinearColor::Yellow,X-130,Y-50);
@@ -149,6 +151,7 @@ void ACFHUD::DrawHUD()
             else if (Pet->FeedingSite.IsValid()) Status = TEXT("Seeking food");
             else if (Pet->bResumeWorkAfterRest) Status = TEXT("Auto rest / work pending");
             if (Pet->WorkSite) { FString Job=UEnum::GetValueAsString(Pet->WorkSite->RequiredSpecialty); Job.RemoveFromStart(TEXT("EWorkSpecialty::")); Status+=TEXT(" | ")+Job; }
+            if(Pet->CarriedFood>0) Status+=FString::Printf(TEXT(" | cargo %d"),Pet->CarriedFood);
             DrawText(Status,FLinearColor::Green,Left+14,RowY+43);
         }
     }

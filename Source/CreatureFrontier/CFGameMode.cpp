@@ -15,6 +15,7 @@
 #include "RespawnScenario.h"
 #include "EquipmentScenario.h"
 #include "MeleeScenario.h"
+#include "LogisticsScenario.h"
 #include "CaptureComponent.h"
 #include "CreatureCharacter.h"
 #include "CreatureDefinition.h"
@@ -64,12 +65,14 @@ void ACFGameMode::BeginPlay()
     const bool bRespawnTest = FParse::Param(FCommandLine::Get(), TEXT("CFRespawnTest"));
     const bool bEquipmentTest = FParse::Param(FCommandLine::Get(), TEXT("CFEquipmentTest"));
     const bool bMeleeTest = FParse::Param(FCommandLine::Get(), TEXT("CFMeleeTest"));
-    if (!bSaveWrite && !bSaveRead && !bInventoryTest && !bNavTest && !bCareTest && !bSpeciesTest && !bCombatTest && !bEncounterTest && !bBossTest && !bBuildingTest && !bWorldTest && !bWorldPreview && !bFarmingTest && !bFarmPreview && !bFeedingTest && !bWorkCycleTest && !bSquadTest && !bJournalTest && !bObjectiveTest && !bRespawnTest && !bEquipmentTest && !bMeleeTest && !FParse::Param(FCommandLine::Get(), TEXT("CFSmokeTest"))) return;
+    const bool bLogisticsTest = FParse::Param(FCommandLine::Get(), TEXT("CFLogisticsTest"));
+    if (!bSaveWrite && !bSaveRead && !bInventoryTest && !bNavTest && !bCareTest && !bSpeciesTest && !bCombatTest && !bEncounterTest && !bBossTest && !bBuildingTest && !bWorldTest && !bWorldPreview && !bFarmingTest && !bFarmPreview && !bFeedingTest && !bWorkCycleTest && !bSquadTest && !bJournalTest && !bObjectiveTest && !bRespawnTest && !bEquipmentTest && !bMeleeTest && !bLogisticsTest && !FParse::Param(FCommandLine::Get(), TEXT("CFSmokeTest"))) return;
     FTimerHandle TestStart;
-    GetWorldTimerManager().SetTimer(TestStart, [this, bSaveWrite, bSaveRead, bInventoryTest, bNavTest, bCareTest, bSpeciesTest, bCombatTest, bEncounterTest, bBossTest, bBuildingTest, bWorldTest, bWorldPreview, bFarmingTest, bFarmPreview, bFeedingTest, bWorkCycleTest, bSquadTest, bJournalTest, bObjectiveTest, bRespawnTest, bEquipmentTest, bMeleeTest]()
+    GetWorldTimerManager().SetTimer(TestStart, [this, bSaveWrite, bSaveRead, bInventoryTest, bNavTest, bCareTest, bSpeciesTest, bCombatTest, bEncounterTest, bBossTest, bBuildingTest, bWorldTest, bWorldPreview, bFarmingTest, bFarmPreview, bFeedingTest, bWorkCycleTest, bSquadTest, bJournalTest, bObjectiveTest, bRespawnTest, bEquipmentTest, bMeleeTest, bLogisticsTest]()
     {
         auto* Hero = Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerPawn(this, 0));
         if (!Hero) { FPlatformMisc::RequestExitWithStatus(true, 1); return; }
+        if (bLogisticsTest) { RunLogisticsScenario(GetWorld(),Hero); return; }
         if (bMeleeTest) { RunMeleeScenario(GetWorld(),Hero); return; }
         if (bEquipmentTest) { RunEquipmentScenario(GetWorld(),Hero); return; }
         if (bRespawnTest) { RunRespawnScenario(GetWorld(),Hero); return; }

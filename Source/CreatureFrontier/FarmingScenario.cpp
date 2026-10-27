@@ -62,13 +62,13 @@ void RunFarmingScenario(UWorld* World, ACFPlayerCharacter* Hero)
     Pet->Health = 0; Reject &= !Hero->FeedCompanion(Pet); Pet->Health = Pet->GetMaxHealth();
     Reject &= Hero->Inventory->Count(EFrontierItem::Food) == 2;
     Pet->Nutrition = 100; Pet->WorkSite = Garden; Pet->SetActivity(ECreatureActivity::Work);
-    Pet->Tick(1); const bool Growing = Hero->Inventory->Count(EFrontierItem::Food) == 2;
+    Pet->Tick(1); const bool Growing = Garden->StoredFood==0 && Hero->Inventory->Count(EFrontierItem::Food) == 2;
     Pet->Tick(2.4f);
-    const bool Harvest = Growing && Hero->Inventory->Count(EFrontierItem::Food) == 3 && Pet->Experience == 1 && Pet->Nutrition < 100;
+    const bool Harvest = Growing && Garden->StoredFood==1 && Hero->Inventory->Count(EFrontierItem::Food) == 2 && Pet->Experience == 1 && Pet->Nutrition < 100;
     Pet->Nutrition = 10; Pet->Stamina = 100;
-    Pet->Tick(3.4f); const bool Slower = Hero->Inventory->Count(EFrontierItem::Food) == 3;
+    Pet->Tick(3.4f); const bool Slower = Garden->StoredFood==1;
     Pet->Tick(3.4f);
-    const bool Hungry = Slower && Hero->Inventory->Count(EFrontierItem::Food) == 4;
+    const bool Hungry = Slower && Garden->StoredFood==2 && Hero->Inventory->Count(EFrontierItem::Food)==2;
     // Switching jobs cannot turn accumulated garden progress into gathered materials.
     auto* Other = World->SpawnActor<AWorkStation>(FVector(0,-1050,-15),FRotator::ZeroRotator);
     Pet->Nutrition = 100; Pet->Stamina = 100;
@@ -79,11 +79,12 @@ void RunFarmingScenario(UWorld* World, ACFPlayerCharacter* Hero)
     Other->Destroy();
     Pet->Nutrition = 100; Pet->Stamina = 100;
     Hero->Inventory->Restore({{EFrontierItem::Material,62},{EFrontierItem::Food,999}});
+    Garden->StoredFood=30;
     const int32 XP = Pet->Experience;
     Pet->Tick(3.4f);
-    bool Full = Hero->Inventory->Count(EFrontierItem::Food) == 999 && Pet->Experience == XP;
-    Hero->Inventory->Consume(EFrontierItem::Food,1); Pet->Tick(.1f);
-    Full &= Hero->Inventory->Count(EFrontierItem::Food) == 999 && Pet->Experience == XP+1;
+    bool Full = Garden->StoredFood==30 && Hero->Inventory->Count(EFrontierItem::Food) == 999 && Pet->Experience == XP;
+    Garden->AdjustFoodStock(-1); Pet->Tick(.1f);
+    Full &= Garden->StoredFood==30 && Hero->Inventory->Count(EFrontierItem::Food) == 999 && Pet->Experience == XP+1;
     Pet->Nutrition = .01f; Pet->Tick(.2f);
     const bool Starve = Pet->Nutrition == 0 && Pet->Activity == ECreatureActivity::Rest && !Pet->IsSpecialReady() && Pet->Health == Pet->GetMaxHealth();
     Hero->Inventory->Restore({{EFrontierItem::Material,62}});
@@ -93,14 +94,15 @@ void RunFarmingScenario(UWorld* World, ACFPlayerCharacter* Hero)
     Pet->Stamina = 20;
     bool Feed = Hero->FeedCompanion(Pet) && Pet->Nutrition == 35 && Pet->Stamina == 35 && Hero->Inventory->Count(EFrontierItem::Food) == 0;
     Feed &= !Hero->FeedCompanion(Pet);
-    Hero->CommandWork(); Pet->Tick(3.4f);
-    Feed &= Pet->Activity == ECreatureActivity::Work && Hero->Inventory->Count(EFrontierItem::Food) == 1;
+    Garden->StoredFood=0; Hero->CommandWork(); Pet->Tick(3.4f);
+    Feed &= Pet->Activity == ECreatureActivity::Work && Garden->StoredFood==1 && Hero->Inventory->Count(EFrontierItem::Food) == 0;
     Pet->Nutrition = 55;
     const FString Slot = TEXT("FrontierFarmingAutomation");
     bool Saved = Hero->SaveProgress(Slot) && Hero->LoadProgress(Slot);
     for (TActorIterator<ACreatureCharacter> It(World); It; ++It)
         if (It->Tamer == Hero->GetController()) Saved &= It->Nutrition == 55 && It->WorkSite && It->WorkSite->RequiredSpecialty == EWorkSpecialty::Farming;
-    Saved &= Hero->Inventory->Count(EFrontierItem::Food) == 1;
+    Saved &= Hero->Inventory->Count(EFrontierItem::Food) == 0;
+    for(TActorIterator<AWorkStation> It(World);It;++It) if(It->RequiredSpecialty==EWorkSpecialty::Farming) Saved &= It->StoredFood==1;
     auto* Legacy = Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot,0));
     bool Migration = Legacy != nullptr;
     if (Legacy)

@@ -60,7 +60,7 @@ void RunFeedingScenario(UWorld* World, ACFPlayerCharacter* Hero)
             *First->GetActorLocation().ToString(),Trough ? Trough->StoredFood : -1,First->Nutrition,static_cast<int32>(First->Activity),
             First->WorkSite ? First->GetDistanceTo(First->WorkSite) : -1,Hero->Inventory->Count(EFrontierItem::Food),First->AutoFeedCooldown,First->FeedingSite.IsValid());
         const bool Trip = Trough && Trough->StoredFood == 3 && First->Nutrition > 50 && First->WorkSite && First->WorkSite->PersistentId == GardenId &&
-            First->Activity == ECreatureActivity::Work && FVector::Dist2D(First->GetActorLocation(),First->WorkSite->GetActorLocation()) <= 220 && Hero->Inventory->Count(EFrontierItem::Food) > 0;
+            First->Activity == ECreatureActivity::Work && FVector::Dist2D(First->GetActorLocation(),First->WorkSite->GetActorLocation()) <= 220 && First->WorkSite->StoredFood>0;
         if (!Trough) { FPlatformMisc::RequestExitWithStatus(false,1); return; }
         First->FeedingSite = Trough; First->Nutrition = 30; First->AutoFeedCooldown = 0; First->Tick(0);
         const bool Timeout = !First->FeedingSite.IsValid() && First->AutoFeedCooldown == 5; // Expired transient target falls back to its job.

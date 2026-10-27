@@ -47,6 +47,8 @@ public:
     AWorkStation* TraceFacility() const;
     void DepositTroughFood();
     void WithdrawTroughFood();
+    bool WithdrawCompanionCargo(ACreatureCharacter* Pet);
+    void WithdrawAimedCargo();
     void UseMedicine();
     bool IsNearWorkStation() const;
     FString Feedback;
