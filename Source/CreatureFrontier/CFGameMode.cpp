@@ -21,6 +21,7 @@
 #include "AnimationScenario.h"
 #include "AffinityScenario.h"
 #include "AffectionScenario.h"
+#include "FormationScenario.h"
 #include "CaptureComponent.h"
 #include "CreatureCharacter.h"
 #include "CreatureDefinition.h"
@@ -70,6 +71,12 @@ void ACFGameMode::BeginPlay()
     const bool bRespawnTest = FParse::Param(FCommandLine::Get(), TEXT("CFRespawnTest"));
     const bool bEquipmentTest = FParse::Param(FCommandLine::Get(), TEXT("CFEquipmentTest"));
     const bool bMeleeTest = FParse::Param(FCommandLine::Get(), TEXT("CFMeleeTest"));
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFFormationTest")))
+    {
+        FTimerHandle FormationStart;
+        GetWorldTimerManager().SetTimer(FormationStart,[this]() { if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0))) RunFormationScenario(GetWorld(),Hero); },1.f,false);
+        return;
+    }
     if(FParse::Param(FCommandLine::Get(),TEXT("CFAffectionTest")))
     {
         FTimerHandle AffectionStart;

@@ -45,22 +45,27 @@ $cases = @(
     @{Flag='CFAnimationTest'; Marker='CF_ANIMATION PASS'},
     @{Flag='CFAffinityTest'; Marker='CF_AFFINITY PASS'},
     @{Flag='CFAffectionTest'; Marker='CF_AFFECTION PASS'},
+    @{Flag='CFFormationTest'; Marker='CF_FORMATION PASS'; Repeats=3},
     @{Flag='CFSaveWrite'; Marker='CF_SAVE_WRITE PASS'},
     @{Flag='CFSaveRead'; Marker='CF_SAVE_READ PASS'},
     @{Flag='CFNavTest'; Marker='CF_NAV_WORK PASS'}
 )
 foreach ($case in $cases) {
-    $logPath = Join-Path $testLogRoot ($case.Flag + '.log')
-    $testProcess = Start-Process -FilePath $exePath -WorkingDirectory $BuildRoot `
-        -ArgumentList @('-nullrhi', '-nosound', '-unattended', '-nop4', "-$($case.Flag)", "-abslog=`"$logPath`"") `
-        -WindowStyle Hidden -PassThru
-    if (-not $testProcess.WaitForExit($TimeoutSeconds * 1000)) {
-        $testProcess.Kill()
-        throw "$($case.Flag) exceeded $TimeoutSeconds seconds; test process stopped. Inspect $logPath"
+    $repeatCount = if ($case.Repeats) { [int]$case.Repeats } else { 1 }
+    for ($attempt = 1; $attempt -le $repeatCount; $attempt++) {
+        $label = if ($repeatCount -gt 1) { "$($case.Flag)-$attempt" } else { $case.Flag }
+        $logPath = Join-Path $testLogRoot ($label + '.log')
+        $testProcess = Start-Process -FilePath $exePath -WorkingDirectory $BuildRoot `
+            -ArgumentList @('-nullrhi', '-nosound', '-unattended', '-nop4', "-$($case.Flag)", "-abslog=`"$logPath`"") `
+            -WindowStyle Hidden -PassThru
+        if (-not $testProcess.WaitForExit($TimeoutSeconds * 1000)) {
+            $testProcess.Kill()
+            throw "$label exceeded $TimeoutSeconds seconds; test process stopped. Inspect $logPath"
+        }
+        if ($testProcess.ExitCode -ne 0) { throw "$label failed with exit code $($testProcess.ExitCode)" }
+        if (-not (Select-String -LiteralPath $logPath -SimpleMatch $case.Marker -Quiet)) {
+            throw "$label did not emit its success marker; inspect $logPath"
+        }
+        Write-Host "${label}: PASS"
     }
-    if ($testProcess.ExitCode -ne 0) { throw "$($case.Flag) failed with exit code $($testProcess.ExitCode)" }
-    if (-not (Select-String -LiteralPath $logPath -SimpleMatch $case.Marker -Quiet)) {
-        throw "$($case.Flag) did not emit its success marker; inspect $logPath"
-    }
-    Write-Host "$($case.Flag): PASS"
 }

@@ -26,6 +26,7 @@ public:
     virtual void Tick(float DeltaSeconds) override;
     void UpdateCreaturePresentation(float DeltaSeconds);
     FName GetVisualState() const { return VisualState; }
+    FVector GetFollowDestination() const;
     UPROPERTY(Replicated,BlueprintReadOnly,Category="Care") int32 BondPoints=0;
     UPROPERTY(Replicated,BlueprintReadOnly,Category="Care") float PettingCooldown=0;
     void AddBond(int32 Amount);
@@ -128,6 +129,8 @@ protected:
     void OnRep_Activity();
 
 private:
+    bool HasClearFollowApproach(const FVector& Destination) const;
+    FVector FindFollowApproach(const FVector& Destination) const;
     FName VisualState=TEXT("Idle");
     float PoseTime=0, RestPoseBlend=0, StrikePoseRemaining=0, HitPoseRemaining=0;
     float AffectionPoseRemaining=0;

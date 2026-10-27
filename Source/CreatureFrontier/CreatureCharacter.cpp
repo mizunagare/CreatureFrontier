@@ -2,6 +2,7 @@
 #include "CreatureDefinition.h"
 #include "CreatureAffinity.h"
 #include "AIController.h"
+#include "Navigation/PathFollowingComponent.h"
 #include "NavigationSystem.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "CFPlayerCharacter.h"
@@ -28,6 +29,7 @@ ACreatureCharacter::ACreatureCharacter()
     GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
     GetCapsuleComponent()->SetCanEverAffectNavigation(false);
     GetCharacterMovement()->bOrientRotationToMovement = true;
+    GetCharacterMovement()->AvoidanceConsiderationRadius=400;
     GetCharacterMovement()->MaxWalkSpeed = 320.0f;
     bUseControllerRotationYaw = false;
 
@@ -159,10 +161,14 @@ void ACreatureCharacter::NavigateTo(const FVector& Destination, float Acceptance
     FNavLocation Projected;
     if (!Nav->ProjectPointToNavigation(Destination, Projected, FVector(250,250,300)))
     {
-        StopNavigation();
-        return;
+        const APawn* FollowOwner=Activity==ECreatureActivity::Follow && Tamer?Tamer->GetPawn():nullptr;
+        if(!FollowOwner || !Nav->ProjectPointToNavigation(FollowOwner->GetActorLocation(),Projected,FVector(250,250,300)))
+        { StopNavigation(); return; }
+        Acceptance=160.f; // Preserve personal space when falling back to the owner's location.
     }
-    AI->MoveToLocation(Projected.Location, Acceptance, false, true, false, false, nullptr, false);
+    const auto Result=AI->MoveToLocation(Projected.Location, Acceptance, false, true, false, false, nullptr, false);
+    if(Result==EPathFollowingRequestResult::Failed && Activity==ECreatureActivity::Follow && Tamer && Tamer->GetPawn())
+        AI->MoveToActor(Tamer->GetPawn(),160,false,true,false,nullptr,false);
 }
 
 bool ACreatureCharacter::CanHit(const AActor* Target) const
@@ -200,6 +206,8 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
         AlphaWarning->SetHiddenInGame(!bWarning);
     }
     if (!HasAuthority()) return;
+    const bool AvoidFollowers=Health>0 && Disposition==ECreatureDisposition::Tamed && (Activity==ECreatureActivity::Follow || Activity==ECreatureActivity::Idle);
+    if(GetCharacterMovement()->bUseRVOAvoidance!=AvoidFollowers) GetCharacterMovement()->SetAvoidanceEnabled(AvoidFollowers);
     SpecialCooldownRemaining = FMath::Max(0.0f, SpecialCooldownRemaining - DeltaSeconds);
     SlowRemaining = FMath::Max(0.0f, SlowRemaining - DeltaSeconds);
     GuardRemaining = FMath::Max(0.0f, GuardRemaining - DeltaSeconds);
@@ -292,9 +300,13 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
             if (Distance < Best) { Best = Distance; Enemy = *It; }
         }
         SetActivity(Enemy ? ECreatureActivity::Combat : ECreatureActivity::Follow);
-        const FVector Destination = Enemy ? Enemy->GetActorLocation() : OwnerPlayer->GetActorLocation();
+        if(GetCharacterMovement()->bUseRVOAvoidance!=(Enemy==nullptr)) GetCharacterMovement()->SetAvoidanceEnabled(Enemy==nullptr);
+        const FVector Destination = Enemy ? Enemy->GetActorLocation() : GetFollowDestination();
+        // Weight 1 bypasses self-steering but remains registered as an obstacle.
+        // Only use this precise docking mode when the real capsule corridor is clear.
+        GetCharacterMovement()->SetRVOAvoidanceWeight(!Enemy && HasClearFollowApproach(Destination)?1.f:.5f);
         const FVector Offset = Destination - GetActorLocation();
-        if (Enemy ? !CanHit(Enemy) : Offset.Size2D() > 230.0f) NavigateTo(Destination, Enemy ? 65.0f : 160.0f);
+        if (Enemy ? !CanHit(Enemy) : Offset.Size2D() > 25.0f) NavigateTo(Destination, Enemy ? 65.0f : 15.0f);
         else
         {
             StopNavigation();
