@@ -1,6 +1,7 @@
 #include "CFHUD.h"
 #include "CFPlayerCharacter.h"
 #include "CreatureCharacter.h"
+#include "CreatureDefinition.h"
 #include "CaptureComponent.h"
 #include "InventoryComponent.h"
 #include "BaseBuildingComponent.h"
@@ -33,7 +34,7 @@ void ACFHUD::DrawHUD()
     DrawText(FString::Printf(TEXT("FOOD %d | 3 craft food (2 materials) | J feed aimed companion"),Player->Inventory->Count(EFrontierItem::Food)),FLinearColor::White,32,268);
     DrawText(TEXT("Trough: aim + U deposit food | O withdraw (up to 5)"),FLinearColor::White,32,294);
     DrawText(Player->GetCommandScopeText(),FLinearColor::Green,32,320);
-    DrawText(TEXT("Tab team roster | [ / ] browse | Enter select"),FLinearColor::White,32,342);
+    DrawText(TEXT("Tab team | [ / ] browse | Enter select | I journal"),FLinearColor::White,32,342);
     DrawText(Player->Feedback, FLinearColor::Yellow, 32, 368);
     if (Player->Building->IsActive()) DrawText(Player->Building->GetHint(), FLinearColor::Yellow,32,440);
     if (auto* Site = Player->TraceFacility(); Site && Site->RequiredSpecialty == EWorkSpecialty::Feeding)
@@ -68,6 +69,48 @@ void ACFHUD::DrawHUD()
         }
         if (Creature->SlowRemaining > 0 || Creature->GuardRemaining > 0)
             DrawText(FString::Printf(TEXT("SLOW %.1fs  GUARD %.1fs"), Creature->SlowRemaining, Creature->GuardRemaining), FLinearColor::Yellow, X-130, Y+92);
+    }
+    if (Player->IsJournalOpen())
+    {
+        const auto& Entries=Player->GetJournal();
+        int32 Captured=0; for (const auto& Entry:Entries) if(Entry.bCaptured) ++Captured;
+        const float Left=Canvas->ClipX-488;
+        DrawRect(FLinearColor(.015f,.025f,.04f,.96f),Left,18,470,440);
+        DrawText(FString::Printf(TEXT("FIELD JOURNAL | %d seen | %d captured"),Entries.Num(),Captured),FLinearColor::Green,Left+14,30);
+        DrawText(TEXT("I close | PageUp / PageDown browse | NOT paused"),FLinearColor::Yellow,Left+14,54);
+        if(Entries.IsEmpty()) DrawText(TEXT("Aim at a living creature within 12m to discover it"),FLinearColor::White,Left+14,104);
+        else
+        {
+            const int32 Index=Player->GetJournalPage()%Entries.Num();
+            const auto& Entry=Entries[Index]; const auto* Definition=Entry.Definition.Get();
+            if (Definition)
+            {
+                DrawText(FString::Printf(TEXT("%d / %d  %s"),Index+1,Entries.Num(),*Definition->DisplayName.ToString()),FLinearColor::White,Left+14,100);
+                DrawText(Entry.bCaptured?TEXT("CAPTURED - permanent research record"):TEXT("SEEN - not captured yet"),Entry.bCaptured?FLinearColor::Green:FLinearColor::Yellow,Left+14,126);
+                if (Entry.bCaptured)
+                {
+                    DrawText(FString::Printf(TEXT("Base HP %d | attack %d | speed %.1fm/s"),Definition->BaseMaxHealth,Definition->BaseAttack,Definition->MoveSpeed/100),FLinearColor::White,Left+14,166);
+                    FString Jobs;
+                    for (auto Job:Definition->WorkSpecialties) { FString Name=UEnum::GetValueAsString(Job); Name.RemoveFromStart(TEXT("EWorkSpecialty::")); Jobs+=(Jobs.IsEmpty()?TEXT(""):TEXT(" / "))+Name; }
+                    DrawText(TEXT("Work: ")+Jobs,FLinearColor::White,Left+14,192);
+                    DrawText(TEXT("Special: ")+Definition->SpecialName.ToString(),FLinearColor::White,Left+14,218);
+                    DrawText(FString::Printf(TEXT("Range %.1fm | cooldown %.0fs | cost 20 stamina"),Definition->SpecialRange/100,Definition->SpecialCooldownSeconds),FLinearColor::White,Left+14,244);
+                }
+                else DrawText(TEXT("Capture to unlock base stats, work and skill notes"),FLinearColor::White,Left+14,166);
+                TArray<FString> Words; Definition->Description.ToString().ParseIntoArrayWS(Words);
+                FString Line; float DescY=290;
+                for (const auto& Word:Words)
+                {
+                    FString Next=Line.IsEmpty()?Word:Line+TEXT(" ")+Word;
+                    float W,H; GetTextSize(Next,W,H);
+                    if(W>430 && !Line.IsEmpty()) { DrawText(Line,FLinearColor::White,Left+14,DescY); DescY+=22; Line=Word; }
+                    else Line=Next;
+                    if(DescY>400) break;
+                }
+                if(DescY<=400 && !Line.IsEmpty()) DrawText(Line,FLinearColor::White,Left+14,DescY);
+                DrawText(TEXT("F5 saves research | F9 restores the saved snapshot"),FLinearColor::Yellow,Left+14,426);
+            }
+        }
     }
     if (Player->IsRosterOpen())
     {

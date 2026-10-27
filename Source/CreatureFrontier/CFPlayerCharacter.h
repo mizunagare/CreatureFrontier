@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
+#include "CreatureJournalTypes.h"
 #include "CFPlayerCharacter.generated.h"
 
 class UCameraComponent;
@@ -10,6 +11,7 @@ class ACreatureCharacter;
 class UInventoryComponent;
 class UBaseBuildingComponent;
 class AWorkStation;
+class UCreatureDefinition;
 
 UCLASS()
 class CREATUREFRONTIER_API ACFPlayerCharacter : public ACharacter
@@ -45,6 +47,15 @@ public:
     void ClearCompanionSelection();
     bool IsCommandTarget(const ACreatureCharacter* Pet) const;
     FString GetCommandScopeText() const;
+    void ObserveAimedCreature();
+    bool ObserveCreature(ACreatureCharacter* Creature);
+    bool HasJournalEntry(const UCreatureDefinition* Definition,bool bRequireCaptured=false) const;
+    const TArray<FCreatureJournalEntry>& GetJournal() const { return Journal; }
+    void ToggleJournal();
+    bool IsJournalOpen() const { return bJournalOpen; }
+    int32 GetJournalPage() const { return JournalPage; }
+    void NextJournalPage();
+    void PreviousJournalPage();
     TArray<ACreatureCharacter*> GetCompanionRoster() const;
     void ToggleRoster();
     void NextRosterCompanion();
@@ -89,6 +100,12 @@ protected:
     virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 
 private:
+    void RecordJournal(UCreatureDefinition* Definition,bool bCaptured);
+    UPROPERTY() TArray<FCreatureJournalEntry> Journal;
+    UPROPERTY() TArray<TObjectPtr<UCreatureDefinition>> JournalAssets;
+    FTimerHandle ObservationTimer;
+    bool bJournalOpen = false;
+    int32 JournalPage = 0;
     void StepRoster(int32 Direction);
     bool bRosterOpen = false;
     TWeakObjectPtr<ACreatureCharacter> RosterHighlight;

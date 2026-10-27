@@ -4,9 +4,9 @@
 
 ## Windows 独立原型
 
-当前最新本机版本：`D:\myGame\Builds\Windows-Roster\CreatureFrontier.exe`。
+当前最新本机版本：`D:\myGame\Builds\Windows-Journal\CreatureFrontier.exe`。
 双击即可进入测试地图，不需要先打开 Unreal Editor。复制到其他机器时需复制整个
-`Builds\Windows-Roster` 文件夹，不能只复制根目录的启动 EXE。
+`Builds\Windows-Journal` 文件夹，不能只复制根目录的启动 EXE。
 这是 Development 灰盒原型，尚未完成正式美术、内容与性能优化。
 
 战斗更新预览另外输出到 `D:\myGame\Builds\Windows-Combat\CreatureFrontier.exe`，
@@ -21,7 +21,8 @@
 自动工作循环更新输出到 `D:\myGame\Builds\Windows-WorkCycle\CreatureFrontier.exe`。
 伙伴分工更新输出到 `D:\myGame\Builds\Windows-Squad\CreatureFrontier.exe`。
 队伍面板更新输出到 `D:\myGame\Builds\Windows-Roster\CreatureFrontier.exe`。
-旧存档版本 1–10 可以读取，新版存档版本为 11（包含自动休息后的待复工状态）。
+伙伴图鉴更新输出到 `D:\myGame\Builds\Windows-Journal\CreatureFrontier.exe`。
+旧存档版本 1–11 可以读取，新版存档版本为 12（包含图鉴发现/捕捉历史及已有的待复工状态）。
 新版保存后的存档不能交给旧版程序读取；请保留旧存档备份。
 测试脚本默认选择 `Builds` 下最新编译的 Development 程序，也可明确指定：
 `.\Scripts\Test-Packaged.ps1 -BuildRoot D:\myGame\Builds\Windows-Combat`。
@@ -58,6 +59,7 @@ Windows 开发环境已部署并验证：Unreal Engine 5.8、Visual Studio C++ �
 - `L`：瞄准 12 米内无遮挡、存活的自有伙伴，切换为单只指令模式
 - `K`：切回全体伙伴指令模式（默认）
 - `Tab`：展开/收起队伍面板；`[` / `]` 浏览伙伴，`Enter` 选择高亮伙伴
+- `I`：打开/关闭伙伴图鉴；`PageUp` / `PageDown` 浏览已发现物种
 - `F`：召回当前指令范围内的伙伴跟随，并自动攻击玩家周边的野生宠物
 - `E`：靠近出生点后方的工作台（8 米内），分配伙伴采集；到达后每 3 秒产出 1 资源
 - `R`：重新开始当前关卡（玩家倒地后也可使用）
@@ -82,6 +84,24 @@ G 在单只模式只检查所选伙伴，冷却中不会改让其他伙伴施法
 伙伴较多时随高亮自动翻页，首尾循环。读档后清除旧高亮，重新打开面板即可从新伙伴列表浏览。
 面板不会暂停游戏；WASD 与战斗键继续有效，不能在战斗中用它冻结敌人。
 它不是远程救治/喂食、仓储或宠物收纳系统，J/P 仍需瞄准目标。
+
+## 伙伴图鉴
+
+玩家存活时，瞄准 12 米内无遮挡的活体生物会记录该物种，约每 0.4 秒检查一次。
+重复观察同一物种不增加条目；只有已发现物种会出现在图鉴，不提前公开未发现物种。
+有效捕捉尝试也会记录发现，失败不会解锁“已捕捉”。成功捕捉后解锁数据资产中的基础生命/攻击/移速、
+工作专长、主动技能名称/射程/冷却，以及物种描述。这是物种基础资料，不是当前个体升级后的属性。
+
+按 I 打开图鉴，PageUp/PageDown 首尾循环浏览；图鉴与 Tab 队伍面板互斥，都不暂停世界。
+图鉴记录不会因伙伴死亡或移除而丢失，但仍需 F5 保存。F9 恢复所选存档快照，
+不会把当前未保存的图鉴进度合并进旧存档；R 重开后也需要 F9 才能恢复。
+版本 1–11 的旧存档仅从自有伙伴补全捕捉记录，不把全地图未观察的野生生物算作发现。
+存档校验拒绝重复条目、无效物种引用和超过 128 条的异常列表，不覆盖当前世界/图鉴。
+当前没有图鉴肖像、发现奖励或收集任务，仍属基础探索进度版本。
+
+`-CFJournalTest -CFJournalPreview -RenderOffscreen -windowed -ResX=1280 -ResY=720 -norhithread -forcerhibypass "-ExecCmds=t.MaxFPS 60"`
+可生成 `Saved/JournalPreview/entry1.png` 与 `entry2.png`，分别检查已发现/已捕捉页面；
+使用独立测试槽，不覆盖玩家存档。离屏缺字问题沿用下述已知限制，普通渲染配置未改动。
 
 主动技能消耗 20 体力，蓄力 0.65 秒；伙伴会先尝试进入射程，最多等待 6 秒。
 工作/休息中的伙伴不响应战斗指令，F 可重新启用跟随。F 取消集火和蓄力；
@@ -176,7 +196,10 @@ HUD 显示玩家生命、资源、伙伴数量、工作数量和准星目标的�
 `-CFSquadTest` 验证队伍名单、面板开关、首尾浏览、确认选择与读档后列表重建、
 单只选择、不同工作分配、局部休息/跟随/集火/技能、无效选择拒绝、
 倒地或失去选择时的安全阻止、全体切换与分工读档，使用 `FrontierSquadAutomation` 测试槽。
-当前打包回归共 16 项，包含上述伙伴分工测试。
+`-CFJournalTest` 验证瞄准发现、去重、距离/遮挡/倒地拒绝、真实捕捉回调、失败不解锁、
+捕捉历史在伙伴移除后保留、快照读档、空名单/循环浏览/面板互斥、异常列表拒绝与旧档迁移；
+使用 `FrontierJournalAutomation` 等独立测试槽，不写入 `FrontierSlot`。
+当前打包回归共 17 项，包含伙伴分工与图鉴测试。
 同时添加 `-CFRosterPreview -RenderOffscreen -windowed -ResX=1280 -ResY=720 -norhithread -forcerhibypass "-ExecCmds=t.MaxFPS 60"`（不要使用 `-nullrhi`），
 可生成 11 只伙伴的两页界面截图 `Saved/RosterPreview/team.png` 和 `team_page2.png` 后退出，不写入玩家存档。
 已知显示问题：当前机器 D3D12 离屏截图存在间歇性缺字，上述兼容参数可改善但尚未完全消除。

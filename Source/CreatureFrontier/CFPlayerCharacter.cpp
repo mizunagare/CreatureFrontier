@@ -14,6 +14,7 @@
 #include "WildEncounter.h"
 #include "WorldLoot.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "TimerManager.h"
 
 void ACFPlayerCharacter::QuickSave() { SaveProgress(); }
 void ACFPlayerCharacter::QuickLoad() { LoadProgress(); }
@@ -65,6 +66,7 @@ bool ACFPlayerCharacter::SaveProgress(const FString& Slot)
     Save->Health = Health;
     Save->Resources = Inventory->Count(EFrontierItem::Material);
     Save->InventoryStacks = Inventory->GetStacks();
+    Save->Journal = Journal;
     for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It)
     {
         FCreatureSaveRecord Record;
@@ -118,7 +120,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
 {
     if (!HasAuthority() || !GetController()) return false;
     auto* Save = Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot, 0));
-    if (!Save || Save->FormatVersion < 1 || Save->FormatVersion > 11 ||
+    if (!Save || Save->FormatVersion < 1 || Save->FormatVersion > 12 ||
         Save->MapName != UGameplayStatics::GetCurrentLevelName(this, true) ||
         !FMath::IsFinite(Save->Health) || Save->Health < 0 || Save->Health > 100 ||
         Save->Resources < 0 || Save->PlayerTransform.ContainsNaN() || Save->ViewRotation.ContainsNaN())
@@ -135,6 +137,17 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
     {
         Feedback = TEXT("Invalid inventory in save");
         return false;
+    }
+    TArray<TObjectPtr<UCreatureDefinition>> LoadedJournalAssets;
+    TSet<FSoftObjectPath> JournalPaths;
+    if (Save->FormatVersion < 12) Save->Journal.Reset();
+    if (Save->Journal.Num()>128) { Feedback=TEXT("Invalid journal size in save"); return false; }
+    for (const auto& Entry : Save->Journal)
+    {
+        auto* Definition=Entry.Definition.LoadSynchronous();
+        const auto Path=Entry.Definition.ToSoftObjectPath();
+        if (!Definition || JournalPaths.Contains(Path)) { Feedback=TEXT("Invalid journal entry in save"); return false; }
+        JournalPaths.Add(Path); LoadedJournalAssets.Add(Definition);
     }
     for (const auto& Entry : Save->EncounterTimers)
         if (Entry.Key.IsNone() || !FMath::IsFinite(Entry.Value) || Entry.Value < 0 || Entry.Value > 600)
@@ -271,6 +284,10 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
     GetCharacterMovement()->SetMovementMode(Health > 0 ? MOVE_Walking : MOVE_None);
     SelectedCompanion.Reset();
     RosterHighlight.Reset();
+    Journal=Save->Journal; JournalAssets=LoadedJournalAssets; JournalPage=0;
+    // Owned survivors in old snapshots prove capture; unseen wild snapshots do not prove discovery.
+    for (auto* Pet : Restored)
+        if (Pet->Tamer==GetController()) RecordJournal(Pet->Definition,true);
     Feedback = bSingleCompanionMode ? TEXT("Save restored - select again with L or use K for ALL; commands blocked until then") : TEXT("Save restored - commands target ALL; L selects one companion");
     return true;
 }
@@ -284,6 +301,7 @@ void ACFPlayerCharacter::BeginPlay()
 {
     Super::BeginPlay();
     CaptureComponent->OnCaptureResolved.AddDynamic(this, &ACFPlayerCharacter::CaptureResolved);
+    GetWorldTimerManager().SetTimer(ObservationTimer,this,&ACFPlayerCharacter::ObserveAimedCreature,.4f,true);
 }
 
 float ACFPlayerCharacter::TakeDamage(float Amount, const FDamageEvent& Event, AController* EventInstigator, AActor* Causer)
@@ -298,6 +316,8 @@ float ACFPlayerCharacter::TakeDamage(float Amount, const FDamageEvent& Event, AC
 
 void ACFPlayerCharacter::CaptureResolved(ACreatureCharacter* Creature, bool bSucceeded)
 {
+    if (HasAuthority() && IsValid(Creature) && Health>0)
+        RecordJournal(Creature->Definition,bSucceeded && Creature->Disposition==ECreatureDisposition::Tamed && Creature->Tamer==GetController());
     Feedback = bSucceeded ? TEXT("Captured! F: follow | E: assign work") : TEXT("Capture failed - weaken it and retry");
 }
 
@@ -436,6 +456,9 @@ void ACFPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
     PlayerInputComponent->BindKey(EKeys::RightBracket, IE_Pressed, this, &ACFPlayerCharacter::NextRosterCompanion);
     PlayerInputComponent->BindKey(EKeys::LeftBracket, IE_Pressed, this, &ACFPlayerCharacter::PreviousRosterCompanion);
     PlayerInputComponent->BindKey(EKeys::Enter, IE_Pressed, this, &ACFPlayerCharacter::SelectRosterCompanion);
+    PlayerInputComponent->BindKey(EKeys::I, IE_Pressed, this, &ACFPlayerCharacter::ToggleJournal);
+    PlayerInputComponent->BindKey(EKeys::PageDown, IE_Pressed, this, &ACFPlayerCharacter::NextJournalPage);
+    PlayerInputComponent->BindKey(EKeys::PageUp, IE_Pressed, this, &ACFPlayerCharacter::PreviousJournalPage);
 }
 
 void ACFPlayerCharacter::MoveForward(float Value)
