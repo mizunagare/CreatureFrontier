@@ -9,6 +9,7 @@
 #include "FarmingScenario.h"
 #include "FeedingScenario.h"
 #include "WorkCycleScenario.h"
+#include "SquadScenario.h"
 #include "CaptureComponent.h"
 #include "CreatureCharacter.h"
 #include "CreatureDefinition.h"
@@ -52,12 +53,14 @@ void ACFGameMode::BeginPlay()
     const bool bFarmPreview = FParse::Param(FCommandLine::Get(), TEXT("CFFarmPreview"));
     const bool bFeedingTest = FParse::Param(FCommandLine::Get(), TEXT("CFFeedingTest"));
     const bool bWorkCycleTest = FParse::Param(FCommandLine::Get(), TEXT("CFWorkCycleTest"));
-    if (!bSaveWrite && !bSaveRead && !bInventoryTest && !bNavTest && !bCareTest && !bSpeciesTest && !bCombatTest && !bEncounterTest && !bBossTest && !bBuildingTest && !bWorldTest && !bWorldPreview && !bFarmingTest && !bFarmPreview && !bFeedingTest && !bWorkCycleTest && !FParse::Param(FCommandLine::Get(), TEXT("CFSmokeTest"))) return;
+    const bool bSquadTest = FParse::Param(FCommandLine::Get(), TEXT("CFSquadTest"));
+    if (!bSaveWrite && !bSaveRead && !bInventoryTest && !bNavTest && !bCareTest && !bSpeciesTest && !bCombatTest && !bEncounterTest && !bBossTest && !bBuildingTest && !bWorldTest && !bWorldPreview && !bFarmingTest && !bFarmPreview && !bFeedingTest && !bWorkCycleTest && !bSquadTest && !FParse::Param(FCommandLine::Get(), TEXT("CFSmokeTest"))) return;
     FTimerHandle TestStart;
-    GetWorldTimerManager().SetTimer(TestStart, [this, bSaveWrite, bSaveRead, bInventoryTest, bNavTest, bCareTest, bSpeciesTest, bCombatTest, bEncounterTest, bBossTest, bBuildingTest, bWorldTest, bWorldPreview, bFarmingTest, bFarmPreview, bFeedingTest, bWorkCycleTest]()
+    GetWorldTimerManager().SetTimer(TestStart, [this, bSaveWrite, bSaveRead, bInventoryTest, bNavTest, bCareTest, bSpeciesTest, bCombatTest, bEncounterTest, bBossTest, bBuildingTest, bWorldTest, bWorldPreview, bFarmingTest, bFarmPreview, bFeedingTest, bWorkCycleTest, bSquadTest]()
     {
         auto* Hero = Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerPawn(this, 0));
         if (!Hero) { FPlatformMisc::RequestExitWithStatus(true, 1); return; }
+        if (bSquadTest) { RunSquadScenario(GetWorld(),Hero); return; }
         if (bWorkCycleTest) { RunWorkCycleScenario(GetWorld(),Hero); return; }
         if (bFeedingTest) { RunFeedingScenario(GetWorld(),Hero); return; }
         if (bFarmPreview) { RunFarmPreview(GetWorld(),Hero); return; }

@@ -269,7 +269,8 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
     Health = Save->Health;
     Inventory->Restore(Save->InventoryStacks);
     GetCharacterMovement()->SetMovementMode(Health > 0 ? MOVE_Walking : MOVE_None);
-    Feedback = TEXT("Save restored");
+    SelectedCompanion.Reset();
+    Feedback = bSingleCompanionMode ? TEXT("Save restored - select again with L or use K for ALL; commands blocked until then") : TEXT("Save restored - commands target ALL; L selects one companion");
     return true;
 }
 
@@ -302,9 +303,10 @@ void ACFPlayerCharacter::CaptureResolved(ACreatureCharacter* Creature, bool bSuc
 void ACFPlayerCharacter::CommandFollow()
 {
     if (Health <= 0.0f) return;
+    int32 Count = 0;
     for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It)
-        if (It->Tamer == GetController()) { It->ClearCombatOrders(); It->WorkSite = nullptr; It->SetActivity(ECreatureActivity::Follow); }
-    Feedback = TEXT("Companions following");
+        if (IsCommandTarget(*It)) { It->ClearCombatOrders(); It->WorkSite = nullptr; It->SetActivity(ECreatureActivity::Follow); ++Count; }
+    Feedback = FString::Printf(TEXT("%d commanded companions following | %s"),Count,*GetCommandScopeText());
 }
 
 void ACFPlayerCharacter::CommandFocus()
@@ -315,7 +317,7 @@ void ACFPlayerCharacter::CommandFocus()
     { Feedback = TEXT("Aim at a living wild creature to focus attacks"); return; }
     int32 Count = 0;
     for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It)
-        if (It->Tamer == GetController() && It->GetDistanceTo(this) <= 1800 && It->OrderAttack(Target)) ++Count;
+        if (IsCommandTarget(*It) && It->GetDistanceTo(this) <= 1800 && It->OrderAttack(Target)) ++Count;
     Feedback = FString::Printf(TEXT("Focus %s: %d active companions"), *Target->GetCreatureName(), Count);
 }
 
@@ -328,7 +330,7 @@ void ACFPlayerCharacter::CommandSpecial()
     float BestDistance = TNumericLimits<float>::Max();
     for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It)
     {
-        if (It->Tamer != GetController() || !It->IsSpecialReady() || It->GetDistanceTo(this) > 1800) continue;
+        if (!IsCommandTarget(*It) || !It->IsSpecialReady() || It->GetDistanceTo(this) > 1800) continue;
         auto* Target = IsValid(Aimed) && Aimed->Health > 0 && Aimed->Disposition != ECreatureDisposition::Tamed ? Aimed : It->FocusTarget.Get();
         if (!IsValid(Target) || Target->Health <= 0 || Target->Disposition == ECreatureDisposition::Tamed || Target->GetDistanceTo(this) > 1500) continue;
         const float Distance = It->GetDistanceTo(Target);
@@ -350,10 +352,11 @@ void ACFPlayerCharacter::CommandWork()
         if (Distance < Best) { Best = Distance; Site = *It; }
     }
     if (!Site) { Feedback = TEXT("Move within 8m of the work station"); return; }
+    int32 Count = 0;
     for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It)
-        if (It->Tamer == GetController() && It->Health > 0.0f)
-        { It->WorkSite = Site; It->SetActivity(ECreatureActivity::Work); }
-    Feedback = FString::Printf(TEXT("Assigned: %s. Matching specialties work faster"),
+        if (IsCommandTarget(*It) && It->Health > 0.0f)
+        { It->WorkSite = Site; It->SetActivity(ECreatureActivity::Work); ++Count; }
+    Feedback = FString::Printf(TEXT("Assigned %d: %s. Matching specialties work faster"),Count,
         *UEnum::GetValueAsString(Site->RequiredSpecialty));
 }
 
@@ -367,7 +370,7 @@ void ACFPlayerCharacter::CommandRest()
     if (!Site) { Feedback = TEXT("Rest command requires a nearby base work station (8m)"); return; }
     int32 Count = 0;
     for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It)
-        if (It->Tamer == GetController() && It->Health > 0)
+        if (IsCommandTarget(*It) && It->Health > 0)
         { It->bResumeWorkAfterRest = false; It->WorkSite = Site; It->SetActivity(ECreatureActivity::Rest); ++Count; }
     Feedback = FString::Printf(TEXT("%d companions returning to base to recover health and stamina"), Count);
 }
@@ -426,6 +429,8 @@ void ACFPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
     PlayerInputComponent->BindKey(EKeys::B, IE_Pressed, this, &ACFPlayerCharacter::ToggleBuilding);
     PlayerInputComponent->BindKey(EKeys::V, IE_Pressed, this, &ACFPlayerCharacter::CycleBuilding);
     PlayerInputComponent->BindKey(EKeys::X, IE_Pressed, this, &ACFPlayerCharacter::DismantleBuilding);
+    PlayerInputComponent->BindKey(EKeys::L, IE_Pressed, this, &ACFPlayerCharacter::SelectAimedCompanion);
+    PlayerInputComponent->BindKey(EKeys::K, IE_Pressed, this, &ACFPlayerCharacter::ClearCompanionSelection);
 }
 
 void ACFPlayerCharacter::MoveForward(float Value)

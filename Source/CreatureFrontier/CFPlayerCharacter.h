@@ -40,6 +40,11 @@ public:
     bool IsNearWorkStation() const;
     FString Feedback;
     ACreatureCharacter* TraceCreature() const;
+    bool SelectCompanion(ACreatureCharacter* Pet);
+    void SelectAimedCompanion();
+    void ClearCompanionSelection();
+    bool IsCommandTarget(const ACreatureCharacter* Pet) const;
+    FString GetCommandScopeText() const;
     void CommandFollow();
     void CommandWork();
     void CommandRest();
@@ -77,6 +82,8 @@ protected:
     virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 
 private:
+    TWeakObjectPtr<ACreatureCharacter> SelectedCompanion;
+    bool bSingleCompanionMode = false;
     void MoveForward(float Value);
     void MoveRight(float Value);
     double NextAttackTime = 0.0;

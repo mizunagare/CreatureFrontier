@@ -17,7 +17,7 @@ void ACFHUD::DrawHUD()
     const float X = Canvas->ClipX * 0.5f, Y = Canvas->ClipY * 0.5f;
     DrawLine(X-7, Y, X+7, Y, FLinearColor::White);
     DrawLine(X, Y-7, X, Y+7, FLinearColor::White);
-    DrawRect(FLinearColor(0.02f,0.03f,0.05f,0.85f), 18, 18, 550, 380);
+    DrawRect(FLinearColor(0.02f,0.03f,0.05f,0.85f), 18, 18, 550, 410);
     DrawText(FString::Printf(TEXT("HEALTH %.0f / 100    MATERIALS %d"), Player->Health, Player->Inventory->Count(EFrontierItem::Material)), FLinearColor::White, 32, 30);
     int32 Companions = 0, Working = 0;
     for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It)
@@ -32,8 +32,9 @@ void ACFHUD::DrawHUD()
     DrawText(TEXT("B build mode | V cycle facility | X dismantle (50% refund)"), FLinearColor::White,32,242);
     DrawText(FString::Printf(TEXT("FOOD %d | 3 craft food (2 materials) | J feed aimed companion"),Player->Inventory->Count(EFrontierItem::Food)),FLinearColor::White,32,268);
     DrawText(TEXT("Trough: aim + U deposit food | O withdraw (up to 5)"),FLinearColor::White,32,294);
-    DrawText(Player->Feedback, FLinearColor::Yellow, 32, 338);
-    if (Player->Building->IsActive()) DrawText(Player->Building->GetHint(), FLinearColor::Yellow,32,410);
+    DrawText(Player->GetCommandScopeText(),FLinearColor::Green,32,320);
+    DrawText(Player->Feedback, FLinearColor::Yellow, 32, 368);
+    if (Player->Building->IsActive()) DrawText(Player->Building->GetHint(), FLinearColor::Yellow,32,440);
     if (auto* Site = Player->TraceFacility(); Site && Site->RequiredSpecialty == EWorkSpecialty::Feeding)
         DrawText(FString::Printf(TEXT("TROUGH %d / 30 FOOD | U deposit | O withdraw"),Site->StoredFood),FLinearColor::Yellow,X-130,Y+25);
     float RegionY = Canvas->ClipY - 90;
