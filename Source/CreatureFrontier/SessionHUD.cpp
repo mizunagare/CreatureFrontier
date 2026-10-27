@@ -47,7 +47,7 @@ void ACFHUD::DrawControlHelp(ACFPlayerCharacter* Player)
         TEXT("T rest | P treat aimed companion"),
         TEXT("J feed aimed companion | H heal yourself"),
         TEXT("B build | V cycle facility | X dismantle"),
-        TEXT("1 craft device (3 materials)"),
+        TEXT("C backpack / recipes | 1 craft device (3)"),
         TEXT("2 craft medicine (5) | 3 craft food (2)"),
         FString::Printf(TEXT("4 spear (%d) | 5 vest (%d)"),Player->Equipment->SpearCost,Player->Equipment->VestCost),
         TEXT("6 / 7 equip or remove spear / vest"),

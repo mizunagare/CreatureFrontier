@@ -14,4 +14,5 @@ private:
     void DrawWrappedText(const FString& Text,FLinearColor Color,float X,float Y,float Width,int32 MaxLines);
     void DrawPauseMenu(ACFPlayerCharacter* Player);
     void DrawControlHelp(ACFPlayerCharacter* Player);
+    void DrawBackpack(ACFPlayerCharacter* Player);
 };

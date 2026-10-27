@@ -37,9 +37,14 @@ bool UInventoryComponent::Consume(EFrontierItem Item, int32 Amount)
     return true;
 }
 
+int32 UInventoryComponent::CraftCost(EFrontierItem Output)
+{
+    return Output == EFrontierItem::CaptureDevice ? 3 : Output == EFrontierItem::Medicine ? 5 : Output == EFrontierItem::Food ? 2 : 0;
+}
+
 bool UInventoryComponent::Craft(EFrontierItem Output)
 {
-    const int32 Cost = Output == EFrontierItem::CaptureDevice ? 3 : Output == EFrontierItem::Medicine ? 5 : Output == EFrontierItem::Food ? 2 : 0;
+    const int32 Cost = CraftCost(Output);
     if (!GetOwner() || !GetOwner()->HasAuthority() || Cost == 0 || Count(Output) >= StackLimit || Count(EFrontierItem::Material) < Cost) return false;
     Stacks.FindOrAdd(EFrontierItem::Material) -= Cost;
     ++Stacks.FindOrAdd(Output);

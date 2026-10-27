@@ -18,6 +18,7 @@ public:
     bool GrantItems(const TMap<EFrontierItem,int32>& Items);
     UFUNCTION(BlueprintCallable) bool Consume(EFrontierItem Item, int32 Amount);
     UFUNCTION(BlueprintCallable) bool Craft(EFrontierItem Output);
+    static int32 CraftCost(EFrontierItem Output);
     const TMap<EFrontierItem, int32>& GetStacks() const { return Stacks; }
     bool Restore(const TMap<EFrontierItem, int32>& NewStacks);
     static bool Validate(const TMap<EFrontierItem, int32>& NewStacks);

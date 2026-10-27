@@ -27,18 +27,18 @@ void ACFPlayerCharacter::TogglePauseMenu()
     }
     if(!UGameplayStatics::SetGamePaused(this,true)) { Feedback=TEXT("Pause is unavailable in this game mode"); return; }
     CancelMeleeAttack(); Building->Cancel(); StopJumping(); GetCharacterMovement()->StopMovementImmediately(); ConsumeMovementInputVector();
-    bRosterOpen=false; bJournalOpen=false; bHelpVisible=false;
+    bRosterOpen=false; bJournalOpen=false; bHelpVisible=false; bBackpackOpen=false;
     bPauseMenu=true; bPauseConfirmation=false; PauseSelection=0;
     Feedback=TEXT("Paused - world simulation stopped. Save before quitting");
 }
 
-void ACFPlayerCharacter::PauseMenuNext() { if(bPauseMenu) { PauseSelection=(PauseSelection+1)%5; bPauseConfirmation=false; } }
-void ACFPlayerCharacter::PauseMenuPrevious() { if(bPauseMenu) { PauseSelection=(PauseSelection+4)%5; bPauseConfirmation=false; } }
+void ACFPlayerCharacter::PauseMenuNext() { if(bPauseMenu) { PauseSelection=(PauseSelection+1)%5; bPauseConfirmation=false; } else StepBackpackRecipe(1); }
+void ACFPlayerCharacter::PauseMenuPrevious() { if(bPauseMenu) { PauseSelection=(PauseSelection+4)%5; bPauseConfirmation=false; } else StepBackpackRecipe(-1); }
 void ACFPlayerCharacter::ToggleHelp()
 {
     if(bPauseMenu) return;
     bHelpVisible=!bHelpVisible;
-    if(bHelpVisible) { bRosterOpen=false; bJournalOpen=false; }
+    if(bHelpVisible) { bRosterOpen=false; bJournalOpen=false; bBackpackOpen=false; }
 }
 
 void ACFPlayerCharacter::QuickSave()
@@ -56,7 +56,7 @@ void ACFPlayerCharacter::QuickLoad()
 
 void ACFPlayerCharacter::ConfirmInterfaceAction()
 {
-    if(!bPauseMenu) { SelectRosterCompanion(); return; }
+    if(!bPauseMenu) { if(bBackpackOpen) CraftBackpackRecipe(); else SelectRosterCompanion(); return; }
     switch(PauseSelection)
     {
         case 0: ClosePauseMenu(); break;

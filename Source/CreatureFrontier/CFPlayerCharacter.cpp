@@ -307,7 +307,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
     Inventory->Restore(Save->InventoryStacks);
     GetCharacterMovement()->SetMovementMode(Health > 0 ? MOVE_Walking : MOVE_None);
     SelectedCompanion.Reset();
-    RosterHighlight.Reset();
+    RosterHighlight.Reset(); bBackpackOpen=false; BackpackRecipe=0;
     Journal=Save->Journal; JournalAssets=LoadedJournalAssets; JournalPage=0;
     Objectives=Save->Objectives;
     // Owned survivors in old snapshots prove capture; unseen wild snapshots do not prove discovery.
@@ -341,7 +341,7 @@ float ACFPlayerCharacter::TakeDamage(float Amount, const FDamageEvent& Event, AC
     {
         GetCharacterMovement()->StopMovementImmediately(); GetCharacterMovement()->DisableMovement(); StopJumping();
         CancelMeleeAttack();
-        Building->Cancel(); bRosterOpen=false; bJournalOpen=false;
+        Building->Cancel(); bRosterOpen=false; bJournalOpen=false; bBackpackOpen=false;
         Equipment->RefreshVisual();
         for(TActorIterator<ACreatureCharacter> It(GetWorld());It;++It) It->HandlePlayerDowned(this);
     }
@@ -484,6 +484,7 @@ void ACFPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
     PlayerInputComponent->BindKey(EKeys::Up, IE_Pressed, this, &ACFPlayerCharacter::PauseMenuPrevious).bExecuteWhenPaused=true;
     PlayerInputComponent->BindKey(EKeys::Down, IE_Pressed, this, &ACFPlayerCharacter::PauseMenuNext).bExecuteWhenPaused=true;
     PlayerInputComponent->BindKey(EKeys::F1, IE_Pressed, this, &ACFPlayerCharacter::ToggleHelp);
+    PlayerInputComponent->BindKey(EKeys::C, IE_Pressed, this, &ACFPlayerCharacter::ToggleBackpack);
     PlayerInputComponent->BindKey(EKeys::One, IE_Pressed, this, &ACFPlayerCharacter::CraftCaptureDevice);
     PlayerInputComponent->BindKey(EKeys::Two, IE_Pressed, this, &ACFPlayerCharacter::CraftMedicine);
     PlayerInputComponent->BindKey(EKeys::Three, IE_Pressed, this, &ACFPlayerCharacter::CraftFood);

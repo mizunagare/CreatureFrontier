@@ -29,7 +29,7 @@ void ACFHUD::DrawHUD()
     DrawText(FString::Printf(TEXT("COMPANIONS %d | WORKING %d"),Companions,Working),FLinearColor::Green,32,78);
     DrawText(Player->GetCommandScopeText(),FLinearColor::Green,32,102);
     DrawText(FString::Printf(TEXT("%s | attack %.0f | reach %.1fm | vest %.0f%%"),Player->Equipment->GetState().bSpearEquipped?TEXT("SPEAR"):TEXT("UNARMED"),Player->GetPlayerAttackDamage(),Player->GetPlayerMeleeRange()/100,Player->Equipment->GetDamageReduction()*100),FLinearColor::White,32,126);
-    DrawText(TEXT("F1 controls | Esc pause | Tab team | I journal"),FLinearColor::White,32,150);
+    DrawText(TEXT("C backpack | F1 controls | Esc pause | Tab team | I journal"),FLinearColor::White,32,150);
     DrawRect(FLinearColor(.02f,.04f,.06f,.88f),18,184,600,52);
     DrawWrappedText(Player->Feedback,FLinearColor::Yellow,32,194,570,2);
     const float JourneyY=Canvas->ClipY-200;
@@ -81,6 +81,7 @@ void ACFHUD::DrawHUD()
             DrawText(FString::Printf(TEXT("SLOW %.1fs  GUARD %.1fs"), Creature->SlowRemaining, Creature->GuardRemaining), FLinearColor::Yellow, X-130, Y+92);
     }
     if(Player->IsHelpVisible()) DrawControlHelp(Player);
+    if(Player->IsBackpackOpen()) DrawBackpack(Player);
     if (Player->IsJournalOpen())
     {
         const auto& Entries=Player->GetJournal();

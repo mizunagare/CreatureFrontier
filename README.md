@@ -4,9 +4,9 @@
 
 ## Windows 独立原型
 
-当前最新本机版本：`D:\myGame\Builds\Windows-Session\CreatureFrontier.exe`。
+当前最新本机版本：`D:\myGame\Builds\Windows-Backpack\CreatureFrontier.exe`。
 双击即可进入测试地图，不需要先打开 Unreal Editor。复制到其他机器时需复制整个
-`Builds\Windows-Session` 文件夹，不能只复制根目录的启动 EXE。
+`Builds\Windows-Backpack` 文件夹，不能只复制根目录的启动 EXE。
 这是 Development 灰盒原型，尚未完成正式美术、内容与性能优化。
 
 战斗更新预览另外输出到 `D:\myGame\Builds\Windows-Combat\CreatureFrontier.exe`，
@@ -28,6 +28,7 @@
 玩家近战更新输出到 `D:\myGame\Builds\Windows-Melee\CreatureFrontier.exe`。
 食物运输更新输出到 `D:\myGame\Builds\Windows-Logistics\CreatureFrontier.exe`。
 暂停菜单与精简 HUD 更新输出到 `D:\myGame\Builds\Windows-Session\CreatureFrontier.exe`。
+背包与制作面板更新输出到 `D:\myGame\Builds\Windows-Backpack\CreatureFrontier.exe`。
 菜单为键盘操作；帮助、队伍和图鉴面板不会暂停，只有 Esc 菜单暂停世界。
 使用 `-CFSessionTest -CFSessionPreview -RenderOffscreen` 可运行菜单测试并在当前程序的
 `Saved/SessionPreview/` 生成暂停、帮助、常驻 HUD 三张检查图；请勿同时使用 `-nullrhi`。
@@ -79,6 +80,7 @@ Windows 开发环境已部署并验证：Unreal Engine 5.8、Visual Studio C++ �
 - `R`：倒地后在原基地附近安全位置重生，保留当前世界；存活时不执行
 - `Esc`：暂停世界并打开菜单；上下选择、Enter 执行。可继续、保存、确认读档、倒地重生、确认退出；退出不自动保存。
 - `F1`：开关操作帮助（帮助不暂停世界）；默认 HUD 只显示关键状态与当前目标。
+- `C`：开关背包/制作面板；上下选择五种配方、Enter 制作一件。数字 1–5 快捷制作仍可用。背包不暂停，Esc 可打开暂停菜单。
 - `F5`：保存当前进度（暂停时也可用）；`F9`：先打开读档确认，再按 F9 或 Enter 恢复快照。Esc 取消确认但保持暂停，再按 Esc 继续游戏。读档成功后仍保持暂停。
 - `1`：工作台 8 米内消耗 3 材料制作 1 个捕捉装置
 - `2`：工作台 8 米内消耗 5 材料制作 1 份治疗药
@@ -240,7 +242,13 @@ HUD 显示当前触及距离和短暂起手提示。捕捉/观察仍使用原先
 匹配专长按表中速度工作，不匹配时为 0.5 倍。各工作台目前都产出通用材料。
 可通过 `Content/Python/create_creature_species.py` 重建物种数据并更新测试地图，脚本最后会重建导航。
 
-背包含材料、捕捉装置与治疗药，每类最多 999。开局有 6 材料、5 装置和 1 份药。
+背包含材料、捕捉装置、治疗药与食物，每类最多 999。开局有 6 材料、5 装置、1 份药和 3 食物。
+C 面板实时显示四类物品数量、长矛/护甲的拥有与穿戴状态，以及五种配方的消耗和当前制作条件。
+上下键循环配方，Enter 制作一件；输出满、缺材料、远离工作台或装备已拥有时不扣材料。
+面板复用数字快捷键的实际制作函数，捕捉装置/药/食物分别消耗 3/5/2 材料；长矛/护甲按装备配置显示消耗。
+喂食槽不充当制作台，需在其他工作设施 8 米内；打开背包取消待结算近战和建造预览，不停止世界。
+背包与图鉴、队伍、帮助面板互斥；进入暂停、倒地或成功读档会关闭背包。面板选择不写入存档。
+装备仍为独立槽位，并非堆叠物品；本面板暂不提供鼠标拖拽、丢弃或批量制作。
 每次有效捕捉尝试消耗 1 个装置，成功和失败均消耗；对倒地/已驯服目标、
 超出距离、隔墙目标或冷却中的点击不消耗。伙伴工作持续提供制作所需材料。
 背包随 F5/F9 保存和恢复，旧版存档会迁移材料并补充初始装置/药。
@@ -311,7 +319,9 @@ HUD 显示玩家生命、资源、伙伴数量、工作数量和准星目标的�
 `-CFLogisticsTest` 验证真实寻路取货/卸货/进食、满食槽不取货、部分卸货、途中反复读档守恒、
 改派保留、背包容量与倒地回收、携带食物应急进食、自动休息复工、非法库存/携带量拒绝和旧档迁移，
 使用 `FrontierLogisticsAutomation` 等独立测试槽。
-当前打包回归共 23 项，包含伙伴分工、图鉴、新手目标、基地重生、装备、近战、食物物流与暂停菜单测试。
+当前打包回归共 24 项，包含伙伴分工、图鉴、新手目标、基地重生、装备、近战、食物物流、暂停菜单与背包制作测试。
+`-CFBackpackTest` 使用独立的 `FrontierBackpackAutomation` 测试槽，验证五配方实际消耗、重复装备、缺料/满格/距离/倒地拒绝、面板互斥和存档恢复。
+追加 `-CFBackpackPreview -RenderOffscreen`（不加 nullrhi）可在当前程序的 `Saved/BackpackPreview/backpack.png` 生成检查图。
 同时添加 `-CFRosterPreview -RenderOffscreen -windowed -ResX=1280 -ResY=720 -norhithread -forcerhibypass "-ExecCmds=t.MaxFPS 60"`（不要使用 `-nullrhi`），
 可生成 11 只伙伴的两页界面截图 `Saved/RosterPreview/team.png` 和 `team_page2.png` 后退出，不写入玩家存档。
 已知显示问题：当前机器 D3D12 离屏截图存在间歇性缺字，上述兼容参数可改善但尚未完全消除。

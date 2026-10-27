@@ -36,7 +36,7 @@ void ACFPlayerCharacter::ObserveAimedCreature() { ObserveCreature(TraceCreature(
 void ACFPlayerCharacter::ToggleJournal()
 {
     bJournalOpen=!bJournalOpen; JournalPage=0;
-    if (bJournalOpen) { bRosterOpen=false; bHelpVisible=false; }
+    if (bJournalOpen) { bRosterOpen=false; bHelpVisible=false; bBackpackOpen=false; }
 }
 void ACFPlayerCharacter::NextJournalPage() { if(bJournalOpen && !Journal.IsEmpty()) JournalPage=(JournalPage+1)%Journal.Num(); }
 void ACFPlayerCharacter::PreviousJournalPage() { if(bJournalOpen && !Journal.IsEmpty()) JournalPage=(JournalPage+Journal.Num()-1)%Journal.Num(); }

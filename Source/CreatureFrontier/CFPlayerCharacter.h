@@ -102,6 +102,13 @@ public:
     void PauseMenuPrevious();
     void ConfirmInterfaceAction();
     void ToggleHelp();
+    void ToggleBackpack();
+    void StepBackpackRecipe(int32 Direction);
+    void CraftBackpackRecipe();
+    bool IsBackpackOpen() const { return bBackpackOpen; }
+    int32 GetBackpackRecipe() const { return BackpackRecipe; }
+    int32 GetBackpackRecipeCost(int32 Index) const;
+    FString GetBackpackRecipeStatus(int32 Index) const;
     bool IsPauseMenuOpen() const { return bPauseMenu; }
     bool IsPauseConfirmationPending() const { return bPauseConfirmation; }
     int32 GetPauseSelection() const { return PauseSelection; }
@@ -139,6 +146,8 @@ private:
     bool bPauseMenu=false;
     bool bPauseConfirmation=false;
     bool bHelpVisible=false;
+    bool bBackpackOpen=false;
+    int32 BackpackRecipe=0;
     int32 PauseSelection=0;
     void ResolveMeleeStrike();
     FTimerHandle MeleeTimer;
