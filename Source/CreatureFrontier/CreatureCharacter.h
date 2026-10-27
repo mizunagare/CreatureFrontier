@@ -28,6 +28,9 @@ public:
     FName GetVisualState() const { return VisualState; }
     FVector GetFollowDestination() const;
     FString GetGatheringStatus() const;
+    bool AssignFieldResource(class AResourceNode* Node);
+    void CancelFieldResource();
+    class AResourceNode* GetFieldResource() const;
     UPROPERTY(Replicated,BlueprintReadOnly,Category="Care") int32 BondPoints=0;
     UPROPERTY(Replicated,BlueprintReadOnly,Category="Care") float PettingCooldown=0;
     void AddBond(int32 Amount);
@@ -130,6 +133,7 @@ protected:
     void OnRep_Activity();
 
 private:
+    TWeakObjectPtr<class AResourceNode> FieldResource;
     void TickGathering(float DeltaSeconds,ACFPlayerCharacter* Recipient);
     void ResetGathering();
     TWeakObjectPtr<class AResourceNode> GatherTarget, FailedResource;

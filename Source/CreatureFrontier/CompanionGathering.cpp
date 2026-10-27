@@ -5,34 +5,57 @@
 #include "CFPlayerCharacter.h"
 #include "InventoryComponent.h"
 #include "EngineUtils.h"
+#include "CreatureDefinition.h"
+
+AResourceNode* ACreatureCharacter::GetFieldResource() const { return FieldResource.Get(); }
+
+bool ACreatureCharacter::AssignFieldResource(AResourceNode* Node)
+{
+    if(!HasAuthority() || Health<=0 || Disposition!=ECreatureDisposition::Tamed || !IsValid(Node) ||
+        Node->GetWorld()!=GetWorld() || !Node->Definition || !Node->Definition->IsValidDefinition()) return false;
+    ResetGathering(); StopNavigation(); ClearCombatOrders();
+    WorkSite=nullptr; FieldResource=Node; bResumeWorkAfterRest=false;
+    SetActivity(ECreatureActivity::Work); return true;
+}
+void ACreatureCharacter::CancelFieldResource()
+{
+    FieldResource.Reset(); ResetGathering();
+}
 
 void ACreatureCharacter::TickGathering(float DeltaSeconds,ACFPlayerCharacter* Recipient)
 {
     bGatheringActive=false;
+    auto* Field=FieldResource.Get();
     auto Park=[this]()
     {
+        if(!IsValid(WorkSite)) { StopNavigation(); return; }
         const FVector Waiting=WorkSite->GetActorLocation()+FVector(-180,0,90);
         if(FVector::Dist2D(Waiting,GetActorLocation())>70) NavigateTo(Waiting,35); else StopNavigation();
     };
     Stamina=FMath::Max(0.f,Stamina-DeltaSeconds*1.5f);
     if(Stamina<=0) { bResumeWorkAfterRest=true; SetActivity(ECreatureActivity::Rest); StopNavigation(); return; }
-    if(ProgressSite.Get()!=WorkSite.Get()) { ResetGathering(); ProgressSite=WorkSite; }
+    if(!Field && ProgressSite.Get()!=WorkSite.Get()) { ResetGathering(); ProgressSite=WorkSite; }
     GatherRetry=FMath::Max(0.f,GatherRetry-DeltaSeconds);
     if(GatherRetry>0) { Park(); return; }
+    if(Field && (!Field->Definition || Field->Remaining<=0)) { WorkProgress=0; Park(); return; }
     auto* Node=GatherTarget.Get();
-    if(Node && (Node->Remaining<=0 || !Node->Definition || Node->Definition->Specialty!=WorkSite->RequiredSpecialty ||
-        Node->GetDistanceTo(WorkSite)>800 || GetWorld()->GetTimeSeconds()>GatherExpires))
+    if(Node && (Node->Remaining<=0 || !Node->Definition || (!Field && (Node->Definition->Specialty!=WorkSite->RequiredSpecialty ||
+        Node->GetDistanceTo(WorkSite)>800)) || GetWorld()->GetTimeSeconds()>GatherExpires))
     {
         FailedResource=Node; FailedResourceUntil=GetWorld()->GetTimeSeconds()+5;
         GatherTarget.Reset(); WorkProgress=0; GatherRetry=2; Park(); return;
     }
     if(!Node)
     {
+        if(Field) { Node=Field; }
+        else
+        {
         float Best=MAX_flt;
         for(TActorIterator<AResourceNode> It(GetWorld());It;++It)
             if(It->Definition && It->Remaining>0 && It->Definition->Specialty==WorkSite->RequiredSpecialty &&
                 It->GetDistanceTo(WorkSite)<=800 && (FailedResource.Get()!=*It || GetWorld()->GetTimeSeconds()>=FailedResourceUntil) && GetDistanceTo(*It)<Best)
             { Node=*It; Best=GetDistanceTo(*It); }
+        }
         if(!Node) { WorkProgress=0; GatherRetry=2; Park(); return; }
         GatherTarget=Node; GatherExpires=GetWorld()->GetTimeSeconds()+8;
     }
@@ -46,7 +69,8 @@ void ACreatureCharacter::TickGathering(float DeltaSeconds,ACFPlayerCharacter* Re
     }
     StopNavigation(); GatherExpires=GetWorld()->GetTimeSeconds()+8;
     bGatheringActive=Recipient->Inventory->Count(Node->Definition->OutputItem)<999;
-    WorkProgress=FMath::Min(Node->Definition->WorkSeconds,WorkProgress+DeltaSeconds*GetWorkEfficiency(WorkSite)*(Nutrition<20?.5f:1.f));
+    const float Efficiency=Field ? (Definition && Definition->WorkSpecialties.Contains(Node->Definition->Specialty)?Definition->WorkSpeed:.5f) : GetWorkEfficiency(WorkSite);
+    WorkProgress=FMath::Min(Node->Definition->WorkSeconds,WorkProgress+DeltaSeconds*Efficiency*(Nutrition<20?.5f:1.f));
     if(WorkProgress>=Node->Definition->WorkSeconds && Node->TryHarvest(Recipient,this))
     { Recipient->RecordCompanionProduction(this,Node->Definition->OutputItem); AddExperience(1); WorkProgress=0; }
 }
@@ -56,6 +80,14 @@ void ACreatureCharacter::ResetGathering()
 }
 FString ACreatureCharacter::GetGatheringStatus() const
 {
+    if(auto* Field=FieldResource.Get())
+    {
+        const auto* Hero=Tamer?Cast<ACFPlayerCharacter>(Tamer->GetPawn()):nullptr;
+        if(Activity==ECreatureActivity::Rest) return TEXT("FIELD JOB: resting here; no field healing | feed/treat as needed | F cancels");
+        if(Hero && Field->Definition && Hero->Inventory->Count(Field->Definition->OutputItem)>=999)
+            return TEXT("FIELD JOB: inventory full; ready work retained | F cancels");
+        return TEXT("FIELD JOB: ")+Field->GetStatus()+TEXT(" | F cancels; exhausted stock waits");
+    }
     if(Activity!=ECreatureActivity::Work || !WorkSite || WorkSite->RequiredSpecialty==EWorkSpecialty::Farming ||
         WorkSite->RequiredSpecialty==EWorkSpecialty::Transport || WorkSite->RequiredSpecialty==EWorkSpecialty::Feeding) return FString();
     if(auto* Node=GatherTarget.Get())

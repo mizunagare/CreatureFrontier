@@ -166,6 +166,7 @@ void ACFHUD::DrawHUD()
             else if (Pet->FeedingSite.IsValid()) Status = TEXT("Seeking food");
             else if (Pet->bResumeWorkAfterRest) Status = TEXT("Auto rest / work pending");
             if (Pet->WorkSite) { FString Job=UEnum::GetValueAsString(Pet->WorkSite->RequiredSpecialty); Job.RemoveFromStart(TEXT("EWorkSpecialty::")); Status+=TEXT(" | ")+Job; }
+            if(Pet->GetFieldResource()) Status+=TEXT(" | Field resource");
             if(Pet->CarriedFood>0) Status+=FString::Printf(TEXT(" | cargo %d"),Pet->CarriedFood);
             DrawText(Status,FLinearColor::Green,Left+14,RowY+43);
         }

@@ -45,7 +45,7 @@ void ACFHUD::DrawControlHelp(ACFPlayerCharacter* Player)
         TEXT("0 normal / resonance capture | C study crystal"),
         TEXT("Q focus enemy | G companion special"),
         TEXT("L select one companion | K command all"),
-        TEXT("F follow | E nearest work facility (8m)"),
+        TEXT("F follow/cancel | E aimed resource or nearby post (8m)"),
         TEXT("T rest | P treat aimed companion"),
         TEXT("J feed aimed companion | H heal yourself"),
         TEXT("Y pet companion (2.5m, safe, follow / rest)"),

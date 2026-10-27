@@ -9,7 +9,8 @@
 随后可制作 **Resonance device**（3 材料 + 1 水晶），或在 `B` → `8` 房屋分类建 **Crystal lantern**（4 材料 + 2 水晶）。
 `0` 选择普通/增强捕捉，`RMB` 只消耗选中的装置，缺货不回退；增强倍率 1.5，概率仍封顶 95%。
 灯具依附地板，具有实际暖色点光照；物品/七配方读取同一目录，背包显示六类物品并自动分页。
-当前野外协作是伙伴战斗掩护，基地站点覆盖不到水晶矿；野外采矿工作令/营地扩展尚未实现。
+野外可瞄准 8 米内资源按 `E` 派伙伴采集，`F` 取消；不命中资源时仍派往附近基地设施。野外没有自动治疗或战斗护卫，迁移营地尚未实现。
+格式 20 保存资源目标与自动休息意图，详情见 [野外工作令](Docs/FIELD_WORK.md)。
 详细规则、迁移与边界见 [水晶探索说明](Docs/CRYSTAL_EXPEDITION.md)。
 
 ## 模块化房间（格式 18）
@@ -19,7 +20,7 @@
 地板/墙/门洞/屋顶分别消耗 8/6/8/10 材料；拆除按实际支付成本返还一半。
 墙依附地板，屋顶需要两面相对墙；不能拆掉最后支撑，也不能抽走室内设施下的地板。
 玩家和伙伴使用真实碰撞/导航穿门，设施可放到地板上；当前仍限原基地 12 米内、单层 4 米网格。
-格式 18 起保存模块 GUID、支撑、位置和支付成本；当前 19 另含研究灯及附加支付。多层、窗、楼梯、可开关门和正式材质/完整照明系统尚未实现。
+格式 18 起保存模块 GUID、支撑、位置和支付成本；格式 19 另含研究灯及附加支付，20 加入野外工作目标。多层、窗、楼梯、可开关门和正式材质/完整照明系统尚未实现。
 具体规则、边界与预览命令见 [房屋建造说明](Docs/HOME_BUILDING.md)。
 
 ## 有限资源采集（格式 17 起）
@@ -34,9 +35,9 @@
 
 ## Windows 独立原型
 
-当前最新本机版本：`D:\myGame\Builds\Windows-Expedition\CreatureFrontier.exe`。
+当前最新本机版本：`D:\myGame\Builds\Windows-FieldWork-Final\CreatureFrontier.exe`。
 双击即可进入测试地图，不需要先打开 Unreal Editor。复制到其他机器时需复制整个
-`Builds\Windows-Expedition` 文件夹，不能只复制根目录的启动 EXE。
+`Builds\Windows-FieldWork-Final` 文件夹，不能只复制根目录的启动 EXE。
 这是 Development 灰盒原型，尚未完成正式美术、内容与性能优化。
 
 战斗更新预览另外输出到 `D:\myGame\Builds\Windows-Combat\CreatureFrontier.exe`，
@@ -66,13 +67,14 @@
 有限资源采集更新输出到 `D:\myGame\Builds\Windows-Resources\CreatureFrontier.exe`。
 模块房间更新输出到 `D:\myGame\Builds\Windows-Home\CreatureFrontier.exe`。
 水晶探索更新输出到 `D:\myGame\Builds\Windows-Expedition\CreatureFrontier.exe`。
+野外工作令更新输出到 `D:\myGame\Builds\Windows-FieldWork-Final\CreatureFrontier.exe`。
 菜单为键盘操作；帮助、队伍和图鉴面板不会暂停，只有 Esc 菜单暂停世界。
 使用 `-CFSessionTest -CFSessionPreview -RenderOffscreen` 可运行菜单测试并在当前程序的
 `Saved/SessionPreview/` 生成暂停、帮助、常驻 HUD 三张检查图；请勿同时使用 `-nullrhi`。
-旧存档版本 1–18 可以读取，新版存档版本为 19（增加水晶研究、物品和灯的混合支付；保留旧节点预算并加入新水晶点）。
+旧存档版本 1–19 可以读取，新版存档版本为 20（保留研究、物品、灯及节点预算，增加野外资源目标与恢复意图）。
 新版保存后的存档不能交给旧版程序读取；请保留旧存档备份。
 测试脚本默认选择 `Builds` 下最新编译的 Development 程序，也可明确指定：
-`.\Scripts\Test-Packaged.ps1 -BuildRoot D:\myGame\Builds\Windows-Expedition`。
+`.\Scripts\Test-Packaged.ps1 -BuildRoot D:\myGame\Builds\Windows-FieldWork-Final`。
 每个测试限时 60 秒，超时只结束该脚本启动的测试进程。
 每次回归使用 `Saved/PackagedTests/<时间戳-随机标识>/` 下的新日志，避免读取上次运行的成功标记。
 
@@ -113,7 +115,7 @@ Windows 开发环境已部署并验证：Unreal Engine 5.8、Visual Studio C++ �
 - `U` / `O`：瞄准 6 米内无遮挡农圃或食槽，每次最多存入 / 取出 5 食物
 - `Z`：瞄准 6 米内无遮挡的自有伙伴，取回携带的食物；倒地伙伴也可取回
 - `F`：召回当前指令范围内的伙伴跟随，并自动攻击玩家周边的野生宠物
-- `E`：工作台 8 米内分配伙伴；伙伴实际寻找工作站 8 米内的匹配资源点，到达后采集有限库存
+- `E`：优先给瞄准的 8 米内资源派工，否则分配到附近工作台；伙伴真实到达后采集共享有限库存
 - `M`：瞄准 3 米内资源点采集 1 材料，与伙伴共用库存和资源点冷却
 - `R`：倒地后在原基地附近安全位置重生，保留当前世界；存活时不执行
 - `Esc`：暂停世界并打开菜单；上下选择、Enter 执行。可继续、保存、确认读档、倒地重生、确认退出；退出不自动保存。

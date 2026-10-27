@@ -218,7 +218,7 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
     PettingCooldown=FMath::Max(0.f,PettingCooldown-DeltaSeconds);
     GetCharacterMovement()->MaxWalkSpeed = (Definition ? Definition->MoveSpeed : 320.0f) * (SlowRemaining > 0 ? 0.5f : 1.0f) *
         (Disposition != ECreatureDisposition::Tamed && Activity == ECreatureActivity::Wander ? .45f : 1.0f);
-    if (Health <= 0.0f) { bResumeWorkAfterRest = false; FeedingSite.Reset(); AlphaWindup = 0; ClearCombatOrders(); StopNavigation(); return; }
+    if (Health <= 0.0f) { bResumeWorkAfterRest = false; CancelFieldResource(); FeedingSite.Reset(); AlphaWindup = 0; ClearCombatOrders(); StopNavigation(); return; }
 
     AttackCooldown = FMath::Max(0.0f, AttackCooldown - DeltaSeconds);
     if (Disposition == ECreatureDisposition::Tamed)
@@ -229,13 +229,13 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
         if (TickAutoFeeding()) return;
         if (Nutrition <= 0 && Activity == ECreatureActivity::Work)
         {
-            bResumeWorkAfterRest = IsValid(WorkSite) && WorkSite->RequiredSpecialty != EWorkSpecialty::Feeding;
+            bResumeWorkAfterRest = GetFieldResource() || (IsValid(WorkSite) && WorkSite->RequiredSpecialty != EWorkSpecialty::Feeding);
             SetActivity(ECreatureActivity::Rest); WorkProgress = 0;
             OwnerPlayer->Feedback = TEXT("A companion is hungry. J: feed aimed companion | 3: craft food at base");
         }
         if (Activity == ECreatureActivity::Rest)
         {
-            if (bResumeWorkAfterRest && (!IsValid(WorkSite) || WorkSite->RequiredSpecialty == EWorkSpecialty::Feeding))
+            if (bResumeWorkAfterRest && !GetFieldResource() && (!IsValid(WorkSite) || WorkSite->RequiredSpecialty == EWorkSpecialty::Feeding))
             { bResumeWorkAfterRest = false; WorkSite = nullptr; SetActivity(ECreatureActivity::Follow); return; }
             if (IsValid(WorkSite) && GetDistanceTo(WorkSite) > 220.0f)
             {
@@ -252,6 +252,8 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
             }
             return;
         }
+        if (Activity == ECreatureActivity::Work && GetFieldResource()) { TickGathering(DeltaSeconds,OwnerPlayer); return; }
+        if(Activity==ECreatureActivity::Work && !IsValid(WorkSite)) { SetActivity(ECreatureActivity::Follow); return; }
         if (Activity == ECreatureActivity::Work && IsValid(WorkSite))
         {
             if (WorkSite->RequiredSpecialty == EWorkSpecialty::Feeding) { SetActivity(ECreatureActivity::Rest); return; }
@@ -420,6 +422,7 @@ float ACreatureCharacter::TakeDamage(float DamageAmount, FDamageEvent const& Dam
         }
         if (Health <= 0.0f)
         {
+            CancelFieldResource();
             bResumeWorkAfterRest = false;
             AlphaWindup = 0;
             SetActivity(ECreatureActivity::Rest);
@@ -447,6 +450,7 @@ void ACreatureCharacter::SetActivity(ECreatureActivity NewActivity)
 {
     if (HasAuthority() && (NewActivity == ECreatureActivity::Work || NewActivity == ECreatureActivity::Rest)) ClearCombatOrders();
     if (!HasAuthority() || Activity == NewActivity) return;
+    if(NewActivity!=ECreatureActivity::Work && !(NewActivity==ECreatureActivity::Rest && bResumeWorkAfterRest)) CancelFieldResource();
     if (NewActivity != ECreatureActivity::Rest) bResumeWorkAfterRest = false;
     if (NewActivity != ECreatureActivity::Work) ResetGathering();
     Activity = NewActivity;

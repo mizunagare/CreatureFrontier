@@ -11,6 +11,7 @@ public:
     ~FResourceRestoreTransaction();
     bool Stage(const UFrontierSaveGame* Save);
     void Commit();
+    AResourceNode* Find(const FGuid& Id) const;
 private:
     UWorld* World;
     TArray<AResourceNode*> Staged;

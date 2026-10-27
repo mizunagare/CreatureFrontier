@@ -1,6 +1,7 @@
 #include "CFGameMode.h"
 #include "ResourceNode.h"
 #include "ResourceScenario.h"
+#include "FieldWorkScenario.h"
 #include "HomeScenario.h"
 #include "ExpeditionScenario.h"
 #include "CFPlayerCharacter.h"
@@ -54,6 +55,13 @@ void ACFGameMode::BeginPlay()
 {
     Super::BeginPlay();
     SeedFrontierResources(GetWorld());
+    const int32 FieldMode=FParse::Param(FCommandLine::Get(),TEXT("CFFieldWrite"))?1:FParse::Param(FCommandLine::Get(),TEXT("CFFieldRead"))?2:0;
+    if(FieldMode || FParse::Param(FCommandLine::Get(),TEXT("CFFieldTest")))
+    {
+        FTimerHandle Start;
+        GetWorldTimerManager().SetTimer(Start,[this,FieldMode](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0))) RunFieldWorkScenario(GetWorld(),Hero,FieldMode);},1.f,false);
+        return;
+    }
     const int32 ExpeditionMode=FParse::Param(FCommandLine::Get(),TEXT("CFExpeditionWrite"))?1:FParse::Param(FCommandLine::Get(),TEXT("CFExpeditionRead"))?2:0;
     if(ExpeditionMode || FParse::Param(FCommandLine::Get(),TEXT("CFExpeditionTest")))
     {

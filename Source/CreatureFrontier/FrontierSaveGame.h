@@ -49,6 +49,7 @@ struct FCreatureSaveRecord
     UPROPERTY() ECreatureActivity Activity = ECreatureActivity::Idle;
     UPROPERTY() FName WorkSiteName;
     UPROPERTY() FGuid WorkSiteId;
+    UPROPERTY() FGuid FieldResourceId;
     UPROPERTY() FName EncounterId;
     UPROPERTY() bool bAlpha = false;
     UPROPERTY() float AlphaCooldown = 3;
@@ -82,7 +83,7 @@ class CREATUREFRONTIER_API UFrontierSaveGame : public USaveGame
 {
     GENERATED_BODY()
 public:
-    UPROPERTY() int32 FormatVersion = 19;
+    UPROPERTY() int32 FormatVersion = 20;
     UPROPERTY() FResearchProgress Research;
     UPROPERTY() TArray<FHomeModuleRecord> HomeModules;
     UPROPERTY() TArray<FResourceSaveRecord> ResourceNodes;

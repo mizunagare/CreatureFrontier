@@ -64,8 +64,9 @@ bool AResourceNode::TryHarvest(ACFPlayerCharacter* Recipient,AActor* Harvester)
     {
         const auto* Pet=Cast<ACreatureCharacter>(Harvester);
         if(!Pet || Pet->Health<=0 || Pet->Tamer!=Recipient->GetController() || Pet->Disposition!=ECreatureDisposition::Tamed ||
-            Pet->Activity!=ECreatureActivity::Work || !IsValid(Pet->WorkSite) || Pet->WorkSite->RequiredSpecialty!=Definition->Specialty ||
-            GetDistanceTo(Pet->WorkSite)>800 || !CanReach(Pet,220)) return false;
+            Pet->Activity!=ECreatureActivity::Work || !CanReach(Pet,220)) return false;
+        if(Pet->GetFieldResource()!=this && (Pet->GetFieldResource() || !IsValid(Pet->WorkSite) ||
+            Pet->WorkSite->RequiredSpecialty!=Definition->Specialty || GetDistanceTo(Pet->WorkSite)>800)) return false;
     }
     else if(!CanReach(Recipient,300)) return false;
     // The single shared transaction: failed capacity/range/ownership checks spend nothing.

@@ -111,6 +111,7 @@ bool ACFPlayerCharacter::SaveProgress(const FString& Slot)
         Record.Activity = It->Activity;
         Record.WorkSiteName = IsValid(It->WorkSite) ? It->WorkSite->GetFName() : NAME_None;
         Record.WorkSiteId = IsValid(It->WorkSite) && It->WorkSite->bPlayerBuilt ? It->WorkSite->PersistentId : FGuid();
+        Record.FieldResourceId=It->GetFieldResource()?It->GetFieldResource()->PersistentId:FGuid();
         Save->Creatures.Add(Record);
     }
     for (TActorIterator<AWildEncounter> It(GetWorld()); It; ++It)
@@ -140,7 +141,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
 {
     if (!HasAuthority() || !GetController()) return false;
     auto* Save = Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot, 0));
-    if (!Save || Save->FormatVersion < 1 || Save->FormatVersion > 19 ||
+    if (!Save || Save->FormatVersion < 1 || Save->FormatVersion > 20 ||
         Save->MapName != UGameplayStatics::GetCurrentLevelName(this, true) ||
         !FMath::IsFinite(Save->Health) || Save->Health < 0 || Save->Health > 100 ||
         Save->Resources < 0 || Save->PlayerTransform.ContainsNaN() || Save->ViewRotation.ContainsNaN())
@@ -205,6 +206,14 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
     }
     FResourceRestoreTransaction ResourceRestore(GetWorld());
     if(!ResourceRestore.Stage(Save)) { Feedback=TEXT("Invalid or unavailable resource snapshot; world unchanged"); return false; }
+    for(auto& Record:Save->Creatures)
+    {
+        if(Save->FormatVersion<20) Record.FieldResourceId.Invalidate();
+        if(Record.FieldResourceId.IsValid() && (!ResourceRestore.Find(Record.FieldResourceId) || !Record.bOwned || Record.Disposition!=ECreatureDisposition::Tamed || Record.Health<=0 ||
+            Record.WorkSiteId.IsValid() || !Record.WorkSiteName.IsNone() ||
+            (Record.Activity!=ECreatureActivity::Work && !(Record.Activity==ECreatureActivity::Rest && Record.bResumeWorkAfterRest))))
+        { Feedback=TEXT("Invalid field work target; world unchanged"); return false; }
+    }
     FHomeRestoreTransaction HomeRestore(GetWorld());
     if(!HomeRestore.Stage(Save)) { Feedback=TEXT("Invalid home structure or indoor facility support; world unchanged"); return false; }
     TArray<ACreatureCharacter*> OldCreatures;
@@ -311,12 +320,17 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
     {
         auto* Pet = Restored[Index];
         const auto& Record = Save->Creatures[Index];
+        if(Record.FieldResourceId.IsValid())
+        {
+            Pet->AssignFieldResource(ResourceRestore.Find(Record.FieldResourceId));
+            Pet->Activity=Record.Activity;
+        }
         if (Record.WorkSiteId.IsValid())
             for (auto* Site : RestoredBuilt) if (Site->PersistentId == Record.WorkSiteId) { Pet->WorkSite = Site; break; }
-        if (Pet->Activity == ECreatureActivity::Work && !IsValid(Pet->WorkSite))
+        if (Pet->Activity == ECreatureActivity::Work && !IsValid(Pet->WorkSite) && !Pet->GetFieldResource())
             Pet->Activity = Record.bOwned ? ECreatureActivity::Follow : ECreatureActivity::Idle;
         Pet->bResumeWorkAfterRest = Record.bResumeWorkAfterRest && Record.bOwned && Pet->Health > 0 && Pet->Activity == ECreatureActivity::Rest &&
-            IsValid(Pet->WorkSite) && Pet->WorkSite->RequiredSpecialty != EWorkSpecialty::Feeding;
+            (Pet->GetFieldResource() || (IsValid(Pet->WorkSite) && Pet->WorkSite->RequiredSpecialty != EWorkSpecialty::Feeding));
     }
     CancelMeleeAttack(); Building->Cancel();
     ResourceRestore.Commit();
@@ -432,7 +446,18 @@ void ACFPlayerCharacter::CommandSpecial()
 
 void ACFPlayerCharacter::CommandWork()
 {
-    if (Health <= 0.0f) return;
+    if (!HasAuthority() || Health <= 0 || UGameplayStatics::IsGamePaused(this) || Building->IsActive()) return;
+    FHitResult Hit; FCollisionQueryParams Params(SCENE_QUERY_STAT(FieldOrder),false,this);
+    const FVector Start=FirstPersonCamera->GetComponentLocation();
+    GetWorld()->LineTraceSingleByChannel(Hit,Start,Start+FirstPersonCamera->GetForwardVector()*800,ECC_Visibility,Params);
+    if(auto* Node=Cast<AResourceNode>(Hit.GetActor()))
+    {
+        int32 Assigned=0;
+        for(TActorIterator<ACreatureCharacter> It(GetWorld());It;++It)
+            if(IsCommandTarget(*It) && It->AssignFieldResource(Node)) ++Assigned;
+        Feedback=FString::Printf(TEXT("Field resource assigned to %d companions; F cancels. Shared stock, no post required"),Assigned);
+        return;
+    }
     AWorkStation* Site = nullptr;
     float Best = 800.0f;
     for (TActorIterator<AWorkStation> It(GetWorld()); It; ++It)
@@ -445,7 +470,7 @@ void ACFPlayerCharacter::CommandWork()
     int32 Count = 0;
     for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It)
         if (IsCommandTarget(*It) && It->Health > 0.0f)
-        { It->WorkSite = Site; It->SetActivity(ECreatureActivity::Work); ++Count; }
+        { It->CancelFieldResource(); It->WorkSite = Site; It->SetActivity(ECreatureActivity::Work); ++Count; }
     Feedback = FString::Printf(TEXT("Assigned %d: %s. Matching specialties work faster"),Count,
         *UEnum::GetValueAsString(Site->RequiredSpecialty));
 }
@@ -461,7 +486,7 @@ void ACFPlayerCharacter::CommandRest()
     int32 Count = 0;
     for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It)
         if (IsCommandTarget(*It) && It->Health > 0)
-        { It->bResumeWorkAfterRest = false; It->WorkSite = Site; It->SetActivity(ECreatureActivity::Rest); ++Count; }
+        { It->CancelFieldResource(); It->bResumeWorkAfterRest = false; It->WorkSite = Site; It->SetActivity(ECreatureActivity::Rest); ++Count; }
     Feedback = FString::Printf(TEXT("%d companions returning to base to recover health and stamina"), Count);
 }
 

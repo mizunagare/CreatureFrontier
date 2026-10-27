@@ -50,3 +50,8 @@ void FResourceRestoreTransaction::Commit()
     for(auto* Node:Staged) Node->SetActorEnableCollision(true);
     bCommitted=true;
 }
+AResourceNode* FResourceRestoreTransaction::Find(const FGuid& Id) const
+{
+    for(auto* Node:Staged) if(Node->PersistentId==Id) return Node;
+    return nullptr;
+}
