@@ -196,7 +196,8 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
     SkillPulseRemaining = FMath::Max(0.0f, SkillPulseRemaining - DeltaSeconds);
     RetaliationRemaining = FMath::Max(0.0f, RetaliationRemaining - DeltaSeconds);
     AlphaCooldown = FMath::Max(0.0f, AlphaCooldown - DeltaSeconds);
-    GetCharacterMovement()->MaxWalkSpeed = (Definition ? Definition->MoveSpeed : 320.0f) * (SlowRemaining > 0 ? 0.5f : 1.0f);
+    GetCharacterMovement()->MaxWalkSpeed = (Definition ? Definition->MoveSpeed : 320.0f) * (SlowRemaining > 0 ? 0.5f : 1.0f) *
+        (Disposition != ECreatureDisposition::Tamed && Activity == ECreatureActivity::Wander ? .45f : 1.0f);
     if (Health <= 0.0f) { AlphaWindup = 0; ClearCombatOrders(); StopNavigation(); return; }
 
     AttackCooldown = FMath::Max(0.0f, AttackCooldown - DeltaSeconds);
@@ -241,7 +242,8 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
             return;
         }
         WorkProgress = 0.0f;
-        if (!IsValid(FocusTarget) || FocusTarget->Health <= 0 || FocusTarget->Disposition == ECreatureDisposition::Tamed || OwnerPlayer->GetDistanceTo(FocusTarget) > 1500.0f)
+        if (!IsValid(FocusTarget) || FocusTarget->Health <= 0 || FocusTarget->Disposition == ECreatureDisposition::Tamed ||
+            FocusTarget->Activity == ECreatureActivity::ReturnHome || OwnerPlayer->GetDistanceTo(FocusTarget) > 1500.0f)
         {
             FocusTarget = nullptr;
             bSpecialRequested = false;
@@ -251,7 +253,7 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
         float Best = 1000.0f;
         if (!Enemy) for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It)
         {
-            if (It->Disposition == ECreatureDisposition::Tamed || It->Health <= 0.0f) continue;
+            if (It->Disposition == ECreatureDisposition::Tamed || It->Health <= 0.0f || It->Activity == ECreatureActivity::ReturnHome) continue;
             const float Distance = OwnerPlayer->GetDistanceTo(*It);
             if (Distance < Best) { Best = Distance; Enemy = *It; }
         }
@@ -272,6 +274,7 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
         }
         return;
     }
+    if (TickHabitatReturn()) return;
     APawn* Player = UGameplayStatics::GetPlayerPawn(this, 0);
     if (!IsValid(Player)) { AlphaWindup = 0; StopNavigation(); return; }
     if (const auto* Hero = Cast<ACFPlayerCharacter>(Player); Hero && Hero->Health <= 0.0f) { AlphaWindup = 0; StopNavigation(); return; }
@@ -311,7 +314,7 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
             }
         }
     }
-    else { StopNavigation(); SetActivity(ECreatureActivity::Idle); }
+    else TickRoaming(DeltaSeconds);
 }
 
 float ACreatureCharacter::GetHealthRatio() const
@@ -346,6 +349,7 @@ void ACreatureCharacter::AddExperience(int32 Amount)
 float ACreatureCharacter::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent,
     AController* EventInstigator, AActor* DamageCauser)
 {
+    if (Activity == ECreatureActivity::ReturnHome && Disposition != ECreatureDisposition::Tamed) return 0;
     const float Applied = FMath::Min(Health, FMath::Max(0.0f, DamageAmount) * (GuardRemaining > 0 ? 0.5f : 1.0f));
     if (HasAuthority() && Applied > 0)
     {
@@ -389,7 +393,8 @@ void ACreatureCharacter::SetActivity(ECreatureActivity NewActivity)
 
 void ACreatureCharacter::Tame(AController* NewTamer)
 {
-    if (!HasAuthority() || !IsValid(NewTamer)) return;
+    if (!HasAuthority() || !IsValid(NewTamer) || Activity == ECreatureActivity::ReturnHome) return;
+    bHasHabitat = false;
     Tamer = NewTamer;
     AlphaWindup = 0;
     RetaliationTarget.Reset();

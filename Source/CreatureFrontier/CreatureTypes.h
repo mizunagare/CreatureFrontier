@@ -19,7 +19,9 @@ enum class ECreatureActivity : uint8
     Follow,
     Combat,
     Work,
-    Rest
+    Rest,
+    Wander,
+    ReturnHome
 };
 
 UENUM(BlueprintType)

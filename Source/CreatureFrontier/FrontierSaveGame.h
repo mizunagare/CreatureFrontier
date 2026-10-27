@@ -29,6 +29,10 @@ struct FCreatureSaveRecord
     UPROPERTY() FName EncounterId;
     UPROPERTY() bool bAlpha = false;
     UPROPERTY() float AlphaCooldown = 3;
+    UPROPERTY() bool bHasHabitat = false;
+    UPROPERTY() FVector HabitatHome = FVector::ZeroVector;
+    UPROPERTY() float RoamRadius = 250;
+    UPROPERTY() float LeashRadius = 1000;
 };
 
 USTRUCT()
@@ -54,7 +58,7 @@ class CREATUREFRONTIER_API UFrontierSaveGame : public USaveGame
 {
     GENERATED_BODY()
 public:
-    UPROPERTY() int32 FormatVersion = 7;
+    UPROPERTY() int32 FormatVersion = 8;
     UPROPERTY() FString MapName;
     UPROPERTY() FTransform PlayerTransform;
     UPROPERTY() FRotator ViewRotation;

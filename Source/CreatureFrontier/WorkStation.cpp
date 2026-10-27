@@ -2,6 +2,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "Components/TextRenderComponent.h"
 #include "Engine/StaticMesh.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "UObject/ConstructorHelpers.h"
 
 AWorkStation::AWorkStation()
@@ -29,6 +30,13 @@ void AWorkStation::OnConstruction(const FTransform& Transform)
 void AWorkStation::BeginPlay()
 {
     Super::BeginPlay();
+    if (bPlayerBuilt)
+        if (auto* Palette = LoadObject<UMaterialInterface>(nullptr,TEXT("/Game/Materials/M_CreaturePalette.M_CreaturePalette")))
+        {
+            auto* Material = UMaterialInstanceDynamic::Create(Palette,this);
+            Material->SetVectorParameterValue(TEXT("Tint"),FLinearColor(.33f,.17f,.065f));
+            FindComponentByClass<UStaticMeshComponent>()->SetMaterial(0,Material);
+        }
     RefreshLabel();
 }
 

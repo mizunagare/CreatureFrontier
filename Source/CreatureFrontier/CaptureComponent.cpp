@@ -13,7 +13,7 @@ UCaptureComponent::UCaptureComponent()
 float UCaptureComponent::CalculateCaptureChance(const ACreatureCharacter* Creature) const
 {
     if (!IsValid(Creature) || Creature->Health <= 0.0f ||
-        Creature->Disposition == ECreatureDisposition::Tamed)
+        Creature->Disposition == ECreatureDisposition::Tamed || Creature->Activity == ECreatureActivity::ReturnHome)
     {
         return 0.0f;
     }

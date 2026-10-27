@@ -26,10 +26,14 @@ void AWildEncounter::BeginPlay()
     // Existing fixture scenarios own their entire population. The encounter scenario
     // explicitly ticks its own slot, keeping all regression worlds isolated.
     for (const TCHAR* Flag : {TEXT("CFSmokeTest"), TEXT("CFInventoryTest"), TEXT("CFCareTest"),
-        TEXT("CFSpeciesTest"), TEXT("CFCombatTest"), TEXT("CFSaveWrite"), TEXT("CFSaveRead"), TEXT("CFNavTest"), TEXT("CFEncounterTest"), TEXT("CFBossTest"), TEXT("CFBuildingTest")})
+        TEXT("CFSpeciesTest"), TEXT("CFCombatTest"), TEXT("CFSaveWrite"), TEXT("CFSaveRead"), TEXT("CFNavTest"), TEXT("CFEncounterTest"), TEXT("CFBossTest"), TEXT("CFBuildingTest"), TEXT("CFWorldTest"), TEXT("CFWorldPreview")})
         if (FParse::Param(FCommandLine::Get(), Flag)) { SetActorTickEnabled(false); break; }
     if (auto* Sign = FindComponentByClass<UTextRenderComponent>())
+    {
         Sign->SetText(FText::FromString(RegionName + (bBoss ? TEXT(" - ALPHA Lv") : TEXT(" - Lv")) + FString::FromInt(CreatureLevel)));
+        const FVector Approach = FVector(-450,0,GetActorLocation().Z)-GetActorLocation();
+        Sign->SetWorldRotation(Approach.Rotation());
+    }
 }
 
 ACreatureCharacter* AWildEncounter::GetResident() const
@@ -73,6 +77,8 @@ void AWildEncounter::Tick(float DeltaSeconds)
     Pet->Level = FMath::Clamp(CreatureLevel, 1, 20);
     Pet->EncounterId = EncounterId;
     Pet->bAlpha = bBoss;
+    Pet->bHasHabitat = true;
+    Pet->HabitatHome = Spawn.GetLocation();
     Pet->FinishSpawning(Spawn);
     Resident = Pet;
     bWaiting = false;

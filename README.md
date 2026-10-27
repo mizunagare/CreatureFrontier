@@ -15,7 +15,8 @@
 野外遭遇更新输出到 `D:\myGame\Builds\Windows-Encounters\CreatureFrontier.exe`。
 首领战更新输出到 `D:\myGame\Builds\Windows-Boss\CreatureFrontier.exe`。
 基地建造更新输出到 `D:\myGame\Builds\Windows-Base\CreatureFrontier.exe`。
-旧存档版本 1–6 可以读取，新版存档版本为 7（包含玩家建造设施和伙伴工作关联）。
+谷地场景更新输出到 `D:\myGame\Builds\Windows-Valley\CreatureFrontier.exe`。
+旧存档版本 1–7 可以读取，新版存档版本为 8（包含野生栖息地锚点和活动范围）。
 新版保存后的存档不能交给旧版程序读取；请保留旧存档备份。
 测试脚本默认选择 `Builds` 下最新编译的 Development 程序，也可明确指定：
 `.\Scripts\Test-Packaged.ps1 -BuildRoot D:\myGame\Builds\Windows-Combat`。
@@ -145,10 +146,23 @@ HUD 显示玩家生命、资源、伙伴数量、工作数量和准星目标的�
 `-CFBuildingTest` 验证建造输入、材料扣除、占用/范围/支撑拒绝、工作产出、
 设施快照去重与尺寸、伙伴工作关联、异常存档拒绝、拆除返还，以及动态导航添加/移除，
 使用 `FrontierBuildingAutomation` 测试槽。
+`-CFWorldTest` 验证谷地场景与防坠落边界、入口到两区的导航连通、真实闲逛位移、
+领地返回/恢复、返程期间伤害与捕捉拒绝、锚点读档及捕捉后脱离生态 AI，使用 `FrontierWorldAutomation` 测试槽。
 `-CFBossTest` 验证范围预警、逃离/跳跃/掩体躲避、伙伴受击与护盾、首领冷却、
 捕捉中止、单次掉落、背包溢出和剩余战利品读档，使用 `FrontierBossAutomation` 测试槽。
 
 ## 可重复野外遭遇
+
+地图现为 40 米见方的 Starter Valley 原创几何原型场景，包含基地棚屋、土路、
+草木栖息地和晶岩首领区；边缘岩壁防止走出地面。场景由 117 个可复用几何组件 Actor
+和 12 种颜色材质构成，尚不代表正式美术、完整开放世界或复杂生态模拟。
+`Content/Python/build_starter_valley.py` 幂等更新带 `CF_Valley` 标识的环境，不会删除未标识对象，
+并会重建导航。原先的三块掩体保留碰撞和位置，用岩石材质融入场景。
+基地棚柱留在既有工作台占地内，新树干放在建造区域外，以保留已有建造空间。
+
+可用 `-CFWorldPreview -RenderOffscreen -windowed -ResX=1280 -ResY=720` 运行图形版引擎，
+自动生成 `Saved/WorldPreview/valley_base.png`、`valley_meadow.png`、`valley_crystal.png` 后退出。
+这需要可用的显卡，不能与 `-nullrhi` 同时使用；不需要接管桌面鼠标键盘。
 
 现有灰盒地图增加两个可重复栖息地，底部 HUD 在附近显示居民生命与刷新倒计时：
 
@@ -162,6 +176,13 @@ F5/F9 保存与恢复居民关联和剩余刷新时间；退出游戏期间倒�
 旧存档没有刷新记录时，新栖息地从可生成状态开始。生成点固定，
 初版三只野生生物仍保持原样，暂不纳入刷新人口。
 可用 `Content/Python/create_wild_encounters.py` 幂等添加或更新这两个点。
+
+栖息地居民会在锚点周围 2.5 米内以 45% 速度闲逛，并交替停留 2–5 秒。
+进入警戒距离或受击后沿用追击/反击；距离锚点超过 10 米时中止战斗并返程，
+返程期间免疫伤害、不能捕捉，伙伴不再将其选为攻击目标。回到锚点 1 米内恢复生命后重新活动。
+捕捉后完全退出领地与闲逛逻辑，按伙伴指令行动。
+存档保留锚点、范围和返程状态；闲逛目的点在读档后重新选择。旧存档中的栖息地居民按其生成点补全锚点。
+出生区三只教学生物暂不启用闲逛，以免随机靠近导致初始围攻。
 
 ## 基地设施建造
 

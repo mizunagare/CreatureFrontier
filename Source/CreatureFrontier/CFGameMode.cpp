@@ -5,6 +5,7 @@
 #include "EncounterScenario.h"
 #include "BossScenario.h"
 #include "BuildingScenario.h"
+#include "WorldScenario.h"
 #include "CaptureComponent.h"
 #include "CreatureCharacter.h"
 #include "CreatureDefinition.h"
@@ -42,12 +43,16 @@ void ACFGameMode::BeginPlay()
     const bool bEncounterTest = FParse::Param(FCommandLine::Get(), TEXT("CFEncounterTest"));
     const bool bBossTest = FParse::Param(FCommandLine::Get(), TEXT("CFBossTest"));
     const bool bBuildingTest = FParse::Param(FCommandLine::Get(), TEXT("CFBuildingTest"));
-    if (!bSaveWrite && !bSaveRead && !bInventoryTest && !bNavTest && !bCareTest && !bSpeciesTest && !bCombatTest && !bEncounterTest && !bBossTest && !bBuildingTest && !FParse::Param(FCommandLine::Get(), TEXT("CFSmokeTest"))) return;
+    const bool bWorldTest = FParse::Param(FCommandLine::Get(), TEXT("CFWorldTest"));
+    const bool bWorldPreview = FParse::Param(FCommandLine::Get(), TEXT("CFWorldPreview"));
+    if (!bSaveWrite && !bSaveRead && !bInventoryTest && !bNavTest && !bCareTest && !bSpeciesTest && !bCombatTest && !bEncounterTest && !bBossTest && !bBuildingTest && !bWorldTest && !bWorldPreview && !FParse::Param(FCommandLine::Get(), TEXT("CFSmokeTest"))) return;
     FTimerHandle TestStart;
-    GetWorldTimerManager().SetTimer(TestStart, [this, bSaveWrite, bSaveRead, bInventoryTest, bNavTest, bCareTest, bSpeciesTest, bCombatTest, bEncounterTest, bBossTest, bBuildingTest]()
+    GetWorldTimerManager().SetTimer(TestStart, [this, bSaveWrite, bSaveRead, bInventoryTest, bNavTest, bCareTest, bSpeciesTest, bCombatTest, bEncounterTest, bBossTest, bBuildingTest, bWorldTest, bWorldPreview]()
     {
         auto* Hero = Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerPawn(this, 0));
         if (!Hero) { FPlatformMisc::RequestExitWithStatus(true, 1); return; }
+        if (bWorldPreview) { RunValleyPreview(GetWorld(),Hero); return; }
+        if (bWorldTest) { RunEcologyScenario(GetWorld(),Hero); return; }
         if (bBuildingTest) { RunBuildingScenario(GetWorld(),Hero); return; }
         if (bBossTest) { RunBossScenario(GetWorld(), Hero); return; }
         if (bEncounterTest) { RunEncounterScenario(GetWorld(), Hero); return; }

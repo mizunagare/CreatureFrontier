@@ -36,6 +36,10 @@ public:
     UPROPERTY(Replicated, BlueprintReadOnly, Category="Encounter") bool bAlpha = false;
     UPROPERTY(Replicated, BlueprintReadOnly, Category="Combat") float AlphaCooldown = 3;
     UPROPERTY(Replicated, BlueprintReadOnly, Category="Combat") float AlphaWindup = 0;
+    UPROPERTY(BlueprintReadOnly, Category="Habitat") bool bHasHabitat = false;
+    UPROPERTY(BlueprintReadOnly, Category="Habitat") FVector HabitatHome = FVector::ZeroVector;
+    UPROPERTY(BlueprintReadOnly, Category="Habitat") float RoamRadius = 250;
+    UPROPERTY(BlueprintReadOnly, Category="Habitat") float LeashRadius = 1000;
 
     UPROPERTY(ReplicatedUsing=OnRep_Health, BlueprintReadOnly, Category="Creature")
     float Health = 100.0f;
@@ -110,6 +114,11 @@ protected:
     void OnRep_Activity();
 
 private:
+    bool TickHabitatReturn();
+    void TickRoaming(float DeltaSeconds);
+    FVector RoamTarget = FVector::ZeroVector;
+    bool bHasRoamTarget = false;
+    float RoamPause = 1;
     bool TickAlphaAttack(float DeltaSeconds, APawn* Target);
     UPROPERTY() TObjectPtr<UStaticMeshComponent> AlphaWarning;
     bool HasClearSight(const AActor* Target) const;

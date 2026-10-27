@@ -40,6 +40,8 @@ void ACFHUD::DrawHUD()
         }
     if (auto* Creature = Player->TraceCreature())
     {
+        if (Creature->Activity == ECreatureActivity::ReturnHome)
+            DrawText(TEXT("RETURNING TO HABITAT - damage and capture disabled"),FLinearColor::Yellow,X-130,Y-30);
         if (Creature->bAlpha && Creature->Disposition != ECreatureDisposition::Tamed)
             DrawText(FString::Printf(TEXT("ALPHA - Crystal Quake %s %.1fs"), Creature->AlphaWindup > 0 ? TEXT("INCOMING") : TEXT("cooldown"),
                 Creature->AlphaWindup > 0 ? Creature->AlphaWindup : Creature->AlphaCooldown), FLinearColor(1,.3f,.05f), X-130, Y+115);

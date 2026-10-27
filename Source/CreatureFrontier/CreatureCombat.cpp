@@ -17,7 +17,7 @@ bool ACreatureCharacter::OrderAttack(ACreatureCharacter* Target)
 {
     if (!HasAuthority() || Health <= 0 || Disposition != ECreatureDisposition::Tamed ||
         Activity == ECreatureActivity::Work || Activity == ECreatureActivity::Rest || !IsValid(Target) ||
-        Target->Health <= 0 || Target->Disposition == ECreatureDisposition::Tamed) return false;
+        Target->Health <= 0 || Target->Disposition == ECreatureDisposition::Tamed || Target->Activity == ECreatureActivity::ReturnHome) return false;
     FocusTarget = Target;
     SetActivity(ECreatureActivity::Combat);
     return true;
@@ -89,7 +89,7 @@ void ACreatureCharacter::ResolveSpecial()
     auto* Target = SpecialTarget.Get();
     SpecialTarget.Reset();
     const float Range = Definition ? Definition->SpecialRange : 600.0f;
-    if (!Target || Target->Health <= 0 || Target->Disposition == ECreatureDisposition::Tamed ||
+    if (!Target || Target->Health <= 0 || Target->Disposition == ECreatureDisposition::Tamed || Target->Activity == ECreatureActivity::ReturnHome ||
         GetDistanceTo(Target) > Range || !HasClearSight(Target)) return;
     const float Damage = GetAttackDamage() * (Definition ? Definition->SpecialDamageScale : 2.0f);
     UGameplayStatics::ApplyDamage(Target, Damage, Tamer, this, UDamageType::StaticClass());

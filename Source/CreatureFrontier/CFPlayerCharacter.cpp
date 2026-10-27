@@ -79,6 +79,8 @@ bool ACFPlayerCharacter::SaveProgress(const FString& Slot)
         Record.EncounterId = It->EncounterId;
         Record.bAlpha = It->bAlpha;
         Record.AlphaCooldown = It->AlphaCooldown;
+        Record.bHasHabitat = It->bHasHabitat; Record.HabitatHome = It->HabitatHome;
+        Record.RoamRadius = It->RoamRadius; Record.LeashRadius = It->LeashRadius;
         Record.bOwned = It->Tamer == GetController();
         Record.Disposition = It->Disposition;
         Record.Activity = It->Activity;
@@ -112,7 +114,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
 {
     if (!HasAuthority() || !GetController()) return false;
     auto* Save = Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot, 0));
-    if (!Save || Save->FormatVersion < 1 || Save->FormatVersion > 7 ||
+    if (!Save || Save->FormatVersion < 1 || Save->FormatVersion > 8 ||
         Save->MapName != UGameplayStatics::GetCurrentLevelName(this, true) ||
         !FMath::IsFinite(Save->Health) || Save->Health < 0 || Save->Health > 100 ||
         Save->Resources < 0 || Save->PlayerTransform.ContainsNaN() || Save->ViewRotation.ContainsNaN())
@@ -159,7 +161,9 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
             (Record.Level < 20 ? Record.Experience >= Record.Level * 100 : Record.Experience != 0) ||
             !FMath::IsFinite(Record.Stamina) || Record.Stamina < 0 || Record.Stamina > 100 ||
             !FMath::IsFinite(Record.SpecialCooldown) || Record.SpecialCooldown < 0 || Record.SpecialCooldown > 60 ||
-            !FMath::IsFinite(Record.AlphaCooldown) || Record.AlphaCooldown < 0 || Record.AlphaCooldown > 10)
+            !FMath::IsFinite(Record.AlphaCooldown) || Record.AlphaCooldown < 0 || Record.AlphaCooldown > 10 ||
+            Record.HabitatHome.ContainsNaN() || !FMath::IsFinite(Record.RoamRadius) || Record.RoamRadius < 0 || Record.RoamRadius > 600 ||
+            !FMath::IsFinite(Record.LeashRadius) || Record.LeashRadius < 600 || Record.LeashRadius > 1500)
         {
             for (auto* Pet : Restored) Pet->Destroy();
             Feedback = TEXT("Save references unavailable or invalid creature data");
@@ -186,6 +190,11 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
         Pet->Stamina = Record.Stamina;
         Pet->SpecialCooldownRemaining = Record.SpecialCooldown;
         Pet->AlphaCooldown = Record.AlphaCooldown;
+        Pet->bHasHabitat = Record.bHasHabitat && !Record.bOwned;
+        Pet->HabitatHome = Record.HabitatHome; Pet->RoamRadius = Record.RoamRadius; Pet->LeashRadius = Record.LeashRadius;
+        if (Save->FormatVersion < 8 && !Record.bOwned && !Record.EncounterId.IsNone())
+            for (TActorIterator<AWildEncounter> It(GetWorld()); It; ++It)
+                if (It->EncounterId == Record.EncounterId) { Pet->bHasHabitat = true; Pet->HabitatHome = It->GetActorLocation()+FVector(0,0,90); break; }
         Pet->Disposition = Record.Disposition;
         Pet->Tamer = Record.bOwned ? GetController() : nullptr;
         Pet->Activity = Record.Activity;
@@ -439,8 +448,8 @@ void ACFPlayerCharacter::Attack()
     if (ACreatureCharacter* Creature = TraceCreature())
     {
         if (Creature->Disposition == ECreatureDisposition::Tamed) return;
-        UGameplayStatics::ApplyDamage(Creature, AttackDamage, GetController(), this, UDamageType::StaticClass());
-        Feedback = TEXT("Hit! Right mouse: capture before health reaches zero");
+        const float Applied = UGameplayStatics::ApplyDamage(Creature, AttackDamage, GetController(), this, UDamageType::StaticClass());
+        Feedback = Applied > 0 ? TEXT("Hit! Right mouse: capture before health reaches zero") : TEXT("Creature retreating - wait for it to return home");
     }
 }
 

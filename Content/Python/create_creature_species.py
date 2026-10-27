@@ -64,7 +64,7 @@ creatures = sorted([a for a in actors.get_all_level_actors() if isinstance(a, un
 assert len(creatures) >= 3
 for creature, definition in zip(creatures, definitions):
     creature.set_editor_property('definition', definition)
-    creature.set_actor_rotation(unreal.Rotator(0, 180, 0), False)
+    creature.set_actor_rotation(unreal.Rotator(yaw=180), False)
 
 for job, position in [(unreal.WorkSpecialty.MINING, (-650, -350, 0)), (unreal.WorkSpecialty.CRAFTING, (-650, 350, 0))]:
     if not any(isinstance(a, unreal.WorkStation) and a.get_editor_property('required_specialty') == job for a in actors.get_all_level_actors()):
