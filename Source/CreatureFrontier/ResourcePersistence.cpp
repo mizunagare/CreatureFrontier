@@ -16,9 +16,15 @@ bool FResourceRestoreTransaction::Stage(const UFrontierSaveGame* Save)
         for(auto* Node:Staged) Node->SetActorEnableCollision(false);
         return Result;
     }
-    if(Save->ResourceNodes.Num()>256) return false;
+    auto Records=Save->ResourceNodes;
+    if(Save->FormatVersion<19 && !Records.ContainsByPredicate([](const FResourceSaveRecord& Record){return Record.Id==FGuid(0xCF170000,0,0,7);}))
+    {
+        TArray<FResourceSaveRecord> Defaults; if(!MakeStarterResourceRecords(Defaults)) return false;
+        for(const auto& Record:Defaults) if(Record.Id==FGuid(0xCF170000,0,0,7)) Records.Add(Record);
+    }
+    if(Records.Num()>256) return false;
     TSet<FGuid> Ids;
-    for(const auto& Record:Save->ResourceNodes)
+    for(const auto& Record:Records)
     {
         auto* Definition=Record.Definition.LoadSynchronous();
         if(!Record.Id.IsValid() || Ids.Contains(Record.Id) || !Definition || !Definition->IsValidDefinition() ||

@@ -82,7 +82,8 @@ class CREATUREFRONTIER_API UFrontierSaveGame : public USaveGame
 {
     GENERATED_BODY()
 public:
-    UPROPERTY() int32 FormatVersion = 18;
+    UPROPERTY() int32 FormatVersion = 19;
+    UPROPERTY() FResearchProgress Research;
     UPROPERTY() TArray<FHomeModuleRecord> HomeModules;
     UPROPERTY() TArray<FResourceSaveRecord> ResourceNodes;
     UPROPERTY() FPlayerEquipmentState Equipment;

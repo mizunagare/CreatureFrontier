@@ -20,6 +20,8 @@ public:
     UPROPERTY(BlueprintReadOnly) FGuid PersistentId;
     UPROPERTY(BlueprintReadOnly) FGuid FloorId;
     UPROPERTY(BlueprintReadOnly) int32 PaidMaterials=0;
+    UPROPERTY(BlueprintReadOnly) TMap<EFrontierItem,int32> PaidExtraItems;
+    UPROPERTY(VisibleAnywhere,BlueprintReadOnly) TObjectPtr<class UPointLightComponent> LanternLight;
     UPROPERTY() bool bPreview=false;
     UPROPERTY() bool bStaged=false;
     EHomeModuleKind GetKind() const { return Definition?Definition->Kind:EHomeModuleKind::Floor; }

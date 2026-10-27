@@ -10,6 +10,9 @@
 #include "UObject/ConstructorHelpers.h"
 #include "EngineUtils.h"
 #include "Kismet/GameplayStatics.h"
+#include "ResearchComponent.h"
+#include "CraftingCatalog.h"
+#include "FrontierSaveGame.h"
 
 AResourceNode::AResourceNode()
 {
@@ -66,9 +69,10 @@ bool AResourceNode::TryHarvest(ACFPlayerCharacter* Recipient,AActor* Harvester)
     }
     else if(!CanReach(Recipient,300)) return false;
     // The single shared transaction: failed capacity/range/ownership checks spend nothing.
-    if(!Recipient->Inventory->AddItem(EFrontierItem::Material,1)) return false;
+    if(!Recipient->Inventory->AddItem(Definition->OutputItem,1)) return false;
     --Remaining; HarvestCooldown=Definition->HarvestInterval;
     if(Remaining==0) RegrowRemaining=Definition->RegrowSeconds;
+    Recipient->Research->RecordHarvest(this);
     Refresh(); return true;
 }
 FString AResourceNode::GetStatus() const
@@ -76,7 +80,7 @@ FString AResourceNode::GetStatus() const
     if(!Definition) return TEXT("Unavailable resource");
     if(Remaining==0) return FString::Printf(TEXT("%s | DEPLETED | %s"),*Definition->DisplayName.ToString(),
         Definition->RegrowSeconds>0?*FString::Printf(TEXT("regrows in %.0fs"),FMath::CeilToFloat(RegrowRemaining)):TEXT("no regrowth"));
-    return FString::Printf(TEXT("%s | %d / %d | M gather (3m)"),*Definition->DisplayName.ToString(),Remaining,Definition->Capacity);
+    return FString::Printf(TEXT("%s | %d / %d | %s | M (3m)"),*Definition->DisplayName.ToString(),Remaining,Definition->Capacity,*UCraftingCatalog::ItemName(Definition->OutputItem));
 }
 void AResourceNode::Refresh()
 {
@@ -94,19 +98,30 @@ void SeedFrontierResources(UWorld* World)
 }
 bool SpawnStarterResources(UWorld* World,TArray<AResourceNode*>& OutNodes)
 {
+    TArray<FResourceSaveRecord> Records;
+    if(!MakeStarterResourceRecords(Records)) return false;
+    for(const auto& Record:Records)
+    {
+        auto* Node=World->SpawnActorDeferred<AResourceNode>(AResourceNode::StaticClass(),Record.Transform,nullptr,nullptr,ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+        if(!Node) return false;
+        Node->Definition=Record.Definition.Get(); Node->PersistentId=Record.Id; Node->FinishSpawning(Record.Transform); OutNodes.Add(Node);
+    }
+    return true;
+}
+bool MakeStarterResourceRecords(TArray<FResourceSaveRecord>& OutRecords)
+{
     struct FSeed { const TCHAR* Asset; FVector Position; uint32 Id; };
     const FSeed Seeds[]={
         {TEXT("DA_Brush"),FVector(-450,290,0),1}, {TEXT("DA_Stone"),FVector(-650,-60,0),2},
         {TEXT("DA_Salvage"),FVector(-650,640,0),3}, {TEXT("DA_Brush"),FVector(-1400,900,0),4},
-        {TEXT("DA_Stone"),FVector(1250,1000,0),5}, {TEXT("DA_Salvage"),FVector(800,-1000,0),6}};
+        {TEXT("DA_Stone"),FVector(1250,1000,0),5}, {TEXT("DA_Salvage"),FVector(800,-1000,0),6},
+        {TEXT("DA_Crystal"),FVector(1400,1600,0),7}};
     for(const auto& Seed:Seeds)
     {
         auto* Definition=LoadObject<UResourceDefinition>(nullptr,*FString::Printf(TEXT("/Game/Resources/%s.%s"),Seed.Asset,Seed.Asset));
         if(!Definition || !Definition->IsValidDefinition()) { UE_LOG(LogTemp,Error,TEXT("Missing resource definition %s"),Seed.Asset); return false; }
-        const FTransform Transform(Seed.Position);
-        auto* Node=World->SpawnActorDeferred<AResourceNode>(AResourceNode::StaticClass(),Transform,nullptr,nullptr,ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
-        if(!Node) return false;
-        Node->Definition=Definition; Node->PersistentId=FGuid(0xCF170000,0,0,Seed.Id); Node->FinishSpawning(Transform); OutNodes.Add(Node);
+        FResourceSaveRecord Record; Record.Id=FGuid(0xCF170000,0,0,Seed.Id); Record.Definition=Definition;
+        Record.Transform=FTransform(Seed.Position); Record.Remaining=Definition->Capacity; OutRecords.Add(Record);
     }
     return true;
 }

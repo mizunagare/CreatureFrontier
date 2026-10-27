@@ -24,7 +24,7 @@ void RunRespawnScenario(UWorld* World,ACFPlayerCharacter* Hero)
     UCreatureDefinition* Definition=nullptr;
     for(TActorIterator<ACreatureCharacter> It(World);It;++It) { if(It->Definition) Definition=It->Definition; It->Destroy(); }
     if(!Definition) { FPlatformMisc::RequestExitWithStatus(false,1); return; }
-    Hero->Inventory->Restore({{EFrontierItem::Material,100},{EFrontierItem::CaptureDevice,7},{EFrontierItem::Medicine,3},{EFrontierItem::Food,9}});
+    Hero->Inventory->Restore({{EFrontierItem::Material,100},{EFrontierItem::CaptureDevice,7},{EFrontierItem::Medicine,3},{EFrontierItem::Food,9},{EFrontierItem::Crystal,2},{EFrontierItem::ResonanceDevice,1}});
     Hero->SetActorLocation(FVector(-350,-1050,40)); Hero->GetCharacterMovement()->DisableMovement();
     Hero->Building->Selected=EWorkSpecialty::Feeding;
     auto* Trough=Hero->Building->BuildAt(FTransform(FRotator::ZeroRotator,FVector(0,-700,-15),FVector(2,1,.7)));
@@ -47,7 +47,7 @@ void RunRespawnScenario(UWorld* World,ACFPlayerCharacter* Hero)
     Hero->SetActorLocation(FVector(-350,-400,40)); Hero->ObserveCreature(Resting); Hero->ClaimObjectiveReward(); Hero->ClaimObjectiveReward();
     const int32 Claimed=Hero->GetObjectives().Claimed, JournalCount=Hero->GetJournal().Num();
     const auto Bag=Hero->Inventory->GetStacks();
-    auto SameBag=[Hero,Bag]() { for(int32 I=0;I<=static_cast<int32>(EFrontierItem::Food);++I) if(Hero->Inventory->Count(static_cast<EFrontierItem>(I))!=Bag.FindRef(static_cast<EFrontierItem>(I))) return false; return true; };
+    auto SameBag=[Hero,Bag]() { for(int32 I=0;I<static_cast<int32>(EFrontierItem::Count);++I) if(Hero->Inventory->Count(static_cast<EFrontierItem>(I))!=Bag.FindRef(static_cast<EFrontierItem>(I))) return false; return true; };
     auto* Loot=World->SpawnActor<AWorldLoot>(FVector(1500,1400,0),FRotator::ZeroRotator); Loot->Materials=7;
     Hero->Health=25; const FVector AlivePosition=Hero->GetActorLocation();
     const bool Living=!Hero->RespawnAtBase() && Hero->Health==25 && Hero->GetActorLocation().Equals(AlivePosition) && SameBag();

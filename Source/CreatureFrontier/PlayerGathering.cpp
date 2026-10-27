@@ -3,6 +3,9 @@
 #include "Camera/CameraComponent.h"
 #include "BaseBuildingComponent.h"
 #include "Kismet/GameplayStatics.h"
+#include "CraftingCatalog.h"
+#include "ResourceDefinition.h"
+#include "ResearchComponent.h"
 
 AResourceNode* ACFPlayerCharacter::TraceResource() const
 {
@@ -15,6 +18,10 @@ void ACFPlayerCharacter::GatherAimedResource()
 {
     if(!HasAuthority() || Health<=0 || UGameplayStatics::IsGamePaused(this) || IsBackpackOpen() || IsHelpVisible() || IsJournalOpen() || Building->IsActive()) return;
     if(auto* Node=TraceResource())
-        Feedback=Node->TryHarvest(this,this)?TEXT("Gathered 1 material from shared resource stock"):TEXT("Cannot gather: depleted, cooldown, blocked, too far, or inventory full");
+    {
+        const bool NewSample=Node->Definition && Node->Definition->Discovery==EFrontierResearch::CrystalSample && !Research->Has(EFrontierResearch::CrystalSample);
+        if(Node->TryHarvest(this,this)) Feedback=NewSample?Research->GetHint():TEXT("Gathered 1 ")+UCraftingCatalog::ItemName(Node->Definition->OutputItem)+TEXT(" from shared stock");
+        else Feedback=TEXT("Cannot gather: depleted, cooldown, blocked, too far, or inventory full");
+    }
     else Feedback=TEXT("Aim at a resource node within 3m, then press M");
 }

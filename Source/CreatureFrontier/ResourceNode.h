@@ -33,3 +33,4 @@ private:
 // Used only for a new world or migrating snapshots that predate resource history.
 void SeedFrontierResources(UWorld* World);
 bool SpawnStarterResources(UWorld* World,TArray<AResourceNode*>& OutNodes);
+bool MakeStarterResourceRecords(TArray<struct FResourceSaveRecord>& OutRecords);

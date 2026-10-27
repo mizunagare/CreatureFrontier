@@ -29,10 +29,16 @@ void RunBackpackScenario(UWorld* World,ACFPlayerCharacter* Hero)
         Craft &= Hero->GetBackpackRecipe()==Index && Hero->GetBackpackRecipeCost(Index)==Costs[Index] && Hero->GetBackpackRecipeStatus(Index).StartsWith(TEXT("READY"));
         Hero->ConfirmInterfaceAction(); Hero->PauseMenuNext();
     }
+    // The original five keep their order/prices; the two new research recipes are locked.
+    for(int32 Index=5;Index<7;++Index)
+    {
+        Craft &= Hero->GetBackpackRecipe()==Index && Hero->GetBackpackRecipeStatus(Index).StartsWith(TEXT("LOCKED"));
+        Hero->ConfirmInterfaceAction(); Hero->PauseMenuNext();
+    }
     Craft &= Hero->GetBackpackRecipe()==0 && Hero->Inventory->Count(EFrontierItem::Material)==70;
     for(int32 Index=1;Index<4;++Index) Craft &= Hero->Inventory->Count(static_cast<EFrontierItem>(Index))==1;
     Craft &= Hero->Equipment->GetState().bSpearEquipped && Hero->Equipment->GetState().bVestEquipped;
-    Hero->PauseMenuPrevious(); Hero->ConfirmInterfaceAction(); Hero->PauseMenuPrevious(); Hero->ConfirmInterfaceAction();
+    Hero->StepBackpackRecipe(-1); Hero->StepBackpackRecipe(-1); Hero->StepBackpackRecipe(-1); Hero->ConfirmInterfaceAction(); Hero->StepBackpackRecipe(-1); Hero->ConfirmInterfaceAction();
     bool Reject=Hero->Inventory->Count(EFrontierItem::Material)==70 && Hero->GetBackpackRecipeStatus(3).StartsWith(TEXT("OWNED"));
     Hero->ToggleBackpack(); Hero->ToggleBackpack();
     Hero->Inventory->Restore({{EFrontierItem::Material,1}}); Hero->ConfirmInterfaceAction();

@@ -1,10 +1,8 @@
 #pragma once
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "FrontierItems.h"
 #include "InventoryComponent.generated.h"
-
-UENUM(BlueprintType)
-enum class EFrontierItem : uint8 { Material, CaptureDevice, Medicine, Food };
 
 UCLASS(ClassGroup=(Frontier), meta=(BlueprintSpawnableComponent))
 class CREATUREFRONTIER_API UInventoryComponent : public UActorComponent
@@ -16,6 +14,7 @@ public:
     UFUNCTION(BlueprintPure) int32 Count(EFrontierItem Item) const;
     UFUNCTION(BlueprintCallable) bool AddItem(EFrontierItem Item, int32 Amount);
     bool GrantItems(const TMap<EFrontierItem,int32>& Items);
+    bool Transact(const TMap<EFrontierItem,int32>& Inputs,const TMap<EFrontierItem,int32>& Outputs);
     UFUNCTION(BlueprintCallable) bool Consume(EFrontierItem Item, int32 Amount);
     UFUNCTION(BlueprintCallable) bool Craft(EFrontierItem Output);
     static int32 CraftCost(EFrontierItem Output);

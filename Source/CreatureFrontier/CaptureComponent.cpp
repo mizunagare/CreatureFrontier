@@ -4,6 +4,8 @@
 #include "CFPlayerCharacter.h"
 #include "InventoryComponent.h"
 #include "GameFramework/Pawn.h"
+#include "CraftingCatalog.h"
+#include "Kismet/GameplayStatics.h"
 
 UCaptureComponent::UCaptureComponent()
 {
@@ -21,7 +23,16 @@ float UCaptureComponent::CalculateCaptureChance(const ACreatureCharacter* Creatu
     // Injured creatures are easier to capture. Chance is always capped to keep tension.
     const float InjuryBonus = 1.0f + (1.0f - Creature->GetHealthRatio()) * 1.5f;
     const float BaseRate = Creature->Definition ? Creature->Definition->BaseCaptureRate : 0.35f;
-    return FMath::Clamp(BaseRate * CapturePower * InjuryBonus, 0.01f, 0.95f);
+    float Multiplier=0;
+    if(const auto* Catalog=UCraftingCatalog::Load()) for(const auto& Item:Catalog->Items)
+        if(Item.Item==(bUseResonance?EFrontierItem::ResonanceDevice:EFrontierItem::CaptureDevice)) Multiplier=Item.CaptureMultiplier;
+    return Multiplier>0?FMath::Clamp(BaseRate * CapturePower * InjuryBonus * Multiplier, 0.01f, 0.95f):0;
+}
+void UCaptureComponent::ToggleDevice()
+{
+    auto* Hero=Cast<ACFPlayerCharacter>(GetOwner()); if(!Hero || !Hero->HasAuthority() || Hero->Health<=0 || UGameplayStatics::IsGamePaused(this)) return;
+    bUseResonance=!bUseResonance;
+    Hero->Feedback=bUseResonance?TEXT("Resonance capture selected | consumes resonance device only | 0 normal"):TEXT("Normal capture selected | consumes normal device only | 0 resonance");
 }
 
 void UCaptureComponent::TryCapture_Implementation(ACreatureCharacter* Creature)
@@ -39,9 +50,9 @@ void UCaptureComponent::TryCapture_Implementation(ACreatureCharacter* Creature)
     if (Chance <= 0.0f) return;
     auto* Hero = Cast<ACFPlayerCharacter>(Pawn);
     if (!Hero || Hero->Health <= 0.0f) return;
-    if (!Hero->Inventory->Consume(EFrontierItem::CaptureDevice, 1))
+    if (!Hero->Inventory->Consume(bUseResonance?EFrontierItem::ResonanceDevice:EFrontierItem::CaptureDevice, 1))
     {
-        Hero->Feedback = TEXT("No capture devices - craft with 1 at work station");
+        Hero->Feedback = bUseResonance?TEXT("No resonance devices - craft after crystal study; no normal fallback"):TEXT("No normal devices - craft with 1 at work station");
         return;
     }
     const bool bSucceeded = Chance > 0.0f && FMath::FRand() <= Chance;

@@ -2,6 +2,7 @@
 #include "ResourceNode.h"
 #include "ResourceScenario.h"
 #include "HomeScenario.h"
+#include "ExpeditionScenario.h"
 #include "CFPlayerCharacter.h"
 #include "CFHUD.h"
 #include "CombatScenario.h"
@@ -53,6 +54,11 @@ void ACFGameMode::BeginPlay()
 {
     Super::BeginPlay();
     SeedFrontierResources(GetWorld());
+    const int32 ExpeditionMode=FParse::Param(FCommandLine::Get(),TEXT("CFExpeditionWrite"))?1:FParse::Param(FCommandLine::Get(),TEXT("CFExpeditionRead"))?2:0;
+    if(ExpeditionMode || FParse::Param(FCommandLine::Get(),TEXT("CFExpeditionTest")))
+    {
+        FTimerHandle ExpeditionStart; GetWorldTimerManager().SetTimer(ExpeditionStart,[this,ExpeditionMode](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0))) RunExpeditionScenario(GetWorld(),Hero,ExpeditionMode);},1.f,false); return;
+    }
     const int32 HomeMode=FParse::Param(FCommandLine::Get(),TEXT("CFHomeWrite"))?1:FParse::Param(FCommandLine::Get(),TEXT("CFHomeRead"))?2:0;
     if(HomeMode || FParse::Param(FCommandLine::Get(),TEXT("CFHomeTest")))
     {
@@ -367,7 +373,7 @@ void ACFGameMode::BeginPlay()
             }
             int32 RepeatedCount = 0;
             for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It) ++RepeatedCount;
-            const bool bPass = bLoaded && bValues && bSecondLoad && Count == RepeatedCount && Owned == 1 && Workers == 1 && ResourceCount==6 && Depleted==1;
+            const bool bPass = bLoaded && bValues && bSecondLoad && Count == RepeatedCount && Owned == 1 && Workers == 1 && ResourceCount==7 && Depleted==1;
             UE_LOG(LogTemp, Display, TEXT("CF_SAVE_READ %s values=%d owned=%d workers=%d count=%d repeated=%d"),
                 bPass ? TEXT("PASS") : TEXT("FAIL"), bValues, Owned, Workers, Count, RepeatedCount);
             FPlatformMisc::RequestExitWithStatus(false, bPass ? 0 : 4);

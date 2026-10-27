@@ -10,6 +10,7 @@
 #include "WildEncounter.h"
 #include "WorkStation.h"
 #include "ResourceNode.h"
+#include "ResearchComponent.h"
 #include "Engine/Canvas.h"
 #include "EngineUtils.h"
 
@@ -19,10 +20,16 @@ void ACFHUD::DrawHUD()
     auto* Player = Cast<ACFPlayerCharacter>(GetOwningPawn());
     if (!Canvas || !Player) return;
     if(Player->IsPauseMenuOpen()) { DrawPauseMenu(Player); return; }
+    if(!Player->IsBackpackOpen() && !Player->IsHelpVisible() && !Player->IsJournalOpen() && !Player->IsRosterOpen())
+    {
+        const float Left=FMath::Max(530.f,Canvas->ClipX-620);
+        DrawRect(FLinearColor(.02f,.035f,.06f,.88f),Left,18,600,72);
+        DrawWrappedText(Player->Research->GetHint(),FLinearColor(.7f,.85f,1),Left+12,30,576,2);
+    }
     const float X = Canvas->ClipX * 0.5f, Y = Canvas->ClipY * 0.5f;
     DrawLine(X-7, Y, X+7, Y, FLinearColor::White);
     DrawLine(X, Y-7, X, Y+7, FLinearColor::White);
-    DrawRect(FLinearColor(0.02f,0.03f,0.05f,0.85f), 18, 18, 500, 158);
+    DrawRect(FLinearColor(0.02f,0.03f,0.05f,0.85f), 18, 18, 500, 180);
     DrawText(FString::Printf(TEXT("HEALTH %.0f / 100    MATERIALS %d"), Player->Health, Player->Inventory->Count(EFrontierItem::Material)), FLinearColor::White, 32, 30);
     int32 Companions = 0, Working = 0;
     for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It)
@@ -30,10 +37,11 @@ void ACFHUD::DrawHUD()
     DrawText(FString::Printf(TEXT("DEVICES %d | MEDICINE %d | FOOD %d"),Player->Inventory->Count(EFrontierItem::CaptureDevice),Player->Inventory->Count(EFrontierItem::Medicine),Player->Inventory->Count(EFrontierItem::Food)),FLinearColor::White,32,54);
     DrawText(FString::Printf(TEXT("COMPANIONS %d | WORKING %d"),Companions,Working),FLinearColor::Green,32,78);
     DrawText(Player->GetCommandScopeText(),FLinearColor::Green,32,102);
+    DrawText(FString::Printf(TEXT("RMB %s | resonance stock %d | 0 switch"),Player->CaptureComponent->UsesResonance()?TEXT("RESONANCE"):TEXT("NORMAL"),Player->Inventory->Count(EFrontierItem::ResonanceDevice)),FLinearColor::Yellow,32,174);
     DrawText(FString::Printf(TEXT("%s | attack %.0f | reach %.1fm | vest %.0f%%"),Player->Equipment->GetState().bSpearEquipped?TEXT("SPEAR"):TEXT("UNARMED"),Player->GetPlayerAttackDamage(),Player->GetPlayerMeleeRange()/100,Player->Equipment->GetDamageReduction()*100),FLinearColor::White,32,126);
     DrawText(TEXT("C backpack | F1 controls | Esc pause | Tab team | I journal"),FLinearColor::White,32,150);
-    DrawRect(FLinearColor(.02f,.04f,.06f,.88f),18,184,600,52);
-    DrawWrappedText(Player->Feedback,FLinearColor::Yellow,32,194,570,2);
+    DrawRect(FLinearColor(.02f,.04f,.06f,.88f),18,208,600,52);
+    DrawWrappedText(Player->Feedback,FLinearColor::Yellow,32,218,570,2);
     const float JourneyY=Canvas->ClipY-200;
     DrawRect(FLinearColor(.02f,.04f,.06f,.88f),18,JourneyY,550,112);
     DrawText(Player->GetObjectiveStatus(),FLinearColor::Green,32,JourneyY+12);

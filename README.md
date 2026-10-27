@@ -2,6 +2,16 @@
 
 原创第一人称生物捕捉 RPG 原型。玩法重点是捕捉伙伴，并与伙伴共同生活、工作和战斗。
 
+## 水晶探索回路（格式 19）
+
+带伙伴前往东北 Crystal Rise，在精英附近用 `M` 采有限水晶；只有真实采样才解锁研究入口。
+返原基地工作站，`C` 背包向下翻到第二页，完成 **Study crystal**（2 材料 + 1 水晶）。
+随后可制作 **Resonance device**（3 材料 + 1 水晶），或在 `B` → `8` 房屋分类建 **Crystal lantern**（4 材料 + 2 水晶）。
+`0` 选择普通/增强捕捉，`RMB` 只消耗选中的装置，缺货不回退；增强倍率 1.5，概率仍封顶 95%。
+灯具依附地板，具有实际暖色点光照；物品/七配方读取同一目录，背包显示六类物品并自动分页。
+当前野外协作是伙伴战斗掩护，基地站点覆盖不到水晶矿；野外采矿工作令/营地扩展尚未实现。
+详细规则、迁移与边界见 [水晶探索说明](Docs/CRYSTAL_EXPEDITION.md)。
+
 ## 模块化房间（格式 18）
 
 正常游戏不会自动赠送房屋；先采集材料，再按 `B` 建造、`8` 切换设施/房屋、`V` 选模块、`9` 切换墙向。
@@ -9,7 +19,7 @@
 地板/墙/门洞/屋顶分别消耗 8/6/8/10 材料；拆除按实际支付成本返还一半。
 墙依附地板，屋顶需要两面相对墙；不能拆掉最后支撑，也不能抽走室内设施下的地板。
 玩家和伙伴使用真实碰撞/导航穿门，设施可放到地板上；当前仍限原基地 12 米内、单层 4 米网格。
-格式 18 保存模块 GUID、支撑、位置和支付成本，兼容读取 1–17。多层、窗、楼梯、可开关门和正式材质/室内照明尚未实现。
+格式 18 起保存模块 GUID、支撑、位置和支付成本；当前 19 另含研究灯及附加支付。多层、窗、楼梯、可开关门和正式材质/完整照明系统尚未实现。
 具体规则、边界与预览命令见 [房屋建造说明](Docs/HOME_BUILDING.md)。
 
 ## 有限资源采集（格式 17 起）
@@ -24,9 +34,9 @@
 
 ## Windows 独立原型
 
-当前最新本机版本：`D:\myGame\Builds\Windows-Home\CreatureFrontier.exe`。
+当前最新本机版本：`D:\myGame\Builds\Windows-Expedition\CreatureFrontier.exe`。
 双击即可进入测试地图，不需要先打开 Unreal Editor。复制到其他机器时需复制整个
-`Builds\Windows-Home` 文件夹，不能只复制根目录的启动 EXE。
+`Builds\Windows-Expedition` 文件夹，不能只复制根目录的启动 EXE。
 这是 Development 灰盒原型，尚未完成正式美术、内容与性能优化。
 
 战斗更新预览另外输出到 `D:\myGame\Builds\Windows-Combat\CreatureFrontier.exe`，
@@ -55,13 +65,14 @@
 分散跟随更新输出到 `D:\myGame\Builds\Windows-Formation\CreatureFrontier.exe`。
 有限资源采集更新输出到 `D:\myGame\Builds\Windows-Resources\CreatureFrontier.exe`。
 模块房间更新输出到 `D:\myGame\Builds\Windows-Home\CreatureFrontier.exe`。
+水晶探索更新输出到 `D:\myGame\Builds\Windows-Expedition\CreatureFrontier.exe`。
 菜单为键盘操作；帮助、队伍和图鉴面板不会暂停，只有 Esc 菜单暂停世界。
 使用 `-CFSessionTest -CFSessionPreview -RenderOffscreen` 可运行菜单测试并在当前程序的
 `Saved/SessionPreview/` 生成暂停、帮助、常驻 HUD 三张检查图；请勿同时使用 `-nullrhi`。
-旧存档版本 1–17 可以读取，新版存档版本为 18（增加模块房间、支撑关系和实际支付成本）。
+旧存档版本 1–18 可以读取，新版存档版本为 19（增加水晶研究、物品和灯的混合支付；保留旧节点预算并加入新水晶点）。
 新版保存后的存档不能交给旧版程序读取；请保留旧存档备份。
 测试脚本默认选择 `Builds` 下最新编译的 Development 程序，也可明确指定：
-`.\Scripts\Test-Packaged.ps1 -BuildRoot D:\myGame\Builds\Windows-Home`。
+`.\Scripts\Test-Packaged.ps1 -BuildRoot D:\myGame\Builds\Windows-Expedition`。
 每个测试限时 60 秒，超时只结束该脚本启动的测试进程。
 每次回归使用 `Saved/PackagedTests/<时间戳-随机标识>/` 下的新日志，避免读取上次运行的成功标记。
 

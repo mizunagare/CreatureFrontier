@@ -3,6 +3,7 @@
 #include "HomeLayout.h"
 #include "FrontierSaveGame.h"
 #include "EngineUtils.h"
+#include "ResearchComponent.h"
 
 FHomeRestoreTransaction::~FHomeRestoreTransaction()
 {
@@ -13,6 +14,15 @@ bool FHomeRestoreTransaction::Stage(UFrontierSaveGame* Save)
     if(Save->FormatVersion<18) Save->HomeModules.Reset();
     if(Save->HomeModules.Num()>128) return false;
     for(auto& Record:Save->HomeModules) if(!Record.Definition.LoadSynchronous()) return false;
+    for(auto& Record:Save->HomeModules)
+    {
+        if(Save->FormatVersion<19)
+        {
+            if(Record.Definition.Get()->Kind==EHomeModuleKind::Lantern) return false;
+            Record.PaidExtraItems.Reset();
+        }
+        if(!UResearchComponent::Meets(Save->Research,Record.Definition.Get()->RequiredResearch)) return false;
+    }
     FString Reason;
     if(!HomeLayout::Validate(Save->HomeModules,Reason)) return false;
     for(const auto& Record:Save->HomeModules) if(!HomeLayout::ValidateTerrain(World,Record,Reason)) return false;
@@ -24,6 +34,7 @@ bool FHomeRestoreTransaction::Stage(UFrontierSaveGame* Save)
         if(!Module) return false;
         Module->Definition=Record.Definition.Get(); Module->PersistentId=Record.Id; Module->FloorId=Record.FloorId;
         Module->PaidMaterials=Record.PaidMaterials;
+        Module->PaidExtraItems=Record.PaidExtraItems;
         Module->bStaged=true; Module->SetActorEnableCollision(false); Module->FinishSpawning(Record.Transform); Staged.Add(Module);
     }
     return true;

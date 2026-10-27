@@ -7,6 +7,7 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Engine/StaticMesh.h"
+#include "CraftingCatalog.h"
 
 UPlayerEquipmentComponent::UPlayerEquipmentComponent()
 {
@@ -49,13 +50,17 @@ float UPlayerEquipmentComponent::GetDamageReduction() const { return State.bOwnV
 bool UPlayerEquipmentComponent::Craft(bool bSpear)
 {
     auto* Hero=Cast<ACFPlayerCharacter>(GetOwner()); if(!Hero || !Hero->HasAuthority() || Hero->Health<=0) return false;
-    if(bSpear?State.bOwnSpear:State.bOwnVest) { Hero->Feedback=TEXT("Already crafted - 6 toggles spear, 7 toggles vest"); return false; }
-    if(!Hero->IsNearWorkStation()) { Hero->Feedback=TEXT("Equipment crafting needs a work station within 8m"); return false; }
-    const int32 Cost=FMath::Clamp(bSpear?SpearCost:VestCost,1,999);
-    if(!Hero->Inventory->Consume(EFrontierItem::Material,Cost)) { Hero->Feedback=TEXT("Not enough materials for equipment"); return false; }
+    return Hero->CraftRecipe(bSpear?TEXT("Spear"):TEXT("Vest"));
+}
+int32 UPlayerEquipmentComponent::GetSpearCost() const
+{ const auto* Catalog=UCraftingCatalog::Load(); const auto* Recipe=Catalog?Catalog->Find(TEXT("Spear")):nullptr; return Recipe?Recipe->Inputs.FindRef(EFrontierItem::Material):0; }
+int32 UPlayerEquipmentComponent::GetVestCost() const
+{ const auto* Catalog=UCraftingCatalog::Load(); const auto* Recipe=Catalog?Catalog->Find(TEXT("Vest")):nullptr; return Recipe?Recipe->Inputs.FindRef(EFrontierItem::Material):0; }
+void UPlayerEquipmentComponent::GrantCrafted(bool bSpear)
+{
     if(bSpear) { State.bOwnSpear=true; State.bSpearEquipped=true; }
     else { State.bOwnVest=true; State.bVestEquipped=true; }
-    RefreshVisual(); Hero->Feedback=bSpear?TEXT("Crafted and equipped Frontier Spear | 6 toggles weapon"):TEXT("Crafted and equipped Trail Vest | 7 toggles armor"); return true;
+    RefreshVisual();
 }
 void UPlayerEquipmentComponent::CraftSpear() { Craft(true); }
 void UPlayerEquipmentComponent::CraftVest() { Craft(false); }

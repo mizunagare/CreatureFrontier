@@ -8,12 +8,14 @@
 #include "EngineUtils.h"
 #include "Kismet/GameplayStatics.h"
 #include "Components/StaticMeshComponent.h"
+#include "ResearchComponent.h"
+#include "CraftingCatalog.h"
 
 namespace
 {
 FHomeModuleRecord Candidate(UHomeModuleDefinition* Definition,const FTransform& Transform,FGuid FloorId)
 {
-    FHomeModuleRecord Record; Record.Id=FGuid::NewGuid(); Record.Definition=Definition; Record.Transform=Transform; Record.FloorId=FloorId; Record.PaidMaterials=Definition?Definition->MaterialCost:0; return Record;
+    FHomeModuleRecord Record; Record.Id=FGuid::NewGuid(); Record.Definition=Definition; Record.Transform=Transform; Record.FloorId=FloorId; Record.PaidMaterials=Definition?Definition->MaterialCost:0; if(Definition) Record.PaidExtraItems=Definition->ExtraCosts; return Record;
 }
 }
 void UHomeBuildingComponent::StartPreview()
@@ -28,7 +30,7 @@ void UHomeBuildingComponent::Cancel() { if(IsValid(Preview)) Preview->Destroy();
 void UHomeBuildingComponent::EndPlay(const EEndPlayReason::Type Reason) { Cancel(); Super::EndPlay(Reason); }
 void UHomeBuildingComponent::Cycle()
 {
-    Selected=static_cast<EHomeModuleKind>((static_cast<int32>(Selected)+1)%4); StartPreview();
+    Selected=static_cast<EHomeModuleKind>((static_cast<int32>(Selected)+1)%5); StartPreview();
 }
 void UHomeBuildingComponent::Rotate() { YawStep=1-YawStep; UpdatePreview(); }
 bool UHomeBuildingComponent::ValidatePlacement(const FTransform& Transform,FGuid FloorId,FString& Reason) const
@@ -37,6 +39,8 @@ bool UHomeBuildingComponent::ValidatePlacement(const FTransform& Transform,FGuid
     if(!Hero || !Hero->HasAuthority() || Hero->Health<=0 || UGameplayStatics::IsGamePaused(this)) { Reason=TEXT("Need a living, unpaused player"); return false; }
     if(!Definition || !Definition->IsValidDefinition() || Hero->Inventory->Count(EFrontierItem::Material)<Definition->MaterialCost)
     { Reason=TEXT("Missing definition or not enough materials"); return false; }
+    if(!Hero->Research->Has(Definition->RequiredResearch)) { Reason=TEXT("LOCKED - study a harvested crystal sample at base"); return false; }
+    for(const auto& Cost:Definition->ExtraCosts) if(Hero->Inventory->Count(Cost.Key)<Cost.Value) { Reason=TEXT("Need ")+UCraftingCatalog::FormatItems(Definition->ExtraCosts); return false; }
     if(FVector::Dist(Hero->GetActorLocation(),Transform.GetLocation())>800) { Reason=TEXT("Too far (8m)"); return false; }
     auto Layout=HomeLayout::Collect(GetWorld()); const auto Proposed=Candidate(Definition,Transform,FloorId); Layout.Add(Proposed);
     if(!HomeLayout::Validate(Layout,Reason)) return false;
@@ -62,19 +66,24 @@ AHomeModule* UHomeBuildingComponent::BuildAt(const FTransform& Transform,FGuid F
     auto* Module=GetWorld()->SpawnActorDeferred<AHomeModule>(AHomeModule::StaticClass(),Transform,nullptr,nullptr,ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
     if(!Module) return nullptr;
     Module->Definition=Definition; Module->PersistentId=FGuid::NewGuid(); Module->FloorId=FloorId; Module->PaidMaterials=Definition->MaterialCost; Module->FinishSpawning(Transform);
-    if(!Hero->Inventory->Consume(EFrontierItem::Material,Definition->MaterialCost)) { Module->Destroy(); return nullptr; }
+    Module->PaidExtraItems=Definition->ExtraCosts;
+    auto Costs=Definition->ExtraCosts; Costs.Add(EFrontierItem::Material,Definition->MaterialCost);
+    if(!Hero->Inventory->Transact(Costs,{})) { Module->Destroy(); return nullptr; }
     Hero->Feedback=TEXT("Home module built | X dismantle | remove roof before its last supports"); return Module;
 }
 bool UHomeBuildingComponent::Dismantle(AHomeModule* Module)
 {
     auto* Hero=Cast<ACFPlayerCharacter>(GetOwner());
     if(!Hero || !Hero->HasAuthority() || Hero->Health<=0 || UGameplayStatics::IsGamePaused(this) || !IsValid(Module) || Module->IsActorBeingDestroyed() || Module->bPreview || !Module->Definition || Hero->GetDistanceTo(Module)>600) return false;
+    for(const auto& Cost:Module->PaidExtraItems) if(Cost.Key==EFrontierItem::Material || Cost.Key>=EFrontierItem::Count || Cost.Value<=0 || Cost.Value>999) return false;
     auto Layout=HomeLayout::Collect(GetWorld()); Layout.RemoveAll([Module](const FHomeModuleRecord& Record){return Record.Id==Module->PersistentId;});
     FString Reason;
     if(!HomeLayout::Validate(Layout,Reason)) { Hero->Feedback=TEXT("Cannot remove support: ")+Reason; return false; }
     for(TActorIterator<AWorkStation> It(GetWorld());It;++It) if(It->bPlayerBuilt && !HomeLayout::SupportsFacility(It->GetActorTransform(),Layout))
     { Hero->Feedback=TEXT("Move/dismantle the indoor facility before its supporting floor"); return false; }
-    if(Module->PaidMaterials<2 || Module->PaidMaterials>100 || !Hero->Inventory->AddItem(EFrontierItem::Material,Module->PaidMaterials/2)) { Hero->Feedback=TEXT("Make inventory space for dismantle refund"); return false; }
+    TMap<EFrontierItem,int32> Refunds={{EFrontierItem::Material,Module->PaidMaterials/2}};
+    for(const auto& Cost:Module->PaidExtraItems) if(Cost.Value>=2) Refunds.Add(Cost.Key,Cost.Value/2);
+    if(Module->PaidMaterials<2 || Module->PaidMaterials>100 || !Hero->Inventory->GrantItems(Refunds)) { Hero->Feedback=TEXT("Make inventory space for all dismantle refunds"); return false; }
     Module->Destroy(); Hero->Feedback=TEXT("Home module dismantled; half materials returned"); return true;
 }
 void UHomeBuildingComponent::UpdatePreview()
@@ -105,6 +114,7 @@ void UHomeBuildingComponent::UpdatePreview()
         Position.Z=-30;
     }
     else Position.Z=Selected==EHomeModuleKind::Floor?-40:280;
+    if(Selected==EHomeModuleKind::Lantern) Position=FVector(FMath::GridSnap(Hit.ImpactPoint.X,100.),FMath::GridSnap(Hit.ImpactPoint.Y,100.),-30);
     Placement=FTransform(FRotator(0,Wall?YawStep*90:0,0),Position);
     bValid=ValidatePlacement(Placement,SupportingFloor,Status);
     Preview->SetActorTransform(Placement); Preview->SetActorHiddenInGame(false); Preview->SetPreviewTint(bValid);
@@ -113,5 +123,7 @@ void UHomeBuildingComponent::Confirm() { UpdatePreview(); if(bValid) BuildAt(Pla
 FString UHomeBuildingComponent::GetHint() const
 {
     const auto* Definition=UHomeModuleDefinition::LoadDefault(Selected);
-    return FString::Printf(TEXT("HOME %s (%d) | V select | 9 rotate | 8 facilities\n%s"),Definition?*Definition->DisplayName.ToString():TEXT("unavailable"),Definition?Definition->MaterialCost:0,*Status);
+    TMap<EFrontierItem,int32> Costs;
+    if(Definition) { Costs=Definition->ExtraCosts; Costs.Add(EFrontierItem::Material,Definition->MaterialCost); }
+    return FString::Printf(TEXT("HOME %s | %s | V/9/8\n%s"),Definition?*Definition->DisplayName.ToString():TEXT("unavailable"),*UCraftingCatalog::FormatItems(Costs),*Status);
 }

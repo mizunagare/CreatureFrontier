@@ -45,10 +45,10 @@ void ACreatureCharacter::TickGathering(float DeltaSeconds,ACFPlayerCharacter* Re
         NavigateTo(Approach,35); return;
     }
     StopNavigation(); GatherExpires=GetWorld()->GetTimeSeconds()+8;
-    bGatheringActive=Recipient->Inventory->Count(EFrontierItem::Material)<999;
+    bGatheringActive=Recipient->Inventory->Count(Node->Definition->OutputItem)<999;
     WorkProgress=FMath::Min(Node->Definition->WorkSeconds,WorkProgress+DeltaSeconds*GetWorkEfficiency(WorkSite)*(Nutrition<20?.5f:1.f));
     if(WorkProgress>=Node->Definition->WorkSeconds && Node->TryHarvest(Recipient,this))
-    { Recipient->RecordCompanionProduction(this,EFrontierItem::Material); AddExperience(1); WorkProgress=0; }
+    { Recipient->RecordCompanionProduction(this,Node->Definition->OutputItem); AddExperience(1); WorkProgress=0; }
 }
 void ACreatureCharacter::ResetGathering()
 {
@@ -61,7 +61,7 @@ FString ACreatureCharacter::GetGatheringStatus() const
     if(auto* Node=GatherTarget.Get())
     {
         const auto* Hero=Tamer?Cast<ACFPlayerCharacter>(Tamer->GetPawn()):nullptr;
-        if(Hero && Hero->Inventory->Count(EFrontierItem::Material)>=999) return TEXT("RESOURCE JOB: inventory full; stock and ready work retained");
+        if(Hero && Node->Definition && Hero->Inventory->Count(Node->Definition->OutputItem)>=999) return TEXT("RESOURCE JOB: inventory full; stock and ready work retained");
         return TEXT("RESOURCE JOB: ")+Node->GetStatus();
     }
     return TEXT("RESOURCE JOB: seeking stock within 8m of post; no stock = no output");

@@ -27,11 +27,13 @@ public:
     const TArray<TObjectPtr<UStaticMeshComponent>>& GetWeaponParts() const { return WeaponParts; }
     bool Restore(const FPlayerEquipmentState& NewState);
     static bool Validate(const FPlayerEquipmentState& Candidate);
-    UPROPERTY(EditDefaultsOnly,Category="Equipment",meta=(ClampMin="1",ClampMax="999")) int32 SpearCost=8;
-    UPROPERTY(EditDefaultsOnly,Category="Equipment",meta=(ClampMin="1",ClampMax="999")) int32 VestCost=12;
+    int32 GetSpearCost() const;
+    int32 GetVestCost() const;
     UPROPERTY(EditDefaultsOnly,Category="Equipment",meta=(ClampMin="0",ClampMax="100")) float SpearAttackBonus=10;
     UPROPERTY(EditDefaultsOnly,Category="Equipment",meta=(ClampMin="0",ClampMax="0.75")) float VestReduction=.2f;
 private:
+    friend class ACFPlayerCharacter;
+    void GrantCrafted(bool bSpear);
     bool Craft(bool bSpear);
     UPROPERTY() FPlayerEquipmentState State;
     UPROPERTY() TObjectPtr<class USceneComponent> WeaponPivot;

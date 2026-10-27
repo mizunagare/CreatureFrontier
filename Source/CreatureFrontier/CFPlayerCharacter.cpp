@@ -21,6 +21,7 @@
 #include "HomeBuildingComponent.h"
 #include "HomeLayout.h"
 #include "HomePersistence.h"
+#include "ResearchComponent.h"
 
 void ACFPlayerCharacter::CraftSpear() { Equipment->CraftSpear(); }
 void ACFPlayerCharacter::CraftVest() { Equipment->CraftVest(); }
@@ -46,16 +47,12 @@ bool ACFPlayerCharacter::IsNearWorkStation() const
 
 void ACFPlayerCharacter::CraftCaptureDevice()
 {
-    if (Health <= 0 || !HasAuthority()) return;
-    if (!IsNearWorkStation()) { Feedback = TEXT("Crafting needs a nearby work station (8m)"); return; }
-    Feedback = Inventory->Craft(EFrontierItem::CaptureDevice) ? TEXT("Crafted capture device: -3 materials") : TEXT("Need 3 materials or inventory is full");
+    CraftRecipe(TEXT("Capture"));
 }
 
 void ACFPlayerCharacter::CraftMedicine()
 {
-    if (Health <= 0 || !HasAuthority()) return;
-    if (!IsNearWorkStation()) { Feedback = TEXT("Crafting needs a nearby work station (8m)"); return; }
-    Feedback = Inventory->Craft(EFrontierItem::Medicine) ? TEXT("Crafted medicine: -5 materials") : TEXT("Need 5 materials or inventory is full");
+    CraftRecipe(TEXT("Medicine"));
 }
 
 void ACFPlayerCharacter::UseMedicine()
@@ -80,6 +77,7 @@ bool ACFPlayerCharacter::SaveProgress(const FString& Slot)
     Save->Objectives = Objectives;
     Save->Equipment=Equipment->GetState();
     Save->HomeModules=HomeLayout::Collect(GetWorld());
+    Save->Research=Research->GetProgress();
     for(TActorIterator<AResourceNode> It(GetWorld());It;++It)
     {
         FResourceSaveRecord Record;
@@ -142,7 +140,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
 {
     if (!HasAuthority() || !GetController()) return false;
     auto* Save = Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot, 0));
-    if (!Save || Save->FormatVersion < 1 || Save->FormatVersion > 18 ||
+    if (!Save || Save->FormatVersion < 1 || Save->FormatVersion > 19 ||
         Save->MapName != UGameplayStatics::GetCurrentLevelName(this, true) ||
         !FMath::IsFinite(Save->Health) || Save->Health < 0 || Save->Health > 100 ||
         Save->Resources < 0 || Save->PlayerTransform.ContainsNaN() || Save->ViewRotation.ContainsNaN())
@@ -157,6 +155,12 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
     if(Save->FormatVersion<14) Save->Equipment=FPlayerEquipmentState();
     if(!UPlayerEquipmentComponent::Validate(Save->Equipment)) { Feedback=TEXT("Invalid equipment in save"); return false; }
     if (Save->FormatVersion < 9) Save->InventoryStacks.FindOrAdd(EFrontierItem::Food) = 3;
+    if(Save->FormatVersion<19)
+    {
+        Save->Research=FResearchProgress();
+        for(const auto& Entry:Save->InventoryStacks) if(Entry.Key>=EFrontierItem::Crystal && Entry.Value>0) { Feedback=TEXT("Unknown item in legacy save"); return false; }
+    }
+    if(!UResearchComponent::Validate(Save->Research)) { Feedback=TEXT("Invalid research prerequisites in save"); return false; }
     if (!UInventoryComponent::Validate(Save->InventoryStacks))
     {
         Feedback = TEXT("Invalid inventory in save");
@@ -329,6 +333,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
     RespawnProtectionUntil=0;
     Equipment->Restore(Save->Equipment);
     Inventory->Restore(Save->InventoryStacks);
+    Research->Restore(Save->Research); CaptureComponent->ResetSelection();
     GetCharacterMovement()->SetMovementMode(Health > 0 ? MOVE_Walking : MOVE_None);
     SelectedCompanion.Reset();
     RosterHighlight.Reset(); bBackpackOpen=false; BackpackRecipe=0;
@@ -482,6 +487,7 @@ ACFPlayerCharacter::ACFPlayerCharacter()
     Inventory = CreateDefaultSubobject<UInventoryComponent>(TEXT("Inventory"));
     Building = CreateDefaultSubobject<UBaseBuildingComponent>(TEXT("Building"));
     HomeBuilding = CreateDefaultSubobject<UHomeBuildingComponent>(TEXT("HomeBuilding"));
+    Research = CreateDefaultSubobject<UResearchComponent>(TEXT("Research"));
     Equipment = CreateDefaultSubobject<UPlayerEquipmentComponent>(TEXT("Equipment"));
 }
 
@@ -512,6 +518,7 @@ void ACFPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
     PlayerInputComponent->BindKey(EKeys::C, IE_Pressed, this, &ACFPlayerCharacter::ToggleBackpack);
     PlayerInputComponent->BindKey(EKeys::Y, IE_Pressed, this, &ACFPlayerCharacter::PetAimedCompanion);
     PlayerInputComponent->BindKey(EKeys::M, IE_Pressed, this, &ACFPlayerCharacter::GatherAimedResource);
+    PlayerInputComponent->BindKey(EKeys::Zero, IE_Pressed, CaptureComponent.Get(), &UCaptureComponent::ToggleDevice);
     PlayerInputComponent->BindKey(EKeys::One, IE_Pressed, this, &ACFPlayerCharacter::CraftCaptureDevice);
     PlayerInputComponent->BindKey(EKeys::Two, IE_Pressed, this, &ACFPlayerCharacter::CraftMedicine);
     PlayerInputComponent->BindKey(EKeys::Three, IE_Pressed, this, &ACFPlayerCharacter::CraftFood);

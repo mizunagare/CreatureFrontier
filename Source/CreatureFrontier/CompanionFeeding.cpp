@@ -6,9 +6,7 @@
 
 void ACFPlayerCharacter::CraftFood()
 {
-    if (!HasAuthority() || Health <= 0) return;
-    if (!IsNearWorkStation()) { Feedback = TEXT("Food crafting needs a nearby work station (8m)"); return; }
-    Feedback = Inventory->Craft(EFrontierItem::Food) ? TEXT("Crafted food: -2 materials") : TEXT("Need 2 materials or food stack is full");
+    CraftRecipe(TEXT("Food"));
 }
 
 bool ACFPlayerCharacter::FeedCompanion(ACreatureCharacter* Pet)

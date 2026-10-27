@@ -27,7 +27,11 @@ public:
 
     UFUNCTION(BlueprintCallable, Server, Reliable, Category="Capture")
     void TryCapture(ACreatureCharacter* Creature);
+    void ToggleDevice();
+    bool UsesResonance() const { return bUseResonance; }
+    void ResetSelection() { bUseResonance=false; }
 private:
+    bool bUseResonance=false;
     double NextCaptureTime = 0.0;
 };
 

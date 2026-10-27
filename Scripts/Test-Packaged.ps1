@@ -50,6 +50,9 @@ $cases = @(
     @{Flag='CFHomeTest'; Marker='CF_HOME PASS'},
     @{Flag='CFHomeWrite'; Marker='CF_HOME_WRITE PASS'},
     @{Flag='CFHomeRead'; Marker='CF_HOME_READ PASS'},
+    @{Flag='CFExpeditionTest'; Marker='CF_EXPEDITION PASS'},
+    @{Flag='CFExpeditionWrite'; Marker='CF_EXPEDITION_WRITE PASS'},
+    @{Flag='CFExpeditionRead'; Marker='CF_EXPEDITION_READ PASS'},
     @{Flag='CFSaveWrite'; Marker='CF_SAVE_WRITE PASS'},
     @{Flag='CFSaveRead'; Marker='CF_SAVE_READ PASS'},
     @{Flag='CFNavTest'; Marker='CF_NAV_WORK PASS'}

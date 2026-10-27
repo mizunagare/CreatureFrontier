@@ -37,6 +37,9 @@ public:
     float GetPlayerAttackDamage() const;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Building") TObjectPtr<UBaseBuildingComponent> Building;
     UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Category="Building") TObjectPtr<class UHomeBuildingComponent> HomeBuilding;
+    UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Category="Research") TObjectPtr<class UResearchComponent> Research;
+    bool CraftRecipe(FName RecipeId);
+    FString GetRecipeStatus(const struct FFrontierRecipe& Recipe) const;
     void ToggleBuilding();
     void CycleBuilding();
     void DismantleBuilding();

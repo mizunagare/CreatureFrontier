@@ -6,6 +6,7 @@ specs = [
     ('DA_Brush', 'Renewable brush', unreal.WorkSpecialty.GATHERING, 24, 180.0, (0.12, 0.5, 0.16)),
     ('DA_Stone', 'Stone deposit', unreal.WorkSpecialty.MINING, 30, 0.0, (0.2, 0.38, 0.6)),
     ('DA_Salvage', 'Salvage pile', unreal.WorkSpecialty.CRAFTING, 18, 0.0, (0.6, 0.28, 0.08)),
+    ('DA_Crystal', 'Crystal Rise deposit', unreal.WorkSpecialty.MINING, 8, 0.0, (0.55, 0.15, 0.8)),
 ]
 for name, label, specialty, capacity, regrow, color in specs:
     path = '/Game/Resources/' + name
@@ -17,7 +18,9 @@ for name, label, specialty, capacity, regrow, color in specs:
     assert asset
     for key, value in dict(display_name=label, specialty=specialty, capacity=capacity,
                            work_seconds=3.0, harvest_interval=0.8, regrow_seconds=regrow,
-                           color=unreal.LinearColor(*color, 1)).items():
+                           color=unreal.LinearColor(*color, 1),
+                           output_item=unreal.FrontierItem.CRYSTAL if name == 'DA_Crystal' else unreal.FrontierItem.MATERIAL,
+                           discovery=unreal.FrontierResearch.CRYSTAL_SAMPLE if name == 'DA_Crystal' else unreal.FrontierResearch.NONE).items():
         asset.set_editor_property(key, value)
     assert unreal.EditorAssetLibrary.save_loaded_asset(asset)
 unreal.log('CF_RESOURCE_ASSETS PASS')
