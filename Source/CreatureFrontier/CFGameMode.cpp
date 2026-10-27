@@ -11,6 +11,7 @@
 #include "WorkCycleScenario.h"
 #include "SquadScenario.h"
 #include "JournalScenario.h"
+#include "ObjectiveScenario.h"
 #include "CaptureComponent.h"
 #include "CreatureCharacter.h"
 #include "CreatureDefinition.h"
@@ -56,12 +57,14 @@ void ACFGameMode::BeginPlay()
     const bool bWorkCycleTest = FParse::Param(FCommandLine::Get(), TEXT("CFWorkCycleTest"));
     const bool bSquadTest = FParse::Param(FCommandLine::Get(), TEXT("CFSquadTest"));
     const bool bJournalTest = FParse::Param(FCommandLine::Get(), TEXT("CFJournalTest"));
-    if (!bSaveWrite && !bSaveRead && !bInventoryTest && !bNavTest && !bCareTest && !bSpeciesTest && !bCombatTest && !bEncounterTest && !bBossTest && !bBuildingTest && !bWorldTest && !bWorldPreview && !bFarmingTest && !bFarmPreview && !bFeedingTest && !bWorkCycleTest && !bSquadTest && !bJournalTest && !FParse::Param(FCommandLine::Get(), TEXT("CFSmokeTest"))) return;
+    const bool bObjectiveTest = FParse::Param(FCommandLine::Get(), TEXT("CFObjectiveTest"));
+    if (!bSaveWrite && !bSaveRead && !bInventoryTest && !bNavTest && !bCareTest && !bSpeciesTest && !bCombatTest && !bEncounterTest && !bBossTest && !bBuildingTest && !bWorldTest && !bWorldPreview && !bFarmingTest && !bFarmPreview && !bFeedingTest && !bWorkCycleTest && !bSquadTest && !bJournalTest && !bObjectiveTest && !FParse::Param(FCommandLine::Get(), TEXT("CFSmokeTest"))) return;
     FTimerHandle TestStart;
-    GetWorldTimerManager().SetTimer(TestStart, [this, bSaveWrite, bSaveRead, bInventoryTest, bNavTest, bCareTest, bSpeciesTest, bCombatTest, bEncounterTest, bBossTest, bBuildingTest, bWorldTest, bWorldPreview, bFarmingTest, bFarmPreview, bFeedingTest, bWorkCycleTest, bSquadTest, bJournalTest]()
+    GetWorldTimerManager().SetTimer(TestStart, [this, bSaveWrite, bSaveRead, bInventoryTest, bNavTest, bCareTest, bSpeciesTest, bCombatTest, bEncounterTest, bBossTest, bBuildingTest, bWorldTest, bWorldPreview, bFarmingTest, bFarmPreview, bFeedingTest, bWorkCycleTest, bSquadTest, bJournalTest, bObjectiveTest]()
     {
         auto* Hero = Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerPawn(this, 0));
         if (!Hero) { FPlatformMisc::RequestExitWithStatus(true, 1); return; }
+        if (bObjectiveTest) { RunObjectiveScenario(GetWorld(),Hero); return; }
         if (bJournalTest) { RunJournalScenario(GetWorld(),Hero); return; }
         if (bSquadTest) { RunSquadScenario(GetWorld(),Hero); return; }
         if (bWorkCycleTest) { RunWorkCycleScenario(GetWorld(),Hero); return; }

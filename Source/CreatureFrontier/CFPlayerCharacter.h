@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "CreatureJournalTypes.h"
+#include "ObjectiveTypes.h"
 #include "CFPlayerCharacter.generated.h"
 
 class UCameraComponent;
@@ -12,6 +13,7 @@ class UInventoryComponent;
 class UBaseBuildingComponent;
 class AWorkStation;
 class UCreatureDefinition;
+enum class EFrontierItem : uint8;
 
 UCLASS()
 class CREATUREFRONTIER_API ACFPlayerCharacter : public ACharacter
@@ -56,6 +58,14 @@ public:
     int32 GetJournalPage() const { return JournalPage; }
     void NextJournalPage();
     void PreviousJournalPage();
+    void RecordCompanionProduction(const ACreatureCharacter* Pet,EFrontierItem Item);
+    void RecordAlphaResolution(const ACreatureCharacter* Creature);
+    void ClaimObjectiveReward();
+    const FFrontierObjectiveProgress& GetObjectives() const { return Objectives; }
+    int32 GetObjectiveProgress(int32 Index) const;
+    FString GetObjectiveStatus() const;
+    FString GetObjectiveHint() const;
+    FString GetObjectiveRewardText() const;
     TArray<ACreatureCharacter*> GetCompanionRoster() const;
     void ToggleRoster();
     void NextRosterCompanion();
@@ -100,6 +110,7 @@ protected:
     virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 
 private:
+    UPROPERTY() FFrontierObjectiveProgress Objectives;
     void RecordJournal(UCreatureDefinition* Definition,bool bCaptured);
     UPROPERTY() TArray<FCreatureJournalEntry> Journal;
     UPROPERTY() TArray<TObjectPtr<UCreatureDefinition>> JournalAssets;

@@ -67,6 +67,7 @@ bool ACFPlayerCharacter::SaveProgress(const FString& Slot)
     Save->Resources = Inventory->Count(EFrontierItem::Material);
     Save->InventoryStacks = Inventory->GetStacks();
     Save->Journal = Journal;
+    Save->Objectives = Objectives;
     for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It)
     {
         FCreatureSaveRecord Record;
@@ -120,7 +121,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
 {
     if (!HasAuthority() || !GetController()) return false;
     auto* Save = Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot, 0));
-    if (!Save || Save->FormatVersion < 1 || Save->FormatVersion > 12 ||
+    if (!Save || Save->FormatVersion < 1 || Save->FormatVersion > 13 ||
         Save->MapName != UGameplayStatics::GetCurrentLevelName(this, true) ||
         !FMath::IsFinite(Save->Health) || Save->Health < 0 || Save->Health > 100 ||
         Save->Resources < 0 || Save->PlayerTransform.ContainsNaN() || Save->ViewRotation.ContainsNaN())
@@ -149,6 +150,15 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
         if (!Definition || JournalPaths.Contains(Path)) { Feedback=TEXT("Invalid journal entry in save"); return false; }
         JournalPaths.Add(Path); LoadedJournalAssets.Add(Definition);
     }
+    if(Save->FormatVersion<13) Save->Objectives=FFrontierObjectiveProgress();
+    const auto& ObjectiveSave=Save->Objectives;
+    bool SeenProof=!Save->Journal.IsEmpty(), CaptureProof=false;
+    for(const auto& Entry:Save->Journal) CaptureProof |= Entry.bCaptured;
+    for(const auto& Record:Save->Creatures) if(Record.bOwned && !Record.Definition.IsNull()) { SeenProof=true; CaptureProof=true; }
+    if(ObjectiveSave.Claimed<0 || ObjectiveSave.Claimed>5 || ObjectiveSave.WorkMaterials<0 || ObjectiveSave.WorkMaterials>3 || ObjectiveSave.FarmFood<0 || ObjectiveSave.FarmFood>2 ||
+        (ObjectiveSave.Claimed>=1 && !SeenProof) || (ObjectiveSave.Claimed>=2 && !CaptureProof) ||
+        (ObjectiveSave.Claimed>=3 && ObjectiveSave.WorkMaterials<3) || (ObjectiveSave.Claimed>=4 && ObjectiveSave.FarmFood<2) || (ObjectiveSave.Claimed>=5 && !ObjectiveSave.bAlphaResolved))
+    { Feedback=TEXT("Invalid journey progress in save"); return false; }
     for (const auto& Entry : Save->EncounterTimers)
         if (Entry.Key.IsNone() || !FMath::IsFinite(Entry.Value) || Entry.Value < 0 || Entry.Value > 600)
         { Feedback = TEXT("Invalid encounter timer in save"); return false; }
@@ -285,9 +295,10 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
     SelectedCompanion.Reset();
     RosterHighlight.Reset();
     Journal=Save->Journal; JournalAssets=LoadedJournalAssets; JournalPage=0;
+    Objectives=Save->Objectives;
     // Owned survivors in old snapshots prove capture; unseen wild snapshots do not prove discovery.
     for (auto* Pet : Restored)
-        if (Pet->Tamer==GetController()) RecordJournal(Pet->Definition,true);
+        if (Pet->Tamer==GetController()) { RecordJournal(Pet->Definition,true); RecordAlphaResolution(Pet); }
     Feedback = bSingleCompanionMode ? TEXT("Save restored - select again with L or use K for ALL; commands blocked until then") : TEXT("Save restored - commands target ALL; L selects one companion");
     return true;
 }
@@ -317,7 +328,10 @@ float ACFPlayerCharacter::TakeDamage(float Amount, const FDamageEvent& Event, AC
 void ACFPlayerCharacter::CaptureResolved(ACreatureCharacter* Creature, bool bSucceeded)
 {
     if (HasAuthority() && IsValid(Creature) && Health>0)
+    {
         RecordJournal(Creature->Definition,bSucceeded && Creature->Disposition==ECreatureDisposition::Tamed && Creature->Tamer==GetController());
+        if(bSucceeded) RecordAlphaResolution(Creature);
+    }
     Feedback = bSucceeded ? TEXT("Captured! F: follow | E: assign work") : TEXT("Capture failed - weaken it and retry");
 }
 
@@ -459,6 +473,7 @@ void ACFPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
     PlayerInputComponent->BindKey(EKeys::I, IE_Pressed, this, &ACFPlayerCharacter::ToggleJournal);
     PlayerInputComponent->BindKey(EKeys::PageDown, IE_Pressed, this, &ACFPlayerCharacter::NextJournalPage);
     PlayerInputComponent->BindKey(EKeys::PageUp, IE_Pressed, this, &ACFPlayerCharacter::PreviousJournalPage);
+    PlayerInputComponent->BindKey(EKeys::N, IE_Pressed, this, &ACFPlayerCharacter::ClaimObjectiveReward);
 }
 
 void ACFPlayerCharacter::MoveForward(float Value)

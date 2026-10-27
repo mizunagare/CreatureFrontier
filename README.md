@@ -4,9 +4,9 @@
 
 ## Windows 独立原型
 
-当前最新本机版本：`D:\myGame\Builds\Windows-Journal\CreatureFrontier.exe`。
+当前最新本机版本：`D:\myGame\Builds\Windows-Journey\CreatureFrontier.exe`。
 双击即可进入测试地图，不需要先打开 Unreal Editor。复制到其他机器时需复制整个
-`Builds\Windows-Journal` 文件夹，不能只复制根目录的启动 EXE。
+`Builds\Windows-Journey` 文件夹，不能只复制根目录的启动 EXE。
 这是 Development 灰盒原型，尚未完成正式美术、内容与性能优化。
 
 战斗更新预览另外输出到 `D:\myGame\Builds\Windows-Combat\CreatureFrontier.exe`，
@@ -22,7 +22,8 @@
 伙伴分工更新输出到 `D:\myGame\Builds\Windows-Squad\CreatureFrontier.exe`。
 队伍面板更新输出到 `D:\myGame\Builds\Windows-Roster\CreatureFrontier.exe`。
 伙伴图鉴更新输出到 `D:\myGame\Builds\Windows-Journal\CreatureFrontier.exe`。
-旧存档版本 1–11 可以读取，新版存档版本为 12（包含图鉴发现/捕捉历史及已有的待复工状态）。
+新手旅程更新输出到 `D:\myGame\Builds\Windows-Journey\CreatureFrontier.exe`。
+旧存档版本 1–12 可以读取，新版存档版本为 13（包含旅程计数/领奖状态、图鉴历史及已有的待复工状态）。
 新版保存后的存档不能交给旧版程序读取；请保留旧存档备份。
 测试脚本默认选择 `Builds` 下最新编译的 Development 程序，也可明确指定：
 `.\Scripts\Test-Packaged.ps1 -BuildRoot D:\myGame\Builds\Windows-Combat`。
@@ -60,6 +61,7 @@ Windows 开发环境已部署并验证：Unreal Engine 5.8、Visual Studio C++ �
 - `K`：切回全体伙伴指令模式（默认）
 - `Tab`：展开/收起队伍面板；`[` / `]` 浏览伙伴，`Enter` 选择高亮伙伴
 - `I`：打开/关闭伙伴图鉴；`PageUp` / `PageDown` 浏览已发现物种
+- `N`：当前新手目标达成后领取奖励，推进到下一步
 - `F`：召回当前指令范围内的伙伴跟随，并自动攻击玩家周边的野生宠物
 - `E`：靠近出生点后方的工作台（8 米内），分配伙伴采集；到达后每 3 秒产出 1 资源
 - `R`：重新开始当前关卡（玩家倒地后也可使用）
@@ -102,6 +104,32 @@ G 在单只模式只检查所选伙伴，冷却中不会改让其他伙伴施法
 `-CFJournalTest -CFJournalPreview -RenderOffscreen -windowed -ResX=1280 -ResY=720 -norhithread -forcerhibypass "-ExecCmds=t.MaxFPS 60"`
 可生成 `Saved/JournalPreview/entry1.png` 与 `entry2.png`，分别检查已发现/已捕捉页面；
 使用独立测试槽，不覆盖玩家存档。离屏缺字问题沿用下述已知限制，普通渲染配置未改动。
+
+## 新手旅程
+
+左侧 HUD 常驻显示当前目标、进度、操作提示和奖励。依次完成并按 N 领取：
+
+| 目标 | 奖励 |
+| --- | --- |
+| 发现一种生物 | 2 捕捉装置 |
+| 捕捉第一只伙伴 | 12 材料 |
+| 伙伴成功生产 3 材料 | 12 材料 |
+| 伙伴在农圃成功生产 2 食物 | 2 药物 |
+| 捕捉或击败 Crystal Rise 精英 | 20 材料 + 3 捕捉装置 |
+
+发现/捕捉沿用图鉴记录；生产由伙伴实际交付触发，拾取、制作、初始物资和任务奖励不增加生产计数。
+背包满时尚未交付的产出不计数。进度可在对应步骤显示前累计，不要求按固定顺序从零重做。
+精英被玩家或其伙伴击败，或成功捕捉，均可完成最后一步；普通生物、失败捕捉和重复攻击尸体不算。
+
+每步奖励在该存档中只能领取一次，必须顺序领取，倒地不能领取。
+整组奖励需全部装得下；不足时不扣除待领奖状态，也不发放部分物资，腾出空间后再按 N。
+F5 将背包、生产/首领进度与领奖状态一起保存；F9 一并回滚到快照，不会把奖励叠加到当前背包。
+旧版本 1–12 从未拥有这套奖励，迁移后从第 1 步开始；已有图鉴/伙伴可满足发现/捕捉，
+自有精英可证明捕捉完成，但无法可靠推断过去的产出或野生尸体归属，生产计数从 0 开始。
+这是五步基础引导，不是完整剧情、NPC 对话、可配置任务系统或游戏最终通关。
+
+`-CFObjectiveTest -CFObjectivePreview -RenderOffscreen -windowed -ResX=1280 -ResY=720 -norhithread -forcerhibypass "-ExecCmds=t.MaxFPS 60"`
+可生成 `Saved/JourneyPreview/ready.png` 和 `complete.png`，使用独立测试存档，不覆盖玩家存档。
 
 主动技能消耗 20 体力，蓄力 0.65 秒；伙伴会先尝试进入射程，最多等待 6 秒。
 工作/休息中的伙伴不响应战斗指令，F 可重新启用跟随。F 取消集火和蓄力；
@@ -199,7 +227,10 @@ HUD 显示玩家生命、资源、伙伴数量、工作数量和准星目标的�
 `-CFJournalTest` 验证瞄准发现、去重、距离/遮挡/倒地拒绝、真实捕捉回调、失败不解锁、
 捕捉历史在伙伴移除后保留、快照读档、空名单/循环浏览/面板互斥、异常列表拒绝与旧档迁移；
 使用 `FrontierJournalAutomation` 等独立测试槽，不写入 `FrontierSlot`。
-当前打包回归共 17 项，包含伙伴分工与图鉴测试。
+`-CFObjectiveTest` 验证五步推进、提前/重复/倒地领取拒绝、真实伙伴产出与满包停滞、
+整组奖励容量校验、精英击败/捕捉、奖励快照回滚、异常状态拒绝和旧版本迁移，
+使用 `FrontierObjectiveAutomation` 等独立测试槽。
+当前打包回归共 18 项，包含伙伴分工、图鉴与新手目标测试。
 同时添加 `-CFRosterPreview -RenderOffscreen -windowed -ResX=1280 -ResY=720 -norhithread -forcerhibypass "-ExecCmds=t.MaxFPS 60"`（不要使用 `-nullrhi`），
 可生成 11 只伙伴的两页界面截图 `Saved/RosterPreview/team.png` 和 `team_page2.png` 后退出，不写入玩家存档。
 已知显示问题：当前机器 D3D12 离屏截图存在间歇性缺字，上述兼容参数可改善但尚未完全消除。

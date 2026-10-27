@@ -257,7 +257,7 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
                 if (WorkProgress >= Interval)
                 {
                     if (OwnerPlayer->Inventory->AddItem(Farm ? EFrontierItem::Food : EFrontierItem::Material, 1))
-                    { AddExperience(1); WorkProgress = 0; }
+                    { OwnerPlayer->RecordCompanionProduction(this,Farm ? EFrontierItem::Food : EFrontierItem::Material); AddExperience(1); WorkProgress = 0; }
                     else WorkProgress = Interval; // Ready harvest stays pending while inventory is full.
                 }
             }
@@ -392,6 +392,7 @@ float ACreatureCharacter::TakeDamage(float DamageAmount, FDamageEvent const& Dam
             {
                 if (auto* Hero = Cast<ACFPlayerCharacter>(EventInstigator->GetPawn()))
                 {
+                    Hero->RecordAlphaResolution(this);
                     auto* Loot = GetWorld()->SpawnActor<AWorldLoot>(GetActorLocation() + FVector(0,0,-55), FRotator::ZeroRotator);
                     if (Loot) { Loot->Materials = bAlpha ? 8 : 2; Loot->Medicine = bAlpha ? 1 : 0; }
                     Hero->Feedback = TEXT("Loot dropped - approach the gold cache to collect");

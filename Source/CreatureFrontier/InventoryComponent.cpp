@@ -10,6 +10,18 @@ UInventoryComponent::UInventoryComponent()
 
 int32 UInventoryComponent::Count(EFrontierItem Item) const { return Stacks.FindRef(Item); }
 
+bool UInventoryComponent::GrantItems(const TMap<EFrontierItem,int32>& Items)
+{
+    if (!GetOwner() || !GetOwner()->HasAuthority() || Items.IsEmpty()) return false;
+    auto Updated=Stacks;
+    for(const auto& Item:Items)
+    {
+        if(static_cast<uint8>(Item.Key)>static_cast<uint8>(EFrontierItem::Food) || Item.Value<=0 || Item.Value>StackLimit-Updated.FindRef(Item.Key)) return false;
+        Updated.FindOrAdd(Item.Key)+=Item.Value;
+    }
+    Stacks=MoveTemp(Updated); return true;
+}
+
 bool UInventoryComponent::AddItem(EFrontierItem Item, int32 Amount)
 {
     if (!GetOwner() || !GetOwner()->HasAuthority() || Amount <= 0 ||

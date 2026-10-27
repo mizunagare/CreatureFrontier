@@ -15,6 +15,7 @@ public:
     static constexpr int32 StackLimit = 999;
     UFUNCTION(BlueprintPure) int32 Count(EFrontierItem Item) const;
     UFUNCTION(BlueprintCallable) bool AddItem(EFrontierItem Item, int32 Amount);
+    bool GrantItems(const TMap<EFrontierItem,int32>& Items);
     UFUNCTION(BlueprintCallable) bool Consume(EFrontierItem Item, int32 Amount);
     UFUNCTION(BlueprintCallable) bool Craft(EFrontierItem Output);
     const TMap<EFrontierItem, int32>& GetStacks() const { return Stacks; }

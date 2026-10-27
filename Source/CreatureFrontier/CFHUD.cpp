@@ -36,6 +36,10 @@ void ACFHUD::DrawHUD()
     DrawText(Player->GetCommandScopeText(),FLinearColor::Green,32,320);
     DrawText(TEXT("Tab team | [ / ] browse | Enter select | I journal"),FLinearColor::White,32,342);
     DrawText(Player->Feedback, FLinearColor::Yellow, 32, 368);
+    DrawRect(FLinearColor(.02f,.04f,.06f,.88f),18,462,550,104);
+    DrawText(Player->GetObjectiveStatus(),FLinearColor::Green,32,474);
+    DrawText(Player->GetObjectiveHint(),FLinearColor::White,32,503);
+    DrawText(Player->GetObjectiveRewardText(),FLinearColor::Yellow,32,532);
     if (Player->Building->IsActive()) DrawText(Player->Building->GetHint(), FLinearColor::Yellow,32,440);
     if (auto* Site = Player->TraceFacility(); Site && Site->RequiredSpecialty == EWorkSpecialty::Feeding)
         DrawText(FString::Printf(TEXT("TROUGH %d / 30 FOOD | U deposit | O withdraw"),Site->StoredFood),FLinearColor::Yellow,X-130,Y+25);
