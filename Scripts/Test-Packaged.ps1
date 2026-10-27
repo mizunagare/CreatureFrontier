@@ -10,6 +10,7 @@ New-Item -ItemType Directory -Path $testLogRoot -Force | Out-Null
 $cases = @(
     @{Flag='CFSmokeTest'; Marker='CF_SMOKE PASS'},
     @{Flag='CFInventoryTest'; Marker='CF_INVENTORY PASS'},
+    @{Flag='CFCareTest'; Marker='CF_CARE PASS'},
     @{Flag='CFSaveWrite'; Marker='CF_SAVE_WRITE PASS'},
     @{Flag='CFSaveRead'; Marker='CF_SAVE_READ PASS'},
     @{Flag='CFNavTest'; Marker='CF_NAV_WORK PASS'}

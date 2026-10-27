@@ -30,6 +30,8 @@ public:
     ACreatureCharacter* TraceCreature() const;
     void CommandFollow();
     void CommandWork();
+    void CommandRest();
+    void HealCompanion();
     void RestartLevel();
     void QuitGame();
     bool SaveProgress(const FString& Slot = TEXT("FrontierSlot"));

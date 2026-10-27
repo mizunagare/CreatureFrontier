@@ -76,7 +76,7 @@ void ACreatureCharacter::BeginPlay()
     Super::BeginPlay();
     if (HasAuthority() && Definition)
     {
-        Health = Definition->BaseMaxHealth;
+        Health = GetMaxHealth();
     }
 }
 
@@ -91,6 +91,18 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
     {
         ACFPlayerCharacter* OwnerPlayer = Tamer ? Cast<ACFPlayerCharacter>(Tamer->GetPawn()) : nullptr;
         if (!OwnerPlayer || OwnerPlayer->Health <= 0.0f) { StopNavigation(); return; }
+        if (Activity == ECreatureActivity::Rest)
+        {
+            if (IsValid(WorkSite) && GetDistanceTo(WorkSite) > 220.0f)
+            {
+                NavigateTo(WorkSite->GetActorLocation(), 35.0f);
+                return;
+            }
+            StopNavigation();
+            Stamina = FMath::Min(100.0f, Stamina + DeltaSeconds * (IsValid(WorkSite) ? 12.0f : 4.0f));
+            if (IsValid(WorkSite)) Health = FMath::Min(GetMaxHealth(), Health + DeltaSeconds * 6.0f);
+            return;
+        }
         if (Activity == ECreatureActivity::Work && IsValid(WorkSite))
         {
             const FVector Offset = WorkSite->GetActorLocation() - GetActorLocation();
@@ -98,8 +110,20 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
             else
             {
                 StopNavigation();
+                Stamina = FMath::Max(0.0f, Stamina - DeltaSeconds * 1.5f);
+                if (Stamina <= 0.0f)
+                {
+                    SetActivity(ECreatureActivity::Rest);
+                    WorkProgress = 0.0f;
+                    OwnerPlayer->Feedback = TEXT("A companion is exhausted and resting at base");
+                    return;
+                }
                 WorkProgress += DeltaSeconds;
-                if (WorkProgress >= 3.0f) { OwnerPlayer->Inventory->AddItem(EFrontierItem::Material, 1); WorkProgress = 0.0f; }
+                if (WorkProgress >= 3.0f)
+                {
+                    if (OwnerPlayer->Inventory->AddItem(EFrontierItem::Material, 1)) AddExperience(1);
+                    WorkProgress = 0.0f;
+                }
             }
             return;
         }
@@ -121,7 +145,9 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
             StopNavigation();
             if (Enemy && AttackCooldown <= 0.0f)
             {
-                UGameplayStatics::ApplyDamage(Enemy, Definition ? Definition->BaseAttack : 10.0f, Tamer, this, UDamageType::StaticClass());
+                if (Stamina < 3.0f) { WorkSite = nullptr; SetActivity(ECreatureActivity::Rest); return; }
+                Stamina -= 3.0f;
+                UGameplayStatics::ApplyDamage(Enemy, GetAttackDamage(), Tamer, this, UDamageType::StaticClass());
                 AttackCooldown = AttackInterval;
             }
         }
@@ -131,22 +157,30 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
     if (!IsValid(Player)) { StopNavigation(); return; }
     if (const auto* Hero = Cast<ACFPlayerCharacter>(Player); Hero && Hero->Health <= 0.0f) { StopNavigation(); return; }
 
-    const FVector Offset = Player->GetActorLocation() - GetActorLocation();
+    APawn* Target = Player;
+    float Closest = GetDistanceTo(Player);
+    for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It)
+    {
+        if (It->Disposition != ECreatureDisposition::Tamed || It->Health <= 0) continue;
+        const float Distance = GetDistanceTo(*It);
+        if (Distance < Closest) { Closest = Distance; Target = *It; }
+    }
+    const FVector Offset = Target->GetActorLocation() - GetActorLocation();
     const float Distance2D = Offset.Size2D();
     if (Distance2D <= AggroRange)
     {
         Disposition = ECreatureDisposition::Hostile;
         SetActivity(ECreatureActivity::Combat);
-        if (!CanHit(Player))
+        if (!CanHit(Target))
         {
-            NavigateTo(Player->GetActorLocation(), 65.0f);
+            NavigateTo(Target->GetActorLocation(), 65.0f);
         }
         else
         {
             StopNavigation();
             if (AttackCooldown <= 0.0f)
             {
-                UGameplayStatics::ApplyDamage(Player, 10.0f, GetController(), this, UDamageType::StaticClass());
+                UGameplayStatics::ApplyDamage(Target, GetAttackDamage(), GetController(), this, UDamageType::StaticClass());
                 AttackCooldown = AttackInterval;
             }
         }
@@ -156,18 +190,51 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
 
 float ACreatureCharacter::GetHealthRatio() const
 {
-    const float MaxHealth = Definition ? Definition->BaseMaxHealth : 100.0f;
+    const float MaxHealth = GetMaxHealth();
     return MaxHealth > 0.0f ? FMath::Clamp(Health / MaxHealth, 0.0f, 1.0f) : 0.0f;
+}
+
+float ACreatureCharacter::GetMaxHealth() const
+{
+    return (Definition ? Definition->BaseMaxHealth : 100.0f) + (Level - 1) * 20.0f;
+}
+
+float ACreatureCharacter::GetAttackDamage() const
+{
+    return (Definition ? Definition->BaseAttack : 10.0f) + (Level - 1) * 2.0f;
+}
+
+void ACreatureCharacter::AddExperience(int32 Amount)
+{
+    if (!HasAuthority() || Health <= 0 || Disposition != ECreatureDisposition::Tamed || Amount <= 0 || Level >= 20) return;
+    Experience += FMath::Min(Amount, 10000);
+    while (Level < 20 && Experience >= Level * 100)
+    {
+        Experience -= Level * 100;
+        ++Level;
+        Health = FMath::Min(GetMaxHealth(), Health + 20.0f);
+    }
+    if (Level == 20) Experience = 0;
 }
 
 float ACreatureCharacter::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent,
     AController* EventInstigator, AActor* DamageCauser)
 {
     const float Applied = FMath::Min(Health, FMath::Max(0.0f, DamageAmount));
-    if (HasAuthority())
+    if (HasAuthority() && Applied > 0)
     {
         Health = FMath::Max(0.0f, Health - Applied);
-        if (Health <= 0.0f) SetActivity(ECreatureActivity::Rest);
+        if (Health <= 0.0f)
+        {
+            SetActivity(ECreatureActivity::Rest);
+            StopNavigation();
+            if (Disposition != ECreatureDisposition::Tamed && IsValid(EventInstigator))
+            {
+                for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It)
+                    if (It->Tamer == EventInstigator && It->GetDistanceTo(this) <= 1500.0f)
+                        It->AddExperience((DamageCauser == *It ? 50 : 25) * Level);
+            }
+        }
         OnRep_Health();
     }
     return Applied;
@@ -197,6 +264,9 @@ void ACreatureCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
 {
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
     DOREPLIFETIME(ACreatureCharacter, Health);
+    DOREPLIFETIME(ACreatureCharacter, Level);
+    DOREPLIFETIME(ACreatureCharacter, Experience);
+    DOREPLIFETIME(ACreatureCharacter, Stamina);
     DOREPLIFETIME(ACreatureCharacter, Disposition);
     DOREPLIFETIME(ACreatureCharacter, Activity);
     DOREPLIFETIME(ACreatureCharacter, Tamer);

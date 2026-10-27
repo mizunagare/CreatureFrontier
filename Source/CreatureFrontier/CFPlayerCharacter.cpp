@@ -66,6 +66,9 @@ bool ACFPlayerCharacter::SaveProgress(const FString& Slot)
         Record.Definition = It->Definition.Get();
         Record.Transform = It->GetActorTransform();
         Record.Health = It->Health;
+        Record.Level = It->Level;
+        Record.Experience = It->Experience;
+        Record.Stamina = It->Stamina;
         Record.bOwned = It->Tamer == GetController();
         Record.Disposition = It->Disposition;
         Record.Activity = It->Activity;
@@ -81,7 +84,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
 {
     if (!HasAuthority() || !GetController()) return false;
     auto* Save = Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot, 0));
-    if (!Save || Save->FormatVersion < 1 || Save->FormatVersion > 2 ||
+    if (!Save || Save->FormatVersion < 1 || Save->FormatVersion > 3 ||
         Save->MapName != UGameplayStatics::GetCurrentLevelName(this, true) ||
         !FMath::IsFinite(Save->Health) || Save->Health < 0 || Save->Health > 100 ||
         Save->Resources < 0 || Save->PlayerTransform.ContainsNaN() || Save->ViewRotation.ContainsNaN())
@@ -108,7 +111,10 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
         UCreatureDefinition* LoadedDefinition = Record.Definition.LoadSynchronous();
         if (!CreatureClass || CreatureClass->HasAnyClassFlags(CLASS_Abstract) ||
             (!Record.Definition.IsNull() && !LoadedDefinition) || Record.Transform.ContainsNaN() ||
-            !FMath::IsFinite(Record.Health) || Record.Health < 0)
+            !FMath::IsFinite(Record.Health) || Record.Health < 0 ||
+            Record.Level < 1 || Record.Level > 20 || Record.Experience < 0 ||
+            (Record.Level < 20 ? Record.Experience >= Record.Level * 100 : Record.Experience != 0) ||
+            !FMath::IsFinite(Record.Stamina) || Record.Stamina < 0 || Record.Stamina > 100)
         {
             for (auto* Pet : Restored) Pet->Destroy();
             Feedback = TEXT("Save references unavailable or invalid creature data");
@@ -123,8 +129,11 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
             return false;
         }
         Pet->Definition = LoadedDefinition;
+        Pet->Level = Record.Level;
         Pet->FinishSpawning(Record.Transform);
-        Pet->Health = Record.Health;
+        Pet->Health = FMath::Min(Pet->GetMaxHealth(), Record.Health);
+        Pet->Experience = Record.Experience;
+        Pet->Stamina = Record.Stamina;
         Pet->Disposition = Record.Disposition;
         Pet->Tamer = Record.bOwned ? GetController() : nullptr;
         Pet->Activity = Record.Activity;
@@ -196,6 +205,32 @@ void ACFPlayerCharacter::CommandWork()
     Feedback = TEXT("Companions assigned to gather resources");
 }
 
+void ACFPlayerCharacter::CommandRest()
+{
+    if (!HasAuthority() || Health <= 0) return;
+    AWorkStation* Site = nullptr;
+    float Best = 800;
+    for (TActorIterator<AWorkStation> It(GetWorld()); It; ++It)
+        if (GetDistanceTo(*It) < Best) { Best = GetDistanceTo(*It); Site = *It; }
+    if (!Site) { Feedback = TEXT("Rest command requires a nearby base work station (8m)"); return; }
+    int32 Count = 0;
+    for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It)
+        if (It->Tamer == GetController() && It->Health > 0)
+        { It->WorkSite = Site; It->SetActivity(ECreatureActivity::Rest); ++Count; }
+    Feedback = FString::Printf(TEXT("%d companions returning to base to recover health and stamina"), Count);
+}
+
+void ACFPlayerCharacter::HealCompanion()
+{
+    if (!HasAuthority() || Health <= 0) return;
+    auto* Pet = TraceCreature();
+    if (!Pet || Pet->Tamer != GetController()) { Feedback = TEXT("Aim at your companion to use medicine"); return; }
+    if (Pet->Health >= Pet->GetMaxHealth()) { Feedback = TEXT("Companion is already healthy"); return; }
+    if (!Inventory->Consume(EFrontierItem::Medicine, 1)) { Feedback = TEXT("No medicine - craft with 2 at base"); return; }
+    Pet->Health = FMath::Min(Pet->GetMaxHealth(), Pet->Health + 40.0f);
+    Feedback = TEXT("Companion treated (+40 health). T: rest at base, F: follow");
+}
+
 ACFPlayerCharacter::ACFPlayerCharacter()
 {
     FirstPersonCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FirstPersonCamera"));
@@ -220,6 +255,8 @@ void ACFPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
     PlayerInputComponent->BindAction(TEXT("Capture"), IE_Pressed, this, &ACFPlayerCharacter::CaptureTarget);
     PlayerInputComponent->BindKey(EKeys::F, IE_Pressed, this, &ACFPlayerCharacter::CommandFollow);
     PlayerInputComponent->BindKey(EKeys::E, IE_Pressed, this, &ACFPlayerCharacter::CommandWork);
+    PlayerInputComponent->BindKey(EKeys::T, IE_Pressed, this, &ACFPlayerCharacter::CommandRest);
+    PlayerInputComponent->BindKey(EKeys::P, IE_Pressed, this, &ACFPlayerCharacter::HealCompanion);
     PlayerInputComponent->BindKey(EKeys::R, IE_Pressed, this, &ACFPlayerCharacter::RestartLevel);
     PlayerInputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &ACFPlayerCharacter::QuitGame);
     PlayerInputComponent->BindKey(EKeys::F5, IE_Pressed, this, &ACFPlayerCharacter::QuickSave);

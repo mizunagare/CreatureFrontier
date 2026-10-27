@@ -29,6 +29,18 @@ public:
 
     UPROPERTY(ReplicatedUsing=OnRep_Health, BlueprintReadOnly, Category="Creature")
     float Health = 100.0f;
+    UPROPERTY(Replicated, BlueprintReadOnly, Category="Progression")
+    int32 Level = 1;
+    UPROPERTY(Replicated, BlueprintReadOnly, Category="Progression")
+    int32 Experience = 0;
+    UPROPERTY(Replicated, BlueprintReadOnly, Category="Care")
+    float Stamina = 100.0f;
+    UFUNCTION(BlueprintPure, Category="Progression")
+    float GetMaxHealth() const;
+    UFUNCTION(BlueprintPure, Category="Progression")
+    float GetAttackDamage() const;
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Progression")
+    void AddExperience(int32 Amount);
 
     UPROPERTY(Replicated, BlueprintReadOnly, Category="Creature")
     ECreatureDisposition Disposition = ECreatureDisposition::Wild;

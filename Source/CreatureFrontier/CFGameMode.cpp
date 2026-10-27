@@ -14,6 +14,7 @@
 #include "NavigationSystem.h"
 #include "NavigationPath.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Camera/CameraComponent.h"
 
 ACFGameMode::ACFGameMode()
 {
@@ -28,12 +29,63 @@ void ACFGameMode::BeginPlay()
     const bool bSaveRead = FParse::Param(FCommandLine::Get(), TEXT("CFSaveRead"));
     const bool bInventoryTest = FParse::Param(FCommandLine::Get(), TEXT("CFInventoryTest"));
     const bool bNavTest = FParse::Param(FCommandLine::Get(), TEXT("CFNavTest"));
-    if (!bSaveWrite && !bSaveRead && !bInventoryTest && !bNavTest && !FParse::Param(FCommandLine::Get(), TEXT("CFSmokeTest"))) return;
+    const bool bCareTest = FParse::Param(FCommandLine::Get(), TEXT("CFCareTest"));
+    if (!bSaveWrite && !bSaveRead && !bInventoryTest && !bNavTest && !bCareTest && !FParse::Param(FCommandLine::Get(), TEXT("CFSmokeTest"))) return;
     FTimerHandle TestStart;
-    GetWorldTimerManager().SetTimer(TestStart, [this, bSaveWrite, bSaveRead, bInventoryTest, bNavTest]()
+    GetWorldTimerManager().SetTimer(TestStart, [this, bSaveWrite, bSaveRead, bInventoryTest, bNavTest, bCareTest]()
     {
         auto* Hero = Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerPawn(this, 0));
         if (!Hero) { FPlatformMisc::RequestExitWithStatus(true, 1); return; }
+        if (bCareTest)
+        {
+            for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It) It->Destroy();
+            Hero->SetActorLocation(FVector(-450,0,40));
+            Hero->GetCharacterMovement()->DisableMovement();
+            auto* Pet = GetWorld()->SpawnActor<ACreatureCharacter>(FVector(-450,180,40), FRotator::ZeroRotator);
+            auto* Enemy = GetWorld()->SpawnActor<ACreatureCharacter>(FVector(-340,180,40), FRotator::ZeroRotator);
+            if (!Pet || !Enemy) { FPlatformMisc::RequestExitWithStatus(true, 2); return; }
+            Pet->Tame(Hero->GetController());
+            Pet->AddExperience(75);
+            UGameplayStatics::ApplyDamage(Enemy, 1000, Hero->GetController(), Pet, nullptr);
+            UGameplayStatics::ApplyDamage(Enemy, 1000, Hero->GetController(), Pet, nullptr);
+            const bool bGrowth = Pet->Level == 2 && Pet->Experience == 25 && Pet->GetMaxHealth() == 120 && Pet->GetAttackDamage() == 12;
+            Enemy->Destroy();
+            auto* Attacker = GetWorld()->SpawnActor<ACreatureCharacter>(FVector(-340,180,40), FRotator::ZeroRotator);
+            if (!Attacker) { FPlatformMisc::RequestExitWithStatus(true, 2); return; }
+            Attacker->Tick(0.1f);
+            const bool bPetDamaged = Pet->Health == 110;
+            UGameplayStatics::ApplyDamage(Pet, 1000, Attacker->GetController(), Attacker, nullptr);
+            Attacker->Destroy();
+            Hero->Inventory->Restore({{EFrontierItem::Material,6},{EFrontierItem::CaptureDevice,5},{EFrontierItem::Medicine,3}});
+            Hero->FirstPersonCamera->SetWorldRotation((Pet->GetActorLocation()-Hero->FirstPersonCamera->GetComponentLocation()).Rotation());
+            Hero->HealCompanion();
+            const bool bTreatment = Pet->Health == 40 && Hero->Inventory->Count(EFrontierItem::Medicine) == 2;
+            Pet->Stamina = 0;
+            Hero->CommandWork();
+            Pet->Tick(0.1f);
+            const bool bFatigue = Pet->Activity == ECreatureActivity::Rest && Pet->Stamina == 0;
+            Hero->CommandRest();
+            const FString Slot = TEXT("FrontierCareAutomation");
+            const bool bSaved = Hero->SaveProgress(Slot);
+            Pet->Level = 1; Pet->Experience = 0; Pet->Stamina = 100; Pet->Health = 10;
+            const bool bLoaded = Hero->LoadProgress(Slot);
+            ACreatureCharacter* Restored = nullptr;
+            for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It)
+                if (It->Tamer == Hero->GetController()) { Restored = *It; break; }
+            const bool bPersist = bSaved && bLoaded && Restored && Restored->Level == 2 && Restored->Experience == 25 && Restored->Stamina == 0 && Restored->Health == 40 && Restored->WorkSite && Restored->Activity == ECreatureActivity::Rest;
+            if (!Restored) { FPlatformMisc::RequestExitWithStatus(true, 9); return; }
+            FTimerHandle RestCheck;
+            GetWorldTimerManager().SetTimer(RestCheck, [Hero, Restored, bGrowth, bPetDamaged, bTreatment, bPersist, bFatigue]()
+            {
+                const bool bRest = Restored->Health > 50 && Restored->Stamina > 30 && Restored->Health <= Restored->GetMaxHealth();
+                Hero->CommandFollow();
+                const bool bResume = Restored->Activity == ECreatureActivity::Follow;
+                const bool bPass = bGrowth && bPetDamaged && bTreatment && bPersist && bRest && bResume && bFatigue;
+                UE_LOG(LogTemp, Display, TEXT("CF_CARE %s growth=%d petDamage=%d treatment=%d persist=%d rest=%d resume=%d fatigue=%d"), bPass ? TEXT("PASS") : TEXT("FAIL"), bGrowth, bPetDamaged, bTreatment, bPersist, bRest, bResume, bFatigue);
+                FPlatformMisc::RequestExitWithStatus(false, bPass ? 0 : 9);
+            }, 3.0f, false);
+            return;
+        }
         if (bNavTest)
         {
             for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It) It->Destroy();
@@ -129,7 +181,8 @@ void ACFGameMode::BeginPlay()
                 if (It->Tamer == Hero->GetController())
                 {
                     ++Owned;
-                    if (It->WorkSite && It->Activity == ECreatureActivity::Work && It->Health == 75) ++Workers;
+                    if (It->WorkSite && It->Activity == ECreatureActivity::Work && It->Health == 75 &&
+                        It->Level == 4 && It->Experience == 123 && It->Stamina == 62) ++Workers;
                 }
             }
             const bool bValues = Hero->Health == 67 && Hero->Inventory->Count(EFrontierItem::Material) == 42 &&
@@ -156,6 +209,7 @@ void ACFGameMode::BeginPlay()
         if (bSaveWrite)
         {
             Hero->Health = 67;
+            Pet->Level = 4; Pet->Experience = 123; Pet->Stamina = 62;
             Hero->Inventory->Restore({{EFrontierItem::Material, 42}, {EFrontierItem::CaptureDevice, 7}, {EFrontierItem::Medicine, 3}});
             const bool bSaved = Hero->SaveProgress(TestSlot);
             UE_LOG(LogTemp, Display, TEXT("CF_SAVE_WRITE %s"), bSaved ? TEXT("PASS") : TEXT("FAIL"));
