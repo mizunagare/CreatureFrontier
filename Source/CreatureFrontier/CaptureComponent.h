@@ -27,5 +27,7 @@ public:
 
     UFUNCTION(BlueprintCallable, Server, Reliable, Category="Capture")
     void TryCapture(ACreatureCharacter* Creature);
+private:
+    double NextCaptureTime = 0.0;
 };
 

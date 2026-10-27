@@ -7,6 +7,7 @@
 
 class UCreatureDefinition;
 class UStaticMeshComponent;
+class AWorkStation;
 
 UCLASS(Blueprintable)
 class CREATUREFRONTIER_API ACreatureCharacter : public ACharacter
@@ -17,6 +18,8 @@ public:
     ACreatureCharacter();
 
     virtual void Tick(float DeltaSeconds) override;
+    UPROPERTY()
+    TObjectPtr<AWorkStation> WorkSite;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Creature")
     TObjectPtr<UStaticMeshComponent> CreatureVisual;
@@ -72,4 +75,5 @@ protected:
 
 private:
     float AttackCooldown = 0.0f;
+    float WorkProgress = 0.0f;
 };

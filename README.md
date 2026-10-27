@@ -18,6 +18,21 @@ Windows 开发环境已部署并验证：Unreal Engine 5.8、Visual Studio C++ �
 - `Space`：跳跃
 - 鼠标左键：攻击准星指向的宠物
 - 鼠标右键：捕捉准星指向的宠物（宠物生命值越低，成功率越高）
+- `F`：召回所有伙伴跟随，并自动攻击玩家周边的野生宠物
+- `E`：靠近出生点后方的工作台（8 米内），分配伙伴采集；到达后每 3 秒产出 1 资源
+- `R`：重新开始当前关卡（玩家倒地后也可使用）
+
+HUD 显示玩家生命、资源、伙伴数量、工作数量和准星目标的生命/捕捉概率。
+宠物生命归零后无法捕捉；请先削弱再捕捉。当前迭代以单机为测试目标，
+伙伴绕障碍仍使用直接移动，资源和驯服状态暂不持久化，联机权威校验与导航将在后续完善。
+
+玩法冒烟测试（运行约 6 秒后自动退出，日志中应出现 `CF_SMOKE PASS`）：
+
+```powershell
+& 'D:\Epic\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe' `
+  'D:\myGame\CreatureFrontier.uproject' /Game/Maps/L_Prototype `
+  -game -nullrhi -nosound -unattended -nop4 -CFSmokeTest -log
+```
 
 打开工程后载入的默认地图为 `/Game/Maps/L_Prototype`，点击工具栏 **Play** 即可测试。
 

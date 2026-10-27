@@ -11,5 +11,6 @@ class CREATUREFRONTIER_API ACFGameMode : public AGameModeBase
 
 public:
     ACFGameMode();
+    virtual void BeginPlay() override;
 };
 

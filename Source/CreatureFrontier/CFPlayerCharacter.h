@@ -15,6 +15,19 @@ class CREATUREFRONTIER_API ACFPlayerCharacter : public ACharacter
 
 public:
     ACFPlayerCharacter();
+    virtual void BeginPlay() override;
+    virtual float TakeDamage(float Amount, const FDamageEvent& Event, AController* EventInstigator, AActor* Causer) override;
+    UPROPERTY(BlueprintReadOnly, Category="Player")
+    float Health = 100.0f;
+    UPROPERTY(BlueprintReadOnly, Category="Player")
+    int32 Resources = 0;
+    FString Feedback;
+    ACreatureCharacter* TraceCreature() const;
+    void CommandFollow();
+    void CommandWork();
+    void RestartLevel();
+    UFUNCTION()
+    void CaptureResolved(ACreatureCharacter* Creature, bool bSucceeded);
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Camera")
     TObjectPtr<UCameraComponent> FirstPersonCamera;
@@ -40,5 +53,5 @@ protected:
 private:
     void MoveForward(float Value);
     void MoveRight(float Value);
-    ACreatureCharacter* TraceCreature() const;
+    double NextAttackTime = 0.0;
 };
