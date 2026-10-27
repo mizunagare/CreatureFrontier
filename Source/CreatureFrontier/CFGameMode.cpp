@@ -5,6 +5,7 @@
 #include "FieldRecoveryScenario.h"
 #include "StorageScenario.h"
 #include "CargoScenario.h"
+#include "MaterialsScenario.h"
 #include "HomeScenario.h"
 #include "ExpeditionScenario.h"
 #include "CFPlayerCharacter.h"
@@ -58,7 +59,14 @@ void ACFGameMode::BeginPlay()
 {
     Super::BeginPlay();
     SeedFrontierResources(GetWorld());
-    const int32 CargoMode=FParse::Param(FCommandLine::Get(),TEXT("CFCargoWrite"))?1:FParse::Param(FCommandLine::Get(),TEXT("CFCargoRead"))?2:FParse::Param(FCommandLine::Get(),TEXT("CFCargoCrystalTest"))?3:0;
+    const int32 MaterialsMode=FParse::Param(FCommandLine::Get(),TEXT("CFMaterialsWrite"))?1:FParse::Param(FCommandLine::Get(),TEXT("CFMaterialsRead"))?2:0;
+    if(MaterialsMode || FParse::Param(FCommandLine::Get(),TEXT("CFMaterialsTest")))
+    {
+        FTimerHandle Start;
+        GetWorldTimerManager().SetTimer(Start,[this,MaterialsMode](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0))) RunMaterialsScenario(GetWorld(),Hero,MaterialsMode);},1.f,false);
+        return;
+    }
+    const int32 CargoMode=FParse::Param(FCommandLine::Get(),TEXT("CFCargoWrite"))?1:FParse::Param(FCommandLine::Get(),TEXT("CFCargoRead"))?2:FParse::Param(FCommandLine::Get(),TEXT("CFCargoCrystalTest"))?3:FParse::Param(FCommandLine::Get(),TEXT("CFCargoOreTest"))?4:0;
     if(CargoMode || FParse::Param(FCommandLine::Get(),TEXT("CFCargoTest")))
     {
         FTimerHandle Start;
@@ -405,9 +413,9 @@ void ACFGameMode::BeginPlay()
             }
             int32 RepeatedCount = 0;
             for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It) ++RepeatedCount;
-            const bool bPass = bLoaded && bValues && bSecondLoad && Count == RepeatedCount && Owned == 1 && Workers == 1 && ResourceCount==7 && Depleted==1;
-            UE_LOG(LogTemp, Display, TEXT("CF_SAVE_READ %s values=%d owned=%d workers=%d count=%d repeated=%d"),
-                bPass ? TEXT("PASS") : TEXT("FAIL"), bValues, Owned, Workers, Count, RepeatedCount);
+            const bool bPass = bLoaded && bValues && bSecondLoad && Count == RepeatedCount && Owned == 1 && Workers == 1 && ResourceCount==10 && Depleted==1;
+            UE_LOG(LogTemp, Display, TEXT("CF_SAVE_READ %s loaded=%d second=%d values=%d owned=%d workers=%d count=%d repeated=%d resources=%d depleted=%d"),
+                bPass ? TEXT("PASS") : TEXT("FAIL"), bLoaded,bSecondLoad,bValues,Owned,Workers,Count,RepeatedCount,ResourceCount,Depleted);
             FPlatformMisc::RequestExitWithStatus(false, bPass ? 0 : 4);
             return;
         }

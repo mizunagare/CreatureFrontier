@@ -43,7 +43,7 @@ bool UCompanionCargoComponent::CanReceive(EFrontierItem Item) const
 {
     const auto* Pet=Cast<ACreatureCharacter>(GetOwner());
     return Pet && bOrdered && GetTarget() && !bReturning && Pet->CarriedFood==0 && Count()<Capacity &&
-        (Item==EFrontierItem::Material || Item==EFrontierItem::Crystal);
+        IsGatheredResource(Item);
 }
 bool UCompanionCargoComponent::Receive(EFrontierItem Item)
 {
@@ -122,7 +122,7 @@ bool UCompanionCargoComponent::ValidateSnapshot(const FCreatureSaveRecord& Recor
     if(!UInventoryComponent::Validate(Record.CargoItems)) return false;
     int32 Total=0;
     for(const auto& Entry:Record.CargoItems)
-    { if(Entry.Key!=EFrontierItem::Material && Entry.Key!=EFrontierItem::Crystal) return false; Total+=Entry.Value; }
+    { if(!IsGatheredResource(Entry.Key)) return false; Total+=Entry.Value; }
     if(Total>Capacity || (Total>0 && (!Record.bOwned || Record.Disposition!=ECreatureDisposition::Tamed || Record.CarriedFood>0))) return false;
     if(Record.bReturningCargo && (Total==0 || !Record.DeliveryCrateId.IsValid())) return false;
     if(Record.DeliveryCrateId.IsValid() && (!Target || Target->GetKind()!=EHomeModuleKind::Storage || !Record.bOwned || Record.Health<=0 ||

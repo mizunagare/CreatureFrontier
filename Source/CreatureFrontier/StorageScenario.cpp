@@ -28,25 +28,25 @@ AHomeModule* Find(UWorld* World,EHomeModuleKind Kind)
     for(TActorIterator<AHomeModule> It(World);It;++It) if(!It->bPreview && !It->bStaged && It->GetKind()==Kind) return *It;
     return nullptr;
 }
-TMap<EFrontierItem,int32> Pack()
+TMap<EFrontierItem,int32> Pack(int32 ItemCount=static_cast<int32>(EFrontierItem::Count))
 {
     TMap<EFrontierItem,int32> Result;
-    for(int32 Index=0;Index<static_cast<int32>(EFrontierItem::Count);++Index)
+    for(int32 Index=0;Index<ItemCount;++Index)
         Result.Add(static_cast<EFrontierItem>(Index),(Index==0?86:10)-(Index+1));
     return Result;
 }
-TMap<EFrontierItem,int32> Stock()
+TMap<EFrontierItem,int32> Stock(int32 ItemCount=static_cast<int32>(EFrontierItem::Count))
 {
     TMap<EFrontierItem,int32> Result;
-    for(int32 Index=0;Index<static_cast<int32>(EFrontierItem::Count);++Index) Result.Add(static_cast<EFrontierItem>(Index),Index+1);
+    for(int32 Index=0;Index<ItemCount;++Index) Result.Add(static_cast<EFrontierItem>(Index),Index+1);
     return Result;
 }
-bool Snapshot(UWorld* World,ACFPlayerCharacter* Hero)
+bool Snapshot(UWorld* World,ACFPlayerCharacter* Hero,int32 ItemCount=static_cast<int32>(EFrontierItem::Count))
 {
     auto* Crate=Find(World,EHomeModuleKind::Storage); auto* Floor=Find(World,EHomeModuleKind::Floor);
     return Crate && Floor && Crate->FloorId==Floor->PersistentId && Crate->PersistentId.IsValid() &&
         HomeLayout::Collect(World).Num()==2 && Crate->PaidMaterials==6 &&
-        Crate->StorageInventory->GetStacks().OrderIndependentCompareEqual(Stock()) && Hero->Inventory->GetStacks().OrderIndependentCompareEqual(Pack()) &&
+        Crate->StorageInventory->GetStacks().OrderIndependentCompareEqual(Stock(ItemCount)) && Hero->Inventory->GetStacks().OrderIndependentCompareEqual(Pack(ItemCount)) &&
         !Hero->Research->Has(EFrontierResearch::CrystalSample);
 }
 void Finish(UWorld* World,ACFPlayerCharacter* Hero,bool Pass,int32 Mode)
@@ -68,7 +68,9 @@ void RunStorageScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
     for(TActorIterator<ACreatureCharacter> It(World);It;++It) It->Destroy();
     if(Mode==2)
     {
-        const bool Loaded=Hero->LoadProgress(TEXT("StorageCross")) && Snapshot(World,Hero) && Hero->LoadProgress(TEXT("StorageCross")) && Snapshot(World,Hero);
+        auto* Saved=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("StorageCross"),0));
+        const int32 ItemCount=Saved && Saved->FormatVersion<23?6:static_cast<int32>(EFrontierItem::Count);
+        const bool Loaded=Saved && Hero->LoadProgress(TEXT("StorageCross")) && Snapshot(World,Hero,ItemCount) && Hero->LoadProgress(TEXT("StorageCross")) && Snapshot(World,Hero,ItemCount);
         Finish(World,Hero,Loaded,Mode); return;
     }
     Hero->GetCharacterMovement()->DisableMovement(); Hero->SetActorLocation(FVector(-400,-1050,40));
@@ -134,17 +136,23 @@ void RunStorageScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
         if(Case==3) for(auto& R:Bad->HomeModules) if(R.Id==FloorId) R.StoredItems.Add(EFrontierItem::Material,1);
         if(Case==4) Record->FloorId=FGuid::NewGuid();
         if(Case==5) { const auto Copy=*Record; Bad->HomeModules.Add(Copy); }
-        if(Case==6) Bad->FormatVersion=20;
+        if(Case==6)
+        {
+            Bad->FormatVersion=20;
+            for(auto Item:{EFrontierItem::Fiber,EFrontierItem::Ore,EFrontierItem::Scrap}) Bad->InventoryStacks.Remove(Item);
+        }
         if(Case==7) { FCreatureSaveRecord Broken; Broken.Id=FGuid::NewGuid(); Broken.CreatureClass=ACreatureCharacter::StaticClass(); Broken.Health=-1; Bad->Creatures.Add(Broken); }
         if(Case==8) { FFacilitySaveRecord Overlap; Overlap.Id=FGuid::NewGuid(); Overlap.Transform=FTransform(FRotator::ZeroRotator,FVector(-400,-800,5),FVector(2,1,.7)); Bad->Facilities.Add(Overlap); }
         Invalid &= UGameplayStatics::SaveGameToSlot(Bad,TEXT("StorageInvalid"),0) && !Hero->LoadProgress(TEXT("StorageInvalid")) && IsValid(Live) && Live->PersistentId==CrateId && Snapshot(World,Hero);
     }
     auto* Legacy=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(Good,0)); Legacy->FormatVersion=20;
+    auto LegacyPack=BeforePack;
+    for(auto Item:{EFrontierItem::Fiber,EFrontierItem::Ore,EFrontierItem::Scrap}) {Legacy->InventoryStacks.Remove(Item); LegacyPack.Remove(Item);}
     Legacy->HomeModules.RemoveAll([](const FHomeModuleRecord& R){return R.Definition.LoadSynchronous()->Kind==EHomeModuleKind::Storage;});
     Legacy->HomeModules[0].StoredItems.Add(EFrontierItem::Crystal,999); // Future field ignored for actual old-format structure.
     bool Migration=UGameplayStatics::SaveGameToSlot(Legacy,TEXT("StorageLegacy20"),0) && Hero->LoadProgress(TEXT("StorageLegacy20")) &&
-        !Find(World,EHomeModuleKind::Storage) && Hero->Inventory->GetStacks().OrderIndependentCompareEqual(BeforePack) &&
-        Hero->LoadProgress(TEXT("StorageLegacy20")) && !Find(World,EHomeModuleKind::Storage) && Hero->Inventory->GetStacks().OrderIndependentCompareEqual(BeforePack);
+        !Find(World,EHomeModuleKind::Storage) && Hero->Inventory->GetStacks().OrderIndependentCompareEqual(LegacyPack) &&
+        Hero->LoadProgress(TEXT("StorageLegacy20")) && !Find(World,EHomeModuleKind::Storage) && Hero->Inventory->GetStacks().OrderIndependentCompareEqual(LegacyPack);
     Saved &= Hero->LoadProgress(Good) && Snapshot(World,Hero);
     Crate=Find(World,EHomeModuleKind::Storage); Hero->Storage->Open(Crate);
     UGameplayStatics::ApplyDamage(Hero,500,nullptr,nullptr,nullptr);

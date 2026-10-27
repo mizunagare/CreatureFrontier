@@ -13,6 +13,9 @@ $cases=@(
     @{Slot='FieldCross'; Flag='CFFieldRead'; Marker='CF_FIELD_READ PASS'},
     @{Slot='FrontierExpeditionCrossProcess'; Flag='CFExpeditionRead'; Marker='CF_EXPEDITION_READ PASS'}
 )
+if(Test-Path -LiteralPath (Join-Path $LegacyBuildRoot 'CreatureFrontier\Saved\SaveGames\CargoCross.sav')){
+    $cases += @{Slot='CargoCross'; Flag='CFCargoRead'; Marker='CF_CARGO_READ PASS'}
+}
 $results=@()
 foreach($case in $cases){
     $source=Join-Path $LegacyBuildRoot ('CreatureFrontier\Saved\SaveGames\'+$case.Slot+'.sav')

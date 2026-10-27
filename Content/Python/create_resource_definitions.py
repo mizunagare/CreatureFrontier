@@ -7,6 +7,9 @@ specs = [
     ('DA_Stone', 'Stone deposit', unreal.WorkSpecialty.MINING, 30, 0.0, (0.2, 0.38, 0.6)),
     ('DA_Salvage', 'Salvage pile', unreal.WorkSpecialty.CRAFTING, 18, 0.0, (0.6, 0.28, 0.08)),
     ('DA_Crystal', 'Crystal Rise deposit', unreal.WorkSpecialty.MINING, 8, 0.0, (0.55, 0.15, 0.8)),
+    ('DA_Fiber', 'Reedbank fibers', unreal.WorkSpecialty.GATHERING, 18, 240.0, (0.65, 0.72, 0.20)),
+    ('DA_Ore', 'Rust Ridge ore', unreal.WorkSpecialty.MINING, 16, 0.0, (0.72, 0.28, 0.12)),
+    ('DA_Scrap', 'Broken machinery', unreal.WorkSpecialty.CRAFTING, 12, 0.0, (0.25, 0.30, 0.34)),
 ]
 for name, label, specialty, capacity, regrow, color in specs:
     path = '/Game/Resources/' + name
@@ -19,7 +22,8 @@ for name, label, specialty, capacity, regrow, color in specs:
     for key, value in dict(display_name=label, specialty=specialty, capacity=capacity,
                            work_seconds=3.0, harvest_interval=0.8, regrow_seconds=regrow,
                            color=unreal.LinearColor(*color, 1),
-                           output_item=unreal.FrontierItem.CRYSTAL if name == 'DA_Crystal' else unreal.FrontierItem.MATERIAL,
+                           output_item={'DA_Crystal': unreal.FrontierItem.CRYSTAL, 'DA_Fiber': unreal.FrontierItem.FIBER,
+                                        'DA_Ore': unreal.FrontierItem.ORE, 'DA_Scrap': unreal.FrontierItem.SCRAP}.get(name, unreal.FrontierItem.MATERIAL),
                            discovery=unreal.FrontierResearch.CRYSTAL_SAMPLE if name == 'DA_Crystal' else unreal.FrontierResearch.NONE).items():
         asset.set_editor_property(key, value)
     assert unreal.EditorAssetLibrary.save_loaded_asset(asset)

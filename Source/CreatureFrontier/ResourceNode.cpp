@@ -119,7 +119,10 @@ bool MakeStarterResourceRecords(TArray<FResourceSaveRecord>& OutRecords)
         {TEXT("DA_Brush"),FVector(-450,290,0),1}, {TEXT("DA_Stone"),FVector(-650,-60,0),2},
         {TEXT("DA_Salvage"),FVector(-650,640,0),3}, {TEXT("DA_Brush"),FVector(-1400,900,0),4},
         {TEXT("DA_Stone"),FVector(1250,1000,0),5}, {TEXT("DA_Salvage"),FVector(800,-1000,0),6},
-        {TEXT("DA_Crystal"),FVector(1400,1600,0),7}};
+        {TEXT("DA_Crystal"),FVector(1400,1600,0),7},
+        {TEXT("DA_Fiber"),FVector(-1500,1400,0),8},
+        {TEXT("DA_Ore"),FVector(1800,-1100,0),9},
+        {TEXT("DA_Scrap"),FVector(-1800,-800,0),10}};
     for(const auto& Seed:Seeds)
     {
         auto* Definition=LoadObject<UResourceDefinition>(nullptr,*FString::Printf(TEXT("/Game/Resources/%s.%s"),Seed.Asset,Seed.Asset));

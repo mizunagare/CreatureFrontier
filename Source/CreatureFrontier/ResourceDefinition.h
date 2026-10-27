@@ -24,7 +24,7 @@ public:
     bool IsValidDefinition() const
     {
         return (Specialty==EWorkSpecialty::Gathering || Specialty==EWorkSpecialty::Mining || Specialty==EWorkSpecialty::Crafting) &&
-            (OutputItem==EFrontierItem::Material || OutputItem==EFrontierItem::Crystal) &&
+            IsGatheredResource(OutputItem) &&
             (Discovery==EFrontierResearch::None || (Discovery==EFrontierResearch::CrystalSample && OutputItem==EFrontierItem::Crystal)) &&
             Capacity>0 && Capacity<=999 && FMath::IsFinite(WorkSeconds) && WorkSeconds>=1 && WorkSeconds<=60 &&
             FMath::IsFinite(HarvestInterval) && HarvestInterval>=.1f && HarvestInterval<=10 &&

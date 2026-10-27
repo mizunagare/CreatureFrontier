@@ -17,6 +17,13 @@ bool FResourceRestoreTransaction::Stage(const UFrontierSaveGame* Save)
         return Result;
     }
     auto Records=Save->ResourceNodes;
+    if(Save->FormatVersion<23)
+    {
+        TArray<FResourceSaveRecord> Defaults; if(!MakeStarterResourceRecords(Defaults)) return false;
+        for(const auto& Added:Defaults)
+            if((Added.Id==FGuid(0xCF170000,0,0,8) || Added.Id==FGuid(0xCF170000,0,0,9) || Added.Id==FGuid(0xCF170000,0,0,10)) &&
+                !Records.ContainsByPredicate([&](const FResourceSaveRecord& Record){return Record.Id==Added.Id;})) Records.Add(Added);
+    }
     if(Save->FormatVersion<19 && !Records.ContainsByPredicate([](const FResourceSaveRecord& Record){return Record.Id==FGuid(0xCF170000,0,0,7);}))
     {
         TArray<FResourceSaveRecord> Defaults; if(!MakeStarterResourceRecords(Defaults)) return false;

@@ -31,12 +31,12 @@ ACreatureCharacter* Worker(UWorld* World,ACFPlayerCharacter* Hero)
 { for(TActorIterator<ACreatureCharacter> It(World);It;++It) if(It->Tamer==Hero->GetController()) return *It; return nullptr; }
 AHomeModule* Box(UWorld* World)
 { for(TActorIterator<AHomeModule> It(World);It;++It) if(!It->bPreview && !It->bStaged && It->GetKind()==EHomeModuleKind::Storage) return *It; return nullptr; }
-AResourceNode* Source(UWorld* World,bool Crystal=false)
-{ for(TActorIterator<AResourceNode> It(World);It;++It) if(It->PersistentId==FGuid(0xCF170000,0,0,Crystal?7:1)) return *It; return nullptr; }
-bool Mid(UWorld* World,ACFPlayerCharacter* Hero,bool Crystal=false)
+AResourceNode* Source(UWorld* World,bool Crystal=false,bool Ore=false)
+{ for(TActorIterator<AResourceNode> It(World);It;++It) if(It->PersistentId==FGuid(0xCF170000,0,0,Ore?9:Crystal?7:1)) return *It; return nullptr; }
+bool Mid(UWorld* World,ACFPlayerCharacter* Hero,bool Crystal=false,bool Ore=false)
 {
-    auto* Pet=Worker(World,Hero); auto* Crate=Box(World); auto* Node=Source(World,Crystal);
-    const auto Item=Crystal?EFrontierItem::Crystal:EFrontierItem::Material;
+    auto* Pet=Worker(World,Hero); auto* Crate=Box(World); auto* Node=Source(World,Crystal,Ore);
+    const auto Item=Ore?EFrontierItem::Ore:Crystal?EFrontierItem::Crystal:EFrontierItem::Material;
     return Pet && Crate && Node && Pet->PersistentId.IsValid() && Pet->Health>0 && Pet->Cargo->Count()==3 && Pet->CargoInventory->Count(Item)==3 &&
         Pet->Cargo->HasOrder() && Pet->Cargo->IsReturning() && Pet->Cargo->GetTarget()==Crate && Pet->GetFieldResource()==Node &&
         Pet->Experience==3 && Node->Remaining==1 && Crate->StorageInventory->Count(Item)==0 && Hero->Inventory->Count(Item)==999 &&
@@ -152,7 +152,7 @@ struct FRun : TSharedFromThis<FRun>
     bool Loaded=true,Paused=false,Delivered=false; FGuid OwnedId;
     void Finish(bool Passed,const TCHAR* Reason)
     {
-        UE_LOG(LogTemp,Display,TEXT("CF_CARGO%s %s phase=%d loaded=%d paused=%d delivered=%d reason=%s"),Mode==1?TEXT("_WRITE"):Mode==2?TEXT("_READ"):Mode==3?TEXT("_CRYSTAL"):TEXT(""),Passed?TEXT("PASS"):TEXT("FAIL"),Phase,Loaded,Paused,Delivered,Reason);
+        UE_LOG(LogTemp,Display,TEXT("CF_CARGO%s %s phase=%d loaded=%d paused=%d delivered=%d reason=%s"),Mode==1?TEXT("_WRITE"):Mode==2?TEXT("_READ"):Mode==3?TEXT("_CRYSTAL"):Mode==4?TEXT("_ORE"):TEXT(""),Passed?TEXT("PASS"):TEXT("FAIL"),Phase,Loaded,Paused,Delivered,Reason);
         if(!Passed || !FParse::Param(FCommandLine::Get(),TEXT("CFCargoPreview"))) FPlatformMisc::RequestExitWithStatus(false,Passed?0:1);
         else
         {
@@ -168,9 +168,9 @@ struct FRun : TSharedFromThis<FRun>
     }
     void Tick()
     {
-        const bool Crystal=Mode==3; const auto Item=Crystal?EFrontierItem::Crystal:EFrontierItem::Material;
-        const FString MidSlot=Crystal?TEXT("CargoCrystalMid"):TEXT("CargoMid");
-        auto* Pet=Worker(World,Hero); auto* Crate=Box(World); auto* Node=Source(World,Crystal);
+        const bool Crystal=Mode==3,Ore=Mode==4; const auto Item=Ore?EFrontierItem::Ore:Crystal?EFrontierItem::Crystal:EFrontierItem::Material;
+        const FString MidSlot=Ore?TEXT("CargoOreMid"):Crystal?TEXT("CargoCrystalMid"):TEXT("CargoMid");
+        auto* Pet=Worker(World,Hero); auto* Crate=Box(World); auto* Node=Source(World,Crystal,Ore);
         const double Now=World->GetTimeSeconds();
         if(!Pet || !Crate || !Node || Now-Started>45) { Finish(false,TEXT("missing actor or timeout")); return; }
         const int32 Stock=Crate->StorageInventory->Count(Item),Count=Pet->Cargo->Count();
@@ -181,9 +181,9 @@ struct FRun : TSharedFromThis<FRun>
             if(Count<3 || !Pet->Cargo->IsReturning()) return;
             CarryStart=Pet->GetActorLocation();
             OwnedId=Pet->PersistentId;
-            Loaded &= Mid(World,Hero,Crystal) && Hero->SaveProgress(MidSlot);
+            Loaded &= Mid(World,Hero,Crystal,Ore) && Hero->SaveProgress(MidSlot);
             if(Mode==1) { Loaded &= Hero->SaveProgress(TEXT("CargoCross")); Finish(Loaded,TEXT("cross checkpoint")); return; }
-            Loaded &= Hero->LoadProgress(MidSlot) && Mid(World,Hero,Crystal) && Hero->LoadProgress(MidSlot) && Mid(World,Hero,Crystal);
+            Loaded &= Hero->LoadProgress(MidSlot) && Mid(World,Hero,Crystal,Ore) && Hero->LoadProgress(MidSlot) && Mid(World,Hero,Crystal,Ore);
             Loaded &= Worker(World,Hero) && Worker(World,Hero)->PersistentId==OwnedId;
             if(!Loaded) { Finish(false,TEXT("midtrip restore")); return; }
             Pet=Worker(World,Hero); Crate=Box(World); Shot(World,Hero,Pet,TEXT("Carrying"));
@@ -216,7 +216,7 @@ struct FRun : TSharedFromThis<FRun>
         if(Phase==4)
         {
             if(Now-PhaseAt<.3) return; // Flush the distinct delivered frame before snapshot rewind fault cases.
-            if(Mode==2 || Mode==3) { Finish(Loaded && Paused && Delivered,TEXT("restored batch checks")); return; }
+            if(Mode==2 || Mode==3 || Mode==4) { Finish(Loaded && Paused && Delivered,TEXT("restored batch checks")); return; }
             Phase=5; return; // The normal case must actually return and harvest the last partial batch.
         }
         if(Phase==5)
@@ -241,7 +241,7 @@ void RunCargoScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
 {
     using namespace CFCargoQA;
     UCreatureDefinition* Leaf=nullptr;
-    for(TActorIterator<ACreatureCharacter> It(World);It;++It) { if(It->Definition && It->Definition->Form==(Mode==3?ECreatureForm::Stone:ECreatureForm::Leaf)) Leaf=It->Definition; It->Destroy(); }
+    for(TActorIterator<ACreatureCharacter> It(World);It;++It) { if(It->Definition && It->Definition->Form==(Mode>=3?ECreatureForm::Stone:ECreatureForm::Leaf)) Leaf=It->Definition; It->Destroy(); }
     auto Run=MakeShared<FRun>(); Run->World=World; Run->Hero=Hero; Run->Mode=Mode; Run->Started=World->GetTimeSeconds();
     Hero->GetCharacterMovement()->DisableMovement();
     if(Mode==2)
@@ -260,7 +260,7 @@ void RunCargoScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
         auto* Floor=Hero->HomeBuilding->BuildAt(FTransform(FVector(-400,-800,-40)));
         Hero->HomeBuilding->Selected=EHomeModuleKind::Storage;
         auto* Crate=Floor?Hero->HomeBuilding->BuildAt(FTransform(FVector(-400,-800,-30)),Floor->PersistentId):nullptr;
-        auto* Node=Source(World,Mode==3);
+        auto* Node=Source(World,Mode==3,Mode==4);
         if(!Crate || !Node || !Leaf) { Run->Finish(false,TEXT("fixture")); return; }
         Node->Remaining=4; Node->HarvestCooldown=0; Node->RegrowRemaining=0;
         const FTransform Spawn(Node->GetActorLocation()+FVector(0,-210,40));
@@ -269,7 +269,7 @@ void RunCargoScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
         Hero->FirstPersonCamera->SetWorldRotation((Crate->GetActorLocation()+FVector(0,0,40)-Hero->FirstPersonCamera->GetComponentLocation()).Rotation()); Hero->CycleBuilding();
         Hero->SetActorLocation(Node->GetActorLocation()+FVector(-250,-290,40));
         Hero->FirstPersonCamera->SetWorldRotation((Node->GetActorLocation()-Hero->FirstPersonCamera->GetComponentLocation()).Rotation()); Hero->CommandWork();
-        Hero->Inventory->Restore({{Mode==3?EFrontierItem::Crystal:EFrontierItem::Material,999}});
+        Hero->Inventory->Restore({{Mode==4?EFrontierItem::Ore:Mode==3?EFrontierItem::Crystal:EFrontierItem::Material,999}});
         if(!Hero->HasDeliverySelection() || !Pet->Cargo->HasOrder() || Pet->Cargo->GetTarget()!=Crate || Pet->GetFieldResource()!=Node)
         { Run->Finish(false,TEXT("actual V/E order")); return; }
     }

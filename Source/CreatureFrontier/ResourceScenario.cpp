@@ -35,7 +35,7 @@ void RunResourceScenario(UWorld* World,ACFPlayerCharacter* Hero)
         if(It->PersistentId==FGuid(0xCF170000,0,0,2)) Stone=*It;
     }
     for(TActorIterator<AWorkStation> It(World);It;++It) if(!It->bPlayerBuilt && It->RequiredSpecialty==EWorkSpecialty::Gathering) Post=*It;
-    if(!Brush || !Stone || !Post || !Leaf || CountNodes()!=7) { UE_LOG(LogTemp,Error,TEXT("CF_RESOURCE FAIL fixture")); FPlatformMisc::RequestExitWithStatus(false,1); return; }
+    if(!Brush || !Stone || !Post || !Leaf || CountNodes()!=10) { UE_LOG(LogTemp,Error,TEXT("CF_RESOURCE FAIL fixture")); FPlatformMisc::RequestExitWithStatus(false,1); return; }
     Hero->GetCharacterMovement()->DisableMovement(); Hero->Inventory->Restore({{EFrontierItem::Material,0}});
     const FVector Home=Brush->GetActorLocation(); const int32 Capacity=Brush->Definition->Capacity;
     Hero->SetActorLocation(Home+FVector(0,-180,90));
@@ -105,7 +105,7 @@ void RunResourceScenario(UWorld* World,ACFPlayerCharacter* Hero)
         if(It->PersistentId==FGuid(0xCF170000,0,0,1)) Brush=*It;
         if(It->PersistentId==FGuid(0xCF170000,0,0,2)) Stone=*It;
     }
-    Snapshot &= Brush && Stone && CountNodes()==7 && Brush->Remaining==0 && Brush->RegrowRemaining==180 && Brush->HarvestCooldown==.8f && Stone->Remaining==0 && Hero->Inventory->Count(EFrontierItem::Material)==7;
+    Snapshot &= Brush && Stone && CountNodes()==10 && Brush->Remaining==0 && Brush->RegrowRemaining==180 && Brush->HarvestCooldown==.8f && Stone->Remaining==0 && Hero->Inventory->Count(EFrontierItem::Material)==7;
     if(!Brush || !Stone) { FPlatformMisc::RequestExitWithStatus(false,1); return; }
     Brush->Tick(179); Stone->Tick(1000);
     bool Regrowth=Brush->Remaining==0 && Brush->RegrowRemaining==1 && Stone->Remaining==0;
@@ -122,11 +122,11 @@ void RunResourceScenario(UWorld* World,ACFPlayerCharacter* Hero)
         if(Case==5) { FCreatureSaveRecord Record; Record.Id=FGuid::NewGuid(); Record.CreatureClass=ACreatureCharacter::StaticClass(); Record.Health=-1; Bad->Creatures.Add(Record); }
         const FString BadSlot=TEXT("FrontierResourceInvalid");
         UGameplayStatics::SaveGameToSlot(Bad,BadSlot,0);
-        Invalid &= !Hero->LoadProgress(BadSlot) && IsValid(Brush) && Brush->Remaining==Capacity && Brush->GetActorEnableCollision() && CountNodes()==7 && Hero->Inventory->Count(EFrontierItem::Material)==7;
+        Invalid &= !Hero->LoadProgress(BadSlot) && IsValid(Brush) && Brush->Remaining==Capacity && Brush->GetActorEnableCollision() && CountNodes()==10 && Hero->Inventory->Count(EFrontierItem::Material)==7;
     }
     auto* Legacy=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot,0)); Legacy->FormatVersion=16; Legacy->ResourceNodes.Reset();
     UGameplayStatics::SaveGameToSlot(Legacy,TEXT("FrontierResourceLegacy"),0);
-    bool Migration=Hero->LoadProgress(TEXT("FrontierResourceLegacy")) && CountNodes()==7 && Hero->Inventory->Count(EFrontierItem::Material)==7;
+    bool Migration=Hero->LoadProgress(TEXT("FrontierResourceLegacy")) && CountNodes()==10 && Hero->Inventory->Count(EFrontierItem::Material)==7;
     for(TActorIterator<AResourceNode> It(World);It;++It) Migration &= It->Remaining==It->Definition->Capacity;
     for(TActorIterator<ACreatureCharacter> It(World);It;++It) It->Destroy();
     // Real navigation around the existing wall, then conserved harvest and depleted waiting.

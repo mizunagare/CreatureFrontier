@@ -81,7 +81,7 @@ bool ACFPlayerCharacter::SaveProgress(const FString& Slot)
 {
     if (!HasAuthority() || !GetController()) return false;
     auto* Save = Cast<UFrontierSaveGame>(UGameplayStatics::CreateSaveGameObject(UFrontierSaveGame::StaticClass()));
-    Save->FormatVersion=22;
+    Save->FormatVersion=23;
     Save->MapName = UGameplayStatics::GetCurrentLevelName(this, true);
     Save->PlayerTransform = GetActorTransform();
     Save->ViewRotation = GetController()->GetControlRotation();
@@ -158,7 +158,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
 {
     if (!HasAuthority() || !GetController()) return false;
     auto* Save = Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot, 0));
-    if (!Save || Save->FormatVersion < 1 || Save->FormatVersion > 22 ||
+    if (!Save || Save->FormatVersion < 1 || Save->FormatVersion > 23 ||
         Save->MapName != UGameplayStatics::GetCurrentLevelName(this, true) ||
         !FMath::IsFinite(Save->Health) || Save->Health < 0 || Save->Health > 100 ||
         Save->Resources < 0 || Save->PlayerTransform.ContainsNaN() || Save->ViewRotation.ContainsNaN())
@@ -179,6 +179,9 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
         for(const auto& Entry:Save->InventoryStacks) if(Entry.Key>=EFrontierItem::Crystal && Entry.Value>0) { Feedback=TEXT("Unknown item in legacy save"); return false; }
     }
     if(!UResearchComponent::Validate(Save->Research)) { Feedback=TEXT("Invalid research prerequisites in save"); return false; }
+    if(Save->FormatVersion<23)
+        for(const auto& Entry:Save->InventoryStacks) if(Entry.Key>=EFrontierItem::Fiber && Entry.Value>0)
+        { Feedback=TEXT("Unknown differentiated material in legacy save"); return false; }
     if (!UInventoryComponent::Validate(Save->InventoryStacks))
     {
         Feedback = TEXT("Invalid inventory in save");

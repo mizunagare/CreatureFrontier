@@ -13,9 +13,9 @@ FString ACFPlayerCharacter::GetRecipeStatus(const FFrontierRecipe& Recipe) const
     if((Recipe.Reward==ERecipeReward::Spear && Gear.bOwnSpear) || (Recipe.Reward==ERecipeReward::Vest && Gear.bOwnVest)) return TEXT("OWNED - use 6 / 7 to equip or remove");
     if(Recipe.Reward==ERecipeReward::CrystalStudy && Research->Has(EFrontierResearch::CrystalStudy)) return TEXT("OWNED - crystal study already completed");
     if(!Research->Has(Recipe.RequiredResearch)) return TEXT("LOCKED - ")+Research->GetHint();
-    if(Recipe.Reward==ERecipeReward::Item && Recipe.OutputAmount>UInventoryComponent::StackLimit-Inventory->Count(Recipe.Output)) return TEXT("OUTPUT FULL - limit 999 per item");
+    if(Recipe.Reward==ERecipeReward::Item && Recipe.OutputAmount>UInventoryComponent::StackLimit-(Inventory->Count(Recipe.Output)-Recipe.Inputs.FindRef(Recipe.Output))) return TEXT("OUTPUT FULL - limit 999 per item");
     if(!IsNearWorkStation()) return TEXT("Need a work station within 8m");
-    if(Recipe.bBaseOnly && FVector::Dist2D(GetActorLocation(),UBaseBuildingComponent::BaseOrigin())>800) return TEXT("Return to the original base workbench to study / craft crystal tools");
+    if(Recipe.bBaseOnly && FVector::Dist2D(GetActorLocation(),UBaseBuildingComponent::BaseOrigin())>800) return TEXT("Return to the original base workbench to process / study / craft");
     if(auto* Catalog=UCraftingCatalog::Load()) for(const auto& Item:Catalog->Items)
     {
         const int32 Missing=Recipe.Inputs.FindRef(Item.Item)-Inventory->Count(Item.Item);

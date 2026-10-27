@@ -76,7 +76,7 @@ bool CheckSnapshot(UWorld* World,ACFPlayerCharacter* Hero,const FString& Slot)
     auto* Saved=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot,0));
     auto* Light=Lantern(World); auto* Node=Crystal(World);
     if(!Saved || !Light || !Node || !Light->LanternLight->IsVisible() || Light->PaidExtraItems.FindRef(EFrontierItem::Crystal)!=2 ||
-        Node->Remaining!=4 || NodeCount(World)!=7 || !Hero->Research->Has(EFrontierResearch::CrystalStudy) || !SameBag(Hero,Saved->InventoryStacks)) return false;
+        Node->Remaining!=4 || NodeCount(World)!=10 || !Hero->Research->Has(EFrontierResearch::CrystalStudy) || !SameBag(Hero,Saved->InventoryStacks)) return false;
     const auto Layout=HomeLayout::Collect(World); if(Layout.Num()!=7 || Saved->HomeModules.Num()!=7) return false;
     for(const auto& Record:Saved->HomeModules)
         if(!Layout.ContainsByPredicate([&Record](const FHomeModuleRecord& Live){return Live.Id==Record.Id && Live.FloorId==Record.FloorId && Live.Transform.Equals(Record.Transform,.001) && Live.PaidMaterials==Record.PaidMaterials && Live.PaidExtraItems.OrderIndependentCompareEqual(Record.PaidExtraItems);})) return false;
@@ -124,7 +124,7 @@ bool FinishProgress(UWorld* World,ACFPlayerCharacter* Hero,FGuid FloorId)
     UGameplayStatics::SaveGameToSlot(Legacy,TEXT("FrontierExpeditionLegacy"),0);
     for(int32 Repeat=0;Repeat<2;++Repeat)
     {
-        Pass &= Hero->LoadProgress(TEXT("FrontierExpeditionLegacy")) && NodeCount(World)==7 && Crystal(World)->Remaining==8 && !Hero->Research->Has(EFrontierResearch::CrystalSample) && !Lantern(World) && SameBag(Hero,Legacy->InventoryStacks);
+        Pass &= Hero->LoadProgress(TEXT("FrontierExpeditionLegacy")) && NodeCount(World)==10 && Crystal(World)->Remaining==8 && !Hero->Research->Has(EFrontierResearch::CrystalSample) && !Lantern(World) && SameBag(Hero,Legacy->InventoryStacks);
         for(TActorIterator<AResourceNode> It(World);It;++It) if(It->PersistentId==FGuid(0xCF170000,0,0,1)) Pass &= It->Remaining==0 && It->RegrowRemaining==123 && It->HarvestCooldown==.5f;
     }
     Pass &= Hero->LoadProgress(Slot) && CheckSnapshot(World,Hero,Slot) && !Hero->CaptureComponent->UsesResonance();

@@ -10,7 +10,8 @@ void ACFHUD::DrawStorage(ACFPlayerCharacter* Player)
 {
     auto* Crate=Player->Storage->GetCrate(); const auto* Catalog=UCraftingCatalog::Load(); if(!Crate || !Catalog) return;
     const float Left=Canvas->ClipX-488;
-    DrawRect(FLinearColor(.015f,.025f,.04f,.98f),Left,18,470,470);
+    const float Extra=(static_cast<int32>(EFrontierItem::Count)-6)*38;
+    DrawRect(FLinearColor(.015f,.025f,.04f,.98f),Left,18,470,470+Extra);
     DrawText(TEXT("STORAGE CRATE | E close | WORLD LIVE"),FLinearColor::Yellow,Left+14,32);
     DrawText(TEXT("ITEM                  PACK     CRATE / 999"),FLinearColor::White,Left+14,68);
     for(int32 Index=0;Index<static_cast<int32>(EFrontierItem::Count);++Index)
@@ -20,9 +21,9 @@ void ACFHUD::DrawStorage(ACFPlayerCharacter* Player)
         DrawText(UCraftingCatalog::ItemName(Item),FLinearColor::White,Left+16,104+Index*38);
         DrawText(FString::Printf(TEXT("%d       %d"),Player->Inventory->Count(Item),Crate->StorageInventory->Count(Item)),FLinearColor::Yellow,Left+260,104+Index*38);
     }
-    DrawText(TEXT("Up/Down select | Enter deposit 1"),FLinearColor::White,Left+14,344);
-    DrawText(TEXT("Backspace withdraw 1"),FLinearColor::White,Left+14,372);
-    DrawText(TEXT("Right deposit stack | Left withdraw stack"),FLinearColor::White,Left+14,400);
-    DrawText(TEXT("Whole stack is all-or-nothing. F5 saves."),FLinearColor::Green,Left+14,428);
-    DrawText(TEXT("Empty crate before dismantling."),FLinearColor::Green,Left+14,454);
+    DrawText(TEXT("Up/Down select | Enter deposit 1"),FLinearColor::White,Left+14,344+Extra);
+    DrawText(TEXT("Backspace withdraw 1"),FLinearColor::White,Left+14,372+Extra);
+    DrawText(TEXT("Right deposit stack | Left withdraw stack"),FLinearColor::White,Left+14,400+Extra);
+    DrawText(TEXT("Whole stack is all-or-nothing. F5 saves."),FLinearColor::Green,Left+14,428+Extra);
+    DrawText(TEXT("Empty crate before dismantling."),FLinearColor::Green,Left+14,454+Extra);
 }
