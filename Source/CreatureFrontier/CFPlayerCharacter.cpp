@@ -8,10 +8,40 @@
 #include "WorkStation.h"
 #include "FrontierSaveGame.h"
 #include "CreatureDefinition.h"
+#include "InventoryComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 
 void ACFPlayerCharacter::QuickSave() { SaveProgress(); }
 void ACFPlayerCharacter::QuickLoad() { LoadProgress(); }
+
+bool ACFPlayerCharacter::IsNearWorkStation() const
+{
+    for (TActorIterator<AWorkStation> It(GetWorld()); It; ++It)
+        if (GetDistanceTo(*It) <= 800.0f) return true;
+    return false;
+}
+
+void ACFPlayerCharacter::CraftCaptureDevice()
+{
+    if (Health <= 0 || !HasAuthority()) return;
+    if (!IsNearWorkStation()) { Feedback = TEXT("Crafting needs a nearby work station (8m)"); return; }
+    Feedback = Inventory->Craft(EFrontierItem::CaptureDevice) ? TEXT("Crafted capture device: -3 materials") : TEXT("Need 3 materials or inventory is full");
+}
+
+void ACFPlayerCharacter::CraftMedicine()
+{
+    if (Health <= 0 || !HasAuthority()) return;
+    if (!IsNearWorkStation()) { Feedback = TEXT("Crafting needs a nearby work station (8m)"); return; }
+    Feedback = Inventory->Craft(EFrontierItem::Medicine) ? TEXT("Crafted medicine: -5 materials") : TEXT("Need 5 materials or inventory is full");
+}
+
+void ACFPlayerCharacter::UseMedicine()
+{
+    if (Health <= 0 || Health >= 100 || !HasAuthority()) { Feedback = TEXT("Medicine requires an injured, living player"); return; }
+    if (!Inventory->Consume(EFrontierItem::Medicine, 1)) { Feedback = TEXT("No medicine - craft at work station"); return; }
+    Health = FMath::Min(100.0f, Health + 40.0f);
+    Feedback = TEXT("Used medicine: restored up to 40 health");
+}
 
 bool ACFPlayerCharacter::SaveProgress(const FString& Slot)
 {
@@ -21,7 +51,8 @@ bool ACFPlayerCharacter::SaveProgress(const FString& Slot)
     Save->PlayerTransform = GetActorTransform();
     Save->ViewRotation = GetController()->GetControlRotation();
     Save->Health = Health;
-    Save->Resources = Resources;
+    Save->Resources = Inventory->Count(EFrontierItem::Material);
+    Save->InventoryStacks = Inventory->GetStacks();
     for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It)
     {
         FCreatureSaveRecord Record;
@@ -44,12 +75,21 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
 {
     if (!HasAuthority() || !GetController()) return false;
     auto* Save = Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot, 0));
-    if (!Save || Save->FormatVersion != 1 ||
+    if (!Save || Save->FormatVersion < 1 || Save->FormatVersion > 2 ||
         Save->MapName != UGameplayStatics::GetCurrentLevelName(this, true) ||
         !FMath::IsFinite(Save->Health) || Save->Health < 0 || Save->Health > 100 ||
         Save->Resources < 0 || Save->PlayerTransform.ContainsNaN() || Save->ViewRotation.ContainsNaN())
     {
         Feedback = TEXT("No compatible save for this map");
+        return false;
+    }
+    if (Save->FormatVersion == 1)
+    {
+        Save->InventoryStacks = {{EFrontierItem::Material, Save->Resources}, {EFrontierItem::CaptureDevice, 5}, {EFrontierItem::Medicine, 1}};
+    }
+    if (!UInventoryComponent::Validate(Save->InventoryStacks))
+    {
+        Feedback = TEXT("Invalid inventory in save");
         return false;
     }
     TArray<ACreatureCharacter*> OldCreatures;
@@ -93,7 +133,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
     GetController()->SetControlRotation(Save->ViewRotation);
     GetCharacterMovement()->StopMovementImmediately();
     Health = Save->Health;
-    Resources = Save->Resources;
+    Inventory->Restore(Save->InventoryStacks);
     GetCharacterMovement()->SetMovementMode(Health > 0 ? MOVE_Walking : MOVE_None);
     Feedback = TEXT("Save restored");
     return true;
@@ -158,6 +198,7 @@ ACFPlayerCharacter::ACFPlayerCharacter()
     FirstPersonCamera->bUsePawnControlRotation = true;
 
     CaptureComponent = CreateDefaultSubobject<UCaptureComponent>(TEXT("CaptureComponent"));
+    Inventory = CreateDefaultSubobject<UInventoryComponent>(TEXT("Inventory"));
 }
 
 void ACFPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -176,6 +217,9 @@ void ACFPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
     PlayerInputComponent->BindKey(EKeys::R, IE_Pressed, this, &ACFPlayerCharacter::RestartLevel);
     PlayerInputComponent->BindKey(EKeys::F5, IE_Pressed, this, &ACFPlayerCharacter::QuickSave);
     PlayerInputComponent->BindKey(EKeys::F9, IE_Pressed, this, &ACFPlayerCharacter::QuickLoad);
+    PlayerInputComponent->BindKey(EKeys::One, IE_Pressed, this, &ACFPlayerCharacter::CraftCaptureDevice);
+    PlayerInputComponent->BindKey(EKeys::Two, IE_Pressed, this, &ACFPlayerCharacter::CraftMedicine);
+    PlayerInputComponent->BindKey(EKeys::H, IE_Pressed, this, &ACFPlayerCharacter::UseMedicine);
 }
 
 void ACFPlayerCharacter::MoveForward(float Value)

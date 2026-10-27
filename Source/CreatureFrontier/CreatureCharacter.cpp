@@ -2,6 +2,7 @@
 #include "CreatureDefinition.h"
 #include "AIController.h"
 #include "CFPlayerCharacter.h"
+#include "InventoryComponent.h"
 #include "WorkStation.h"
 #include "EngineUtils.h"
 #include "Components/CapsuleComponent.h"
@@ -60,7 +61,7 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
             else
             {
                 WorkProgress += DeltaSeconds;
-                if (WorkProgress >= 3.0f) { ++OwnerPlayer->Resources; WorkProgress = 0.0f; }
+                if (WorkProgress >= 3.0f) { OwnerPlayer->Inventory->AddItem(EFrontierItem::Material, 1); WorkProgress = 0.0f; }
             }
             return;
         }

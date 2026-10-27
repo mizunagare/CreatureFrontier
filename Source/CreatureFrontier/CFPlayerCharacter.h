@@ -7,6 +7,7 @@
 class UCameraComponent;
 class UCaptureComponent;
 class ACreatureCharacter;
+class UInventoryComponent;
 
 UCLASS()
 class CREATUREFRONTIER_API ACFPlayerCharacter : public ACharacter
@@ -19,8 +20,12 @@ public:
     virtual float TakeDamage(float Amount, const FDamageEvent& Event, AController* EventInstigator, AActor* Causer) override;
     UPROPERTY(BlueprintReadOnly, Category="Player")
     float Health = 100.0f;
-    UPROPERTY(BlueprintReadOnly, Category="Player")
-    int32 Resources = 0;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Inventory")
+    TObjectPtr<UInventoryComponent> Inventory;
+    void CraftCaptureDevice();
+    void CraftMedicine();
+    void UseMedicine();
+    bool IsNearWorkStation() const;
     FString Feedback;
     ACreatureCharacter* TraceCreature() const;
     void CommandFollow();

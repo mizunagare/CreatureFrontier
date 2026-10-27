@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/SaveGame.h"
 #include "CreatureTypes.h"
+#include "InventoryComponent.h"
 #include "FrontierSaveGame.generated.h"
 
 class ACreatureCharacter;
@@ -27,11 +28,12 @@ class CREATUREFRONTIER_API UFrontierSaveGame : public USaveGame
 {
     GENERATED_BODY()
 public:
-    UPROPERTY() int32 FormatVersion = 1;
+    UPROPERTY() int32 FormatVersion = 2;
     UPROPERTY() FString MapName;
     UPROPERTY() FTransform PlayerTransform;
     UPROPERTY() FRotator ViewRotation;
     UPROPERTY() float Health = 100.0f;
     UPROPERTY() int32 Resources = 0;
+    UPROPERTY() TMap<EFrontierItem, int32> InventoryStacks;
     UPROPERTY() TArray<FCreatureSaveRecord> Creatures;
 };

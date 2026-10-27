@@ -1,6 +1,8 @@
 #include "CaptureComponent.h"
 #include "CreatureCharacter.h"
 #include "CreatureDefinition.h"
+#include "CFPlayerCharacter.h"
+#include "InventoryComponent.h"
 #include "GameFramework/Pawn.h"
 
 UCaptureComponent::UCaptureComponent()
@@ -34,6 +36,14 @@ void UCaptureComponent::TryCapture_Implementation(ACreatureCharacter* Creature)
     if (GetWorld()->LineTraceSingleByChannel(Hit, Pawn->GetPawnViewLocation(), Creature->GetActorLocation(), ECC_Visibility, Params)
         && Hit.GetActor() != Creature) return;
     const float Chance = CalculateCaptureChance(Creature);
+    if (Chance <= 0.0f) return;
+    auto* Hero = Cast<ACFPlayerCharacter>(Pawn);
+    if (!Hero || Hero->Health <= 0.0f) return;
+    if (!Hero->Inventory->Consume(EFrontierItem::CaptureDevice, 1))
+    {
+        Hero->Feedback = TEXT("No capture devices - craft with 1 at work station");
+        return;
+    }
     const bool bSucceeded = Chance > 0.0f && FMath::FRand() <= Chance;
     if (bSucceeded)
     {
