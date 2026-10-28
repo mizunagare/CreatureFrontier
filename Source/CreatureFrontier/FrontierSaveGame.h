@@ -9,6 +9,7 @@
 #include "EquipmentTypes.h"
 #include "HomeLayout.h"
 #include "CompanionPersonalityComponent.h"
+#include "CompanionMemoryComponent.h"
 #include "FrontierSaveGame.generated.h"
 
 class ACreatureCharacter;
@@ -35,6 +36,9 @@ struct FCreatureSaveRecord
     UPROPERTY() FString Nickname;
     UPROPERTY() ECompanionPreference Preference=ECompanionPreference::None;
     UPROPERTY() bool bPreferenceDiscovered=false;
+    // Store the raw byte: enum-name deserialization may turn unknown names into
+    // the valid None default before our snapshot validator can reject them.
+    UPROPERTY() uint8 CrystalJourney=0;
     UPROPERTY() TSoftClassPtr<ACreatureCharacter> CreatureClass;
     UPROPERTY() TSoftObjectPtr<UCreatureDefinition> Definition;
     UPROPERTY() FTransform Transform;

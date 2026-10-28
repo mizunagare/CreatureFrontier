@@ -26,6 +26,7 @@
 #include "FarmCropComponent.h"
 #include "CompanionNamingComponent.h"
 #include "CompanionPersonalityComponent.h"
+#include "CompanionMemoryComponent.h"
 #include "HomeModule.h"
 #include "ResearchComponent.h"
 
@@ -92,7 +93,7 @@ bool ACFPlayerCharacter::SaveProgress(const FString& Slot)
 {
     if (!HasAuthority() || !GetController()) return false;
     auto* Save = Cast<UFrontierSaveGame>(UGameplayStatics::CreateSaveGameObject(UFrontierSaveGame::StaticClass()));
-    Save->FormatVersion=26;
+    Save->FormatVersion=27;
     Save->MapName = UGameplayStatics::GetCurrentLevelName(this, true);
     Save->PlayerTransform = GetActorTransform();
     Save->ViewRotation = GetController()->GetControlRotation();
@@ -137,6 +138,7 @@ bool ACFPlayerCharacter::SaveProgress(const FString& Slot)
         Record.BondPoints=It->BondPoints; Record.PettingCooldown=It->PettingCooldown;
         It->Personality->EnsurePreference();
         Record.Preference=It->Personality->GetPreference();Record.bPreferenceDiscovered=It->Personality->IsDiscovered();
+        Record.CrystalJourney=static_cast<uint8>(It->Memory->GetMemory());
         Record.Disposition = It->Disposition;
         Record.Activity = It->Activity;
         Record.WorkSiteName = IsValid(It->WorkSite) ? It->WorkSite->GetFName() : NAME_None;
@@ -173,7 +175,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
 {
     if (!HasAuthority() || !GetController()) return false;
     auto* Save = Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot, 0));
-    if (!Save || Save->FormatVersion < 1 || Save->FormatVersion > 26 ||
+    if (!Save || Save->FormatVersion < 1 || Save->FormatVersion > 27 ||
         Save->MapName != UGameplayStatics::GetCurrentLevelName(this, true) ||
         !FMath::IsFinite(Save->Health) || Save->Health < 0 || Save->Health > 100 ||
         Save->Resources < 0 || Save->PlayerTransform.ContainsNaN() || Save->ViewRotation.ContainsNaN())
@@ -257,6 +259,9 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
         {Record.Preference=OwnedTamed?UCompanionPersonalityComponent::PreferenceForId(Record.Id):ECompanionPreference::None;Record.bPreferenceDiscovered=false;}
         if(!UCompanionPersonalityComponent::ValidateSnapshot(Record.Preference,Record.bPreferenceDiscovered,OwnedTamed))
         {Feedback=TEXT("Invalid companion preference; world unchanged");return false;}
+        if(Save->FormatVersion<27)Record.CrystalJourney=0;
+        if(!UCompanionMemoryComponent::ValidateSnapshot(static_cast<ECrystalJourneyMemory>(Record.CrystalJourney),OwnedTamed,Save->Research.bCrystalSample))
+        {Feedback=TEXT("Invalid companion memory; world unchanged");return false;}
         CreatureIds.Add(Record.Id);
         if(Save->FormatVersion<20) Record.FieldResourceId.Invalidate();
         if(Record.FieldResourceId.IsValid() && (!ResourceRestore.Find(Record.FieldResourceId) || !Record.bOwned || Record.Disposition!=ECreatureDisposition::Tamed || Record.Health<=0 ||
@@ -308,6 +313,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
         Pet->PersistentId=Record.Id;
         Pet->Nickname=Record.Nickname;
         Pet->Personality->RestoreSnapshot(Record.Preference,Record.bPreferenceDiscovered);
+        Pet->Memory->RestoreSnapshot(static_cast<ECrystalJourneyMemory>(Record.CrystalJourney));
         Pet->Definition = LoadedDefinition;
         Pet->EncounterId = Record.EncounterId;
         Pet->Level = Record.Level;
@@ -390,7 +396,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
             (Pet->GetFieldResource() || (IsValid(Pet->WorkSite) && Pet->WorkSite->RequiredSpecialty != EWorkSpecialty::Feeding));
         Pet->Cargo->RestoreSnapshot(Record,HomeRestore.Find(Record.DeliveryCrateId));
     }
-    Naming->Close(); CancelMeleeAttack(); Building->Cancel();
+    UCompanionMemoryComponent::CloseAll(GetWorld());Naming->Close(); CancelMeleeAttack(); Building->Cancel();
     ResourceRestore.Commit();
     HomeRestore.Commit();
     for (auto* Site : OldBuilt) Site->Destroy();
@@ -442,6 +448,7 @@ float ACFPlayerCharacter::TakeDamage(float Amount, const FDamageEvent& Event, AC
     Feedback = Health <= 0.0f ? TEXT("Downed - R respawns at base without resetting the world | F9 load") : TEXT("Taking damage!");
     if (Health <= 0.0f)
     {
+        UCompanionMemoryComponent::CloseAll(GetWorld());
         Naming->Close();
         Storage->Close();
         DeliverySelection.Reset(); bDeliverySelection=false;
@@ -615,6 +622,7 @@ void ACFPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
     PlayerInputComponent->BindKey(EKeys::Left, IE_Pressed, Storage.Get(), &UStorageInteractionComponent::WithdrawStack);
     PlayerInputComponent->BindKey(EKeys::Y, IE_Pressed, this, &ACFPlayerCharacter::PetAimedCompanion);
     PlayerInputComponent->BindKey(EKeys::F6, IE_Pressed, this, &ACFPlayerCharacter::PlayAimedCompanion);
+    PlayerInputComponent->BindKey(EKeys::F7, IE_Pressed, this, &ACFPlayerCharacter::RecallAimedJourney);
     PlayerInputComponent->BindKey(EKeys::M, IE_Pressed, this, &ACFPlayerCharacter::GatherAimedResource);
     PlayerInputComponent->BindKey(EKeys::F2,IE_Pressed,this,&ACFPlayerCharacter::DepositGardenSeed);
     PlayerInputComponent->BindKey(EKeys::F3,IE_Pressed,this,&ACFPlayerCharacter::WithdrawGardenSeed);

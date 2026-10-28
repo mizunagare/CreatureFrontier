@@ -1,0 +1,121 @@
+#include "CompanionMemoryComponent.h"
+#include "CreatureCharacter.h"
+#include "CFPlayerCharacter.h"
+#include "ResourceNode.h"
+#include "ResourceDefinition.h"
+#include "BaseBuildingComponent.h"
+#include "CompanionNamingComponent.h"
+#include "StorageInteractionComponent.h"
+#include "EngineUtils.h"
+#include "Engine/GameViewportClient.h"
+#include "GameFramework/PlayerController.h"
+#include "GameFramework/CharacterMovementComponent.h"
+#include "Kismet/GameplayStatics.h"
+#include "Framework/Application/SlateApplication.h"
+#include "Widgets/SCompoundWidget.h"
+#include "Widgets/Layout/SBorder.h"
+#include "Widgets/Layout/SBox.h"
+#include "Widgets/SBoxPanel.h"
+#include "Widgets/Input/SButton.h"
+#include "Widgets/Text/STextBlock.h"
+#include "Styling/CoreStyle.h"
+
+class SJourneyMemoryPanel : public SCompoundWidget
+{
+public:
+    SLATE_BEGIN_ARGS(SJourneyMemoryPanel){} SLATE_END_ARGS()
+    void Construct(const FArguments&,TSharedRef<SWidget> Content,TFunction<void(int32)> InChoose)
+    {Choose=MoveTemp(InChoose);ChildSlot[Content];}
+    virtual bool SupportsKeyboardFocus() const override {return true;}
+    virtual FReply OnKeyDown(const FGeometry&,const FKeyEvent& Event) override
+    {
+        if(Event.GetKey()==EKeys::Escape){Choose(0);return FReply::Handled();}
+        if(Event.GetKey()==EKeys::One || Event.GetKey()==EKeys::NumPadOne){Choose(1);return FReply::Handled();}
+        if(Event.GetKey()==EKeys::Two || Event.GetKey()==EKeys::NumPadTwo){Choose(2);return FReply::Handled();}
+        return FReply::Unhandled();
+    }
+private:
+    TFunction<void(int32)> Choose;
+};
+bool UCompanionMemoryComponent::ValidateSnapshot(ECrystalJourneyMemory State,bool OwnedTamed,bool Sampled)
+{
+    return State==ECrystalJourneyMemory::None || (OwnedTamed && Sampled &&
+        (State==ECrystalJourneyMemory::Pending || State==ECrystalJourneyMemory::QuietThanks || State==ECrystalJourneyMemory::Celebration));
+}
+void UCompanionMemoryComponent::RestoreSnapshot(ECrystalJourneyMemory State)
+{if(GetOwner()->HasAuthority()) Memory=State;}
+FString UCompanionMemoryComponent::GetSummary() const
+{
+    switch(Memory)
+    {
+    case ECrystalJourneyMemory::Pending:return TEXT("Crystal journey | home + F7 to share a memory");
+    case ECrystalJourneyMemory::QuietThanks:return TEXT("Crystal journey | a quiet thank-you at home");
+    case ECrystalJourneyMemory::Celebration:return TEXT("Crystal journey | celebrated together at home");
+    default:return TEXT("No shared journey yet");
+    }
+}
+void UCompanionMemoryComponent::RecordHarvest(AResourceNode* Source,ACFPlayerCharacter* Hero,AActor* Harvester)
+{
+    if(!IsValid(Source) || !Source->HasAuthority() || !Source->Definition || Source->Definition->Discovery!=EFrontierResearch::CrystalSample ||
+        !IsValid(Hero) || Hero->Health<=0 || !Source->CanReach(Hero,800)) return;
+    int32 Witnesses=0;
+    for(TActorIterator<ACreatureCharacter> It(Source->GetWorld());It;++It)
+    {
+        auto* Pet=*It;
+        if(Pet->IsActorBeingDestroyed() || Pet->Health<=0 || Pet->Disposition!=ECreatureDisposition::Tamed || Pet->Tamer!=Hero->GetController() ||
+            Pet->Memory->Memory!=ECrystalJourneyMemory::None || !Source->CanReach(Pet,600) ||
+            (Pet->Activity!=ECreatureActivity::Follow && Pet->Activity!=ECreatureActivity::Combat && !(Pet==Harvester && Pet->Activity==ECreatureActivity::Work))) continue;
+        Pet->Memory->Memory=ECrystalJourneyMemory::Pending;++Witnesses;
+    }
+    if(Witnesses>0) Hero->Feedback=FString::Printf(TEXT("%d companions shared this crystal discovery. Return home together: aim + F7"),Witnesses);
+}
+bool UCompanionMemoryComponent::CanRecall(ACFPlayerCharacter* Hero) const
+{
+    const auto* Pet=Cast<ACreatureCharacter>(GetOwner());
+    if(!IsValid(Hero) || !Hero->HasAuthority() || Hero->Health<=0 || !Pet || Pet->IsActorBeingDestroyed() || Pet->GetWorld()!=Hero->GetWorld() ||
+        Pet->Health<=0 || Pet->Disposition!=ECreatureDisposition::Tamed || Pet->Tamer!=Hero->GetController() || Hero->GetDistanceTo(Pet)>250 ||
+        Memory!=ECrystalJourneyMemory::Pending || (Pet->Activity!=ECreatureActivity::Follow && Pet->Activity!=ECreatureActivity::Rest) || Pet->FocusTarget || Pet->SpecialWindupRemaining>0 ||
+        FVector::Dist(Hero->GetActorLocation(),UBaseBuildingComponent::BaseOrigin())>800 || !Hero->IsNearWorkStation()) return false;
+    for(TActorIterator<ACreatureCharacter> It(GetWorld());It;++It)
+        if(It->Disposition!=ECreatureDisposition::Tamed && It->Health>0 && It->Activity!=ECreatureActivity::ReturnHome && Pet->GetDistanceTo(*It)<600) return false;
+    FHitResult Hit;FCollisionQueryParams Params(SCENE_QUERY_STAT(JourneyRecallSight),false,Hero);
+    return !GetWorld()->LineTraceSingleByChannel(Hit,Hero->GetPawnViewLocation(),Pet->GetActorLocation(),ECC_Visibility,Params) || Hit.GetActor()==Pet;
+}
+bool UCompanionMemoryComponent::Open(ACFPlayerCharacter* Hero)
+{
+    auto* PC=IsValid(Hero)?Cast<APlayerController>(Hero->GetController()):nullptr;
+    if(IsOpen() || !CanRecall(Hero) || !PC || UGameplayStatics::IsGamePaused(this) || !GetWorld()->GetGameViewport() || !FSlateApplication::IsInitialized() ||
+        Hero->Building->IsActive() || Hero->Storage->IsOpen() || Hero->IsBackpackOpen() || Hero->IsHelpVisible() || Hero->IsJournalOpen() || Hero->Naming->IsOpen()) return false;
+    if(!UGameplayStatics::SetGamePaused(this,true)) return false;
+    Listener=Hero;if(Hero->IsRosterOpen())Hero->ToggleRoster();Hero->CancelMeleeAttack();Hero->GetCharacterMovement()->StopMovementImmediately();Hero->StopJumping();Hero->ConsumeMovementInputVector();
+    const auto* Pet=CastChecked<ACreatureCharacter>(GetOwner());
+    auto Choice=[this](int32 Reply){if(Reply==0)Close();else Commit(Reply==2);};
+    auto Content=SNew(SBorder).HAlign(HAlign_Center).VAlign(VAlign_Center).Padding(24)
+    [SNew(SBox).WidthOverride(760)[SNew(SVerticalBox)
+        +SVerticalBox::Slot().AutoHeight().Padding(8)[SNew(STextBlock).Font(FCoreStyle::GetDefaultFontStyle("Regular",24)).Text(FText::FromString(TEXT("Back from Crystal Rise | WORLD PAUSED")))]
+        +SVerticalBox::Slot().AutoHeight().Padding(8)[SNew(STextBlock).Font(FCoreStyle::GetDefaultFontStyle("Regular",20)).WrapTextAt(740).Text(FText::FromString(Pet->GetCreatureName()+TEXT(" watched the crystal come free beside you. Back at the workbench, you take a moment to remember the trip together.")))]
+        +SVerticalBox::Slot().AutoHeight().Padding(8)[SNew(SButton).OnClicked_Lambda([Choice](){Choice(1);return FReply::Handled();})[SNew(STextBlock).Font(FCoreStyle::GetDefaultFontStyle("Regular",20)).Text(FText::FromString(TEXT("1 - A quiet thank-you: glad we came home together")))]]
+        +SVerticalBox::Slot().AutoHeight().Padding(8)[SNew(SButton).OnClicked_Lambda([Choice](){Choice(2);return FReply::Handled();})[SNew(STextBlock).Font(FCoreStyle::GetDefaultFontStyle("Regular",20)).Text(FText::FromString(TEXT("2 - Celebrate: we made a discovery together!")))]]
+        +SVerticalBox::Slot().AutoHeight().Padding(8)[SNew(SButton).OnClicked_Lambda([Choice](){Choice(0);return FReply::Handled();})[SNew(STextBlock).Font(FCoreStyle::GetDefaultFontStyle("Regular",18)).Text(FText::FromString(TEXT("Later / Esc - keep this memory for another time")))]]
+        +SVerticalBox::Slot().AutoHeight().Padding(8)[SNew(STextBlock).Font(FCoreStyle::GetDefaultFontStyle("Regular",16)).WrapTextAt(740).Text(FText::FromString(TEXT("A shared memory, not a stat reward. 1 / 2 choose; Tab + Enter also works. F5 saves after closing.")))]
+    ]];
+    Dialog=SNew(SJourneyMemoryPanel,Content,Choice);GetWorld()->GetGameViewport()->AddViewportWidgetContent(Dialog.ToSharedRef(),100);
+    PC->bShowMouseCursor=true;FInputModeUIOnly Input;Input.SetWidgetToFocus(Dialog);PC->SetInputMode(Input);FSlateApplication::Get().SetKeyboardFocus(Dialog);return true;
+}
+bool UCompanionMemoryComponent::Commit(bool Celebrate)
+{
+    auto* Hero=Listener.Get();if(!IsOpen() || !CanRecall(Hero)) return false;
+    Memory=Celebrate?ECrystalJourneyMemory::Celebration:ECrystalJourneyMemory::QuietThanks;
+    auto* Pet=CastChecked<ACreatureCharacter>(GetOwner());Pet->RespondToMemory(Celebrate);
+    Hero->Feedback=Pet->GetCreatureName()+TEXT(" remembers: ")+GetSummary()+TEXT(" | no items, bond or combat stats awarded");Close();return true;
+}
+void UCompanionMemoryComponent::Close()
+{
+    if(!Dialog.IsValid())return;
+    if(GetWorld() && GetWorld()->GetGameViewport())GetWorld()->GetGameViewport()->RemoveViewportWidgetContent(Dialog.ToSharedRef());Dialog.Reset();
+    if(auto* Hero=Listener.Get())if(auto* PC=Cast<APlayerController>(Hero->GetController())){PC->bShowMouseCursor=false;PC->SetInputMode(FInputModeGameOnly());}
+    Listener.Reset();UGameplayStatics::SetGamePaused(this,false);
+}
+void UCompanionMemoryComponent::CloseAll(UWorld* World)
+{if(World)for(TActorIterator<ACreatureCharacter> It(World);It;++It)It->Memory->Close();}
+void UCompanionMemoryComponent::EndPlay(const EEndPlayReason::Type Reason){Close();Super::EndPlay(Reason);}

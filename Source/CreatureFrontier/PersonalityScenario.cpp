@@ -49,12 +49,13 @@ void RunPersonalityScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
     if(Mode==3)
     {
         auto* Old=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("NameCross"),0));
-        bool Pass=Old && Old->FormatVersion<=25 && Old->Creatures.Num()==2;
+        bool Pass=Old && Old->FormatVersion<=26 && Old->Creatures.Num()==2;
         for(int32 Attempt=0;Attempt<2;++Attempt)
         {
             Pass &= Hero->LoadProgress(TEXT("NameCross"));
             if(Old) for(const auto& R:Old->Creatures)
-            {auto* Pet=Find(World,R.Id);Pass &= Pet && Pet->Nickname==R.Nickname && Pet->BondPoints==R.BondPoints && Pet->Personality->GetPreference()==UCompanionPersonalityComponent::PreferenceForId(R.Id) && !Pet->Personality->IsDiscovered();}
+            {auto* Pet=Find(World,R.Id);const auto Preference=Old->FormatVersion>=26?R.Preference:UCompanionPersonalityComponent::PreferenceForId(R.Id);
+             Pass &= Pet && Pet->Nickname==R.Nickname && Pet->BondPoints==R.BondPoints && Pet->Personality->GetPreference()==Preference && Pet->Personality->IsDiscovered()==(Old->FormatVersion>=26 && R.bPreferenceDiscovered);}
         }
         UE_LOG(LogTemp,Display,TEXT("CF_PERSONALITY_LEGACY_READ %s"),Pass?TEXT("PASS"):TEXT("FAIL"));FPlatformMisc::RequestExitWithStatus(false,Pass?0:1);return;
     }

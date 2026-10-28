@@ -23,6 +23,7 @@ public:
     UPROPERTY(VisibleAnywhere,BlueprintReadOnly) TObjectPtr<class UInventoryComponent> CargoInventory;
     UPROPERTY(VisibleAnywhere,BlueprintReadOnly) TObjectPtr<class UCompanionCargoComponent> Cargo;
     UPROPERTY(VisibleAnywhere,BlueprintReadOnly) TObjectPtr<class UCompanionPersonalityComponent> Personality;
+    UPROPERTY(VisibleAnywhere,BlueprintReadOnly) TObjectPtr<class UCompanionMemoryComponent> Memory;
     virtual void OnConstruction(const FTransform& Transform) override;
     UFUNCTION(BlueprintPure, Category="Creature")
     FString GetCreatureName() const;
@@ -44,6 +45,7 @@ public:
     void RespondToPetting();
     void AcknowledgeName();
     void SetSocialResponse(bool Playful,bool Favorite);
+    void RespondToMemory(bool Celebrate);
     FString GetBondLabel() const;
     UPROPERTY()
     TObjectPtr<AWorkStation> WorkSite;

@@ -3,6 +3,7 @@
 #include "EngineUtils.h"
 #include "Kismet/GameplayStatics.h"
 #include "CompanionPersonalityComponent.h"
+#include "CompanionMemoryComponent.h"
 
 FString ACreatureCharacter::GetBondLabel() const
 {
@@ -25,6 +26,8 @@ void ACreatureCharacter::AcknowledgeName()
 }
 void ACreatureCharacter::SetSocialResponse(bool Playful,bool Favorite)
 { bPlayfulResponse=Playful;bFavoriteResponse=Favorite; }
+void ACreatureCharacter::RespondToMemory(bool Celebrate)
+{if(HasAuthority() && Health>0 && Disposition==ECreatureDisposition::Tamed){AffectionPoseRemaining=2;SetSocialResponse(Celebrate,false);}}
 bool ACFPlayerCharacter::PetCompanion(ACreatureCharacter* Pet)
 {return InteractCompanion(Pet,false);}
 bool ACFPlayerCharacter::PlayWithCompanion(ACreatureCharacter* Pet)
@@ -50,3 +53,8 @@ bool ACFPlayerCharacter::InteractCompanion(ACreatureCharacter* Pet,bool Playful)
 }
 void ACFPlayerCharacter::PetAimedCompanion() { PetCompanion(TraceCreature()); }
 void ACFPlayerCharacter::PlayAimedCompanion() { PlayWithCompanion(TraceCreature()); }
+void ACFPlayerCharacter::RecallAimedJourney()
+{
+    auto* Pet=TraceCreature();
+    if(!Pet || !Pet->Memory->Open(this))Feedback=TEXT("F7: share a pending crystal journey at the original base; own safe idle companion within 2.5m");
+}

@@ -23,6 +23,8 @@ AWildEncounter::AWildEncounter()
 void AWildEncounter::BeginPlay()
 {
     Super::BeginPlay();
+    for(const TCHAR* Flag:{TEXT("CFMemoryTest"),TEXT("CFMemoryWrite"),TEXT("CFMemoryRead"),TEXT("CFMemoryDoneRead"),TEXT("CFMemoryLegacyRead")})
+        if(FParse::Param(FCommandLine::Get(),Flag))SetActorTickEnabled(false);
     for(const TCHAR* Flag:{TEXT("CFPersonalityTest"),TEXT("CFPersonalityWrite"),TEXT("CFPersonalityRead"),TEXT("CFPersonalityLegacyRead")})
         if(FParse::Param(FCommandLine::Get(),Flag)) SetActorTickEnabled(false);
     for(const TCHAR* Flag:{TEXT("CFNameTest"),TEXT("CFNameWrite"),TEXT("CFNameRead")})

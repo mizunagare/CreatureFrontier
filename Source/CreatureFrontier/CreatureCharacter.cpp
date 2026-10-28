@@ -2,6 +2,7 @@
 #include "CreatureDefinition.h"
 #include "CompanionCargoComponent.h"
 #include "CompanionPersonalityComponent.h"
+#include "CompanionMemoryComponent.h"
 #include "FarmCropComponent.h"
 #include "CreatureAffinity.h"
 #include "AIController.h"
@@ -28,6 +29,7 @@ ACreatureCharacter::ACreatureCharacter()
     CargoInventory=CreateDefaultSubobject<UInventoryComponent>(TEXT("CargoInventory"));
     Cargo=CreateDefaultSubobject<UCompanionCargoComponent>(TEXT("Cargo"));
     Personality=CreateDefaultSubobject<UCompanionPersonalityComponent>(TEXT("Personality"));
+    Memory=CreateDefaultSubobject<UCompanionMemoryComponent>(TEXT("Memory"));
     bReplicates = true;
     SetReplicateMovement(true);
     AutoPossessAI = EAutoPossessAI::PlacedInWorldOrSpawned;

@@ -14,6 +14,7 @@
 #include "CraftingCatalog.h"
 #include "FrontierSaveGame.h"
 #include "CompanionCargoComponent.h"
+#include "CompanionMemoryComponent.h"
 
 AResourceNode::AResourceNode()
 {
@@ -77,6 +78,7 @@ bool AResourceNode::TryHarvest(ACFPlayerCharacter* Recipient,AActor* Harvester)
     --Remaining; HarvestCooldown=Definition->HarvestInterval;
     if(Remaining==0) RegrowRemaining=Definition->RegrowSeconds;
     Recipient->Research->RecordHarvest(this);
+    UCompanionMemoryComponent::RecordHarvest(this,Recipient,Harvester);
     Refresh(); return true;
 }
 FString AResourceNode::GetStatus() const

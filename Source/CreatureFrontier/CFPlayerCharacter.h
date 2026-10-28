@@ -55,6 +55,7 @@ public:
     bool PlayWithCompanion(ACreatureCharacter* Pet);
     bool InteractCompanion(ACreatureCharacter* Pet,bool Playful);
     void PlayAimedCompanion();
+    void RecallAimedJourney();
     void PetAimedCompanion();
     AWorkStation* TraceFacility() const;
     void DepositTroughFood();
