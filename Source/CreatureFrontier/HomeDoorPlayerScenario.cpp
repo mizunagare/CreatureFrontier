@@ -13,6 +13,7 @@
 #include "HAL/FileManager.h"
 #include "TimerManager.h"
 #include "UnrealClient.h"
+#include "Engine/GameViewportClient.h"
 
 namespace CFDoorPlayerQA
 {
@@ -33,12 +34,18 @@ bool Capture(ACFPlayerCharacter* Hero,AHomeModule* Door,const FString& Root,cons
     auto* PC=Cast<APlayerController>(Hero->GetController());auto* HUD=PC?Cast<ACFHUD>(PC->GetHUD()):nullptr;
     if(!HUD || HUD->GetLayoutAudit().Context!=EFrontierHUDContext::Door)return false;
     const auto& Audit=HUD->GetLayoutAudit();
+    const auto* Viewport=Hero->GetWorld()->GetGameViewport();
+    if(!Viewport)return false;
+    const int32 View=Viewport->ViewModeIndex;
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFDoorUnlitPreview")) && View!=VMI_Unlit)return false;
+    UE_LOG(LogTemp,Display,TEXT("CF_DOOR_PLAYER_VIEW %s mode=%d lighting=%d materials=%d"),Scene,View,Viewport->EngineShowFlags.Lighting,Viewport->EngineShowFlags.Materials);
     UE_LOG(LogTemp,Display,TEXT("CF_DOOR_PLAYER_SHOT %s viewport=%.0fx%.0f frame=%llu"),Scene,Audit.Viewport.X,Audit.Viewport.Y,Audit.Frame);
     const uint8 Expected=Door->DoorState;const TWeakObjectPtr<AHomeModule> WeakDoor(Door);const FString Label(Scene);
     const auto Handle=MakeShared<FDelegateHandle>();
-    *Handle=FScreenshotRequest::OnScreenshotRequestProcessed().AddLambda([WeakDoor,Expected,Label,StateValid,Processed,Handle]()
+    *Handle=FScreenshotRequest::OnScreenshotRequestProcessed().AddLambda([WeakDoor,Expected,View,Label,StateValid,Processed,Handle]()
     {
-        const auto* Target=WeakDoor.Get();const bool Valid=Target && Target->DoorState==Expected;
+        const auto* Target=WeakDoor.Get();const auto* CurrentViewport=Target?Target->GetWorld()->GetGameViewport():nullptr;
+        const bool Valid=Target && Target->DoorState==Expected && CurrentViewport && CurrentViewport->ViewModeIndex==View;
         *StateValid &= Valid;++*Processed;
         UE_LOG(LogTemp,Display,TEXT("CF_DOOR_PLAYER_SHOT_STATE %s %s state=%d expected=%d"),*Label,Valid?TEXT("PASS"):TEXT("FAIL"),Target?Target->DoorState:-1,Expected);
         FScreenshotRequest::OnScreenshotRequestProcessed().Remove(*Handle);

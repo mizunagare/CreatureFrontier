@@ -1,5 +1,5 @@
 param([switch]$Editor,[string]$BuildRoot='',[string]$EngineRoot='D:\Epic\UE_5.8',
-      [string[]]$Resolutions=@('960x540','1280x720','1920x1080'),[switch]$Rotated)
+      [string[]]$Resolutions=@('960x540','1280x720','1920x1080'),[switch]$Rotated,[switch]$Unlit)
 $ErrorActionPreference='Stop'
 . (Join-Path $PSScriptRoot 'BuildFingerprint.ps1')
 $projectRoot=Split-Path $PSScriptRoot -Parent
@@ -25,7 +25,10 @@ foreach($resolution in $Resolutions){
     $log=Join-Path $folder 'Traversal.log';$started=[DateTime]::UtcNow
     $flag=if($Rotated){'-CFDoorPlayerRotatedTest'}else{'-CFDoorPlayerTest'}
     $yaw=if($Rotated){90}else{0}
-    $arguments=@('-game',$flag,'-CFDoorPlayerPreview','-RenderOffscreen','-ForceRes',('-ResX='+$width),('-ResY='+$height),'-nosound','-unattended','-nop4','-norhithread','-forcerhibypass','-ExecCmds="t.MaxFPS 60,r.MotionBlurQuality 0,r.DefaultFeature.MotionBlur 0,r.AntiAliasingMethod 1"',('-abslog="'+$log+'"'))
+    $commands='t.MaxFPS 60,r.MotionBlurQuality 0,r.DefaultFeature.MotionBlur 0,r.AntiAliasingMethod 1'
+    if($Unlit){$commands+=',viewmode unlit'}
+    $arguments=@('-game',$flag,'-CFDoorPlayerPreview','-RenderOffscreen','-ForceRes',('-ResX='+$width),('-ResY='+$height),'-nosound','-unattended','-nop4','-norhithread','-forcerhibypass',('-ExecCmds="'+$commands+'"'),('-abslog="'+$log+'"'))
+    if($Unlit){$arguments+='-CFDoorUnlitPreview'}
     if($Editor){$arguments=@((Join-Path $projectRoot 'CreatureFrontier.uproject'))+$arguments}
     $process=Start-Process -FilePath $exe -WorkingDirectory $working -ArgumentList $arguments -WindowStyle Hidden -PassThru
     if(!$process.WaitForExit(60000)){$process.Kill();$process.WaitForExit();throw "玩家通行图形专项超时：$log"}
@@ -35,6 +38,8 @@ foreach($resolution in $Resolutions){
     if(!$rootMatch.Success){throw '缺少本轮截图根目录'}
     $frames=@()
     foreach($scene in @('Closed','Open','Occupied','InsideClosed','Returned')){
+        $expectedView=if($Unlit){2}else{3}
+        if(!(Select-String -LiteralPath $log -SimpleMatch ('CF_DOOR_PLAYER_VIEW '+$scene+' mode='+$expectedView) -Quiet)){throw "缺少实际渲染视图模式：$scene"}
         $frame=[regex]::Match($contents,('CF_DOOR_PLAYER_SHOT '+$scene+' viewport='+$width+'x'+$height+' frame=(\d+)'))
         if(!$frame.Success){throw "缺少实际门对象卡/视口帧：$scene"}
         $expectedState=if($scene -in @('Closed','InsideClosed','Returned')){1}else{2}
@@ -52,7 +57,7 @@ foreach($resolution in $Resolutions){
     }
     if(@($frames | Sort-Object -Unique).Count -ne 5){throw '五张门通行截图没有对应不同HUD帧'}
     if((Get-FrontierBuildFingerprint -LiteralPath $module) -ne $hash){throw '图形专项期间程序模块发生变化'}
-    $results+=[pscustomobject]@{Resolution=$resolution;Yaw=$yaw;Pass=$true;BuildSHA256=$hash;Log=$log}
+    $results+=[pscustomobject]@{Resolution=$resolution;Yaw=$yaw;Unlit=[bool]$Unlit;Pass=$true;BuildSHA256=$hash;Log=$log}
     $results | Export-Csv -LiteralPath (Join-Path $run 'Results.csv') -NoTypeInformation
     Write-Host "$resolution 行为及五张新图检查通过，仍需逐图查看"
 }
