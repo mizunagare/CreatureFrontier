@@ -3,7 +3,9 @@ param([Parameter(Mandatory=$true)][string]$LegacyBuildRoot,
       [switch]$IncludeCrops,
       [switch]$IncludeNames,
       [switch]$IncludeMemories,
-      [switch]$IncludeJourneys)
+      [switch]$IncludeJourneys,
+      [switch]$IncludeWindows,
+      [switch]$IncludeStances)
 
 $ErrorActionPreference='Stop'
 . (Join-Path $PSScriptRoot 'BuildFingerprint.ps1')
@@ -56,6 +58,8 @@ if(Test-Path -LiteralPath (Join-Path $LegacyBuildRoot 'CreatureFrontier\Saved\Sa
 }
 if($IncludeMemories){$cases+=@{Slot='PersonalityCross';Flag='CFMemoryLegacyRead';Marker='CF_MEMORY_LEGACY_READ PASS'}}
 if($IncludeNames){$cases+=@{Slot='NameCross';Flag='CFNameRead';Marker='CF_NAME_READ PASS'};$cases+=@{Slot='NameCross';Flag='CFPersonalityLegacyRead';Marker='CF_PERSONALITY_LEGACY_READ PASS'}}
+if($IncludeWindows){$cases+=@{Slot='WindowGood';Flag='CFWindowRead';Marker='CF_WINDOW_READ PASS windows=2 loads=2'}}
+if($IncludeStances){$cases+=@{Slot='StanceGood';Flag='CFStanceRead';Marker='CF_STANCE_READ PASS avoid=2 guard=2'}}
 foreach($case in $cases){
     $source=Join-Path $LegacyBuildRoot ('CreatureFrontier\Saved\SaveGames\'+$case.Slot+'.sav')
     $target=Join-Path $BuildRoot ('CreatureFrontier\Saved\SaveGames\'+$case.Slot+'.sav')

@@ -1,5 +1,13 @@
 # 开放窗墙
 
+## 完整回归与扩展既有存档审计
+
+202738D9候选的完整回归已结束（原进程49982退出0），证据为 `Saved/PackagedTests/20261029-054251-b67b446d/`。按启动时 `d4cba7a` 的脚本定义重新解析并逐日志检查：121项定义、123份实际日志，全部必要标记、种子及巡游判据通过，无FAIL、致命错误或断言；内部EXE指纹仍为202738D9。不能将后来新增的技能专项计入此包。
+
+`Scripts/Test-LegacySaves.ps1` 新增显式可选 `-IncludeWindows`、`-IncludeStances`，默认行为不变。以Windows-Open-Window的既有格式32存档为输入，在Windows-Window-Combat-QA隔离副本实际完成21种存档各两次读取，42行全部通过，固定F344CC5B指纹；证据 `Saved/CargoLegacyAudit/20261029-055732-Verified/`。隔离副本47个运行文件逐一与源包哈希一致，未复制玩家Saved目录。脚本核对输入哈希、恢复目标测试槽，源存档不改写。这是既有格式32兼容审计，不冒充格式31迁移证据。
+
+F344自身完整回归、图形及扩展多帧率仍待；原恢复卡路未归因，不提升稳定包。
+
 ## 含技能专项的独立Windows候选
 
 `E:\CreatureFrontierBuilds\Windows-Window-Combat` 已独立构建成功，内部EXE SHA-256 `F344CC5B39C6E000B834B87B671BE964BBEA4393A5B1DCAA1EE8588714321A1C`，格式32。旧包与玩家存档不覆盖。
