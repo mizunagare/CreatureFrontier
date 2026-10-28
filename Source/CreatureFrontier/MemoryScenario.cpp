@@ -80,7 +80,7 @@ void RunMemoryScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
     using namespace CFMemoryQA;bool Sampling=true,Gates=true,Persistence=true;
     if(Mode==4)
     {
-        auto* Old=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("PersonalityCross"),0));bool Pass=Old && Old->FormatVersion>=26 && Old->FormatVersion<=27 && Old->Creatures.Num()==2;
+        auto* Old=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("PersonalityCross"),0));bool Pass=Old && Old->FormatVersion>=26 && Old->FormatVersion<=28 && Old->Creatures.Num()==2;
         for(int32 Attempt=0;Attempt<2;++Attempt)
         {
             Pass &= Hero->LoadProgress(TEXT("PersonalityCross"));

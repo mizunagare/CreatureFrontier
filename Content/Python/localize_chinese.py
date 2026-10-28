@@ -6,7 +6,7 @@ assets = {
     '/Game/Creatures/DA_Cinderkit': dict(display_name='烬尾兽', description='背鳍明亮的小生物，会用温暖的尾巴协助制作工具。', special_name='余烬爆发'),
     '/Game/Creatures/DA_Craglet': dict(display_name='岩角兽', description='长着水晶角的结实掘地生物，步伐缓慢，采矿时却能挥出有力的重击。', special_name='岩石守护'),
 }
-for key, name in [('Brush','再生灌木'),('Stone','石料矿床'),('Salvage','废料堆'),('Crystal','高地水晶矿'),('Fiber','河岸纤维'),('Ore','锈岭矿料'),('Scrap','废弃机械')]:
+for key, name in [('Brush','再生灌木'),('Stone','石料矿床'),('Salvage','废料堆'),('Crystal','高地水晶矿'),('Fiber','河岸纤维'),('Ore','锈岭矿料'),('Scrap','废弃机械'),('HollowScrap','洞窟旧机件')]:
     assets['/Game/Resources/DA_' + key] = dict(display_name=name)
 for key, name in [('Floor','木地板'),('Wall','木墙'),('Doorway','开放门框'),('Roof','平屋顶'),('Lantern','水晶灯'),('Storage','储物箱')]:
     assets['/Game/Home/DA_' + key] = dict(display_name=name)
@@ -54,11 +54,15 @@ assert unreal.EditorAssetLibrary.save_loaded_asset(catalog)
 levels = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
 actors = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
 assert levels.load_level('/Game/Maps/L_Prototype')
-regions = {'MeadowGrove':'草甸林地', 'CrystalRise':'水晶高地'}
+regions = {'MeadowGrove':'草甸林地', 'CrystalRise':'水晶高地', 'EmberHollow':'余烬洞窟'}
+seen = set()
 for actor in actors.get_all_level_actors():
     if isinstance(actor, unreal.WildEncounter):
         key = str(actor.get_editor_property('encounter_id'))
         assert key in regions, '未知栖息地：' + key
         actor.set_editor_property('region_name', regions[key])
+        assert key not in seen, '栖息地身份重复：' + key
+        seen.add(key)
+assert seen == set(regions), '栖息地不完整'
 assert levels.save_current_level()
-unreal.log('CF_CHINESE_ASSETS PASS assets=16 recipes=11 items=10 regions=2')
+unreal.log(f'CF_CHINESE_ASSETS PASS assets={len(assets)} recipes=11 items=10 regions={len(seen)}')

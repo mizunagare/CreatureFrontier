@@ -94,7 +94,7 @@ bool ACFPlayerCharacter::SaveProgress(const FString& Slot)
 {
     if (!HasAuthority() || !GetController()) return false;
     auto* Save = Cast<UFrontierSaveGame>(UGameplayStatics::CreateSaveGameObject(UFrontierSaveGame::StaticClass()));
-    Save->FormatVersion=27;
+    Save->FormatVersion=28;
     Save->MapName = UGameplayStatics::GetCurrentLevelName(this, true);
     Save->PlayerTransform = GetActorTransform();
     Save->ViewRotation = GetController()->GetControlRotation();
@@ -176,7 +176,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
 {
     if (!HasAuthority() || !GetController()) return false;
     auto* Save = Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot, 0));
-    if (!Save || Save->FormatVersion < 1 || Save->FormatVersion > 27 ||
+    if (!Save || Save->FormatVersion < 1 || Save->FormatVersion > 28 ||
         Save->MapName != UGameplayStatics::GetCurrentLevelName(this, true) ||
         !FMath::IsFinite(Save->Health) || Save->Health < 0 || Save->Health > 100 ||
         Save->Resources < 0 || Save->PlayerTransform.ContainsNaN() || Save->ViewRotation.ContainsNaN())

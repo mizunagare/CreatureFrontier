@@ -127,3 +127,7 @@ world = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_wor
 assert unreal.FrontierEditorLibrary.prepare_prototype_navigation(world)
 assert levels.save_current_level()
 unreal.log('CF_VALLEY_ASSETS_OK: %d managed environment actors and %d materials' % (len(used),len(materials)))
+
+# 山谷边界重建后同步恢复已明确扩展的洞口，避免后续重建把支线封死。
+import runpy
+runpy.run_path(unreal.Paths.project_content_dir()+'Python/build_hollow_content.py',run_name='__main__')

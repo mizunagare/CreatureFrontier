@@ -23,6 +23,8 @@ AWildEncounter::AWildEncounter()
 void AWildEncounter::BeginPlay()
 {
     Super::BeginPlay();
+    for(const TCHAR* Flag:{TEXT("CFHollowTest"),TEXT("CFHollowWrite"),TEXT("CFHollowRead"),TEXT("CFHollowRouteTest")})
+        if(FParse::Param(FCommandLine::Get(),Flag))SetActorTickEnabled(false);
     for(const TCHAR* Flag:{TEXT("CFBefriendTest"),TEXT("CFBefriendWrite"),TEXT("CFBefriendRead")})
         if(FParse::Param(FCommandLine::Get(),Flag))SetActorTickEnabled(false);
     if(auto* Sign=FindComponentByClass<UTextRenderComponent>())Sign->SetHiddenInGame(true);

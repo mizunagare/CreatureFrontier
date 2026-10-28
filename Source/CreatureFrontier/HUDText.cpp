@@ -15,7 +15,8 @@ float ACFHUD::DrawHUDText(const FString& Text,FLinearColor Color,const FBox2D& R
     if(Text.IsEmpty() || MaxLines<=0 || Rect.GetSize().X<4)return 0;
     auto* Font=GEngine->GetSmallFont();FTextSizingParameters Params(0,0,Rect.GetSize().X,0,Font);Params.Scaling=FVector2D(Layout.FontScale);
     TArray<FWrappedStringElement> Lines;Canvas->WrapString(Params,0,FStringView(Text),Lines);
-    const int32 Count=FMath::Min3(MaxLines,Lines.Num(),static_cast<int32>(FMath::FloorToInt(Rect.GetSize().Y/Layout.Line)));
+    // 投影矩形的浮点相减可能把整行高度算成0.999999行，不能因此丢掉整行文字。
+    const int32 Count=FMath::Min3(MaxLines,Lines.Num(),static_cast<int32>(FMath::FloorToInt((Rect.GetSize().Y+.01f)/Layout.Line)));
     if(Count<Lines.Num())++Audit.Elided;
     for(int32 Index=0;Index<Count;++Index)
     {

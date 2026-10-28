@@ -1,4 +1,5 @@
 #include "CFGameMode.h"
+#include "HollowScenario.h"
 #include "BefriendingScenario.h"
 #include "ResourceNode.h"
 #include "ResourceScenario.h"
@@ -65,6 +66,9 @@ void ACFGameMode::BeginPlay()
 {
     Super::BeginPlay();
     SeedFrontierResources(GetWorld());
+    const int32 HollowMode=FParse::Param(FCommandLine::Get(),TEXT("CFHollowWrite"))?1:FParse::Param(FCommandLine::Get(),TEXT("CFHollowRead"))?2:FParse::Param(FCommandLine::Get(),TEXT("CFHollowRouteTest"))?3:FParse::Param(FCommandLine::Get(),TEXT("CFHollowPreview"))?4:0;
+    if(HollowMode || FParse::Param(FCommandLine::Get(),TEXT("CFHollowTest")))
+    {FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this,HollowMode](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunHollowScenario(GetWorld(),Hero,HollowMode);},1.f,false);return;}
     const int32 BefriendMode=FParse::Param(FCommandLine::Get(),TEXT("CFBefriendWrite"))?1:FParse::Param(FCommandLine::Get(),TEXT("CFBefriendRead"))?2:0;
     if(BefriendMode || FParse::Param(FCommandLine::Get(),TEXT("CFBefriendTest")))
     {FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this,BefriendMode](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunBefriendingScenario(GetWorld(),Hero,BefriendMode);},1.f,false);return;}
@@ -438,7 +442,7 @@ void ACFGameMode::BeginPlay()
             }
             int32 RepeatedCount = 0;
             for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It) ++RepeatedCount;
-            const bool bPass = bLoaded && bValues && bSecondLoad && Count == RepeatedCount && Owned == 1 && Workers == 1 && ResourceCount==10 && Depleted==1;
+            const bool bPass = bLoaded && bValues && bSecondLoad && Count == RepeatedCount && Owned == 1 && Workers == 1 && ResourceCount==11 && Depleted==1;
             UE_LOG(LogTemp, Display, TEXT("CF_SAVE_READ %s loaded=%d second=%d values=%d owned=%d workers=%d count=%d repeated=%d resources=%d depleted=%d"),
                 bPass ? TEXT("PASS") : TEXT("FAIL"), bLoaded,bSecondLoad,bValues,Owned,Workers,Count,RepeatedCount,ResourceCount,Depleted);
             FPlatformMisc::RequestExitWithStatus(false, bPass ? 0 : 4);

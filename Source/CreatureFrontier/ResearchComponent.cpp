@@ -24,5 +24,5 @@ FString UResearchComponent::GetHint() const
 {
     if(Progress.bCrystalStudy) return TEXT("已研究水晶 | C 共鸣捕捉器 | B/8 水晶灯 | 0 捕捉模式");
     if(Progress.bCrystalSample) return TEXT("水晶样本 | 回初始基地工作台，按C研究水晶");
-    return TEXT("远征 | 东北水晶高地：首领守卫的有限水晶 | M 采集");
+    return TEXT("远征 | 东北水晶高地 / 南侧余烬洞窟 | M 采集，返家加工");
 }

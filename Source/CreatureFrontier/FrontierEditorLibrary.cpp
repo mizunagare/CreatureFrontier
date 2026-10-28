@@ -16,9 +16,9 @@ bool UFrontierEditorLibrary::PreparePrototypeNavigation(UWorld* World)
     for (TActorIterator<ANavMeshBoundsVolume> It(World); It; ++It) { Volume = *It; break; }
     if (!Volume) Volume = World->SpawnActor<ANavMeshBoundsVolume>();
     if (!Volume) return false;
-    Volume->SetActorLocation(FVector(0, 0, 200));
+    Volume->SetActorLocation(FVector(0, -1200, 200));
     auto* Builder = NewObject<UCubeBuilder>();
-    Builder->X = 3900; Builder->Y = 3900; Builder->Z = 1000;
+    Builder->X = 3900; Builder->Y = 6500; Builder->Z = 1000;
     UActorFactory::CreateBrushForVolumeActor(Volume, Builder);
     Volume->SetActorLabel(TEXT("Prototype Navigation Bounds"));
     Volume->MarkPackageDirty();

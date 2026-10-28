@@ -41,7 +41,7 @@ void RunCropScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
     if(Mode==3)
     {
         const FString Slot=TEXT("FrontierFarmingAutomation");
-        auto* Old=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot,0));Pass=Old && Old->FormatVersion<=27;
+        auto* Old=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot,0));Pass=Old && Old->FormatVersion<=28;
         const auto* Expected=Old?Old->Facilities.FindByPredicate([](const FFacilitySaveRecord& R){return R.Specialty==EWorkSpecialty::Farming;}):nullptr;
         for(int32 Attempt=0;Attempt<2;++Attempt)
         {

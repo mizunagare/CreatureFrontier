@@ -127,7 +127,8 @@ bool MakeStarterResourceRecords(TArray<FResourceSaveRecord>& OutRecords)
         {TEXT("DA_Crystal"),FVector(1400,1600,0),7},
         {TEXT("DA_Fiber"),FVector(-1500,1400,0),8},
         {TEXT("DA_Ore"),FVector(1800,-1100,0),9},
-        {TEXT("DA_Scrap"),FVector(-1800,-800,0),10}};
+        {TEXT("DA_Scrap"),FVector(-1800,-800,0),10},
+        {TEXT("DA_HollowScrap"),FVector(-550,-4100,0),11}};
     for(const auto& Seed:Seeds)
     {
         auto* Definition=LoadObject<UResourceDefinition>(nullptr,*FString::Printf(TEXT("/Game/Resources/%s.%s"),Seed.Asset,Seed.Asset));
