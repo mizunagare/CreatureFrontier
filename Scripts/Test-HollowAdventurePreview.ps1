@@ -1,28 +1,35 @@
 param([Parameter(Mandatory=$true)][string]$BuildRoot,
-      [ValidateSet('960x540','1280x720','1920x1080')][string]$Resolution='1280x720')
+      [ValidateSet('960x540','1280x720','1920x1080')][string]$Resolution='1280x720',
+      [switch]$Recovery)
 $ErrorActionPreference='Stop'
 $projectRoot=Split-Path $PSScriptRoot -Parent
 $exe=Join-Path $BuildRoot 'CreatureFrontier\Binaries\Win64\CreatureFrontier.exe'
 if(!(Test-Path -LiteralPath $exe)){throw '缺少打包程序'}
 $hash=(Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash
-$evidence=Join-Path $projectRoot ('Saved\HollowAdventureQA\'+(Get-Date -Format 'yyyyMMdd-HHmmss')+'-'+[Guid]::NewGuid().ToString('N').Substring(0,8))
+$folder=if($Recovery){'HollowRecoveryQA'}else{'HollowAdventureQA'}
+$evidence=Join-Path $projectRoot ('Saved\'+$folder+'\'+(Get-Date -Format 'yyyyMMdd-HHmmss')+'-'+[Guid]::NewGuid().ToString('N').Substring(0,8))
 New-Item -ItemType Directory -Path $evidence | Out-Null
 $log=Join-Path $evidence 'Adventure.log'
 Write-Host "连续冒险图形证据：$evidence"
 $viewWidth,$viewHeight=$Resolution.Split('x') | ForEach-Object {[int]$_}
-$arguments=@('-CFHollowAdventureTest','-CFHollowAdventurePreview','-RenderOffscreen','-ForceRes',('-ResX='+$viewWidth),('-ResY='+$viewHeight),'-nosound','-unattended','-nop4','-norhithread','-forcerhibypass','-ExecCmds="t.MaxFPS 60,r.MotionBlurQuality 0,r.DefaultFeature.MotionBlur 0,r.AntiAliasingMethod 1"',('-abslog="'+$log+'"'))
+$testFlag=if($Recovery){'-CFHollowRecoveryTest'}else{'-CFHollowAdventureTest'}
+$arguments=@($testFlag,'-CFHollowAdventurePreview','-RenderOffscreen','-ForceRes',('-ResX='+$viewWidth),('-ResY='+$viewHeight),'-nosound','-unattended','-nop4','-norhithread','-forcerhibypass','-ExecCmds="t.MaxFPS 60,r.MotionBlurQuality 0,r.DefaultFeature.MotionBlur 0,r.AntiAliasingMethod 1"',('-abslog="'+$log+'"'))
 $process=Start-Process -FilePath $exe -WorkingDirectory $BuildRoot -ArgumentList $arguments -WindowStyle Hidden -PassThru
 $watch=[Diagnostics.Stopwatch]::StartNew();$sampledMemory=0L
 while(!$process.WaitForExit(200)){
-    if($watch.Elapsed.TotalSeconds -gt 90){$process.Kill();$process.WaitForExit();throw '连续冒险图形专项超时，原进程已停止'}
+    $timeout=if($Recovery){195}else{90}
+    if($watch.Elapsed.TotalSeconds -gt $timeout){$process.Kill();$process.WaitForExit();throw '连续冒险图形专项超时，原进程已停止'}
     try {$process.Refresh();$sampledMemory=[Math]::Max($sampledMemory,$process.WorkingSet64)} catch [InvalidOperationException] {}
 }
 $contents=Get-Content -LiteralPath $log -Raw
-if($process.ExitCode -ne 0 -or $contents -notmatch 'Using Default RHI: D3D12' -or $contents -notmatch 'CF_HOLLOW_ADVENTURE PASS ' -or $contents -notmatch 'CF_HOLLOW_ADVENTURE_BATTLE PASS ' -or $contents -match 'CF_HOLLOW_ADVENTURE.*FAIL|Fatal error|Assertion failed'){throw "连续冒险或D3D12未通过：$log"}
+$required=if($Recovery){'CF_HOLLOW_RECOVERY PASS '}else{'CF_HOLLOW_ADVENTURE PASS '}
+if($process.ExitCode -ne 0 -or $contents -notmatch 'Using Default RHI: D3D12' -or !$contents.Contains($required) -or $contents -notmatch 'CF_HOLLOW_ADVENTURE_BATTLE PASS ' -or $contents -match 'CF_HOLLOW_(?:ADVENTURE|RECOVERY).*FAIL|Fatal error|Assertion failed'){throw "连续冒险或D3D12未通过：$log"}
+if($Recovery -and ($contents -notmatch 'CF_HOLLOW_RECOVERY_RESPAWN PASS ' -or $contents -notmatch 'CF_HOLLOW_RECOVERY_REJOIN PASS ')){throw '缺少复活/返程断言'}
 $rootMatch=[regex]::Match($contents,'CF_HOLLOW_ADVENTURE_ROOT [^\r\n]*[/\\]([A-F0-9]{32})')
 if(!$rootMatch.Success){throw '缺少独立截图目录'}
 $shots=Join-Path $BuildRoot ('CreatureFrontier\Saved\HollowAdventurePreview\'+$rootMatch.Groups[1].Value)
-foreach($scene in 'Entrance','Skill','Impact','Cache','Home'){
+$scenes=if($Recovery){@('Entrance','Downed','Revived','Rejoined','Skill','Impact','Cache','Home')}else{@('Entrance','Skill','Impact','Cache','Home')}
+foreach($scene in $scenes){
     if($contents -notmatch ('CF_HOLLOW_ADVENTURE_SHOT '+$scene+' viewport='+$Resolution+' frame=\d+')){throw "缺少实际取景审计：$scene"}
     $source=Join-Path $shots ($scene+'.png')
     if(!(Test-Path -LiteralPath $source) -or (Get-Item -LiteralPath $source).Length -lt 1000){throw "缺少新截图：$source"}
@@ -40,5 +47,5 @@ $firstTime=[DateTime]::ParseExact($frames[0].Groups[1].Value,'yyyy.MM.dd-HH.mm.s
 $lastTime=[DateTime]::ParseExact($frames[1].Groups[1].Value,'yyyy.MM.dd-HH.mm.ss:fff',[Globalization.CultureInfo]::InvariantCulture)
 $fps=([long]$frames[1].Groups[3].Value-[long]$frames[0].Groups[3].Value)/($lastTime-$firstTime).TotalSeconds
 if((Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash -ne $hash){throw '测试期间程序改变'}
-[pscustomobject]@{Pass=$true;Resolution=$Resolution;ShotIntervalFPS=[Math]::Round($fps,2);SampledWorkingSetMiB=[Math]::Round($sampledMemory/1MB,1);BuildSHA256=$hash;Log=$log} | Export-Csv -LiteralPath (Join-Path $evidence 'Results.csv') -NoTypeInformation
-Write-Host "连续冒险与五图尺寸通过，仍需逐图查看：$evidence"
+[pscustomobject]@{Pass=$true;Recovery=[bool]$Recovery;Resolution=$Resolution;ShotIntervalFPS=[Math]::Round($fps,2);SampledWorkingSetMiB=[Math]::Round($sampledMemory/1MB,1);BuildSHA256=$hash;Log=$log} | Export-Csv -LiteralPath (Join-Path $evidence 'Results.csv') -NoTypeInformation
+Write-Host "连续冒险与$($scenes.Count)图尺寸通过，仍需逐图查看：$evidence"

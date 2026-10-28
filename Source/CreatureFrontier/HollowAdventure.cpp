@@ -55,6 +55,7 @@ struct FAdventure
     FString Shots;TSet<FString> Taken;double FinishAfter=0;
     int32 RecoveryStage=0;float PetTravel=0,ReturnStartTravel=0,SecondHeroHP=0,SecondPetHP=0;double NextRecoveryLog=0;bool RecoveryAttackSent=false;
     TMap<EFrontierItem,int32> RecoveryBag;
+    double DownedShotAfter=0,RejoinedShotAfter=0;
     bool SameRecoveryBag() const
     {for(int32 I=0;I<static_cast<int32>(EFrontierItem::Count);++I)if(Hero->Inventory->Count(static_cast<EFrontierItem>(I))!=RecoveryBag.FindRef(static_cast<EFrontierItem>(I)))return false;return true;}
     void Shot(const TCHAR* Name)
@@ -85,7 +86,13 @@ struct FAdventure
         {
             // 受伤出发后必须由自然住民实际击倒；残血目标才能有效验证复活不补血。
             if(Now.Y>=-2700 || Enemy->GetDistanceTo(Hero)>300 || Enemy->Health<=0 || Enemy->Health>=Enemy->GetMaxHealth() || Pet->Health>=Pet->GetMaxHealth() || Camp->GetResident()!=Enemy || Pet->FocusTarget || Pet->SpecialWindupRemaining>0 || Hero->Pace->IsSlowWalking())return Fail(TEXT("natural-death-state"));
-            Input->Direction=FVector::ZeroVector;RecoveryBag=Hero->Inventory->GetStacks();
+            Input->Direction=FVector::ZeroVector;
+            if(!Shots.IsEmpty())
+            {
+                if(DownedShotAfter==0){Shot(TEXT("Downed"));if(Taken.Contains(TEXT("Downed")))DownedShotAfter=FPlatformTime::Seconds()+.35;return true;}
+                if(FPlatformTime::Seconds()<DownedShotAfter)return true;
+            }
+            RecoveryBag=Hero->Inventory->GetStacks();
             const float EnemyHP=Enemy->Health,PetHP=Pet->Health;const FGuid PetId=Pet->PersistentId;
             if(!CFInputQA::Press(Hero,EKeys::R) || Hero->Health!=100 || FVector::Dist2D(Hero->GetActorLocation(),UBaseBuildingComponent::BaseOrigin())>1201 || Hero->GetRespawnProtectionRemaining()<=0 ||
                 Pet->PersistentId!=PetId || Pet->Health!=PetHP || Enemy->Health!=EnemyHP || Camp->GetResident()!=Enemy || !SameRecoveryBag() || !HollowCache(World) || HollowCache(World)->Remaining!=6)return Fail(TEXT("respawn-preservation"));
@@ -97,10 +104,19 @@ struct FAdventure
         if(Mode==3 && RecoveryStage==1)
         {
             Input->Direction=FVector::ZeroVector;
+            Shot(TEXT("Revived"));
             if(!SameRecoveryBag() || HollowCache(World)->Remaining!=6)return Fail(TEXT("return-conservation"));
             if(FPlatformTime::Seconds()>NextRecoveryLog)
             {NextRecoveryLog=FPlatformTime::Seconds()+5;UE_LOG(LogTemp,Display,TEXT("CF_HOLLOW_RECOVERY_RETURN pet=%s distance=%.1f travel=%.1f hp=%.1f activity=%d"),*PetNow.ToString(),Pet->GetDistanceTo(Hero),PetTravel-ReturnStartTravel,Pet->Health,static_cast<int32>(Pet->Activity));}
             if(Pet->GetDistanceTo(Hero)>300)return true;
+            if(!Shots.IsEmpty())
+            {
+                // 图形夹具正常转头看向返家的伙伴，世界与导航继续运行。
+                const auto View=(PetNow-Hero->FirstPersonCamera->GetComponentLocation()).Rotation();
+                Hero->GetController()->SetControlRotation(View);Hero->FirstPersonCamera->SetWorldRotation(View);
+                if(RejoinedShotAfter==0){Shot(TEXT("Rejoined"));if(Taken.Contains(TEXT("Rejoined")))RejoinedShotAfter=FPlatformTime::Seconds()+.35;return true;}
+                if(FPlatformTime::Seconds()<RejoinedShotAfter)return true;
+            }
             if(PetTravel-ReturnStartTravel<2500 || !CFInputQA::Press(Hero,EKeys::LeftShift) || !Hero->Pace->IsSlowWalking())return Fail(TEXT("return-navigation"));
             RecoveryStage=2;Index=0;Battle=false;Skill=false;Incoming=false;SecondHeroHP=Hero->Health;SecondPetHP=Pet->Health;
             UE_LOG(LogTemp,Display,TEXT("CF_HOLLOW_RECOVERY_REJOIN PASS travel=%.1f petHP=%.1f"),PetTravel-ReturnStartTravel,Pet->Health);

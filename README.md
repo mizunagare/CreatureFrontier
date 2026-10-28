@@ -1,5 +1,7 @@
 # 幻兽边境 · Creature Frontier
 
+正在验收[洞窟倒地与伙伴重聚](Docs/HOLLOW_RECOVERY.md)，并修正倒地时误导性的交互提示。最新候选三尺寸24图与30个真实旧档读取进程已通过，87进程完整回归仍在执行；暂不替换下述稳定可玩包。
+
 当前可玩包：`E:\CreatureFrontierBuilds\Windows-SkillTrail-Framing\CreatureFrontier.exe`。[伙伴技能空间反馈](Docs/SKILL_SPATIAL_FEEDBACK.md)首版已通过同一EXE的81类/85进程回归、14份真实28旧档的30进程读取、三尺寸六张显示/遮挡对照图和15张洞窟实战图检查。旧包和玩家档保留，格式仍28。仍为灰盒，伙伴画外辨识、正式特效/美术与普通窗口持续按键尚未完整验收；下一步推进洞窟倒地后的综合恢复。
 
 此前[左 Shift 慢行](Docs/PLAYER_PACE.md)已实现并保留：按住慢行、松开恢复，帮助与状态提示使用中文。暂停、成功读档、失活回调和倒地会清除慢行状态。历史包为 `E:\CreatureFrontierBuilds\Windows-Pace-Clock\CreatureFrontier.exe`，其81类/85进程回归和三尺寸12张图记录保留，不挪用为新包证据。系统层持续按键/Alt-Tab尚未验收。以下旧包记录均为历史证据，不代表最新功能仍缺失。

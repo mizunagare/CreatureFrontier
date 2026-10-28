@@ -32,7 +32,7 @@ void ACFHUD::DrawWorldHUD(ACFPlayerCharacter* Player)
         {FString::Printf(TEXT("伙伴 %d | 工作中 %d"),Companions,Working),Green},
         {(Player->Pace->IsSlowWalking()?FString(TEXT("慢行 | ")):FString())+Player->GetCommandScopeText(),Green,2},
         {FString::Printf(TEXT("%s | 攻击 %.0f | 距离 %.1f米 | 护甲 %.0f%%"),Player->Equipment->GetState().bSpearEquipped?TEXT("长矛"):TEXT("徒手"),Player->GetPlayerAttackDamage(),Player->GetPlayerMeleeRange()/100,Player->Equipment->GetDamageReduction()*100)},
-        {FString::Printf(TEXT("右键 %s | 共鸣器 %d | 0 切换"),Player->CaptureComponent->UsesResonance()?TEXT("共鸣捕捉"):TEXT("普通捕捉"),Player->Inventory->Count(EFrontierItem::ResonanceDevice)),Yellow},
+        {Player->Health<=0?FString(TEXT("已倒下：R 基地复活 | F9 读档")):FString::Printf(TEXT("右键 %s | 共鸣器 %d | 0 切换"),Player->CaptureComponent->UsesResonance()?TEXT("共鸣捕捉"):TEXT("普通捕捉"),Player->Inventory->Count(EFrontierItem::ResonanceDevice)),Yellow},
         {TEXT("F1 帮助 | C 背包 | Tab 队伍 | I 图鉴 | Esc 暂停")}});
     TArray<FFrontierHUDRow> Feedback={{Player->Feedback,Yellow,Player->HasDeliverySelection()?2:3}};
     if(Player->HasDeliverySelection())Feedback.Add({TEXT("已选运输箱 | E 指派资源 | 对空按 V 清除"),Green,1});
@@ -53,12 +53,14 @@ void ACFHUD::DrawWorldHUD(ACFPlayerCharacter* Player)
     if(Nearest)Research.Add({Nearest->GetStatus(),Nearest->bBoss?Yellow:Green,2});DrawHUDPanel(Layout.Research,Research);
     TArray<FFrontierHUDRow> Rows;
     if(Player->Building->IsActive()){Audit.Context=EFrontierHUDContext::Building;Rows.Add({TEXT("建造模式"),Yellow});Rows.Add({Player->Building->GetHint(),Yellow,4});}
+    else if(Player->Health<=0 && !Creature)Rows.Add({TEXT("倒下时无法交互，请先复活或读档"),Yellow,2});
     else if(Creature)
     {
         const bool Tamed=Creature->Disposition==ECreatureDisposition::Tamed;Audit.Context=Tamed?EFrontierHUDContext::Companion:EFrontierHUDContext::Wild;
         const FString Identity=Creature->Nickname.IsEmpty()?Creature->GetCreatureName():Creature->GetCreatureName()+TEXT(" / ")+Creature->GetSpeciesName();
         Rows.Add({Identity,Blue,2});Rows.Add({FString::Printf(TEXT("%s 等级%d | 生命 %.0f/%.0f"),Tamed?TEXT("伙伴"):TEXT("野生"),Creature->Level,Creature->Health,Creature->GetMaxHealth())});
-        if(Tamed)
+        if(Player->Health<=0)Rows.Add({TEXT("倒下时无法交互，请先复活或读档"),Yellow,2});
+        else if(Tamed)
         {
             const FString Activity=FrontierChinese::Activity(Creature->Activity);
             Rows.Add({FString::Printf(TEXT("%s | 体力 %.0f | 饱食 %.0f | 经验 %d/%d"),*Activity,Creature->Stamina,Creature->Nutrition,Creature->Experience,Creature->Level*100),Green,2});
