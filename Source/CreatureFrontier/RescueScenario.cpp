@@ -28,6 +28,9 @@
 #include "Misc/Parse.h"
 #include "Misc/Paths.h"
 #include "HAL/FileManager.h"
+#include "NavigationSystem.h"
+#include "NavigationPath.h"
+#include "Components/CapsuleComponent.h"
 
 namespace
 {
@@ -155,11 +158,11 @@ void RunNaturalRescueResume(UWorld* World, ACFPlayerCharacter* Hero, bool ReadFi
     if(FParse::Param(FCommandLine::Get(),TEXT("CFRescuePreview")))
     {Shots->Root=FPaths::ProjectSavedDir()/TEXT("RescuePreview")/FGuid::NewGuid().ToString(EGuidFormats::Digits);IFileManager::Get().MakeDirectory(*Shots->Root,true);UE_LOG(LogTemp,Display,TEXT("CF_RESCUE_SHOT_ROOT %s"),*Shots->Root);}
     const double Deadline=FPlatformTime::Seconds()+120;CFInputQA::Press(Hero,EKeys::LeftShift);
-    FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([World,Hero,Pet,Enemy,Camp,Input,Points,Snapshot,Shots,Deadline,Index=Nearest,Stage=0,Skill=false,Travel=0.f,Previous=Pet->GetActorLocation()](float) mutable
+    FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([World,Hero,Pet,Enemy,Camp,Input,Points,Snapshot,Shots,Deadline,Index=Nearest,Stage=0,Skill=false,Travel=0.f,NextReturnLog=0.,Previous=Pet->GetActorLocation()](float) mutable
     {
         const float Step=FVector::Dist(Pet->GetActorLocation(),Previous);Travel+=Step;Previous=Pet->GetActorLocation();
         if(FPlatformTime::Seconds()>Deadline || Hero->Health<=0 || (Stage>0 && Pet->Health<=0) || Step>160)
-        {UE_LOG(LogTemp,Error,TEXT("CF_RESCUE_NATURAL_RESUME FAIL stage=%d index=%d heroHP=%.1f petHP=%.1f travel=%.1f"),Stage,Index,Hero->Health,Pet->Health,Travel);FPlatformMisc::RequestExitWithStatus(false,1);return false;}
+        {UE_LOG(LogTemp,Error,TEXT("CF_RESCUE_NATURAL_RESUME FAIL stage=%d index=%d heroHP=%.1f petHP=%.1f travel=%.1f hero=%s pet=%s"),Stage,Index,Hero->Health,Pet->Health,Travel,*Hero->GetActorLocation().ToString(),*Pet->GetActorLocation().ToString());FPlatformMisc::RequestExitWithStatus(false,1);return false;}
         auto Aim=[Hero](AActor* Actor){const auto View=(Actor->GetActorLocation()-Hero->FirstPersonCamera->GetComponentLocation()).Rotation();Hero->GetController()->SetControlRotation(View);Hero->FirstPersonCamera->SetWorldRotation(View);};
         if(Stage==0)
         {
@@ -184,7 +187,26 @@ void RunNaturalRescueResume(UWorld* World, ACFPlayerCharacter* Hero, bool ReadFi
             Stage=2;CFInputQA::Press(Hero,EKeys::F);
         }
         if(Index<Points.Num())
-        {if(FVector::Dist2D(Hero->GetActorLocation(),Points[Index])<70){++Index;Input->Direction=FVector::ZeroVector;}else{Input->Direction=(Points[Index]-Hero->GetActorLocation()).GetSafeNormal2D();Hero->GetController()->SetControlRotation(Input->Direction.Rotation());}return true;}
+        {
+            if(FVector::Dist2D(Hero->GetActorLocation(),Points[Index])<70){++Index;Input->Direction=FVector::ZeroVector;}
+            else
+            {
+                // 拍摄期间的正常后退可能跨过墙角；按真实导航拐点输入行走，不直线顶墙。
+                auto* Path=UNavigationSystemV1::FindPathToLocationSynchronously(World,Hero->GetActorLocation(),Points[Index],Hero);
+                if(!Path || !Path->IsValid() || Path->IsPartial())
+                {UE_LOG(LogTemp,Error,TEXT("CF_RESCUE_NATURAL_RESUME FAIL return-path index=%d hero=%s"),Index,*Hero->GetActorLocation().ToString());FPlatformMisc::RequestExitWithStatus(false,1);return false;}
+                FVector Goal=Points[Index];for(const auto& Point:Path->PathPoints)if(FVector::Dist2D(Hero->GetActorLocation(),Point)>55){Goal=Point;break;}
+                Input->Direction=(Goal-Hero->GetActorLocation()).GetSafeNormal2D();Hero->GetController()->SetControlRotation(Input->Direction.Rotation());
+                if(FPlatformTime::Seconds()>NextReturnLog)
+                {
+                    NextReturnLog=FPlatformTime::Seconds()+5;FHitResult Hit;FCollisionQueryParams Params(SCENE_QUERY_STAT(RescueReturnProbe),false,Hero);
+                    const auto* Capsule=Hero->GetCapsuleComponent();World->SweepSingleByChannel(Hit,Hero->GetActorLocation(),Hero->GetActorLocation()+Input->Direction*100,FQuat::Identity,ECC_Pawn,FCollisionShape::MakeCapsule(Capsule->GetScaledCapsuleRadius(),Capsule->GetScaledCapsuleHalfHeight()-2),Params);
+                    const auto* Blocker=Cast<ACreatureCharacter>(Hit.GetActor());
+                    UE_LOG(LogTemp,Display,TEXT("CF_RESCUE_RETURN_PROBE index=%d hero=%s goal=%s path0=%s path1=%s blocker=%s creatureHP=%.1f"),Index,*Hero->GetActorLocation().ToString(),*Goal.ToString(),*Path->PathPoints[0].ToString(),Path->PathPoints.Num()>1?*Path->PathPoints[1].ToString():TEXT("none"),*GetNameSafe(Hit.GetActor()),Blocker?Blocker->Health:-1.f);
+                }
+            }
+            return true;
+        }
         Input->Direction=FVector::ZeroVector;if(Pet->GetDistanceTo(Hero)>300)return true;
         if(!Shots->Ready(Hero,Pet,TEXT("Home")))return true;
         CFInputQA::Release(Hero,EKeys::LeftShift);const bool Pass=Skill && Travel>2000 && Snapshot() && Hero->SaveProgress(TEXT("RescueNaturalFinal"));
