@@ -32,6 +32,8 @@ $cases = @(
     @{Flag='CFHollowAdventureTest'; Marker='CF_HOLLOW_ADVENTURE PASS'; Timeout=90},
     @{Flag='CFHollowAdventureWrite'; Marker='CF_HOLLOW_ADVENTURE_WRITE PASS'; Timeout=90},
     @{Flag='CFHollowAdventureRead'; Marker='CF_HOLLOW_ADVENTURE_READ PASS'},
+    @{Flag='CFHollowRecoveryTest'; Marker='CF_HOLLOW_RECOVERY PASS'; Timeout=195},
+    @{Flag='CFHollowRecoveryRead'; Marker='CF_HOLLOW_RECOVERY_READ PASS'},
     @{Flag='CFHollowRouteTest'; Marker='CF_HOLLOW_ROUTE PASS'},
     @{Flag='CFHollowWrite'; Marker='CF_HOLLOW_WRITE PASS'},
     @{Flag='CFHollowRead'; Marker='CF_HOLLOW_READ PASS'},
