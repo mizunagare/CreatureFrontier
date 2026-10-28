@@ -22,7 +22,7 @@ if($process.ExitCode -ne 0 -or $contents -notmatch 'Using Default RHI: D3D12' -o
 $rootMatch=[regex]::Match($contents,'CF_HOLLOW_ADVENTURE_ROOT [^\r\n]*[/\\]([A-F0-9]{32})')
 if(!$rootMatch.Success){throw '缺少独立截图目录'}
 $shots=Join-Path $BuildRoot ('CreatureFrontier\Saved\HollowAdventurePreview\'+$rootMatch.Groups[1].Value)
-foreach($scene in 'Entrance','Skill','Cache','Home'){
+foreach($scene in 'Entrance','Skill','Impact','Cache','Home'){
     if($contents -notmatch ('CF_HOLLOW_ADVENTURE_SHOT '+$scene+' viewport='+$Resolution+' frame=\d+')){throw "缺少实际取景审计：$scene"}
     $source=Join-Path $shots ($scene+'.png')
     if(!(Test-Path -LiteralPath $source) -or (Get-Item -LiteralPath $source).Length -lt 1000){throw "缺少新截图：$source"}
@@ -41,4 +41,4 @@ $lastTime=[DateTime]::ParseExact($frames[1].Groups[1].Value,'yyyy.MM.dd-HH.mm.ss
 $fps=([long]$frames[1].Groups[3].Value-[long]$frames[0].Groups[3].Value)/($lastTime-$firstTime).TotalSeconds
 if((Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash -ne $hash){throw '测试期间程序改变'}
 [pscustomobject]@{Pass=$true;Resolution=$Resolution;ShotIntervalFPS=[Math]::Round($fps,2);SampledWorkingSetMiB=[Math]::Round($sampledMemory/1MB,1);BuildSHA256=$hash;Log=$log} | Export-Csv -LiteralPath (Join-Path $evidence 'Results.csv') -NoTypeInformation
-Write-Host "连续冒险与四图尺寸通过，仍需逐图查看：$evidence"
+Write-Host "连续冒险与五图尺寸通过，仍需逐图查看：$evidence"

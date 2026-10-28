@@ -1,5 +1,7 @@
 # 幻兽边境 · Creature Frontier
 
+正在验收[伙伴技能空间反馈](Docs/SKILL_SPATIAL_FEEDBACK.md)：三尺寸显示/实体墙遮挡对照和真实洞窟命中取景已通过，新包完整回归仍在执行，暂不替换下述慢行稳定包。
+
 最新进度：[左 Shift 慢行](Docs/PLAYER_PACE.md)已实现，按住慢行、松开恢复，帮助与状态提示使用中文。暂停、成功读档、失活回调和倒地会清除慢行状态。新包为 `E:\CreatureFrontierBuilds\Windows-Pace-Clock\CreatureFrontier.exe`，81类/85进程回归通过，三尺寸连续冒险的12张新图已逐张检查。系统层持续按键/Alt-Tab尚未验收。以下旧包记录保留作历史证据，不代表最新功能仍缺失。
 
 原创第一人称生物伙伴RPG原型。通过结交或捕捉获得伙伴，并与伙伴共同生活、工作和战斗。

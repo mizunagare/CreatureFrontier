@@ -24,6 +24,7 @@
 #include "HAL/FileManager.h"
 #include "UnrealClient.h"
 #include "PlayerPaceComponent.h"
+#include "CompanionSkillTrail.h"
 
 namespace
 {
@@ -67,6 +68,8 @@ struct FAdventure
         Incoming |= Hero->Health<100 || Pet->Health<Pet->GetMaxHealth();Skill |= Pet->SpecialCooldownRemaining>0 && Pet->Stamina<=80;
         if(!Returning && Now.Y<-2200)Shot(TEXT("Entrance"));
         if(Pet->SpecialWindupRemaining>0)Shot(TEXT("Skill"));
+        for(TActorIterator<ACompanionSkillTrail> It(World);It;++It)
+            if(It->GetOwner()==Pet){Shot(TEXT("Impact"));break;}
         if(FPlatformTime::Seconds()>Deadline || Step>160 || PetStep>160 || Now.Z<0 || PetNow.Z<-10 || Hero->Health<=0 || Pet->Health<=0 ||
             Hero->GetCapsuleComponent()->GetCollisionEnabled()==ECollisionEnabled::NoCollision || Pet->GetCapsuleComponent()->GetCollisionEnabled()==ECollisionEnabled::NoCollision ||
             !Pet->IsActorTickEnabled() || !Enemy->IsActorTickEnabled() || !Camp->IsActorTickEnabled())return Fail(TEXT("continuous/alive/deadline"));

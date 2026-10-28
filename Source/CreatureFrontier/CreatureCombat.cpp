@@ -129,7 +129,10 @@ void ACreatureCharacter::ResolveSpecial()
     UGameplayStatics::ApplyDamage(Target, Damage, Tamer, this, UDamageType::StaticClass());
     // 在已通过距离/视线检查的真实结算点生成，不把表现当作第二次攻击。
     if(auto* Trail=GetWorld()->SpawnActor<ACompanionSkillTrail>())
+    {
+        Trail->SetOwner(this);
         Trail->Initialize(GetActorLocation()+FVector(0,0,15),Target->GetActorLocation()+FVector(0,0,15),Definition);
+    }
     SkillPulseRemaining = 0.3f;
     BeginStrikePose(Target);
     const ECreatureForm Form = Definition ? Definition->Form : ECreatureForm::Leaf;

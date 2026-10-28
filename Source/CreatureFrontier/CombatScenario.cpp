@@ -16,6 +16,7 @@
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
 #include "Misc/Paths.h"
+#include "GameFramework/PlayerController.h"
 
 void RunCompanionCombatScenario(UWorld* World, ACFPlayerCharacter* Hero)
 {
@@ -58,11 +59,36 @@ void RunCompanionCombatScenario(UWorld* World, ACFPlayerCharacter* Hero)
     Ally->SetActorTickEnabled(false);
     if(FParse::Param(FCommandLine::Get(),TEXT("CFSkillTrailPreview")))
     {
-        FTimerHandle Shot;
-        World->GetTimerManager().SetTimer(Shot,[World]()
+        // 只调整隔离图形夹具的观看方向，不改角色位置、技能或时间流速。
+        const auto View=(FVector(-1150,-1200,55)-Hero->FirstPersonCamera->GetComponentLocation()).Rotation();
+        CastChecked<APlayerController>(Hero->GetController())->SetControlRotation(View);
+        AStaticMeshActor* Screen=nullptr;
+        const bool Covered=FParse::Param(FCommandLine::Get(),TEXT("CFSkillTrailCovered"));
+        if(Covered)
         {
-            int32 Count=0;for(TActorIterator<ACompanionSkillTrail> It(World);It;++It)++Count;
-            UE_LOG(LogTemp,Display,TEXT("CF_SKILL_TRAIL_SHOT active=%d frame=%llu"),Count,static_cast<uint64>(GFrameCounter));
+            Screen=World->SpawnActor<AStaticMeshActor>(FVector(-1400,-1200,200),FRotator::ZeroRotator);
+            Screen->GetStaticMeshComponent()->SetMobility(EComponentMobility::Movable);
+            Screen->GetStaticMeshComponent()->SetStaticMesh(LoadObject<UStaticMesh>(nullptr,TEXT("/Engine/BasicShapes/Cube.Cube")));
+            Screen->SetActorScale3D(FVector(.15,14,5));
+        }
+        FTimerHandle Shot;
+        World->GetTimerManager().SetTimer(Shot,[World,Hero,Covered,Screen]()
+        {
+            int32 Count=0,Projected=0,Occluded=0;
+            auto* PC=CastChecked<APlayerController>(Hero->GetController());int32 Width=0,Height=0;PC->GetViewportSize(Width,Height);
+            for(TActorIterator<ACompanionSkillTrail> It(World);It;++It)
+            {
+                ++Count;TInlineComponentArray<UStaticMeshComponent*> Marks(*It);
+                for(auto* Mark:Marks)
+                {
+                    FVector2D Pixel;
+                    if(PC->ProjectWorldLocationToScreen(Mark->GetComponentLocation(),Pixel) && Pixel.X>=0 && Pixel.Y>=0 && Pixel.X<Width && Pixel.Y<Height)++Projected;
+                    FHitResult Hit;FCollisionQueryParams Params(SCENE_QUERY_STAT(SkillTrailPreview),false,Hero);
+                    if(Covered && World->LineTraceSingleByChannel(Hit,Hero->FirstPersonCamera->GetComponentLocation(),Mark->GetComponentLocation(),ECC_Visibility,Params) && Hit.GetActor()==Screen)++Occluded;
+                }
+            }
+            const bool Pass=Count==3 && Projected==21 && (!Covered || Occluded==21);
+            UE_LOG(LogTemp,Display,TEXT("CF_SKILL_TRAIL_SHOT %s active=%d projected=%d occluded=%d covered=%d viewport=%dx%d frame=%llu"),Pass?TEXT("PASS"):TEXT("FAIL"),Count,Projected,Occluded,Covered,Width,Height,static_cast<uint64>(GFrameCounter));
             FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir()/TEXT("SkillTrailPreview.png"),true,false);
         },.8f,false);
     }
