@@ -12,14 +12,14 @@ void RunHomePaletteScenario(UWorld* World,ACFPlayerCharacter* Hero)
     // 使用游戏世界里的正常付费建造，不把Editor临时Actor的结果当作运行时证据。
     auto* Door=CFDoorNavigationQA::Room(World,Hero,0);
     if(!Door || !Door->Definition){UE_LOG(LogTemp,Error,TEXT("CF_HOME_PALETTE FAIL fixture"));FPlatformMisc::RequestExitWithStatus(false,1);return;}
-    const FLinearColor Expected=Door->Definition->Color;
-    auto Inspect=[Door,Expected](const TCHAR* Stage)
+    auto Inspect=[Door](const TCHAR* Stage)
     {
         TArray<UStaticMeshComponent*> Meshes;Door->GetComponents(Meshes);
         bool Pass=Meshes.Num()==4;
         for(const auto* Mesh:Meshes)
         {
             auto* Dynamic=Cast<UMaterialInstanceDynamic>(Mesh->GetMaterial(0));
+            const FLinearColor Expected=Mesh->GetFName()==FName(TEXT("Part3"))?Door->Definition->DoorLeafColor:Door->Definition->Color;
             const FLinearColor Actual=Dynamic?Dynamic->K2_GetVectorParameterValue(TEXT("Tint")):FLinearColor::Transparent;
             const bool Matches=Dynamic && Actual.Equals(Expected,.0001f);
             UE_LOG(LogTemp,Display,TEXT("CF_HOME_PALETTE_PART stage=%s part=%s dynamic=%d matches=%d actual=%s expected=%s material=%s"),

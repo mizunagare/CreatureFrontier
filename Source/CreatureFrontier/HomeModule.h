@@ -38,4 +38,5 @@ public:
 private:
     UPROPERTY() TArray<TObjectPtr<class UStaticMeshComponent>> Meshes;
     UPROPERTY() TObjectPtr<class UMaterialInstanceDynamic> Palette;
+    UPROPERTY() TObjectPtr<class UMaterialInstanceDynamic> DoorLeafPalette;
 };

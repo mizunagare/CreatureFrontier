@@ -18,6 +18,8 @@ public:
     UPROPERTY(EditAnywhere,BlueprintReadOnly) TMap<EFrontierItem,int32> ExtraCosts;
     UPROPERTY(EditAnywhere,BlueprintReadOnly) EFrontierResearch RequiredResearch=EFrontierResearch::None;
     UPROPERTY(EditAnywhere,BlueprintReadOnly) FLinearColor Color=FLinearColor(.32f,.2f,.12f);
+    // 门扇独立于门框着色；其他模块不使用此字段，不写入玩家存档。
+    UPROPERTY(EditAnywhere,BlueprintReadOnly) FLinearColor DoorLeafColor=FLinearColor(.65f,.38f,.12f);
     UPROPERTY(EditAnywhere,BlueprintReadOnly) float LanternLumens=0;
     bool IsValidDefinition() const;
     static UHomeModuleDefinition* LoadDefault(EHomeModuleKind Kind);

@@ -52,6 +52,9 @@ void AHomeModule::OnConstruction(const FTransform& Transform)
     Super::OnConstruction(Transform);
     if(!Palette) Palette=Meshes[0]->CreateDynamicMaterialInstance(0);
     if(Palette && Definition) Palette->SetVectorParameterValue(TEXT("Tint"),Definition->Color);
+    // 从基础材质创建独立实例，避免从共享MID创建而意外改写门框。
+    if(!DoorLeafPalette && Palette) DoorLeafPalette=UMaterialInstanceDynamic::Create(Palette->GetMaterial(),this);
+    if(DoorLeafPalette && Definition) DoorLeafPalette->SetVectorParameterValue(TEXT("Tint"),Definition->DoorLeafColor);
     const auto Geometry=Parts(GetKind());
     LanternLight->SetIntensity(Definition?Definition->LanternLumens:0);
     LanternLight->SetVisibility(GetKind()==EHomeModuleKind::Lantern && !bPreview && !bStaged);
@@ -67,7 +70,7 @@ void AHomeModule::OnConstruction(const FTransform& Transform)
         if(Used) { Mesh->SetRelativeLocation(Geometry[Index].Center); Mesh->SetRelativeScale3D(Geometry[Index].Extent/50); }
         if(Used && GetKind()==EHomeModuleKind::Door && Index==3 && DoorState==2)
         { Mesh->SetRelativeLocation(FVector(-110,110,125)); Mesh->SetRelativeRotation(FRotator(0,90,0)); }
-        if(Palette) Mesh->SetMaterial(0,Palette);
+        if(Palette) Mesh->SetMaterial(0,GetKind()==EHomeModuleKind::Door && Index==3 && DoorLeafPalette?DoorLeafPalette.Get():Palette.Get());
     }
 }
 void AHomeModule::ActivateInWorld()
@@ -77,4 +80,5 @@ void AHomeModule::ActivateInWorld()
 void AHomeModule::SetPreviewTint(bool Valid)
 {
     if(Palette && bPreview) Palette->SetVectorParameterValue(TEXT("Tint"),Valid?FLinearColor(.08f,.8f,.15f):FLinearColor(.9f,.04f,.02f));
+    if(DoorLeafPalette && bPreview) DoorLeafPalette->SetVectorParameterValue(TEXT("Tint"),Valid?FLinearColor(.08f,.8f,.15f):FLinearColor(.9f,.04f,.02f));
 }
