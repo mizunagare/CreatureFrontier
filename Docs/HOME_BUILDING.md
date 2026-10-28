@@ -1,5 +1,15 @@
 # P2 — 模块化房间首版
 
+## 游戏世界材质参数四阶段核对（2026-10-29，Editor游戏模式）
+
+新增 `HomePaletteScenario.cpp` / `CFHomePaletteTest`，复用已有围合房间夹具，在真实游戏World中通过既有付费BuildAt建门，分别于built/opened/closed/两秒后settled读取四个零件的MID和Tint。开关使用原Door入口，未修改生产材质、资产、碰撞或规则，不写玩家存档。完成使用单次定时回调，未在销毁捕获后继续调用，避免重复农圃QA的生命周期错误。
+
+Editor模块 `8C16457AA612D51C3515FDB4EC272309C538D1ED942B7CD78FBAF14452D5E591` 构建成功。`Scripts/Test-HomePalette.ps1` 在 `Saved/HomePaletteQA/20261029-020908-1065eeab/` 实际通过：四阶段各四条dynamic=1/matches=1，共16条均为(0.30,0.19,0.10,1)，场景正常建成/开门/关门且延迟后没有丢色，固定模块指纹未变、无失败标记。
+
+这是Editor游戏模式、NullRHI下的CPU侧参数证据，不是有光照像素验证或打包程序结果；尚未证明着色器参数上传、光照/色调映射或最终门面质量正确。只排除了本场景四阶段MID参数丢失，后续需要新开发候选的渲染对照，再决定具体配色/材质改动，不仅凭灰色观感盲改资产。
+
+新增入口不在正在完整回归的EAA71545包中，不能混用；EAA71545程序SHA-256复核未变，`Saved/PackagedTests/20261029-015528-01feb06f/` 尚未结束。稳定交付保持不变。
+
 ## 临时Editor门材质实例核对（2026-10-29）
 
 新增 `Content/Python/audit_home_instance.py`，在独立Editor命令let会话生成Transient门并赋予既有DA_Door，只读检查四个StaticMesh零件使用的MID和Tint，finally销毁临时门，不保存世界/资产。`Saved/HomeInstanceAudit-20261029-0200.log` 首次实际读取四件均为(0.30,0.19,0.10,1)，且共用同一MID。

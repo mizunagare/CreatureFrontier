@@ -1,5 +1,6 @@
 #include "CFGameMode.h"
 #include "HomeDoorScenario.h"
+#include "HomePaletteScenario.h"
 #include "HollowScenario.h"
 #include "BefriendingScenario.h"
 #include "ResourceNode.h"
@@ -70,6 +71,8 @@ void ACFGameMode::BeginPlay()
 {
     Super::BeginPlay();
     SeedFrontierResources(GetWorld());
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFHomePaletteTest")))
+    {FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunHomePaletteScenario(GetWorld(),Hero);},1.f,false);return;}
     if(FParse::Param(FCommandLine::Get(),TEXT("CFDoorFarmCancelTest")) || FParse::Param(FCommandLine::Get(),TEXT("CFDoorFarmDismantleTest")))
     {const int32 Mode=FParse::Param(FCommandLine::Get(),TEXT("CFDoorFarmCancelTest"))?3:4;FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this,Mode](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunHomeDoorFarmScenario(GetWorld(),Hero,Mode);},1.f,false);return;}
     if(FParse::Param(FCommandLine::Get(),TEXT("CFDoorFarmTest")) || FParse::Param(FCommandLine::Get(),TEXT("CFDoorFarmWrite")) || FParse::Param(FCommandLine::Get(),TEXT("CFDoorFarmRead")))
