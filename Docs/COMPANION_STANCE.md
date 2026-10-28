@@ -1,5 +1,13 @@
 # 伙伴护主与避战姿态
 
+## 独立进程持久化验证（2026-10-29）
+
+EB81F580 Editor构建成功，新增CFStanceRead只读取StanceGood，不赠送/重建夹具。读取要求真实格式31、两只避战和两只护主（含范围外/倒地样本），每进程正常LoadProgress两次，对全部生物逐GUID比较姿态、生命及归属并检查总数。写入专项另加入非自有敌人生物CombatStance=1坏档拒绝，保持当前伙伴/敌人对象及玩家生命位置；原255非法值用例保留。
+
+`Scripts/Test-CompanionStance.ps1 -Editor` 实际完成一写两独立读，证据 `Saved/StancePersistenceQA/20261029-031532-996eb07a/` 三进程均正常退出且必要标记通过、无FAIL。固定模块EB81F580，输入SHA-256 `DB9CF9D26DABB2DEC35BC77969000F89C903A70E77D0BFBDE4495F2EACE0FD5A` 各读取后不变；原StanceGood/Bad/Legacy30三个专用槽已还原并哈希校验，生成副本及Input.sav保留。新脚本语法解析通过，包含固定指纹、失败拒绝、互斥、槽备份/恢复及输入不改写检查；不与完整回归共槽并行。
+
+完整本地回归已加入独立读取入口和输入槽只读保护，但尚未在新Windows执行。这里证明冷启动状态恢复，不证明加载后的真实时间撤退、生产物流、G技能或中文排版。格式31新档仍不可由旧30程序读取；旧稳定包与常规玩家档保持不变。
+
 ## 边界与既有护主关联验证（2026-10-29）
 
 333DE720 Editor构建成功，`Saved/StanceBoundaryQA-20261029-0312/Boundary.log` 正常退出0，原七判据及新增 `CF_STANCE_BOUNDARIES PASS scope=1 guard=1 bounds=1 work=1` 全部通过。单选Ally后切护主只改变它，手动Tick确实伤害敌人；再切避战，另一伙伴不变。全队混合状态切换、25米外伙伴、倒地伙伴、野生生物方法拒绝、玩家倒地时F8不生效均覆盖。

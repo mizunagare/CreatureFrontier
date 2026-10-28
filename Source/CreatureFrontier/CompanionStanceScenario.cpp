@@ -8,9 +8,35 @@
 #include "EngineUtils.h"
 #include "Kismet/GameplayStatics.h"
 #include "WorkStation.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 
 void RunCompanionStanceScenario(UWorld* World,ACFPlayerCharacter* Hero)
 {
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFStanceRead")))
+    {
+        // 只读取前一进程留下的快照，不重建姿态或赠送夹具。
+        const auto* Input=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("StanceGood"),0));
+        bool Pass=Input && Input->FormatVersion==31;
+        int32 Avoid=0,Guard=0;
+        if(Input)for(const auto& Record:Input->Creatures)if(Record.bOwned){if(Record.CombatStance==1)++Avoid;else if(Record.CombatStance==0)++Guard;else Pass=false;}
+        Pass &= Avoid==2 && Guard==2;
+        for(int32 Attempt=0;Attempt<2 && Pass;++Attempt)
+        {
+            Pass &= Hero->LoadProgress(TEXT("StanceGood"));
+            int32 Matched=0;
+            for(TActorIterator<ACreatureCharacter> It(World);It;++It)
+            {
+                const auto* Record=Input->Creatures.FindByPredicate([&](const FCreatureSaveRecord& R){return R.Id==It->PersistentId;});
+                Pass &= Record && It->bAvoidCombat==(Record->CombatStance==1) && It->Health==Record->Health &&
+                    ((It->Tamer==Hero->GetController())==Record->bOwned);
+                ++Matched;
+            }
+            Pass &= Matched==Input->Creatures.Num();
+        }
+        UE_LOG(LogTemp,Display,TEXT("CF_STANCE_READ %s avoid=%d guard=%d"),Pass?TEXT("PASS"):TEXT("FAIL"),Avoid,Guard);
+        FPlatformMisc::RequestExitWithStatus(false,Pass?0:1);return;
+    }
     for(TActorIterator<ACreatureCharacter> It(World);It;++It)It->SetActorTickEnabled(false);
     auto* Definition=LoadObject<UCreatureDefinition>(nullptr,TEXT("/Game/Creatures/DA_Craglet.DA_Craglet"));
     if(!Definition){FPlatformMisc::RequestExitWithStatus(false,1);return;}
@@ -67,6 +93,14 @@ void RunCompanionStanceScenario(UWorld* World,ACFPlayerCharacter* Hero)
     {
         for(auto& Record:Snapshot->Creatures)if(Record.Id==Id)Record.CombatStance=255;
         Invalid &= UGameplayStatics::SaveGameToSlot(Snapshot,TEXT("StanceBad"),0) && !Hero->LoadProgress(TEXT("StanceBad")) && IsValid(Ally) && Ally->bAvoidCombat;
+        for(auto& Record:Snapshot->Creatures)
+        {
+            if(Record.Id==Id)Record.CombatStance=1;
+            if(Record.Id==Enemy->PersistentId)Record.CombatStance=1;
+        }
+        const float HeroHPBefore=Hero->Health;const FVector PositionBefore=Hero->GetActorLocation();
+        Invalid &= UGameplayStatics::SaveGameToSlot(Snapshot,TEXT("StanceBad"),0) && !Hero->LoadProgress(TEXT("StanceBad")) &&
+            IsValid(Ally) && IsValid(Enemy) && Ally->bAvoidCombat && !Enemy->bAvoidCombat && Hero->Health==HeroHPBefore && Hero->GetActorLocation().Equals(PositionBefore);
     }
     const bool Loaded=Saved && Hero->LoadProgress(TEXT("StanceGood"));
     auto Find=[&](){for(TActorIterator<ACreatureCharacter> It(World);It;++It)if(It->PersistentId==Id)return *It;return static_cast<ACreatureCharacter*>(nullptr);};
