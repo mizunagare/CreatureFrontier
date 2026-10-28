@@ -169,6 +169,7 @@ void RunHomeWindowScenario(UWorld* World,ACFPlayerCharacter* Hero)
             {
                 Pass &= CFInputQA::UniqueBindings(Hero) && CFInputQA::Press(Hero,EKeys::B) && CFInputQA::Press(Hero,EKeys::Eight);
                 const auto Aim=(Wall->GetActorTransform().TransformPosition(FVector(145,0,170))-Hero->FirstPersonCamera->GetComponentLocation()).Rotation();
+                Hero->SetActorRotation(FRotator(0,Aim.Yaw,0));
                 Hero->GetController()->SetControlRotation(Aim);Hero->FirstPersonCamera->SetWorldRotation(Aim);
                 Pass &= CFInputQA::Press(Hero,EKeys::Insert) && IsValid(Wall) && Hero->Inventory->Count(EFrontierItem::Material)==Before && Hero->Feedback.Contains(TEXT("再按Insert确认"));
                 if(FParse::Param(FCommandLine::Get(),TEXT("CFHomeReplaceCancel")))
@@ -186,13 +187,13 @@ void RunHomeWindowScenario(UWorld* World,ACFPlayerCharacter* Hero)
                             if(World->GetTimeSeconds()-At<5.4)return;
                             Pass &= Fresh();
                             // 真实预览Tick应在下一阶段前看到视线离开，不直接调用清理内部状态。
-                            Hero->GetController()->SetControlRotation(FRotator(70,0,0));Hero->FirstPersonCamera->SetWorldRotation(FRotator(70,0,0));
+                            Hero->SetActorRotation(FRotator::ZeroRotator);Hero->GetController()->SetControlRotation(FRotator(70,0,0));Hero->FirstPersonCamera->SetWorldRotation(FRotator(70,0,0));
                             Phase=1;At=World->GetTimeSeconds();return;
                         }
                         if(World->GetTimeSeconds()-At<.4)return;
                         if(Phase==1)
                         {
-                            Hero->GetController()->SetControlRotation(Aim);Hero->FirstPersonCamera->SetWorldRotation(Aim);
+                            Hero->SetActorRotation(FRotator(0,Aim.Yaw,0));Hero->GetController()->SetControlRotation(Aim);Hero->FirstPersonCamera->SetWorldRotation(Aim);
                             Pass &= Fresh();
                             for(int32 I=0;I<8;++I)Pass &= CFInputQA::Press(Hero,EKeys::V);
                             Pass &= Fresh();

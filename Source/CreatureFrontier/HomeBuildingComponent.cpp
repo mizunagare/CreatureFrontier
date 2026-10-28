@@ -145,8 +145,17 @@ void UHomeBuildingComponent::UpdatePreview()
     FHitResult Hit; FCollisionQueryParams Params(SCENE_QUERY_STAT(HomeAim),false,Hero); Params.AddIgnoredActor(Preview);
     const FVector Start=Hero->FirstPersonCamera->GetComponentLocation();
     if(!GetWorld()->LineTraceSingleByChannel(Hit,Start,Start+Hero->FirstPersonCamera->GetForwardVector()*800,ECC_Visibility,Params))
-    { PendingReplacement.Reset(); Status=TEXT("请瞄准8米内地面或房屋地板"); bValid=false; Preview->SetActorHiddenInGame(true); return; }
-    if(PendingReplacement.IsValid() && (Hit.GetActor()!=PendingReplacement.Get() || Selected!=PendingKind || GetWorld()->GetTimeSeconds()>ReplacementDeadline))PendingReplacement.Reset();
+    {
+        if(PendingReplacement.IsValid())UE_LOG(LogTemp,Display,TEXT("CF_HOME_REPLACE_CANCEL_TRACE miss target=%s camera=%s direction=%s"),*GetNameSafe(PendingReplacement.Get()),*Start.ToString(),*Hero->FirstPersonCamera->GetForwardVector().ToString());
+        PendingReplacement.Reset(); Status=TEXT("请瞄准8米内地面或房屋地板"); bValid=false; Preview->SetActorHiddenInGame(true); return;
+    }
+    if(PendingReplacement.IsValid() && (Hit.GetActor()!=PendingReplacement.Get() || Selected!=PendingKind || GetWorld()->GetTimeSeconds()>ReplacementDeadline))
+    {
+        UE_LOG(LogTemp,Verbose,TEXT("CF_HOME_REPLACE_CANCEL_TRACE target=%s hit=%s kind=%d pendingKind=%d time=%.3f deadline=%.3f camera=%s direction=%s"),
+            *GetNameSafe(PendingReplacement.Get()),*GetNameSafe(Hit.GetActor()),static_cast<int32>(Selected),static_cast<int32>(PendingKind),GetWorld()->GetTimeSeconds(),ReplacementDeadline,
+            *Start.ToString(),*Hero->FirstPersonCamera->GetForwardVector().ToString());
+        PendingReplacement.Reset();
+    }
     FVector Center(FMath::GridSnap(Hit.ImpactPoint.X,400.),FMath::GridSnap(Hit.ImpactPoint.Y,400.),-40);
     const auto Layout=HomeLayout::Collect(GetWorld()); SupportingFloor=FGuid();
     if(Selected!=EHomeModuleKind::Floor)
