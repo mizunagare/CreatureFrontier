@@ -319,7 +319,8 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
         float Best = 1000.0f;
         if (!Enemy) for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It)
         {
-            if (It->Disposition == ECreatureDisposition::Tamed || It->Health <= 0.0f || It->Activity == ECreatureActivity::ReturnHome) continue;
+            // 自动支援只响应敌意；中性/温顺生物交由玩家决定是否集火。
+            if (It->Disposition != ECreatureDisposition::Hostile || It->Health <= 0.0f || It->Activity == ECreatureActivity::ReturnHome) continue;
             const float Distance = OwnerPlayer->GetDistanceTo(*It);
             if (Distance < Best && HasClearSight(*It)) { Best = Distance; Enemy = *It; }
         }
