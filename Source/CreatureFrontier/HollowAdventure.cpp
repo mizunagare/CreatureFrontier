@@ -32,6 +32,8 @@
 #include "FrontierSaveGame.h"
 #include "Kismet/GameplayStatics.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "NavigationSystem.h"
+#include "NavigationPath.h"
 
 namespace
 {
@@ -342,6 +344,41 @@ void StartAdventure(UWorld* World,ACFPlayerCharacter* Hero,ACreatureCharacter* P
 }
 void RunHollowAdventure(UWorld* World,ACFPlayerCharacter* Hero,int Mode)
 {
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFHollowInspectFailure")))
+    {
+        // 只读取隔离输入并查询恢复后的静态现场；不继续冒险、不写档，不冒充瞬态重放。
+        const FString Slot=TEXT("HollowFailureInspectInput");
+        const auto* Input=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot,0));
+        bool Ready=Input && Input->FormatVersion==FrontierCurrentSaveVersion && Hero->LoadProgress(Slot) &&
+            Hero->Health==Input->Health && Hero->GetActorLocation().Equals(Input->PlayerTransform.GetLocation(),.01);
+        auto* Pet=Ready?AdventurePet(World,Hero):nullptr;auto* Camp=Ready?HollowCamp(World):nullptr;auto* Enemy=Camp?Camp->GetResident():nullptr;
+        Ready &= Pet && Enemy;
+        if(!Ready){UE_LOG(LogTemp,Error,TEXT("CF_HOLLOW_INSPECT FAIL load"));FPlatformMisc::RequestExitWithStatus(false,1);return;}
+        UGameplayStatics::SetGamePaused(World,true);
+        for(auto* Actor:{Pet,Enemy})
+        {
+            const auto* Record=Input->Creatures.FindByPredicate([Actor](const FCreatureSaveRecord& R){return R.Id==Actor->PersistentId;});
+            Ready &= Record && Actor->GetActorLocation().Equals(Record->Transform.GetLocation(),.01) && Actor->Health==Record->Health;
+            UE_LOG(LogTemp,Display,TEXT("CF_HOLLOW_INSPECT_ACTOR owned=%d id=%s location=%s hp=%.1f activity=%d savedActivity=%d focus=%s actor=%s radius=%.2f"),
+                Actor==Pet,*Actor->PersistentId.ToString(),*Actor->GetActorLocation().ToString(),Actor->Health,static_cast<int32>(Actor->Activity),Record?static_cast<int32>(Record->Activity):-1,*GetNameSafe(Actor->FocusTarget),*Actor->GetName(),Actor->GetCapsuleComponent()->GetScaledCapsuleRadius());
+        }
+        auto QueryPath=[World](const TCHAR* Label,AActor* Actor,const FVector& Goal)
+        {
+            auto* Path=UNavigationSystemV1::FindPathToLocationSynchronously(World,Actor->GetActorLocation(),Goal,Actor);
+            UE_LOG(LogTemp,Display,TEXT("CF_HOLLOW_INSPECT_PATH label=%s valid=%d partial=%d points=%d length=%.1f from=%s goal=%s"),Label,Path && Path->IsValid(),Path && Path->IsPartial(),Path?Path->PathPoints.Num():0,Path?Path->GetPathLength():0.,*Actor->GetActorLocation().ToString(),*Goal.ToString());
+        };
+        const FVector Goal=MakeHollowRoutePoints()[6];
+        QueryPath(TEXT("hero-route6"),Hero,Goal);QueryPath(TEXT("hero-enemy"),Hero,Enemy->GetActorLocation());QueryPath(TEXT("pet-enemy"),Pet,Enemy->GetActorLocation());
+        FHitResult Hit;FCollisionQueryParams Query(SCENE_QUERY_STAT(HollowInspect),false,Hero);const auto* Capsule=Hero->GetCapsuleComponent();
+        const FVector Direction=(Goal-Hero->GetActorLocation()).GetSafeNormal2D();
+        const bool Blocked=World->SweepSingleByChannel(Hit,Hero->GetActorLocation(),Hero->GetActorLocation()+Direction*100,FQuat::Identity,ECC_Pawn,
+            FCollisionShape::MakeCapsule(Capsule->GetScaledCapsuleRadius(),Capsule->GetScaledCapsuleHalfHeight()),Query);
+        UE_LOG(LogTemp,Display,TEXT("CF_HOLLOW_INSPECT_SWEEP blocked=%d actor=%s component=%s impact=%s pet=%d penetrating=%d depth=%.3f heroRadius=%.2f distance=%.3f"),Blocked,*GetNameSafe(Hit.GetActor()),*GetNameSafe(Hit.GetComponent()),*Hit.ImpactPoint.ToString(),Hit.GetActor()==Pet,Hit.bStartPenetrating,Hit.PenetrationDepth,Capsule->GetScaledCapsuleRadius(),Hero->GetDistanceTo(Pet));
+        FHitResult Sight;World->LineTraceSingleByChannel(Sight,Hero->FirstPersonCamera->GetComponentLocation(),Enemy->GetActorLocation(),ECC_Visibility,Query);
+        UE_LOG(LogTemp,Display,TEXT("CF_HOLLOW_INSPECT_SIGHT actor=%s component=%s hero=%s hp=%.1f control=%s camera=%s"),*GetNameSafe(Sight.GetActor()),*GetNameSafe(Sight.GetComponent()),*Hero->GetActorLocation().ToString(),Hero->Health,*Hero->GetController()->GetControlRotation().ToString(),*Hero->FirstPersonCamera->GetComponentRotation().ToString());
+        UE_LOG(LogTemp,Display,TEXT("CF_HOLLOW_INSPECT %s snapshotOnly=1 transientReplay=0"),Ready?TEXT("PASS"):TEXT("FAIL"));
+        FPlatformMisc::RequestExitWithStatus(false,Ready?0:1);return;
+    }
     if(Mode==2 || Mode==4 || Mode==7)
     {const bool Pass=Hero->LoadProgress(Mode==7?TEXT("HollowCheckpointFinal"):Mode==4?TEXT("HollowRecoveryCross"):TEXT("HollowAdventureCross")) && AdventureSnapshot(World,Hero);UE_LOG(LogTemp,Display,TEXT("%s %s"),Mode==7?TEXT("CF_HOLLOW_CHECKPOINT_READ"):Mode==4?TEXT("CF_HOLLOW_RECOVERY_READ"):TEXT("CF_HOLLOW_ADVENTURE_READ"),Pass?TEXT("PASS"):TEXT("FAIL"));FPlatformMisc::RequestExitWithStatus(false,Pass?0:1);return;}
     if(Mode==6)
