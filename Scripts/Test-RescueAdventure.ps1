@@ -23,6 +23,7 @@ if(!$ReuseInput){$cases+=@{Flag='CFRescueNaturalWrite';Marker='CF_RESCUE_NATURAL
 $cases+=@{Flag='CFRescueNaturalResume';Marker='CF_RESCUE_NATURAL_RESUME PASS';Timeout=135}
 $cases+=@{Flag='CFRescueNaturalRead';Marker='CF_RESCUE_NATURAL_READ PASS';Timeout=60}
 $source=Join-Path $saveRoot 'RescueNaturalDowned.sav'
+if(Test-Path -LiteralPath $source){Copy-Item -LiteralPath $source -Destination (Join-Path $run 'Input-before.sav')}
 $inputHash=if($ReuseInput){(Get-FileHash -LiteralPath $source).Hash}else{''}
 $results=@()
 Write-Host "救助证据目录：$run"
@@ -34,6 +35,10 @@ foreach($case in $cases){
     if($process.ExitCode -ne 0 -or !(Select-String -LiteralPath $log -SimpleMatch $case.Marker -Quiet) -or (Select-String -LiteralPath $log -Pattern 'CF_RESCUE.*FAIL|Fatal error|Assertion failed' -Quiet)){throw "救助测试失败：$log"}
     if(!$inputHash){$inputHash=(Get-FileHash -LiteralPath $source).Hash}
     if((Get-FileHash -LiteralPath $source).Hash -ne $inputHash){throw '倒地输入存档被改写'}
+    $inputCopy=Join-Path $run 'Input.sav'
+    if(!(Test-Path -LiteralPath $inputCopy)){Copy-Item -LiteralPath $source -Destination $inputCopy}
+    if((Get-FileHash -LiteralPath $inputCopy).Hash -ne $inputHash){throw '留存输入副本哈希不符'}
+    if($case.Flag -eq 'CFRescueNaturalRead'){Copy-Item -LiteralPath (Join-Path $saveRoot 'RescueNaturalFinal.sav') -Destination (Join-Path $run 'Final.sav')}
     if((Get-FileHash -LiteralPath $exe).Hash -ne $buildHash){throw '测试程序发生变化'}
     if($module -and (Get-FileHash -LiteralPath $module).Hash -ne $moduleHash){throw 'Editor游戏模块发生变化'}
     $results+=[pscustomobject]@{Flag=$case.Flag;Pass=$true;Editor=[bool]$Editor;InputSHA256=$inputHash;BuildSHA256=$buildHash;ModuleSHA256=$moduleHash;Log=$log}
