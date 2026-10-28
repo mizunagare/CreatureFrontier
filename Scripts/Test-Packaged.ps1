@@ -1,6 +1,7 @@
 param([string]$BuildRoot = '', [int]$TimeoutSeconds = 60)
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'BuildFingerprint.ps1')
 $projectRoot = Split-Path $PSScriptRoot -Parent
 if (-not $BuildRoot) {
     $candidates = @(Get-ChildItem -LiteralPath (Join-Path $projectRoot 'Builds') -Directory | ForEach-Object {
@@ -16,7 +17,7 @@ if ($TimeoutSeconds -lt 10 -or $TimeoutSeconds -gt 60) { throw '超时时间必�
 Write-Host "正在测试构建：$BuildRoot"
 $exePath = Join-Path $BuildRoot 'CreatureFrontier\Binaries\Win64\CreatureFrontier.exe'
 if (-not (Test-Path -LiteralPath $exePath)) { throw "找不到 Development 游戏程序：$exePath" }
-$buildHash=(Get-FileHash -LiteralPath $exePath).Hash
+$buildHash=Get-FrontierBuildFingerprint -LiteralPath $exePath
 $runName = (Get-Date -Format 'yyyyMMdd-HHmmss') + '-' + [Guid]::NewGuid().ToString('N').Substring(0,8)
 $testLogRoot = Join-Path $projectRoot (Join-Path 'Saved\PackagedTests' $runName)
 New-Item -ItemType Directory -Path $testLogRoot -Force | Out-Null
@@ -144,7 +145,7 @@ foreach ($case in $cases) {
             throw "$label 超过 $caseTimeout 秒，已停止测试进程。详见：$logPath"
         }
         if ($testProcess.ExitCode -ne 0) { throw "$label 测试失败，退出码：$($testProcess.ExitCode)" }
-        if ((Get-FileHash -LiteralPath $exePath).Hash -ne $buildHash) { throw '完整回归期间测试程序发生变化' }
+        if ((Get-FrontierBuildFingerprint -LiteralPath $exePath) -ne $buildHash) { throw '完整回归期间测试程序发生变化' }
         if (Select-String -LiteralPath $logPath -Pattern 'CF_\w+ FAIL|Fatal error|Assertion failed' -Quiet) {
             throw "$label 日志包含失败标记。详见：$logPath"
         }
