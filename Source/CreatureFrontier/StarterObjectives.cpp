@@ -6,8 +6,8 @@
 namespace
 {
     constexpr int32 StarterObjectiveTargets[]={1,1,3,2,1};
-    const TCHAR* StarterObjectiveTitles[]={TEXT("发现一种生物"),TEXT("捕捉第一位伙伴"),TEXT("与伙伴生产3份材料"),TEXT("与伙伴种出2份食物"),TEXT("捕捉或击败水晶高地首领")};
-    const TCHAR* StarterObjectiveHints[]={TEXT("瞄准12米内的活体生物 | I 图鉴"),TEXT("削弱野生生物，再按右键捕捉"),TEXT("工作台附近按E | 专长匹配工作更快"),TEXT("B / V 建造农圃（18材料），再按E指派"),TEXT("水晶高地：右前方山谷 | Q 集火 / G 技能")};
+    const TCHAR* StarterObjectiveTitles[]={TEXT("发现一种生物"),TEXT("结交第一位伙伴"),TEXT("与伙伴生产3份材料"),TEXT("与伙伴种出2份食物"),TEXT("捕捉或击败水晶高地首领")};
+    const TCHAR* StarterObjectiveHints[]={TEXT("瞄准12米内的活体生物 | I 图鉴"),TEXT("J 向平静苔跳兽分享3食物，或削弱野生生物后右键捕捉"),TEXT("工作台附近按E | 专长匹配工作更快"),TEXT("B / V 建造农圃（18材料），再按E指派"),TEXT("水晶高地：右前方山谷 | Q 集火 / G 技能")};
     TMap<EFrontierItem,int32> Reward(int32 Index)
     {
         switch(Index)

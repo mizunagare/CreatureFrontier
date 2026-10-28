@@ -368,6 +368,10 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
     }
     const FVector Offset = Target->GetActorLocation() - GetActorLocation();
     const float Distance2D = Offset.Size2D();
+    // 温顺物种允许靠近结交；受伤、被挑衅或首领仍走原战斗规则。
+    if(!bAlpha && !bProvoked && Definition && Definition->PeacefulFoodCost>=1 && Definition->PeacefulFoodCost<=10 &&
+        FMath::IsNearlyEqual(Health,GetMaxHealth(),.01f))
+    {TickRoaming(DeltaSeconds);return;}
     if ((AlphaWindup > 0 || Distance2D <= AggroRange || bProvoked) && TickAlphaAttack(DeltaSeconds, Target)) return;
     if (Distance2D <= AggroRange || bProvoked)
     {

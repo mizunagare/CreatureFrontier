@@ -23,6 +23,8 @@ AWildEncounter::AWildEncounter()
 void AWildEncounter::BeginPlay()
 {
     Super::BeginPlay();
+    for(const TCHAR* Flag:{TEXT("CFBefriendTest"),TEXT("CFBefriendWrite"),TEXT("CFBefriendRead")})
+        if(FParse::Param(FCommandLine::Get(),Flag))SetActorTickEnabled(false);
     if(auto* Sign=FindComponentByClass<UTextRenderComponent>())Sign->SetHiddenInGame(true);
     if(FParse::Param(FCommandLine::Get(),TEXT("CFHUDLayoutTest")) || FParse::Param(FCommandLine::Get(),TEXT("CFHUDPreview")))SetActorTickEnabled(false);
     for(const TCHAR* Flag:{TEXT("CFMemoryTest"),TEXT("CFMemoryWrite"),TEXT("CFMemoryRead"),TEXT("CFMemoryDoneRead"),TEXT("CFMemoryLegacyRead")})

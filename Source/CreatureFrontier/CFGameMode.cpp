@@ -1,4 +1,5 @@
 #include "CFGameMode.h"
+#include "BefriendingScenario.h"
 #include "ResourceNode.h"
 #include "ResourceScenario.h"
 #include "FieldWorkScenario.h"
@@ -64,6 +65,9 @@ void ACFGameMode::BeginPlay()
 {
     Super::BeginPlay();
     SeedFrontierResources(GetWorld());
+    const int32 BefriendMode=FParse::Param(FCommandLine::Get(),TEXT("CFBefriendWrite"))?1:FParse::Param(FCommandLine::Get(),TEXT("CFBefriendRead"))?2:0;
+    if(BefriendMode || FParse::Param(FCommandLine::Get(),TEXT("CFBefriendTest")))
+    {FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this,BefriendMode](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunBefriendingScenario(GetWorld(),Hero,BefriendMode);},1.f,false);return;}
     if(FParse::Param(FCommandLine::Get(),TEXT("CFHUDLayoutTest")) || FParse::Param(FCommandLine::Get(),TEXT("CFHUDPreview")))
     {const bool Preview=FParse::Param(FCommandLine::Get(),TEXT("CFHUDPreview"));FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this,Preview](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunHUDScenario(GetWorld(),Hero,Preview);},1.f,false);return;}
     const int32 MemoryMode=FParse::Param(FCommandLine::Get(),TEXT("CFMemoryWrite"))?1:FParse::Param(FCommandLine::Get(),TEXT("CFMemoryRead"))?2:FParse::Param(FCommandLine::Get(),TEXT("CFMemoryDoneRead"))?3:FParse::Param(FCommandLine::Get(),TEXT("CFMemoryLegacyRead"))?4:0;

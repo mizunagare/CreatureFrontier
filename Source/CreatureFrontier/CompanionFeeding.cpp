@@ -30,7 +30,12 @@ bool ACFPlayerCharacter::FeedCompanion(ACreatureCharacter* Pet)
     return true;
 }
 
-void ACFPlayerCharacter::FeedAimedCompanion() { FeedCompanion(TraceCreature()); }
+void ACFPlayerCharacter::FeedAimedCompanion()
+{
+    auto* Creature=TraceCreature();
+    if(Creature && Creature->Disposition!=ECreatureDisposition::Tamed)BefriendWildCreature(Creature);
+    else FeedCompanion(Creature);
+}
 
 AWorkStation* ACFPlayerCharacter::TraceFacility() const
 {

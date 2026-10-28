@@ -51,6 +51,7 @@ public:
     void CraftFood();
     void FeedAimedCompanion();
     bool FeedCompanion(ACreatureCharacter* Pet);
+    bool BefriendWildCreature(ACreatureCharacter* Creature);
     bool PetCompanion(ACreatureCharacter* Pet);
     bool PlayWithCompanion(ACreatureCharacter* Pet);
     bool InteractCompanion(ACreatureCharacter* Pet,bool Playful);

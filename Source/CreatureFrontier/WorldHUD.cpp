@@ -72,6 +72,8 @@ void ACFHUD::DrawWorldHUD(ACFPlayerCharacter* Player)
         }
         else
         {
+            if(Creature->Definition && Creature->Definition->PeacefulFoodCost>0 && !Creature->bAlpha)
+                Rows.Add({FString::Printf(TEXT("J 和平结交：分享%d食物 | 健康、平静、安全，2.5米内"),Creature->Definition->PeacefulFoodCost),Green,2});
             Rows.Add({FString::Printf(TEXT("捕捉概率 %.0f%% | 右键捕捉 | Q 集火 | G 技能"),Player->CaptureComponent->CalculateCaptureChance(Creature)*100),Yellow,2});
             if(Creature->Activity==ECreatureActivity::ReturnHome)Rows.Add({TEXT("返回栖息地中：暂不可伤害或捕捉"),Yellow,2});
             if(Creature->bAlpha)Rows.Add({FString::Printf(TEXT("首领震地 | %s %.1f秒"),Creature->AlphaWindup>0?TEXT("即将释放"):TEXT("冷却"),Creature->AlphaWindup>0?Creature->AlphaWindup:Creature->AlphaCooldown),Yellow,2});

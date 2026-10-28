@@ -48,7 +48,7 @@ void ACFHUD::DrawControlHelp(ACFPlayerCharacter* Player)
         TEXT("F4 给自己的空闲伙伴命名（2.5米，输入时暂停）"),
         TEXT("F7 回应水晶之旅：在家瞄准空闲伙伴（2.5米）"),
         TEXT("T 休息 | P 治疗瞄准的伙伴"),
-        TEXT("J 喂食瞄准的伙伴 | H 治疗自己"),
+        TEXT("J 喂食伙伴/向温顺野生生物分享食物 | H 自疗"),
         TEXT("Y 安静陪伴 / F6 玩耍（安全2.5米，玩耍耗体力/饱食20）"),
         TEXT("B 建造 | V 切换设施 | X 拆除"),
         TEXT("建造时：8 切换设施/房屋 | 9 旋转墙体"),

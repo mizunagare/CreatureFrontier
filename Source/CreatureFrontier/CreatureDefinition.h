@@ -48,6 +48,10 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Capture", meta=(ClampMin="0.01", ClampMax="1.0"))
     float BaseCaptureRate = 0.35f;
 
+    // 0表示不接受和平结交；资源成本由物种数据配置，不进入个体存档。
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Companionship", meta=(ClampMin="0", ClampMax="10"))
+    int32 PeacefulFoodCost = 0;
+
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Work")
     TArray<EWorkSpecialty> WorkSpecialties;
 };

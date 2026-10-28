@@ -1,10 +1,14 @@
 # 幻兽边境 · Creature Frontier
 
-原创第一人称生物捕捉 RPG 原型。玩法重点是捕捉伙伴，并与伙伴共同生活、工作和战斗。
+原创第一人称生物伙伴RPG原型。通过结交或捕捉获得伙伴，并与伙伴共同生活、工作和战斗。
+
+本轮新增[和平结交](Docs/PEACEFUL_BEFRIENDING.md)：在安全的2.5米内瞄准满生命、平静的苔跳兽，按J分享3份食物即可成为伙伴，不消耗捕捉器。首领/敌对/受伤目标不适用，伙伴喂食仍用J。存档格式保持27。
+
+当前可运行包：`E:\CreatureFrontierBuilds\Windows-Befriend-Render\CreatureFrontier.exe`。同一最终构建73项本地回归、10份真实27旧档的22个读取进程通过；三尺寸六张结交前后图与三张帮助图已逐张查看，主界面24帧边界/尺寸审计通过。当前仍为灰盒首版，不是完整信任系统或最终美术。
 
 已完成本轮中文显示改造：界面、帮助、任务、反馈、生物/技能/资源/配方和区域名称使用简体中文，后续开发文档与新增注释也使用中文。技术标识、路径、存档协议和玩家自定义昵称不改。实现、失败记录与验收边界见 [中文开发约定](Docs/CHINESE.md)；主界面已完成[信息分区与遮挡收敛](Docs/HUD_READABILITY.md)，场景名牌已修复中文缺字。
 
-中文可运行包：`E:\CreatureFrontierBuilds\Windows-Chinese-Verified\CreatureFrontier.exe`。同一最终构建连续70项本地回归、10份真实27旧档的22个独立读取进程通过；三种分辨率24张主界面图及1280×720的11张菜单图已逐张检查。本项目仍是灰盒，旧菜单极端尺寸排版、实体输入/IME、复杂场景性能与正式美术仍待完善。
+此前中文版本：`E:\CreatureFrontierBuilds\Windows-Chinese-Verified\CreatureFrontier.exe`。该构建70项本地回归、22个旧档进程及35张逐图记录保留，不冒充本轮哈希证据。旧菜单极端尺寸排版、实体输入/IME、复杂场景性能与正式美术仍待完善。
 
 本轮加入“水晶之旅归家”：实际共同采样后回家，F7 选择安静致谢或一起庆祝，格式 27 保存个体回忆，不额外发资源、亲密度或战斗加成。详见 [共同经历与归家事件](Docs/COMPANION_MEMORIES.md)。原 Y / F6 的 [互动偏好](Docs/COMPANION_PREFERENCES.md) 保留。
 此前回忆版本：`E:\CreatureFrontierBuilds\Windows-Memories-Final\CreatureFrontier.exe`；连续69项回归、9份真实26旧档的20个独立进程读取检查、D3D12回忆行为与两张新图检查通过。该版本与失败记录保留，不以编译或退出码单独判通过；更多生活偏好/关系事件和正式角色/动画/UI品质尚未全面完成。

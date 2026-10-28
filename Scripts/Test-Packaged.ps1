@@ -23,6 +23,9 @@ Write-Host "Fresh test logs: $testLogRoot"
 $cases = @(
     @{Flag='CFSmokeTest'; Marker='CF_SMOKE PASS'},
     @{Flag='CFHUDLayoutTest'; Marker='CF_HUD_LAYOUT PASS'},
+    @{Flag='CFBefriendTest'; Marker='CF_BEFRIEND PASS'},
+    @{Flag='CFBefriendWrite'; Marker='CF_BEFRIEND_WRITE PASS'},
+    @{Flag='CFBefriendRead'; Marker='CF_BEFRIEND_READ PASS'},
     @{Flag='CFInventoryTest'; Marker='CF_INVENTORY PASS'},
     @{Flag='CFStorageTest'; Marker='CF_STORAGE PASS'},
     @{Flag='CFStorageWrite'; Marker='CF_STORAGE_WRITE PASS'},

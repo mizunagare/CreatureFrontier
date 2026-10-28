@@ -44,6 +44,7 @@ for spec in specs:
                   base_max_health=spec['health'], base_attack=spec['attack'], base_capture_rate=spec['rate'],
                   move_speed=spec['speed'], attack_seconds=spec['seconds'], work_speed=spec['work'],
                   work_specialties=[spec['job']] + ([unreal.WorkSpecialty.FARMING] if spec['asset'] == 'DA_Mosskip' else []), palette_material=palette,
+                  peaceful_food_cost=3 if spec['asset'] == 'DA_Mosskip' else 0,
                   body_color=unreal.LinearColor(*spec['color'], 1), accent_color=unreal.LinearColor(*spec['accent'], 1))
     for key, value in values.items():
         asset.set_editor_property(key, value)
