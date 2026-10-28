@@ -89,6 +89,8 @@ struct FAdventure
     bool WriteDownedCheckpoint=false,ResumedCheckpoint=false;
     float ObservedHeroHP=-1,ObservedPetHP=-1,ObservedEnemyHP=-1;
     double NextRouteLog=0;
+    FVector RouteProgressAnchor=FVector::ZeroVector;
+    double RouteProgressAt=0;
     bool SameRecoveryBag() const
     {for(int32 I=0;I<static_cast<int32>(EFrontierItem::Count);++I)if(Hero->Inventory->Count(static_cast<EFrontierItem>(I))!=RecoveryBag.FindRef(static_cast<EFrontierItem>(I)))return false;return true;}
     void Shot(const TCHAR* Name)
@@ -117,16 +119,19 @@ struct FAdventure
         }
         const float Step=FVector::Dist(Now,Previous),PetStep=FVector::Dist(PetNow,PreviousPet);Travel+=FVector::Dist2D(Now,Previous);PetTravel+=FVector::Dist2D(PetNow,PreviousPet);Previous=Now;PreviousPet=PetNow;PetSouth=FMath::Min(PetSouth,PetNow.Y);
         // 卡路时记录真实胶囊前方的阻挡物，先区分洞壁与伙伴碰撞，不改变路线或碰撞规则。
-        if(Mode==3 && RecoveryStage==0 && Step<1 && !Input->Direction.IsNearlyZero() && FPlatformTime::Seconds()>NextRouteLog)
+        if(FVector::Dist2D(Now,RouteProgressAnchor)>80)
+        {RouteProgressAnchor=Now;RouteProgressAt=FPlatformTime::Seconds();}
+        // 以持续未离开局部区域判定，覆盖每帧仍有小幅移动的往返振荡。
+        if(Mode==3 && RecoveryStage==0 && FPlatformTime::Seconds()-RouteProgressAt>3 && !Input->Direction.IsNearlyZero() && FPlatformTime::Seconds()>NextRouteLog)
         {
             NextRouteLog=FPlatformTime::Seconds()+5;
             FHitResult Hit;FCollisionQueryParams Query(SCENE_QUERY_STAT(HollowRouteObstacle),false,Hero);
             const auto* Capsule=Hero->GetCapsuleComponent();
             const bool Blocked=World->SweepSingleByChannel(Hit,Now,Now+Input->Direction.GetSafeNormal()*100,FQuat::Identity,ECC_Pawn,
                 FCollisionShape::MakeCapsule(Capsule->GetScaledCapsuleRadius(),Capsule->GetScaledCapsuleHalfHeight()),Query);
-            UE_LOG(LogTemp,Display,TEXT("CF_HOLLOW_ROUTE_STALL index=%d hero=%s goal=%s input=%s velocity=%s blocked=%d actor=%s component=%s impact=%s"),
+            UE_LOG(LogTemp,Display,TEXT("CF_HOLLOW_ROUTE_STALL index=%d hero=%s goal=%s input=%s velocity=%s blocked=%d actor=%s component=%s impact=%s battle=%d focus=%s"),
                 Index,*Now.ToString(),Points.IsValidIndex(Index)?*Points[Index].ToString():TEXT("none"),*Input->Direction.ToString(),
-                *Hero->GetVelocity().ToString(),Blocked,*GetNameSafe(Hit.GetActor()),*GetNameSafe(Hit.GetComponent()),*Hit.ImpactPoint.ToString());
+                *Hero->GetVelocity().ToString(),Blocked,*GetNameSafe(Hit.GetActor()),*GetNameSafe(Hit.GetComponent()),*Hit.ImpactPoint.ToString(),Battle,*GetNameSafe(Pet->FocusTarget));
         }
         Incoming |= Mode==3 && RecoveryStage==2?(Hero->Health<SecondHeroHP || Pet->Health<SecondPetHP):(Hero->Health<100 || Pet->Health<Pet->GetMaxHealth());Skill |= Pet->SpecialCooldownRemaining>0 && Pet->Stamina<=80;
         if(!Returning && Now.Y<-2200)Shot(TEXT("Entrance"));
@@ -297,6 +302,14 @@ void StartAdventure(UWorld* World,ACFPlayerCharacter* Hero,ACreatureCharacter* P
     auto State=MakeShared<FAdventure>();State->World=World;State->Hero=Hero;State->Pet=Pet;State->Enemy=Camp->GetResident();State->Camp=Camp;State->Mode=Mode;
     State->WriteDownedCheckpoint=WriteDowned;State->ResumedCheckpoint=Resumed;
     State->Input=NewObject<UHomeMovementProbe>(Hero);State->Input->RegisterComponent();State->Points=MakeHollowRoutePoints();State->Previous=Hero->GetActorLocation();State->PreviousPet=Pet->GetActorLocation();State->Deadline=FPlatformTime::Seconds()+(Mode==3?180:75);
+    if(Mode==3 && !Resumed && FParse::Param(FCommandLine::Get(),TEXT("CFHollowCornerProbe")))
+    {
+        // 限定诊断的初始夹具取自失败位置；不冒充原路线重放或正常通行验收。
+        // 此后不传送、不停AI、不关闭碰撞，沿原第六目标持续输入并记录真实阻挡。
+        Hero->SetActorLocation(FVector(167.180,-3219.343,40));Pet->SetActorLocation(FVector(145.985,-3154.643,40));
+        State->Index=6;State->Previous=Hero->GetActorLocation();State->PreviousPet=Pet->GetActorLocation();
+        UE_LOG(LogTemp,Display,TEXT("CF_HOLLOW_CORNER_PROBE fixture=1 initialPlacementOnly=1"));
+    }
     if(!Resumed && (!CFInputQA::Press(Hero,EKeys::LeftShift) || !Hero->Pace->IsSlowWalking())){FPlatformMisc::RequestExitWithStatus(false,1);return;}
     if(FParse::Param(FCommandLine::Get(),TEXT("CFHollowAdventurePreview")))
     {State->Shots=FPaths::ProjectSavedDir()/TEXT("HollowAdventurePreview")/FGuid::NewGuid().ToString(EGuidFormats::Digits);IFileManager::Get().MakeDirectory(*State->Shots,true);UE_LOG(LogTemp,Display,TEXT("CF_HOLLOW_ADVENTURE_ROOT %s"),*State->Shots);}
