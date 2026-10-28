@@ -5,7 +5,7 @@
 #include "HomeModuleDefinition.generated.h"
 
 UENUM(BlueprintType)
-enum class EHomeModuleKind : uint8 { Floor, Wall, Doorway, Roof, Lantern, Storage, Door };
+enum class EHomeModuleKind : uint8 { Floor, Wall, Doorway, Roof, Lantern, Storage, Door, Window };
 
 UCLASS(BlueprintType)
 class CREATUREFRONTIER_API UHomeModuleDefinition : public UPrimaryDataAsset

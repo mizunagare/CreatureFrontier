@@ -25,6 +25,48 @@
 #include "Components/BoxComponent.h"
 
 UHomeMovementProbe::UHomeMovementProbe() { PrimaryComponentTick.bCanEverTick=true; }
+
+void RunHomeWindowScenario(UWorld* World,ACFPlayerCharacter* Hero)
+{
+    // 独立灰盒夹具；不借用其他建筑专项作为窗洞/支撑验收。
+    Hero->SetActorLocation(FVector(-450,-400,40));
+    Hero->Inventory->Restore({{EFrontierItem::Material,100}});
+    auto Build=[Hero](EHomeModuleKind Kind,FVector Position,FGuid Floor=FGuid(),double Yaw=0.)
+    {Hero->HomeBuilding->Selected=Kind;return Hero->HomeBuilding->BuildAt(FTransform(FRotator(0,Yaw,0),Position),Floor);};
+    auto* Floor=Build(EHomeModuleKind::Floor,FVector(-400,-800,-40));
+    auto* Window=Floor?Build(EHomeModuleKind::Window,FVector(-400,-1000,-30),Floor->PersistentId):nullptr;
+    auto* Back=Floor?Build(EHomeModuleKind::Wall,FVector(-400,-600,-30),Floor->PersistentId):nullptr;
+    auto* Roof=Back && Window?Build(EHomeModuleKind::Roof,FVector(-400,-800,280),Floor->PersistentId):nullptr;
+    bool Built=Floor && Window && Back && Roof && Hero->Inventory->Count(EFrontierItem::Material)==66;
+    auto* Side=Built?Build(EHomeModuleKind::Window,FVector(-600,-800,-30),Floor->PersistentId,90.):nullptr;
+    Built &= Side && Hero->Inventory->Count(EFrontierItem::Material)==56;
+    bool Hole=Built,Frame=Built,PawnBlocked=Built;
+    FCollisionQueryParams Params(SCENE_QUERY_STAT(WindowGeometry),false,Hero);
+    for(auto* Module:{Window,Side})if(Module)
+    {
+        auto Ray=[&](double Height,FHitResult& Hit)
+        {return World->LineTraceSingleByChannel(Hit,Module->GetActorTransform().TransformPosition(FVector(0,-80,Height)),Module->GetActorTransform().TransformPosition(FVector(0,80,Height)),ECC_Visibility,Params);};
+        FHitResult Hit;
+        Hole &= !Ray(170,Hit);
+        Frame &= Ray(60,Hit) && Hit.GetActor()==Module && Ray(260,Hit) && Hit.GetActor()==Module;
+        const auto* Capsule=Hero->GetCapsuleComponent();
+        PawnBlocked &= World->SweepSingleByChannel(Hit,Module->GetActorTransform().TransformPosition(FVector(0,-100,100)),Module->GetActorTransform().TransformPosition(FVector(0,100,100)),FQuat::Identity,ECC_Pawn,
+            FCollisionShape::MakeCapsule(Capsule->GetScaledCapsuleRadius(),Capsule->GetScaledCapsuleHalfHeight()),Params) && Hit.GetActor()==Module;
+    }
+    const bool Support=Built && !Hero->HomeBuilding->Dismantle(Window) && IsValid(Window);
+    const FGuid WindowId=Window?Window->PersistentId:FGuid(),SideId=Side?Side->PersistentId:FGuid();
+    bool Saved=Built && Hero->SaveProgress(TEXT("WindowGood"));
+    auto* Legacy=Saved?Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("WindowGood"),0)):nullptr;
+    bool Rejected=false;
+    if(Legacy){Legacy->FormatVersion=31;Rejected=UGameplayStatics::SaveGameToSlot(Legacy,TEXT("WindowLegacy31"),0) && !Hero->LoadProgress(TEXT("WindowLegacy31")) && IsValid(Window) && Hero->Inventory->Count(EFrontierItem::Material)==56;}
+    Saved &= Hero->LoadProgress(TEXT("WindowGood")) && Hero->LoadProgress(TEXT("WindowGood"));
+    const auto Restored=HomeLayout::Collect(World);
+    Saved &= Restored.ContainsByPredicate([WindowId](const auto& R){return R.Id==WindowId && R.Definition.Get() && R.Definition.Get()->Kind==EHomeModuleKind::Window;}) &&
+        Restored.ContainsByPredicate([SideId](const auto& R){return R.Id==SideId && R.Definition.Get() && R.Definition.Get()->Kind==EHomeModuleKind::Window;});
+    const bool Pass=Built && Hole && Frame && PawnBlocked && Support && Rejected && Saved;
+    UE_LOG(LogTemp,Display,TEXT("CF_WINDOW %s built=%d hole=%d frame=%d pawn=%d support=%d legacy=%d save=%d"),Pass?TEXT("PASS"):TEXT("FAIL"),Built,Hole,Frame,PawnBlocked,Support,Rejected,Saved);
+    FPlatformMisc::RequestExitWithStatus(false,Pass?0:1);
+}
 void UHomeMovementProbe::TickComponent(float DeltaTime,ELevelTick TickType,FActorComponentTickFunction* Tick)
 {
     Super::TickComponent(DeltaTime,TickType,Tick);

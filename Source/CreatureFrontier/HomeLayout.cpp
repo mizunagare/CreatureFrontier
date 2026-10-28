@@ -12,7 +12,7 @@
 namespace
 {
 bool Grid(double Value,double Step) { return FMath::IsNearlyEqual(Value,FMath::GridSnap(Value,Step),.01); }
-bool IsWall(EHomeModuleKind Kind) { return Kind==EHomeModuleKind::Wall || Kind==EHomeModuleKind::Doorway || Kind==EHomeModuleKind::Door; }
+bool IsWall(EHomeModuleKind Kind) { return Kind==EHomeModuleKind::Wall || Kind==EHomeModuleKind::Doorway || Kind==EHomeModuleKind::Door || Kind==EHomeModuleKind::Window; }
 bool At(const FHomeModuleRecord& Record,const FVector& Position,double Yaw)
 { return Record.Transform.GetLocation().Equals(Position,.01) && FMath::IsNearlyEqual(Record.Transform.Rotator().Yaw,Yaw,.01); }
 bool WallAt(const TArray<FHomeModuleRecord>& Records,const FVector& Position,double Yaw)

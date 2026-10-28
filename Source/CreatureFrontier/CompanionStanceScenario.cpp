@@ -21,7 +21,7 @@ void RunCompanionStanceScenario(UWorld* World,ACFPlayerCharacter* Hero)
     {
         // 只读取前一进程留下的快照，不重建姿态或赠送夹具。
         const auto* Input=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("StanceGood"),0));
-        bool Pass=Input && Input->FormatVersion==31;
+        bool Pass=Input && Input->FormatVersion>=31 && Input->FormatVersion<=FrontierCurrentSaveVersion;
         int32 Avoid=0,Guard=0;
         if(Input)for(const auto& Record:Input->Creatures)if(Record.bOwned){if(Record.CombatStance==1)++Avoid;else if(Record.CombatStance==0)++Guard;else Pass=false;}
         Pass &= Avoid==2 && Guard==2;

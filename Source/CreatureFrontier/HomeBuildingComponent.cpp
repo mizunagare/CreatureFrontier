@@ -30,7 +30,7 @@ void UHomeBuildingComponent::Cancel() { if(IsValid(Preview)) Preview->Destroy();
 void UHomeBuildingComponent::EndPlay(const EEndPlayReason::Type Reason) { Cancel(); Super::EndPlay(Reason); }
 void UHomeBuildingComponent::Cycle()
 {
-    Selected=static_cast<EHomeModuleKind>((static_cast<int32>(Selected)+1)%7); StartPreview();
+    Selected=static_cast<EHomeModuleKind>((static_cast<int32>(Selected)+1)%8); StartPreview();
 }
 void UHomeBuildingComponent::Rotate() { YawStep=1-YawStep; UpdatePreview(); }
 bool UHomeBuildingComponent::ValidatePlacement(const FTransform& Transform,FGuid FloorId,FString& Reason) const
@@ -107,7 +107,7 @@ void UHomeBuildingComponent::UpdatePreview()
         else SupportingFloor=HomeLayout::FindFloor(Hit.ImpactPoint,Layout);
         if(!SupportingFloor.IsValid()) { Status=TEXT("请瞄准可支撑的地板、墙或门框"); bValid=false; Preview->SetActorHiddenInGame(true); return; }
     }
-    const bool Wall=Selected==EHomeModuleKind::Wall || Selected==EHomeModuleKind::Doorway || Selected==EHomeModuleKind::Door;
+    const bool Wall=Selected==EHomeModuleKind::Wall || Selected==EHomeModuleKind::Doorway || Selected==EHomeModuleKind::Door || Selected==EHomeModuleKind::Window;
     FVector Position=Center;
     if(Wall)
     {

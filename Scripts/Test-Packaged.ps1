@@ -27,6 +27,7 @@ $cases = @(
     @{Flag='CFDoorFarmTest'; Label='CFStanceFarm'; Arguments=@('-CFStanceFarmTest'); Marker='CF_STANCE_FARM PASS'; RequiredMarkers=@('CF_STANCE_FARM_SWITCH PASS','CF_DOOR_FARM_CLOSED PASS','CF_DOOR_FARM PASS')},
     @{Flag='CFDoorFarmTest'; Label='CFDoorFarmNoRoof'; Arguments=@('-CFDoorFarmNoRoof'); Marker='CF_DOOR_FARM PASS'; RequiredMarkers=@('CF_DOOR_FARM_CLOSED PASS','CF_DOOR_FARM_FIXTURE roof=0 removed=1')},
     @{Flag='CFHomePaletteTest'; Marker='CF_HOME_PALETTE PASS built=1 opened=1 closed=1'; RequiredMarkers=@('CF_HOME_PALETTE_PREVIEW PASS','CF_HOME_PALETTE_INDEPENDENT stage=settled pass=1')},
+    @{Flag='CFWindowTest'; Arguments=@('-CFHomeTest'); Marker='CF_WINDOW PASS built=1 hole=1 frame=1 pawn=1 support=1 legacy=1 save=1'},
     @{Flag='CFStanceTest'; Arguments=@('-CFDefenseTest'); Marker='CF_STANCE PASS defaults=1 passive=1 explicit=1 cancel=1 invalid=1 persist=1 legacy=1'; RequiredMarkers=@('CF_STANCE_BOUNDARIES PASS scope=1 guard=1 bounds=1 work=1','CF_STANCE_SKILL PASS explicit=1 cancel=1')},
     @{Flag='CFStanceRead'; Arguments=@('-CFDefenseTest'); Marker='CF_STANCE_READ PASS avoid=2 guard=2'; PreserveSlot='StanceGood'},
     @{Flag='CFStanceRetreatTest'; Arguments=@('-CFDefenseTest'); Marker='CF_STANCE_RETREAT PASS'; RequiredMarkers=@('CF_STANCE_RETREAT_SWITCH PASS')},

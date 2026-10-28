@@ -44,6 +44,7 @@ bool FHomeRestoreTransaction::Stage(UFrontierSaveGame* Save)
     for(auto& Record:Save->HomeModules) if(!Record.Definition.LoadSynchronous()) return false;
     for(auto& Record:Save->HomeModules)
     {
+        if(Save->FormatVersion<32 && Record.Definition.Get()->Kind==EHomeModuleKind::Window)return false;
         if(Save->FormatVersion<30)
         {if(Record.Definition.Get()->Kind==EHomeModuleKind::Door)return false;Record.DoorState=0;}
         if(Save->FormatVersion<21)
