@@ -26,11 +26,63 @@
 #include "Misc/Paths.h"
 #include "UnrealClient.h"
 #include "Components/BoxComponent.h"
+#include "InputRoutingQA.h"
+#include "InputKeyEventArgs.h"
+#include "GenericPlatform/GenericPlatformInputDeviceMapper.h"
 
 UHomeMovementProbe::UHomeMovementProbe() { PrimaryComponentTick.bCanEverTick=true; }
 
+void RunHomeWindowInputScenario(UWorld* World,ACFPlayerCharacter* Hero)
+{
+    // 地板是唯一直接创建的出发夹具，窗墙必须经过正常选择/旋转/Attack输入。
+    Hero->SetActorLocation(FVector(-450,-400,40));Hero->Inventory->Restore({{EFrontierItem::Material,100}});
+    Hero->HomeBuilding->Selected=EHomeModuleKind::Floor;
+    auto* Floor=Hero->HomeBuilding->BuildAt(FTransform(FRotator::ZeroRotator,FVector(-400,-800,-40)));
+    auto Aim=[Hero]() {const auto View=(FVector(-400,-950,-30)-Hero->FirstPersonCamera->GetComponentLocation()).Rotation();Hero->GetController()->SetControlRotation(View);Hero->FirstPersonCamera->SetWorldRotation(View);};
+    Aim();
+    bool Setup=Floor && CFInputQA::UniqueBindings(Hero) && CFInputQA::Press(Hero,EKeys::B) && CFInputQA::Press(Hero,EKeys::Eight);
+    for(int32 I=0;Setup && I<7;++I)Setup &= CFInputQA::Press(Hero,EKeys::V);
+    Setup &= Hero->HomeBuilding->Selected==EHomeModuleKind::Window && Hero->HomeBuilding->GetPreview()!=nullptr;
+    if(!Setup){UE_LOG(LogTemp,Error,TEXT("CF_WINDOW_INPUT FAIL setup"));FPlatformMisc::RequestExitWithStatus(false,1);return;}
+    auto Tap=[World,Hero]()
+    {
+        auto* PC=CastChecked<APlayerController>(Hero->GetController());
+        PC->InputKey(FInputKeyEventArgs(nullptr,IPlatformInputDeviceMapper::Get().GetDefaultInputDevice(),EKeys::LeftMouseButton,IE_Pressed,FPlatformTime::Cycles64()));
+        FTimerHandle Release;TWeakObjectPtr<APlayerController> Weak=PC;
+        World->GetTimerManager().SetTimer(Release,[Weak](){if(auto* C=Weak.Get())C->InputKey(FInputKeyEventArgs(nullptr,IPlatformInputDeviceMapper::Get().GetDefaultInputDevice(),EKeys::LeftMouseButton,IE_Released,FPlatformTime::Cycles64()));},.05f,false);
+    };
+    auto Step=MakeShared<int32>(0);auto Timer=MakeShared<FTimerHandle>();Tap();
+    World->GetTimerManager().SetTimer(*Timer,[World,Hero,Aim,Tap,Step,Timer]()
+    {
+        const auto Records=HomeLayout::Collect(World);
+        int32 Windows=0;bool South=false,East=false;
+        for(const auto& R:Records)if(R.Definition.Get() && R.Definition.Get()->Kind==EHomeModuleKind::Window)
+        {++Windows;South |= R.Transform.GetLocation().Equals(FVector(-400,-1000,-30),.01) && FMath::IsNearlyZero(R.Transform.Rotator().Yaw,.01);East |= R.Transform.GetLocation().Equals(FVector(-200,-800,-30),.01) && FMath::IsNearlyEqual(R.Transform.Rotator().Yaw,90.,.01);}
+        bool Pass=true;bool Done=false;
+        if(*Step==0){Pass=Windows==1 && South && Hero->Inventory->Count(EFrontierItem::Material)==82; if(Pass)Tap();}
+        else if(*Step==1)
+        {
+            Pass=Windows==1 && Hero->Inventory->Count(EFrontierItem::Material)==82 && Hero->HomeBuilding->GetHint().Contains(TEXT("占用"));
+            if(Pass){Pass=CFInputQA::Press(Hero,EKeys::Nine);Aim();Tap();}
+        }
+        else
+        {
+            Pass=Windows==2 && South && East && Hero->Inventory->Count(EFrontierItem::Material)==72 && CFInputQA::Press(Hero,EKeys::B) && !Hero->Building->IsActive() && !Hero->HomeBuilding->GetPreview();Done=true;
+        }
+        if(!Pass || Done)
+        {
+            const int32 Phase=*Step,Materials=Hero->Inventory->Count(EFrontierItem::Material);auto Handle=*Timer;
+            World->GetTimerManager().ClearTimer(Handle);
+            UE_LOG(LogTemp,Display,TEXT("CF_WINDOW_INPUT %s phase=%d windows=%d materials=%d"),Pass?TEXT("PASS"):TEXT("FAIL"),Phase,Windows,Materials);
+            FPlatformMisc::RequestExitWithStatus(false,Pass?0:1);return;
+        }
+        ++*Step;
+    },.3f,true);
+}
+
 void RunHomeWindowScenario(UWorld* World,ACFPlayerCharacter* Hero)
 {
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFWindowInputTest"))){RunHomeWindowInputScenario(World,Hero);return;}
     if(FParse::Param(FCommandLine::Get(),TEXT("CFWindowRead")))
     {
         // 冷启动读取只使用磁盘期望值，不摆放夹具、不赠送材料、不另写存档。
