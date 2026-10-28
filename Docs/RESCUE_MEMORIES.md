@@ -2,6 +2,8 @@
 
 ## 回忆窗口生命周期修复（Editor 已验证，Windows 待验收）
 
+后续逐图补查：`Saved/ChineseMenus/20261028-202719-ead15c64/` 剩余八图现已逐张查看，合计11图。背包、图鉴、命名与两类回忆展示正文中文可读，Fern/Spark等为刻意保留的自定义昵称。发现储物箱表头错位并已另行修改，详见 `Docs/STORAGE.md`；此处 E7FBB028 固定包仍含旧排版，完整回归结果不覆盖后续源码修复。
+
 Windows 候选增量：`E:\CreatureFrontierBuilds\Windows-Memory-Lifecycle` 已成功打包，内部程序 SHA-256 为 `E7FBB02826978DDCC46A89604DC99E0F431164AB22EF1F43F215C8ADF6017D6D`。`Saved/RescueMemoryQA/20261028-202531-eaace2cb/` 八进程专项全部通过，包含真实控制转换与销毁边界。真实旧档读取正在执行，其后串行执行完整回归，尚不替换原稳定包。
 
 后续实际结果：`Saved/CargoLegacyAudit/20261028-202602-Verified/` 的34个旧档读取进程全部通过并恢复测试槽。完整回归已在 `Saved/PackagedTests/20261028-202832-6f5c990c/` 启动，仍在运行，不能标记通过。`Saved/ChineseMenus/20261028-202719-ead15c64/` 六个菜单预览进程完成，11张新图检查存在/时间戳且日志无失败标记；本轮只逐图查看其中暂停、帮助和普通视野三图，1280下中文可读且F7包含两类回忆，其余八图尚未逐图检查。菜单测试不是系统级实体输入或任意窗口尺寸验收。
