@@ -20,6 +20,12 @@
 #include "Components/CapsuleComponent.h"
 #include "Engine/OverlapResult.h"
 
+namespace CFDoorFarmVolumeQA
+{
+bool InsideRoom(FVector Position)
+{return Position.X>-560 && Position.X<-240 && Position.Y>-1000 && Position.Y<-600 && Position.Z>40 && Position.Z<120;}
+}
+
 void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
 {
     // 固定房间只验证单伙伴工作，不替代自由放置、长期运输或自然冒险。
@@ -91,10 +97,14 @@ void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
             if(Elapsed<8)return;
             const bool FacingProbe=FParse::Param(FCommandLine::Get(),TEXT("CFDoorFarmFacingProbe"));
             const FVector Position=Pet->GetActorLocation();
-            const bool Inside=Position.X>-560 && Position.X<-240 && Position.Y>-1000 && Position.Y<-600;
+            const bool VolumeChecked=CFDoorFarmVolumeQA::InsideRoom(FVector(-400,-850,60)) &&
+                !CFDoorFarmVolumeQA::InsideRoom(FVector(-400,-850,360)) && !CFDoorFarmVolumeQA::InsideRoom(FVector(-666,-850,60));
+            const bool Inside=CFDoorFarmVolumeQA::InsideRoom(Position);
+            const bool SameFloor=FMath::Abs(Position.Z-Hero->GetActorLocation().Z)<100;
+            UE_LOG(LogTemp,Display,TEXT("CF_DOOR_FARM_VOLUME %s sameFloor=%d height=%.1f"),VolumeChecked?TEXT("PASS"):TEXT("FAIL"),SameFloor,Position.Z);
             UE_LOG(LogTemp,Display,TEXT("CF_DOOR_FARM_DOCK probe=%d inside=%d distance=%.1f"),FacingProbe,Inside,FVector::Dist2D(Position,Pet->GetFollowDestination()));
             End(Farm->StoredFood==0 && Farm->Crop->Seeds==1 && !Farm->Crop->bPlanted && Farm->Crop->GrowthWork==0 &&
-                !Pet->WorkSite && Pet->Activity==ECreatureActivity::Follow && (FacingProbe?Travel>100:(Travel>300 && Inside)) &&
+                !Pet->WorkSite && Pet->Activity==ECreatureActivity::Follow && VolumeChecked && SameFloor && (FacingProbe?Travel>100:(Travel>300 && Inside)) &&
                 FVector::Dist2D(Pet->GetActorLocation(),Pet->GetFollowDestination())<65);return;
         }
         if(Phase==0 && Elapsed>=2)

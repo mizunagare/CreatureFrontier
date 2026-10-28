@@ -30,6 +30,7 @@ if($process.ExitCode -ne 0 -or !(Select-String -LiteralPath $log -SimpleMatch 'C
    (Select-String -LiteralPath $log -Pattern '\bFAIL\b|Fatal error|Assertion failed' -Quiet)){throw "门与农圃专项未通过：$log"}
 if((Get-FrontierBuildFingerprint -LiteralPath $module) -ne $hash){throw '专项期间模块发生变化'}
 if($Mode -eq 'Cancel' -and !$OriginalAim){$dockMarker=if($FacingProbe){'CF_DOOR_FARM_DOCK probe=1'}else{'CF_DOOR_FARM_DOCK probe=0 inside=1'};if(!(Select-String -LiteralPath $log -SimpleMatch $dockMarker -Quiet)){throw '缺少对应停靠或室内归队的实际断言标记'}}
+if($Mode -eq 'Cancel' -and !$OriginalAim -and !(Select-String -LiteralPath $log -SimpleMatch 'CF_DOOR_FARM_VOLUME PASS sameFloor=1' -Quiet)){throw '缺少空间边界和同层高度成功标记'}
 if($Mode -eq 'Cancel' -and !$OriginalAim -and !(Select-String -LiteralPath $log -SimpleMatch 'CF_DOOR_FARM_HERO_FIXTURE overlapFarm=0' -Quiet)){throw '取消后归队缺少玩家与农圃无重叠证据'}
 if($Mode -eq 'Cancel' -and !$OriginalAim -and !(Select-String -LiteralPath $log -SimpleMatch ('CF_DOOR_FARM_FACING yaw='+$FollowYaw.ToString('F1',[Globalization.CultureInfo]::InvariantCulture)) -Quiet)){throw '缺少指定朝向的实际执行标记'}
 if(!(Select-String -LiteralPath $log -SimpleMatch ('CF_DOOR_FARM_MODE PASS mode='+$modeNumber) -Quiet)){throw '缺少对应存读模式的成功标记'}
