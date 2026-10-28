@@ -1,5 +1,7 @@
 # 照料暂停边界修复（格式 25，不改字段）
 
+收尾更新：格式29的Windows-Rescue-Pause（17704D08）已完成自己的101进程完整回归、34真实旧档读取和三尺寸自然链/15张逐图检查，现为限定交付。下文“完整仍运行”为历史进度，当前记录见 `Docs/RESCUE_MEMORIES.md`。
+
 后续补查（开发格式29，字段不改）：HealCompanion在世界暂停时仍可能直接扣药回血，而脱险经历拒绝推进，现已增加事务前暂停保护。负对照 `Saved/RescuePausedHeal-Before.log` 为hp40/medicine0/state1且行为FAIL（进程退出0仍判失败）；修复后Editor与Windows的七进程专项为hp0/medicine1/state1并通过。Windows-Rescue-Pause（17704D08）已独立通过1280自然图形链与34真实旧档读取，完整101进程仍在运行；不挪用下述早期25包结果，也不宣称所有库存/战斗接口已审计。完整状态见 `Docs/RESCUE_MEMORIES.md`。
 
 ## 目标与发现

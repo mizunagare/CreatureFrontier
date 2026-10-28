@@ -1,6 +1,14 @@
 # 玩家慢行与同行节奏（首版限定验收）
 
-当前启动：`E:\CreatureFrontierBuilds\Windows-Pace-Clock\CreatureFrontier.exe`。面向玩家文案、开发说明与新增注释遵循中文约定；技术标识及存档协议不翻译。
+## 系统层窗口抽查（2026-10-28，范围有限）
+
+在computer-use技能规定的Windows窗口API下，通过SendInput路径操作17704D08固定程序的独立副本 `E:\CreatureFrontierBuilds\Windows-Rescue-Pause-Graphics`，不是CFInputQA委托或Slate测试分派。正常启动、不带测试旗标，窗口捕获为2560×1440，初始无伙伴、材料6/捕捉器5/药1/食物3；没有加载测试倒地档或按F5保存。Esc显示中文暂停菜单，选中继续后Enter恢复普通视野，F1打开/关闭中文帮助，Tab打开/关闭空队伍面板均实际观察到对应画面。Alt+F4后重新列窗确认本次游戏窗口消失，副本 `CreatureFrontier/Saved/Logs/CreatureFrontier.log` 于19:51:28正常关闭，EXE哈希复核仍为17704D08。截图为本会话窗口工具记录，没有把它们虚称为新增Saved图形专项图片。
+
+该工具公开接口只有按下后释放的press_key，没有独立key-down/key-up或持续按住时长；本次未进行持续W/Shift、按住移动再Alt-Tab、鼠标捕获/视角旋转或实体硬件矩阵。没有因此删除原慢行/失焦风险，也不把窗口快捷键通过等同完整新角色冒险流程。普通UI键响应证据仅属于该固定候选，不替代其正在运行的完整回归。
+
+发现帮助页F7仍只介绍水晶之旅，未说明新增脱险经历；属于后续提示一致性缺口。未在固定候选回归中改二进制，避免混淆程序指纹；对象卡/归家窗口已有共同经历入口说明。下文早期版本与“系统层未验”记录保留，现仅补齐上述有限抽查。
+
+历史慢行首版启动：`E:\CreatureFrontierBuilds\Windows-Pace-Clock\CreatureFrontier.exe`。当前交付以README为准。面向玩家文案、开发说明与新增注释遵循中文约定；技术标识及存档协议不翻译。
 
 旧档独立复验：`Saved/CargoLegacyAudit/20261028-142356-Verified/`，源包为 `Windows-Adventure-Candidate`，14份真实格式28源档、15类读取各两次，共30进程全部通过。每次使用的源字节和目标EXE哈希记于Results.csv；当前测试槽已恢复并校验，常规玩家档与旧源档不改写。不升级格式，不借此声称覆盖任意历史版本。
 
