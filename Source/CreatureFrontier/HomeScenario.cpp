@@ -126,13 +126,14 @@ void RunHomeWindowScenario(UWorld* World,ACFPlayerCharacter* Hero)
     if(FParse::Param(FCommandLine::Get(),TEXT("CFHomeReplaceRead")))
     {
         const bool DoorMode=FParse::Param(FCommandLine::Get(),TEXT("CFHomeReplaceDoorRead"));
-        const FString Slot=DoorMode?TEXT("HomeReplaceDoorGood"):TEXT("HomeReplaceGood");
+        const bool ClosedMode=DoorMode && FParse::Param(FCommandLine::Get(),TEXT("CFHomeReplaceDoorClosed"));
+        const FString Slot=ClosedMode?TEXT("HomeReplaceDoorClosed"):DoorMode?TEXT("HomeReplaceDoorGood"):TEXT("HomeReplaceGood");
         const auto* Input=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot,0));
         bool Pass=Input && Input->FormatVersion==FrontierCurrentSaveVersion && Input->HomeModules.Num()==4;
         int32 Windows=0,Roofs=0,Doors=0;
         if(Input)for(const auto& Record:Input->HomeModules)if(auto* D=Record.Definition.LoadSynchronous())
         {if(D->Kind==EHomeModuleKind::Window){++Windows;Pass &= Record.PaidMaterials==D->MaterialCost && Record.FloorId.IsValid();}if(D->Kind==EHomeModuleKind::Roof)++Roofs;
-            if(D->Kind==EHomeModuleKind::Door){++Doors;Pass &= Record.DoorState==2 && Record.PaidMaterials==D->MaterialCost && Record.FloorId.IsValid();}}
+            if(D->Kind==EHomeModuleKind::Door){++Doors;Pass &= Record.DoorState==(ClosedMode?1:2) && Record.PaidMaterials==D->MaterialCost && Record.FloorId.IsValid();}}
         Pass &= Roofs==1 && (DoorMode?(Windows==0 && Doors==1):(Windows==1 && Doors==0));
         for(int32 Attempt=0;Pass && Attempt<2;++Attempt)
         {
@@ -147,10 +148,11 @@ void RunHomeWindowScenario(UWorld* World,ACFPlayerCharacter* Hero)
             if(DoorMode)for(TActorIterator<AHomeModule> It(World);It;++It)if(!It->bPreview && It->GetKind()==EHomeModuleKind::Door)
             {
                 FHitResult Hit;FCollisionQueryParams Params(SCENE_QUERY_STAT(HomeReplaceDoorRead),false,Hero);const auto T=It->GetActorTransform();
-                Pass &= It->DoorState==2 && !World->LineTraceSingleByChannel(Hit,T.TransformPosition(FVector(0,-150,170)),T.TransformPosition(FVector(0,150,170)),ECC_Visibility,Params);
+                const bool Blocked=World->LineTraceSingleByChannel(Hit,T.TransformPosition(FVector(0,-150,170)),T.TransformPosition(FVector(0,150,170)),ECC_Visibility,Params);
+                Pass &= It->DoorState==(ClosedMode?1:2) && (ClosedMode?(Blocked && Hit.GetActor()==*It):!Blocked);
             }
         }
-        if(DoorMode)UE_LOG(LogTemp,Display,TEXT("CF_HOME_REPLACE_DOOR_READ %s loads=2 doors=%d open=1"),Pass?TEXT("PASS"):TEXT("FAIL"),Doors);
+        if(DoorMode)UE_LOG(LogTemp,Display,TEXT("CF_HOME_REPLACE_DOOR_READ %s loads=2 doors=%d open=%d"),Pass?TEXT("PASS"):TEXT("FAIL"),Doors,ClosedMode?0:1);
         UE_LOG(LogTemp,Display,TEXT("CF_HOME_REPLACE_READ %s loads=2 windows=%d roofs=%d"),Pass?TEXT("PASS"):TEXT("FAIL"),Windows,Roofs);
         FPlatformMisc::RequestExitWithStatus(false,Pass?0:1);return;
     }
@@ -286,10 +288,16 @@ void RunHomeWindowScenario(UWorld* World,ACFPlayerCharacter* Hero)
                         if(Kind==EHomeModuleKind::Door)
                         {
                             Pass &= Current->DoorState==1 && CenterHit()==Current;
+                            const bool ClosedSave=FParse::Param(FCommandLine::Get(),TEXT("CFHomeReplaceDoorClosed"));
+                            if(ClosedSave && FParse::Param(FCommandLine::Get(),TEXT("CFHomeReplaceDoorWrite")))
+                            {
+                                Pass &= Hero->SaveProgress(TEXT("HomeReplaceDoorClosed"));
+                                UE_LOG(LogTemp,Display,TEXT("CF_HOME_REPLACE_DOOR_WRITE %s closed=1"),Pass?TEXT("PASS"):TEXT("FAIL"));
+                            }
                             const auto View=(Current->GetActorTransform().TransformPosition(FVector(0,0,125))-Hero->FirstPersonCamera->GetComponentLocation()).Rotation();
                             Hero->GetController()->SetControlRotation(View);Hero->FirstPersonCamera->SetWorldRotation(View);
                             Pass &= Current->ToggleDoor(Hero) && Current->DoorState==2 && CenterHit()==nullptr;
-                            if(FParse::Param(FCommandLine::Get(),TEXT("CFHomeReplaceDoorWrite")))
+                            if(!ClosedSave && FParse::Param(FCommandLine::Get(),TEXT("CFHomeReplaceDoorWrite")))
                             {
                                 Pass &= Hero->SaveProgress(TEXT("HomeReplaceDoorGood"));
                                 UE_LOG(LogTemp,Display,TEXT("CF_HOME_REPLACE_DOOR_WRITE %s"),Pass?TEXT("PASS"):TEXT("FAIL"));
