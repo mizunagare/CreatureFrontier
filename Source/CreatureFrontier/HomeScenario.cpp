@@ -123,6 +123,28 @@ void RunHomeWindowInputScenario(UWorld* World,ACFPlayerCharacter* Hero)
 
 void RunHomeWindowScenario(UWorld* World,ACFPlayerCharacter* Hero)
 {
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFHomeReplaceRead")))
+    {
+        const auto* Input=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("HomeReplaceGood"),0));
+        bool Pass=Input && Input->FormatVersion==FrontierCurrentSaveVersion && Input->HomeModules.Num()==4;
+        int32 Windows=0,Roofs=0;
+        if(Input)for(const auto& Record:Input->HomeModules)if(auto* D=Record.Definition.LoadSynchronous())
+        {if(D->Kind==EHomeModuleKind::Window){++Windows;Pass &= Record.PaidMaterials==D->MaterialCost && Record.FloorId.IsValid();}if(D->Kind==EHomeModuleKind::Roof)++Roofs;}
+        Pass &= Windows==1 && Roofs==1;
+        for(int32 Attempt=0;Pass && Attempt<2;++Attempt)
+        {
+            Pass &= Hero->LoadProgress(TEXT("HomeReplaceGood"));
+            const auto Live=HomeLayout::Collect(World);Pass &= Live.Num()==Input->HomeModules.Num() && Hero->Inventory->GetStacks().OrderIndependentCompareEqual(Input->InventoryStacks);
+            for(const auto& Expected:Input->HomeModules)
+            {
+                const auto* Actual=Live.FindByPredicate([&Expected](const FHomeModuleRecord& R){return R.Id==Expected.Id;});
+                Pass &= Actual && Actual->Definition==Expected.Definition && Actual->FloorId==Expected.FloorId && Actual->Transform.Equals(Expected.Transform,.01) &&
+                    Actual->PaidMaterials==Expected.PaidMaterials && Actual->PaidExtraItems.OrderIndependentCompareEqual(Expected.PaidExtraItems) && Actual->DoorState==Expected.DoorState;
+            }
+        }
+        UE_LOG(LogTemp,Display,TEXT("CF_HOME_REPLACE_READ %s loads=2 windows=%d roofs=%d"),Pass?TEXT("PASS"):TEXT("FAIL"),Windows,Roofs);
+        FPlatformMisc::RequestExitWithStatus(false,Pass?0:1);return;
+    }
     if(FParse::Param(FCommandLine::Get(),TEXT("CFHomeReplaceTest")))
     {
         Hero->GetCharacterMovement()->DisableMovement();Hero->SetActorLocation(FVector(-400,-1250,60));
@@ -167,6 +189,11 @@ void RunHomeWindowScenario(UWorld* World,ACFPlayerCharacter* Hero)
                 Window->PaidMaterials==10 && Hero->Inventory->Count(EFrontierItem::Material)==Before-10+Refund;
             if(Window)
             {
+                if(FParse::Param(FCommandLine::Get(),TEXT("CFHomeReplaceWrite")))
+                {
+                    Pass &= Hero->SaveProgress(TEXT("HomeReplaceGood"));
+                    UE_LOG(LogTemp,Display,TEXT("CF_HOME_REPLACE_WRITE %s"),Pass?TEXT("PASS"):TEXT("FAIL"));
+                }
                 const int32 After=Hero->Inventory->Count(EFrontierItem::Material);
                 Pass &= !Hero->HomeBuilding->ReplaceWall(Window) && Hero->Inventory->Count(EFrontierItem::Material)==After;
                 Hero->HomeBuilding->Selected=EHomeModuleKind::Wall;Hero->Inventory->Restore({{EFrontierItem::Material,0}});

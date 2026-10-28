@@ -1,6 +1,7 @@
-param([switch]$Editor,[string]$BuildRoot='',[string]$EngineRoot='D:\Epic\UE_5.8',[switch]$Preview,[string]$Resolution='1280x720',[switch]$Interactions,[switch]$Skills,[switch]$RotatedNavigation)
+param([switch]$Editor,[string]$BuildRoot='',[string]$EngineRoot='D:\Epic\UE_5.8',[switch]$Preview,[string]$Resolution='1280x720',[switch]$Interactions,[switch]$Skills,[switch]$RotatedNavigation,[switch]$Replacement)
 $ErrorActionPreference='Stop'
 if(($Editor -and $BuildRoot) -or (!$Editor -and !$BuildRoot)){throw '请只指定Editor或BuildRoot之一'}
+if($Replacement -and ($Preview -or $Interactions -or $Skills -or $RotatedNavigation)){throw '原位替换冷启动模式不能与其他专项开关组合'}
 if($Resolution -notmatch '^(960x540|1280x720|1920x1080)$'){throw '窗墙预览仅支持960x540、1280x720或1920x1080'}
 $projectRoot=Split-Path $PSScriptRoot -Parent
 . (Join-Path $PSScriptRoot 'BuildFingerprint.ps1')
@@ -15,8 +16,10 @@ Write-Host "窗墙跨进程证据：$run"
 $mutex=[Threading.Mutex]::new($false,'Local\CreatureFrontierWindowQA')
 if(!$mutex.WaitOne(0)){$mutex.Dispose();throw '窗墙测试槽正在使用'}
 $backups=@();$results=@()
+$slot=if($Replacement){'HomeReplaceGood'}else{'WindowGood'}
 try {
-    foreach($name in @('WindowGood','WindowLegacy31')){
+    $slots=if($Replacement){@('HomeReplaceGood')}else{@('WindowGood','WindowLegacy31')}
+    foreach($name in $slots){
         $path=Join-Path $saveRoot ($name+'.sav');$exists=Test-Path -LiteralPath $path
         $backup=Join-Path $run ($name+'-before.sav')
         $before=if($exists){(Get-FileHash -LiteralPath $path).Hash}else{''}
@@ -33,6 +36,10 @@ try {
         @{Name='Melee';Flag='CFWindowMeleeTest';Marker='CF_WINDOW_MELEE PASS sill=1 opening=2 upper=1 side=1'})}
     if($Skills){$cases+=@{Name='Skill';Flag='CFWindowSkillTest';Marker='CF_WINDOW_SKILL PASS phase=3 charged=1';RequiredMarkers=@('CF_WINDOW_SKILL_BLOCKED PASS','CF_WINDOW_SKILL_SPLASH PASS')}}
     if($RotatedNavigation){$cases+=@{Name='NavigationRotated';Flag='CFWindowNavigationTest';Arguments=@('-CFWindowNavigationRotated','-ExecCmds="t.MaxFPS 30"');Marker='CF_WINDOW_NAV PASS phase=2 closed=1 continuous=1 windowBlocked=1 yaw=90';RequiredMarkers=@('CF_WINDOW_NAV_GUARD PASS samples=6','t.MaxFPS = "30"')}}
+    if($Replacement){$cases=@(
+        @{Name='Write';Flag='CFWindowTest';Arguments=@('-CFHomeReplaceTest','-CFHomeReplaceInput','-CFHomeReplaceWrite');Marker='CF_HOME_REPLACE PASS support=1';RequiredMarkers=@('CF_HOME_REPLACE_WRITE PASS')},
+        @{Name='Read1';Flag='CFWindowTest';Arguments=@('-CFHomeReplaceRead');Marker='CF_HOME_REPLACE_READ PASS loads=2 windows=1 roofs=1'},
+        @{Name='Read2';Flag='CFWindowTest';Arguments=@('-CFHomeReplaceRead');Marker='CF_HOME_REPLACE_READ PASS loads=2 windows=1 roofs=1'})}
     foreach($case in $cases){
         $log=Join-Path $run ($case.Name+'.log')
         $arguments=@('-game','-nullrhi','-nosound','-unattended','-nop4','-CFHomeTest',('-'+$case.Flag),('-abslog="'+$log+'"'))
@@ -62,9 +69,9 @@ try {
                 Copy-Item -LiteralPath $png -Destination (Join-Path $run ($scene+'.png'))
             }
         }
-        $current=(Get-FileHash -LiteralPath (Join-Path $saveRoot 'WindowGood.sav')).Hash
+        $current=(Get-FileHash -LiteralPath (Join-Path $saveRoot ($slot+'.sav'))).Hash
         if($case.Name -eq 'Write'){$inputHash=$current}elseif($current -ne $inputHash){throw '窗墙读取改写了输入文件'}
-        $results += [pscustomobject]@{Case=$case.Name;Pass=$true;Preview=[bool]$Preview;Interactions=[bool]$Interactions;Skills=[bool]$Skills;RotatedNavigation=[bool]$RotatedNavigation;Resolution=$Resolution;BuildSHA256=$hash;InputSHA256=$inputHash;Log=$log}
+        $results += [pscustomobject]@{Case=$case.Name;Pass=$true;Replacement=[bool]$Replacement;Preview=[bool]$Preview;Interactions=[bool]$Interactions;Skills=[bool]$Skills;RotatedNavigation=[bool]$RotatedNavigation;Resolution=$Resolution;BuildSHA256=$hash;InputSHA256=$inputHash;Log=$log}
         $results | Export-Csv -LiteralPath (Join-Path $run 'Results.csv') -NoTypeInformation
         Write-Host "$($case.Name) 通过"
     }

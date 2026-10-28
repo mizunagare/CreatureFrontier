@@ -1,5 +1,13 @@
 # 开放窗墙
 
+## 替换后冷启动恢复
+
+新增独立 `HomeReplaceGood` 专用槽与只读 `-CFHomeReplaceRead` 路径（同用CFWindowTest），读取前不创建夹具/赠送材料。写入在真实绑定双确认完成窗墙替换后、后续换回实墙之前保存；先前GUID/支撑/支付及成本断言仍执行。每个读取进程执行两次正常加载，逐记录比较四个模块的身份、定义、地板、变换、支付物资和门状态，并核对完整背包、一个窗墙和一个屋顶。
+
+`Test-HomeWindow.ps1 -Replacement` 显式选择一写两读，保护恢复此独立槽、逐进程验证程序指纹和输入哈希，不动WindowGood或玩家常规档。禁止与其他专项开关组合，实际拒绝路径及语法通过。Editor构建成功，实际 `-Editor -Replacement` 的 `Saved/WindowPersistenceQA/20261029-062505-61f3172a/` 三进程全部结束通过，模块 `7F0D3ED5C77352FDF8AB8F7D81985410565B956AF8DA3F194124A3AF1FA21A61`，输入SHA-256 `411B7521030EDFCA2952D0136F7F5BCACE5B45B61BEBD230CF5ACE946E130D63` 不变、原专用槽恢复。
+
+当前只覆盖一个实墙换窗/有屋顶房间的冷启动，不覆盖门类状态转换、旋转/容量扩展、所有取消条件或Windows。没有新存档字段/版本升级；旧候选自身完整回归不替代这次新模块回归，稳定版仍不升。
+
 ## 替换确认画面与候选完整回归
 
 新增仅取图用 `-CFHomeReplacePreview`（与WindowTest/HomeReplaceTest/HomeReplaceInput同用），停在第一次确认、不实际替换。首张1280图 `Saved/HomeReplacePreview/071BDEE24B3DF7FA706426A835BC5100/Confirm.png` 已目视，中文信息完整但普通红色占位预览覆盖旧墙，易混淆。现等待确认时隐藏普通预览并显示独立待确认状态，普通放置仍保留占位拒绝。
