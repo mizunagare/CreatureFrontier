@@ -26,13 +26,13 @@ void UHomeBuildingComponent::StartPreview()
     if(Preview) { Preview->bPreview=true; Preview->Definition=UHomeModuleDefinition::LoadDefault(Selected); Preview->FinishSpawning(Transform); }
     UpdatePreview();
 }
-void UHomeBuildingComponent::Cancel() { if(IsValid(Preview)) Preview->Destroy(); Preview=nullptr; bValid=false; }
+void UHomeBuildingComponent::Cancel() { PendingReplacement.Reset(); if(IsValid(Preview)) Preview->Destroy(); Preview=nullptr; bValid=false; }
 void UHomeBuildingComponent::EndPlay(const EEndPlayReason::Type Reason) { Cancel(); Super::EndPlay(Reason); }
 void UHomeBuildingComponent::Cycle()
 {
     Selected=static_cast<EHomeModuleKind>((static_cast<int32>(Selected)+1)%8); StartPreview();
 }
-void UHomeBuildingComponent::Rotate() { YawStep=1-YawStep; UpdatePreview(); }
+void UHomeBuildingComponent::Rotate() { PendingReplacement.Reset(); YawStep=1-YawStep; UpdatePreview(); }
 bool UHomeBuildingComponent::ValidatePlacement(const FTransform& Transform,FGuid FloorId,FString& Reason) const
 {
     const auto* Hero=Cast<ACFPlayerCharacter>(GetOwner()); auto* Definition=UHomeModuleDefinition::LoadDefault(Selected);
@@ -145,7 +145,8 @@ void UHomeBuildingComponent::UpdatePreview()
     FHitResult Hit; FCollisionQueryParams Params(SCENE_QUERY_STAT(HomeAim),false,Hero); Params.AddIgnoredActor(Preview);
     const FVector Start=Hero->FirstPersonCamera->GetComponentLocation();
     if(!GetWorld()->LineTraceSingleByChannel(Hit,Start,Start+Hero->FirstPersonCamera->GetForwardVector()*800,ECC_Visibility,Params))
-    { Status=TEXT("请瞄准8米内地面或房屋地板"); bValid=false; Preview->SetActorHiddenInGame(true); return; }
+    { PendingReplacement.Reset(); Status=TEXT("请瞄准8米内地面或房屋地板"); bValid=false; Preview->SetActorHiddenInGame(true); return; }
+    if(PendingReplacement.IsValid() && (Hit.GetActor()!=PendingReplacement.Get() || Selected!=PendingKind || GetWorld()->GetTimeSeconds()>ReplacementDeadline))PendingReplacement.Reset();
     FVector Center(FMath::GridSnap(Hit.ImpactPoint.X,400.),FMath::GridSnap(Hit.ImpactPoint.Y,400.),-40);
     const auto Layout=HomeLayout::Collect(GetWorld()); SupportingFloor=FGuid();
     if(Selected!=EHomeModuleKind::Floor)
@@ -172,11 +173,32 @@ void UHomeBuildingComponent::UpdatePreview()
     bValid=ValidatePlacement(Placement,SupportingFloor,Status);
     Preview->SetActorTransform(Placement); Preview->SetActorHiddenInGame(false); Preview->SetPreviewTint(bValid);
 }
-void UHomeBuildingComponent::Confirm() { UpdatePreview(); if(bValid) BuildAt(Placement,SupportingFloor); }
+void UHomeBuildingComponent::Confirm() { PendingReplacement.Reset(); UpdatePreview(); if(bValid) BuildAt(Placement,SupportingFloor); }
+void UHomeBuildingComponent::ConfirmAimedReplacement()
+{
+    auto* Hero=Cast<ACFPlayerCharacter>(GetOwner());
+    if(!Hero || !IsValid(Preview) || Hero->Health<=0 || !Hero->HasAuthority() || UGameplayStatics::IsGamePaused(this)){PendingReplacement.Reset();return;}
+    FHitResult Hit;FCollisionQueryParams Params(SCENE_QUERY_STAT(HomeReplaceAim),false,Hero);Params.AddIgnoredActor(Preview);
+    const FVector Start=Hero->FirstPersonCamera->GetComponentLocation();
+    const bool Visible=GetWorld()->LineTraceSingleByChannel(Hit,Start,Start+Hero->FirstPersonCamera->GetForwardVector()*600,ECC_Visibility,Params);
+    auto* Target=Visible?Cast<AHomeModule>(Hit.GetActor()):nullptr;
+    const auto Wall=[](EHomeModuleKind Kind){return Kind==EHomeModuleKind::Wall || Kind==EHomeModuleKind::Window || Kind==EHomeModuleKind::Door || Kind==EHomeModuleKind::Doorway;};
+    if(!Target || Target->bPreview || !Wall(Target->GetKind()) || !Wall(Selected) || Target->GetKind()==Selected)
+    {PendingReplacement.Reset();Hero->Feedback=TEXT("替换：选择不同墙类，瞄准6米内旧墙实体，再按Insert");return;}
+    if(PendingReplacement.Get()==Target && PendingKind==Selected && GetWorld()->GetTimeSeconds()<=ReplacementDeadline)
+    {PendingReplacement.Reset();ReplaceWall(Target);UpdatePreview();return;}
+    auto* Definition=UHomeModuleDefinition::LoadDefault(Selected);
+    if(!Definition || !Definition->IsValidDefinition()){PendingReplacement.Reset();return;}
+    auto Costs=Definition->ExtraCosts;Costs.Add(EFrontierItem::Material,Definition->MaterialCost);
+    TMap<EFrontierItem,int32> Refunds={{EFrontierItem::Material,Target->PaidMaterials/2}};
+    for(const auto& Cost:Target->PaidExtraItems)if(Cost.Value>=2)Refunds.Add(Cost.Key,Cost.Value/2);
+    PendingReplacement=Target;PendingKind=Selected;ReplacementDeadline=GetWorld()->GetTimeSeconds()+5;
+    Hero->Feedback=FString::Printf(TEXT("替换为%s：消耗%s，返还%s。保持瞄准，5秒内再按Insert确认；移开视线取消"),*Definition->DisplayName.ToString(),*UCraftingCatalog::FormatItems(Costs),*UCraftingCatalog::FormatItems(Refunds));
+}
 FString UHomeBuildingComponent::GetHint() const
 {
     const auto* Definition=UHomeModuleDefinition::LoadDefault(Selected);
     TMap<EFrontierItem,int32> Costs;
     if(Definition) { Costs=Definition->ExtraCosts; Costs.Add(EFrontierItem::Material,Definition->MaterialCost); }
-    return FString::Printf(TEXT("房屋 %s | %s | V/9/8\n%s"),Definition?*Definition->DisplayName.ToString():TEXT("不可用"),*UCraftingCatalog::FormatItems(Costs),*Status);
+    return FString::Printf(TEXT("房屋 %s | %s | V/9/8 | Insert替换\n%s"),Definition?*Definition->DisplayName.ToString():TEXT("不可用"),*UCraftingCatalog::FormatItems(Costs),*Status);
 }

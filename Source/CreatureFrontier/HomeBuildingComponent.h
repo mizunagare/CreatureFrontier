@@ -20,6 +20,7 @@ public:
     AHomeModule* BuildAt(const FTransform& Transform,FGuid FloorId=FGuid());
     bool Dismantle(AHomeModule* Module);
     AHomeModule* ReplaceWall(AHomeModule* Module);
+    void ConfirmAimedReplacement();
     bool ValidatePlacement(const FTransform& Transform,FGuid FloorId,FString& Reason) const;
     EHomeModuleKind Selected=EHomeModuleKind::Floor;
     AHomeModule* GetPreview() const { return Preview; }
@@ -31,4 +32,7 @@ private:
     bool bValid=false;
     int32 YawStep=0;
     FString Status;
+    TWeakObjectPtr<AHomeModule> PendingReplacement;
+    EHomeModuleKind PendingKind=EHomeModuleKind::Floor;
+    double ReplacementDeadline=0;
 };

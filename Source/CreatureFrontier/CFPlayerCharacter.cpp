@@ -660,6 +660,7 @@ void ACFPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
     PlayerInputComponent->BindKey(EKeys::V, IE_Pressed, this, &ACFPlayerCharacter::CycleBuilding);
     PlayerInputComponent->BindKey(EKeys::Eight, IE_Pressed, Building.Get(), &UBaseBuildingComponent::SwitchCategory);
     PlayerInputComponent->BindKey(EKeys::Nine, IE_Pressed, Building.Get(), &UBaseBuildingComponent::RotateHome);
+    PlayerInputComponent->BindKey(EKeys::Insert,IE_Pressed,Building.Get(),&UBaseBuildingComponent::ReplaceHome);
     PlayerInputComponent->BindKey(EKeys::X, IE_Pressed, this, &ACFPlayerCharacter::DismantleBuilding);
     PlayerInputComponent->BindKey(EKeys::L, IE_Pressed, this, &ACFPlayerCharacter::SelectAimedCompanion);
     PlayerInputComponent->BindKey(EKeys::K, IE_Pressed, this, &ACFPlayerCharacter::ClearCompanionSelection);

@@ -87,6 +87,10 @@ void UBaseBuildingComponent::RotateHome()
 {
     if(bActive && bHomeMode) CastChecked<ACFPlayerCharacter>(GetOwner())->HomeBuilding->Rotate();
 }
+void UBaseBuildingComponent::ReplaceHome()
+{
+    if(bActive && bHomeMode)CastChecked<ACFPlayerCharacter>(GetOwner())->HomeBuilding->ConfirmAimedReplacement();
+}
 
 bool UBaseBuildingComponent::ValidatePlacement(const FTransform& Transform, FString& Reason) const
 {

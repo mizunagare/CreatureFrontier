@@ -139,8 +139,20 @@ void RunHomeWindowScenario(UWorld* World,ACFPlayerCharacter* Hero)
             const FGuid Id=Wall->PersistentId;const auto Transform=Wall->GetActorTransform();
             const int32 Before=Hero->Inventory->Count(EFrontierItem::Material),Refund=Wall->PaidMaterials/2;
             Hero->HomeBuilding->Selected=EHomeModuleKind::Window;
-            auto* Window=Hero->HomeBuilding->ReplaceWall(Wall);
-            Pass=Window && IsValid(Roof) && Window->PersistentId==Id && Window->FloorId==Floor->PersistentId && Window->GetActorTransform().Equals(Transform) &&
+            AHomeModule* Window=nullptr;
+            if(FParse::Param(FCommandLine::Get(),TEXT("CFHomeReplaceInput")))
+            {
+                Pass &= CFInputQA::UniqueBindings(Hero) && CFInputQA::Press(Hero,EKeys::B) && CFInputQA::Press(Hero,EKeys::Eight);
+                const auto Aim=(Wall->GetActorTransform().TransformPosition(FVector(145,0,170))-Hero->FirstPersonCamera->GetComponentLocation()).Rotation();
+                Hero->GetController()->SetControlRotation(Aim);Hero->FirstPersonCamera->SetWorldRotation(Aim);
+                Pass &= CFInputQA::Press(Hero,EKeys::Insert) && IsValid(Wall) && Hero->Inventory->Count(EFrontierItem::Material)==Before && Hero->Feedback.Contains(TEXT("再按Insert确认"));
+                Pass &= CFInputQA::Press(Hero,EKeys::Nine) && CFInputQA::Press(Hero,EKeys::Insert) && IsValid(Wall) && Hero->Inventory->Count(EFrontierItem::Material)==Before;
+                Pass &= CFInputQA::Press(Hero,EKeys::Insert);
+                for(TActorIterator<AHomeModule> It(World);It;++It)if(!It->bPreview && It->PersistentId==Id && It->GetKind()==EHomeModuleKind::Window)Window=*It;
+                Pass &= CFInputQA::Press(Hero,EKeys::B) && !Hero->Building->IsActive();
+            }
+            else Window=Hero->HomeBuilding->ReplaceWall(Wall);
+            Pass &= Window && IsValid(Roof) && Window->PersistentId==Id && Window->FloorId==Floor->PersistentId && Window->GetActorTransform().Equals(Transform) &&
                 Window->PaidMaterials==10 && Hero->Inventory->Count(EFrontierItem::Material)==Before-10+Refund;
             if(Window)
             {

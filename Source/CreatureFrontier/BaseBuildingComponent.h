@@ -20,6 +20,7 @@ public:
     void Dismantle();
     void SwitchCategory();
     void RotateHome();
+    void ReplaceHome();
     bool IsActive() const { return bActive; }
     FString GetHint() const;
     static int32 GetCost(EWorkSpecialty Specialty);
