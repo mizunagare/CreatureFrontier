@@ -22,6 +22,16 @@ Windows-Rescue-HUD独立打包成功，内部EXE SHA-256为 `4C31B7BB24B3CEE768B
 
 同一固定程序的完整90进程回归正在 `Saved/PackagedTests/20261028-164730-4485894b/` 执行；另已启动上一稳定包Windows-Checkpoint-Shots真实旧档审计。两者尚未得到终止结果，稳定交付仍为Windows-Checkpoint-Shots，不混用其既有90进程证据。
 
+旧档审计现已正常退出0：`Saved/CargoLegacyAudit/20261028-164751-Verified/` 使用Windows-Checkpoint-Shots的15份真实格式28文件，16类读取各两次，共32进程全部通过，Results.csv的构建哈希均为上述4C31B7BB。测试槽已恢复并校验，不改写旧源文件或常规玩家档。此脚本尚未纳入最近新增的HollowDownedCross/HollowCheckpointFinal，只能声明所列15份样本，不泛称全部旧档覆盖。
+
+本轮补看960×540的Companion、Roster、RosterDanger、HelpDanger四张原场景图：伙伴信息、队伍翻页长昵称、队伍/帮助与危险提示可见，没有新增越界。当前累计目视10/30图，其余20图仅有自动审计。
+
+## 新增救助门槛专项（Editor通过，未打包）
+
+新增 `CFRescueGatesTest` 独立入口，使用实际P绑定委托，而非直接调用HealCompanion。Editor编译与 `Saved/RescueGates-Editor.log` 实际进程通过，标记 `CF_RESCUE_GATES PASS`：缺药、玩家倒地、实体墙遮挡、非自有、零生命同进程存读、救起一次消耗及满血拒绝七项均为1；验证40生命、药品3→2、材料7不变、GUID/位置保留。专用槽为RescueGateDead。
+
+本测试隔离生物、直接伤害造倒地，暂停生物Tick以核对同步事务；不是自然战斗、系统级实体按键、跨进程救助或返家导航证明。测试新增于Windows-Rescue-HUD冻结之后，该包不含此入口；仍在运行的90进程不能宣称覆盖它，后续需要新包独立执行。
+
 ## 后续验收门槛
 
 - 独立新包三尺寸十场景审计；逐张查看救助图，保留原八场景的回归门槛。

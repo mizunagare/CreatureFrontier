@@ -29,6 +29,7 @@
 #include "JournalScenario.h"
 #include "ObjectiveScenario.h"
 #include "RespawnScenario.h"
+#include "RescueScenario.h"
 #include "EquipmentScenario.h"
 #include "MeleeScenario.h"
 #include "LogisticsScenario.h"
@@ -66,6 +67,8 @@ void ACFGameMode::BeginPlay()
 {
     Super::BeginPlay();
     SeedFrontierResources(GetWorld());
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFRescueGatesTest")))
+    {FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunRescueGateScenario(GetWorld(),Hero);},1.f,false);return;}
     const int32 CheckpointMode=FParse::Param(FCommandLine::Get(),TEXT("CFHollowDownedWrite"))?5:FParse::Param(FCommandLine::Get(),TEXT("CFHollowDownedResume"))?6:FParse::Param(FCommandLine::Get(),TEXT("CFHollowCheckpointRead"))?7:0;
     if(CheckpointMode){FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this,CheckpointMode](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunHollowAdventure(GetWorld(),Hero,CheckpointMode);},1.f,false);return;}
     if(FParse::Param(FCommandLine::Get(),TEXT("CFHollowRecoveryTest")) || FParse::Param(FCommandLine::Get(),TEXT("CFHollowRecoveryRead")))
