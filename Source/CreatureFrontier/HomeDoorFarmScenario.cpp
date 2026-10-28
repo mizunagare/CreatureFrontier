@@ -63,7 +63,9 @@ void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
         {
             const auto* LiveFarm=FarmWeak.Get();
             UE_LOG(LogTemp,Display,TEXT("CF_DOOR_FARM_STATE phase=%d food=%d seeds=%d growth=%.2f travel=%.1f continuous=%d pet=%s"),Phase,LiveFarm?LiveFarm->StoredFood:-1,LiveFarm?LiveFarm->Crop->Seeds:-1,LiveFarm?LiveFarm->Crop->GrowthWork:-1,Travel,Continuous,Pet?*Pet->GetActorLocation().ToString():TEXT("无"));
-            FTimerHandle Handle=*Timer;World->GetTimerManager().ClearTimer(Handle);Finish(Pass);
+            // 清除定时器会释放捕获对象；完成回调必须先复制到当前调用栈。
+            const auto Complete=Finish;
+            FTimerHandle Handle=*Timer;World->GetTimerManager().ClearTimer(Handle);Complete(Pass);
         };
         const double Elapsed=World->GetTimeSeconds()-At;
         if(Pet){const auto Now=Pet->GetActorLocation();const double Step=FVector::Dist2D(Now,Previous);Travel+=Step;Previous=Now;Continuous &= Step<120;if(!Continuous || Pet->Health<=0 || Hero->Health<=0){End(false);return;}}
