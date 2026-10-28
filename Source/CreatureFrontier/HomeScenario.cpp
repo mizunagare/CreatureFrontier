@@ -241,6 +241,29 @@ void RunHomeWindowScenario(UWorld* World,ACFPlayerCharacter* Hero)
                         Pass &= HomeLayout::Validate(HomeLayout::Collect(World),Reason);
                     }
                     UE_LOG(LogTemp,Display,TEXT("CF_HOME_REPLACE_DOOR %s transitions=%d"),Pass?TEXT("PASS"):TEXT("FAIL"),Transitions);
+                    if(Pass)Restored=Current;
+                }
+                if(Pass && FParse::Param(FCommandLine::Get(),TEXT("CFHomeReplaceCapacity")))
+                {
+                    Hero->HomeBuilding->Selected=EHomeModuleKind::Window;
+                    const auto Bag=Hero->Inventory->GetStacks();
+                    UGameplayStatics::SetGamePaused(World,true);
+                    const bool Paused=!Hero->HomeBuilding->ReplaceWall(Restored);
+                    UGameplayStatics::SetGamePaused(World,false);
+                    Hero->Health=0;const bool Downed=!Hero->HomeBuilding->ReplaceWall(Restored);Hero->Health=100;
+                    Hero->SetActorLocation(FVector(-400,-1800,60));const bool Far=!Hero->HomeBuilding->ReplaceWall(Restored);Hero->SetActorLocation(FVector(-400,-1250,60));
+                    const bool Unchanged=IsValid(Restored) && Restored->PersistentId==Id && Restored->PaidMaterials==Cost && Hero->Inventory->GetStacks().OrderIndependentCompareEqual(Bag);
+                    Pass &= Paused && Downed && Far && Unchanged && Hero->Inventory->Restore({{EFrontierItem::Material,UInventoryComponent::StackLimit}});
+                    // 注入合法范围内的历史支付记录，专门验证净返还溢出；不是当前造价或自然经济证据。
+                    Restored->PaidMaterials=100;
+                    const bool Overflow=!Hero->HomeBuilding->ReplaceWall(Restored) && IsValid(Restored) && Restored->PaidMaterials==100 &&
+                        Restored->PersistentId==Id && Hero->Inventory->Count(EFrontierItem::Material)==UInventoryComponent::StackLimit && HomeLayout::Collect(World).Num()==4;
+                    Restored->PaidMaterials=Cost;
+                    auto* FullStackResult=Hero->HomeBuilding->ReplaceWall(Restored);
+                    const bool Net=FullStackResult && FullStackResult->PersistentId==Id && FullStackResult->PaidMaterials==10 &&
+                        Hero->Inventory->Count(EFrontierItem::Material)==UInventoryComponent::StackLimit-10+Cost/2 && IsValid(Roof);
+                    Pass &= Overflow && Net && HomeLayout::Validate(HomeLayout::Collect(World),Reason);
+                    UE_LOG(LogTemp,Display,TEXT("CF_HOME_REPLACE_CAPACITY %s paused=%d downed=%d far=%d overflow=%d net=%d"),Pass?TEXT("PASS"):TEXT("FAIL"),Paused,Downed,Far,Overflow,Net);
                 }
             }
         }

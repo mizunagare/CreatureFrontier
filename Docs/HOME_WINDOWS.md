@@ -1,5 +1,11 @@
 # 开放窗墙
 
+## 满栈与执行门槛
+
+新增 `-CFHomeReplaceCapacity`（同用CFWindowTest/HomeReplaceTest，可加HomeReplaceInput/HomeReplaceDoor）验证暂停、倒地、超距均拒绝且模块/背包不变；材料999满栈、净消耗时仍能替换，避免先返还后扣费产生伪溢出。另注入100材料的合法历史支付记录，用实际替换事务触发净返还溢出，要求拒绝、保留原支付/GUID/满栈背包且无暂存实体残留；之后恢复原支付再验证正常净消耗。历史记录注入仅QA，不是当前造价或自然经济证据，不写存档。
+
+Editor重建成功，模块 `2DE02D4EFF221BDCFCF3B237ADB1FB8E282DFE3A1A7138213D54278604649E27`。实际 `Saved/HomeReplace-Capacity-20261029.log` 组合运行门类四转换、容量五门槛及核心标记全部PASS，进程退出0、无失败/致命/断言。只覆盖材料栈及固定房间，额外物品容量、超时/视线取消、旋转替换等仍待；95C185CB Windows不含这个新增QA，完整回归30814仍按启动定义运行，不混用证据。
+
 ## Windows替换确认三尺寸图形
 
 95C185CB候选自身运行不写存档的确认预览，`Saved/HomeReplace-Preview-Windows-20261029.log`（1280）、`HomeReplace-Preview-Windows-960-20261029.log`、`HomeReplace-Preview-Windows-1920-20261029.log` 均输出必要预览PASS，无失败/致命/断言。实际PNG尺寸分别1280×720、960×540、1920×1080已核对，三张均逐张目视：成本10/返还3、5秒Insert确认/移开取消和右下待确认状态完整可读，无红色普通预览叠影或面板重叠。
