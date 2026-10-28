@@ -33,6 +33,7 @@ try {
         $pass=$done -and $process.ExitCode -eq 0 -and (Test-Path -LiteralPath $log)
         if($pass){
             foreach($marker in @('CF_HOLLOW_RECOVERY_PREPARED PASS',
+                'CF_HOLLOW_RECOVERY_AVOID PASS',
                 'CF_HOLLOW_RECOVERY_DEATH_GATES south=1 near=1 enemyAlive=1 enemyHurt=1 petHurt=1 resident=1 noFocus=1 noWindup=1 noSlow=1',
                 'CF_HOLLOW_RECOVERY_RESPAWN PASS','CF_HOLLOW_RECOVERY_REJOIN PASS','CF_HOLLOW_ADVENTURE_BATTLE PASS',
                 'CF_HOLLOW_RECOVERY PASS',('t.MaxFPS = "'+$cap+'"'))){

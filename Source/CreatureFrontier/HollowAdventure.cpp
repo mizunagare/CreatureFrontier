@@ -205,11 +205,16 @@ struct FAdventure
                     }
                     if(Pet->FocusTarget)
                     {
+                        // 使用玩家正式姿态指令撤回自动护主，保留移动、受伤和正常AI。
+                        // 不关闭伙伴Tick，也不降低原18生命出发夹具。
+                        if(!Pet->bAvoidCombat && !CFInputQA::Press(Hero,EKeys::F8))return Fail(TEXT("recovery-avoid-input"));
+                        if(!Pet->bAvoidCombat)return Fail(TEXT("recovery-avoid-state"));
                         if(!CFInputQA::Press(Hero,EKeys::F) || Pet->FocusTarget)return Fail(TEXT("recovery-prepare-follow"));
                         // 取消显式集火不关闭自动护主；及时松开慢行接近并用近战吸引敌人，
                         // 避免在远处缓慢接近期间让自动支援先击败自然住民。
                         if(!CFInputQA::Release(Hero,EKeys::LeftShift) || Hero->Pace->IsSlowWalking())return Fail(TEXT("recovery-prepare-pace"));
                         UE_LOG(LogTemp,Display,TEXT("CF_HOLLOW_RECOVERY_PREPARED PASS heroHP=%.1f petHP=%.1f enemyHP=%.1f"),Hero->Health,Pet->Health,Enemy->Health);
+                        UE_LOG(LogTemp,Display,TEXT("CF_HOLLOW_RECOVERY_AVOID PASS"));
                     }
                     if(Hero->GetDistanceTo(Enemy)>160)Drive(Enemy->GetActorLocation());
                     Hero->GetController()->SetControlRotation(View);Hero->FirstPersonCamera->SetWorldRotation(View);
