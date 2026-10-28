@@ -28,6 +28,38 @@ UHomeMovementProbe::UHomeMovementProbe() { PrimaryComponentTick.bCanEverTick=tru
 
 void RunHomeWindowScenario(UWorld* World,ACFPlayerCharacter* Hero)
 {
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFWindowRead")))
+    {
+        // 冷启动读取只使用磁盘期望值，不摆放夹具、不赠送材料、不另写存档。
+        const auto* Input=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("WindowGood"),0));
+        bool Pass=Input && Input->FormatVersion==FrontierCurrentSaveVersion && Input->HomeModules.Num()==5 && Input->InventoryStacks.FindRef(EFrontierItem::Material)==56;
+        int32 Windows=0;
+        if(Input)for(const auto& R:Input->HomeModules)if(auto* D=R.Definition.LoadSynchronous();D && D->Kind==EHomeModuleKind::Window)
+        {++Windows;Pass &= R.PaidMaterials==10;}
+        Pass &= Windows==2;
+        for(int32 Attempt=0;Pass && Attempt<2;++Attempt)
+        {
+            Pass &= Hero->LoadProgress(TEXT("WindowGood"));
+            const auto Actual=HomeLayout::Collect(World);
+            Pass &= Actual.Num()==Input->HomeModules.Num() && Hero->Inventory->GetStacks().OrderIndependentCompareEqual(Input->InventoryStacks);
+            for(const auto& Expected:Input->HomeModules)
+            {
+                const auto* Found=Actual.FindByPredicate([&](const auto& R){return R.Id==Expected.Id;});
+                Pass &= Found && Found->Definition==Expected.Definition && Found->FloorId==Expected.FloorId &&
+                    Found->Transform.Equals(Expected.Transform,.01) && Found->PaidMaterials==Expected.PaidMaterials &&
+                    Found->PaidExtraItems.OrderIndependentCompareEqual(Expected.PaidExtraItems) && Found->DoorState==Expected.DoorState;
+            }
+            for(TActorIterator<AHomeModule> It(World);It;++It)if(It->GetKind()==EHomeModuleKind::Window && !It->bPreview)
+            {
+                FHitResult Hit;FCollisionQueryParams Params(SCENE_QUERY_STAT(WindowColdGeometry),false,Hero);
+                const auto T=It->GetActorTransform();
+                Pass &= !World->LineTraceSingleByChannel(Hit,T.TransformPosition(FVector(0,-80,170)),T.TransformPosition(FVector(0,80,170)),ECC_Visibility,Params);
+                Pass &= World->LineTraceSingleByChannel(Hit,T.TransformPosition(FVector(0,-80,60)),T.TransformPosition(FVector(0,80,60)),ECC_Visibility,Params) && Hit.GetActor()==*It;
+            }
+        }
+        UE_LOG(LogTemp,Display,TEXT("CF_WINDOW_READ %s windows=%d loads=2"),Pass?TEXT("PASS"):TEXT("FAIL"),Windows);
+        FPlatformMisc::RequestExitWithStatus(false,Pass?0:1);return;
+    }
     // 独立灰盒夹具；不借用其他建筑专项作为窗洞/支撑验收。
     Hero->SetActorLocation(FVector(-450,-400,40));
     Hero->Inventory->Restore({{EFrontierItem::Material,100}});

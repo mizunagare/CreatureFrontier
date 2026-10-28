@@ -177,10 +177,10 @@ void ACFGameMode::BeginPlay()
         FTimerHandle ExpeditionStart; GetWorldTimerManager().SetTimer(ExpeditionStart,[this,ExpeditionMode](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0))) RunExpeditionScenario(GetWorld(),Hero,ExpeditionMode);},1.f,false); return;
     }
     const int32 HomeMode=FParse::Param(FCommandLine::Get(),TEXT("CFHomeWrite"))?1:FParse::Param(FCommandLine::Get(),TEXT("CFHomeRead"))?2:0;
-    if(HomeMode || FParse::Param(FCommandLine::Get(),TEXT("CFHomeTest")) || FParse::Param(FCommandLine::Get(),TEXT("CFWindowTest")))
+    if(HomeMode || FParse::Param(FCommandLine::Get(),TEXT("CFHomeTest")) || FParse::Param(FCommandLine::Get(),TEXT("CFWindowTest")) || FParse::Param(FCommandLine::Get(),TEXT("CFWindowRead")))
     {
         FTimerHandle HomeStart;
-        GetWorldTimerManager().SetTimer(HomeStart,[this,HomeMode](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0))){if(FParse::Param(FCommandLine::Get(),TEXT("CFWindowTest")))RunHomeWindowScenario(GetWorld(),Hero);else RunHomeScenario(GetWorld(),Hero,HomeMode);}},1.f,false); return;
+        GetWorldTimerManager().SetTimer(HomeStart,[this,HomeMode](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0))){if(FParse::Param(FCommandLine::Get(),TEXT("CFWindowTest")) || FParse::Param(FCommandLine::Get(),TEXT("CFWindowRead")))RunHomeWindowScenario(GetWorld(),Hero);else RunHomeScenario(GetWorld(),Hero,HomeMode);}},1.f,false); return;
     }
     if(FParse::Param(FCommandLine::Get(),TEXT("CFResourceTest")))
     {
