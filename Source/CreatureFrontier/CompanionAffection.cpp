@@ -1,6 +1,7 @@
 #include "CFPlayerCharacter.h"
 #include "CreatureCharacter.h"
 #include "EngineUtils.h"
+#include "Kismet/GameplayStatics.h"
 
 FString ACreatureCharacter::GetBondLabel() const
 {
@@ -23,7 +24,7 @@ void ACreatureCharacter::AcknowledgeName()
 }
 bool ACFPlayerCharacter::PetCompanion(ACreatureCharacter* Pet)
 {
-    if(!HasAuthority() || Health<=0 || IsPauseMenuOpen() || !IsValid(Pet) || Pet->Health<=0 || Pet->Disposition!=ECreatureDisposition::Tamed || Pet->Tamer!=GetController() || GetDistanceTo(Pet)>250)
+    if(!HasAuthority() || Health<=0 || UGameplayStatics::IsGamePaused(this) || !IsValid(Pet) || Pet->Health<=0 || Pet->Disposition!=ECreatureDisposition::Tamed || Pet->Tamer!=GetController() || GetDistanceTo(Pet)>250)
     { Feedback=TEXT("Aim at your living companion within 2.5m to pet it"); return false; }
     if(Pet->Activity==ECreatureActivity::Work || Pet->Activity==ECreatureActivity::Combat || Pet->FocusTarget || Pet->SpecialWindupRemaining>0)
     { Feedback=TEXT("Companion is busy - ask it to follow or rest first"); return false; }

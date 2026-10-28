@@ -4,6 +4,7 @@
 #include "WorkStation.h"
 #include "Camera/CameraComponent.h"
 #include "CompanionCargoComponent.h"
+#include "Kismet/GameplayStatics.h"
 
 void ACFPlayerCharacter::CraftFood()
 {
@@ -12,7 +13,7 @@ void ACFPlayerCharacter::CraftFood()
 
 bool ACFPlayerCharacter::FeedCompanion(ACreatureCharacter* Pet)
 {
-    if (!HasAuthority() || Health <= 0 || !IsValid(Pet) || Pet->Tamer != GetController() || Pet->Health <= 0 || GetDistanceTo(Pet) > 600)
+    if (!HasAuthority() || Health <= 0 || UGameplayStatics::IsGamePaused(this) || !IsValid(Pet) || Pet->Tamer != GetController() || Pet->Health <= 0 || GetDistanceTo(Pet) > 600)
     { Feedback = TEXT("Feed a living companion within 6m; use medicine to revive"); return false; }
     if (GetWorld()->GetTimeSeconds() < NextFeedTime) { Feedback = TEXT("Wait before feeding again (3s)"); return false; }
     if (Pet->Nutrition > 80) { Feedback = TEXT("Companion is not hungry (satiety must be 80 or below)"); return false; }

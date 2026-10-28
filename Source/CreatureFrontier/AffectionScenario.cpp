@@ -2,6 +2,7 @@
 #include "CFPlayerCharacter.h"
 #include "CreatureCharacter.h"
 #include "CreatureDefinition.h"
+#include "CompanionNamingComponent.h"
 #include "InventoryComponent.h"
 #include "FrontierSaveGame.h"
 #include "EngineUtils.h"
@@ -40,7 +41,22 @@ void RunAffectionScenario(UWorld* World,ACFPlayerCharacter* Hero)
     auto* Threat=World->SpawnActor<ACreatureCharacter>(Pet->GetActorLocation()+FVector(0,400,0),FRotator::ZeroRotator); Threat->SetActorTickEnabled(false); Gates &= !Hero->PetCompanion(Pet); Threat->Destroy();
     Pet->Tamer=nullptr; Gates &= !Hero->PetCompanion(Pet); Pet->Tamer=Hero->GetController(); Pet->Health=0; Gates &= !Hero->PetCompanion(Pet); Pet->Health=HP; Hero->Health=0; Gates &= !Hero->PetCompanion(Pet); Hero->Health=100;
     Hero->TogglePauseMenu(); Gates &= !Hero->PetCompanion(Pet); Hero->TogglePauseMenu(); Gates &= Pet->BondPoints==2 && Pet->PettingCooldown==0;
-    Pet->Nutrition=50; bool Feed=Hero->FeedCompanion(Pet) && Pet->BondPoints==5 && Hero->Inventory->Count(EFrontierItem::Food)==2;
+    Pet->Nutrition=50;
+    auto RejectPausedCare=[Hero,Pet]()
+    {
+        const int32 Food=Hero->Inventory->Count(EFrontierItem::Food),Bond=Pet->BondPoints;
+        const float Nutrition=Pet->Nutrition,Energy=Pet->Stamina,Cooldown=Pet->PettingCooldown;
+        const bool PetRejected=!Hero->PetCompanion(Pet);
+        const bool FeedRejected=!Hero->FeedCompanion(Pet);
+        return PetRejected && FeedRejected && Hero->Inventory->Count(EFrontierItem::Food)==Food && Pet->BondPoints==Bond &&
+            Pet->Nutrition==Nutrition && Pet->Stamina==Energy && Pet->PettingCooldown==Cooldown;
+    };
+    bool PausedCare=UGameplayStatics::SetGamePaused(World,true);
+    PausedCare &= RejectPausedCare(); UGameplayStatics::SetGamePaused(World,false);
+    const bool Opened=Hero->Naming->Open(Pet); PausedCare &= Opened && UGameplayStatics::IsGamePaused(World);
+    if(Opened) { PausedCare &= RejectPausedCare(); Hero->Naming->Close(); }
+    PausedCare &= !UGameplayStatics::IsGamePaused(World) && !Hero->Naming->IsOpen();
+    bool Feed=Hero->FeedCompanion(Pet) && Pet->BondPoints==5 && Hero->Inventory->Count(EFrontierItem::Food)==2;
     Pet->BondPoints=99; Feed &= Hero->PetCompanion(Pet) && Pet->BondPoints==100; Pet->AddBond(3); Feed &= Pet->BondPoints==100 && Pet->GetBondLabel()==TEXT("Devoted");
     auto FindPet=[World,Hero]() { for(TActorIterator<ACreatureCharacter> It(World);It;++It) if(It->Tamer==Hero->GetController()) return *It; return static_cast<ACreatureCharacter*>(nullptr); };
     bool Saved=Hero->SaveProgress(TEXT("FrontierAffectionAutomation")) && Hero->LoadProgress(TEXT("FrontierAffectionAutomation")); Pet=FindPet();
@@ -61,8 +77,8 @@ void RunAffectionScenario(UWorld* World,ACFPlayerCharacter* Hero)
     if(Snapshot) { Snapshot->FormatVersion=15; Legacy=UGameplayStatics::SaveGameToSlot(Snapshot,TEXT("FrontierAffectionLegacy"),0) && Hero->LoadProgress(TEXT("FrontierAffectionLegacy")); Pet=FindPet(); Legacy &= Pet && Pet->BondPoints==0 && Pet->PettingCooldown==0; }
     bool Response=Pet && Hero->PetCompanion(Pet);
     if(Pet) { Pet->UpdateCreaturePresentation(.1f); Response &= Pet->GetVisualState()==TEXT("Affection") && Pet->BondPoints==2; }
-    const bool Passed=Care && Gates && Feed && Saved && Invalid && Legacy && Response;
-    UE_LOG(LogTemp,Display,TEXT("CF_AFFECTION %s care=%d gates=%d feed=%d save=%d invalid=%d legacy=%d response=%d"),Passed?TEXT("PASS"):TEXT("FAIL"),Care,Gates,Feed,Saved,Invalid,Legacy,Response);
+    const bool Passed=Care && Gates && PausedCare && Feed && Saved && Invalid && Legacy && Response;
+    UE_LOG(LogTemp,Display,TEXT("CF_AFFECTION %s care=%d gates=%d paused=%d feed=%d save=%d invalid=%d legacy=%d response=%d"),Passed?TEXT("PASS"):TEXT("FAIL"),Care,Gates,PausedCare,Feed,Saved,Invalid,Legacy,Response);
     if(Passed && FParse::Param(FCommandLine::Get(),TEXT("CFAffectionPreview")))
     {
         Pet->SetActorTickEnabled(false); Hero->GetCharacterMovement()->DisableMovement();

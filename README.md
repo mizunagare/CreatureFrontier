@@ -3,7 +3,7 @@
 原创第一人称生物捕捉 RPG 原型。玩法重点是捕捉伙伴，并与伙伴共同生活、工作和战斗。
 
 本轮加入伙伴个体昵称与暂停中的原生改名窗口，格式 25 按稳定身份保存昵称；保留物种信息，不改战斗/关系数值。并修复 G 重复绑定：瞄准农圃交互，其他时候保留伙伴技能。详见 [个体命名](Docs/COMPANION_NAMES.md)。
-当前可运行包：`E:\CreatureFrontierBuilds\Windows-Names-Final\CreatureFrontier.exe`；62 项回归完成（58+4 分段、保留一次启动中断），七份真实 24 旧档各读两次，D3D12 三进程/四张新图检查通过。仍为灰盒，正常 HUD 遮挡、真实 IME/键盘布局和正式 UI 品质尚未全面验证。
+当前可运行包：`E:\CreatureFrontierBuilds\Windows-CarePause-Final\CreatureFrontier.exe`；补齐抚摸/手动喂食的世界暂停校验，连续 62 项回归与 D3D12 照料检查通过，仍为格式 25，详见 [照料暂停边界](Docs/CARE_PAUSE.md)。上一命名包另有 62 项分段回归、七份真实 24 旧档各读两次及 D3D12 三进程/四图证据，不冒充当前补丁重验。仍为灰盒，正常 HUD 遮挡、真实 IME/键盘布局和正式 UI 品质尚未全面验证。
 此前有投入的播种—照料—收获及食物运输见 [农业说明](Docs/CROPS.md)。
 此前纤维、矿料、机械废件与基地加工见 [差异材料与加工](Docs/MATERIALS.md)。
 此前伙伴实际携带、满箱等待、倒下保货与稳定 ID 见 [伙伴运输](Docs/CARGO_DELIVERY.md)；玩家仓储独立验收见 [基地仓储](Docs/STORAGE.md)。
