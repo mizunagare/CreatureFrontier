@@ -1,4 +1,4 @@
-param([string]$EngineRoot='D:\Epic\UE_5.8',[string]$BuildRoot='',[switch]$NoRoof)
+param([string]$EngineRoot='D:\Epic\UE_5.8',[string]$BuildRoot='',[switch]$NoRoof,[ValidateSet('Test','Write','Read')][string]$Mode='Test')
 $ErrorActionPreference='Stop'
 . (Join-Path $PSScriptRoot 'BuildFingerprint.ps1')
 $projectRoot=Split-Path $PSScriptRoot -Parent
@@ -9,7 +9,10 @@ $run=Join-Path $projectRoot ('Saved\DoorFarmQA\'+(Get-Date -Format 'yyyyMMdd-HHm
 New-Item -ItemType Directory -Path $run | Out-Null
 $log=Join-Path $run 'CFDoorFarmTest.log'
 Write-Host "门与农圃工作专项：$run"
-$arguments=@((Join-Path $projectRoot 'CreatureFrontier.uproject'),'-game','-CFDoorFarmTest','-nullrhi','-nosound','-unattended','-nop4',('-abslog="'+$log+'"'))
+if($NoRoof -and $Mode -ne 'Test'){throw '跨进程链固定使用有顶房间'}
+$flag='CFDoorFarm'+$Mode
+$modeNumber=if($Mode -eq 'Write'){1}elseif($Mode -eq 'Read'){2}else{0}
+$arguments=@((Join-Path $projectRoot 'CreatureFrontier.uproject'),'-game',('-'+$flag),'-nullrhi','-nosound','-unattended','-nop4',('-abslog="'+$log+'"'))
 $exe=Join-Path $EngineRoot 'Engine\Binaries\Win64\UnrealEditor-Cmd.exe'
 if($BuildRoot){$exe=$module;$arguments=$arguments[1..($arguments.Count-1)]}
 if($NoRoof){$arguments+='-CFDoorFarmNoRoof'}
@@ -20,7 +23,8 @@ if($process.ExitCode -ne 0 -or !(Select-String -LiteralPath $log -SimpleMatch 'C
    !(Select-String -LiteralPath $log -SimpleMatch 'CF_DOOR_FARM_CLOSED PASS' -Quiet) -or
    (Select-String -LiteralPath $log -Pattern '\bFAIL\b|Fatal error|Assertion failed' -Quiet)){throw "门与农圃专项未通过：$log"}
 if((Get-FrontierBuildFingerprint -LiteralPath $module) -ne $hash){throw '专项期间模块发生变化'}
+if(!(Select-String -LiteralPath $log -SimpleMatch ('CF_DOOR_FARM_MODE PASS mode='+$modeNumber) -Quiet)){throw '缺少对应存读模式的成功标记'}
 $fixtureMarker=if($NoRoof){'CF_DOOR_FARM_FIXTURE roof=0 removed=1'}else{'CF_DOOR_FARM_FIXTURE roof=1 removed=0'}
 if(!(Select-String -LiteralPath $log -SimpleMatch $fixtureMarker -Quiet)){throw '缺少预期屋顶对照标记'}
-[pscustomobject]@{Case='CFDoorFarmTest';NoRoof=[bool]$NoRoof;Pass=$true;BuildSHA256=$hash;Log=$log} | Export-Csv -LiteralPath (Join-Path $run 'Results.csv') -NoTypeInformation
+[pscustomobject]@{Case=$flag;NoRoof=[bool]$NoRoof;Pass=$true;BuildSHA256=$hash;Log=$log} | Export-Csv -LiteralPath (Join-Path $run 'Results.csv') -NoTypeInformation
 Write-Host '门与农圃工作专项通过；不代表运输、多伙伴或跨进程恢复已验收'

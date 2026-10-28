@@ -13,26 +13,41 @@
 #include "EngineUtils.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
+#include "WildEncounter.h"
+#include "GameFramework/CharacterMovementComponent.h"
 
-void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero)
+void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
 {
     // 固定房间只验证单伙伴工作，不替代自由放置、长期运输或自然冒险。
-    auto* Door=CFDoorNavigationQA::Room(World,Hero,0);
+    auto Finish=[Mode](bool Pass)
+    {UE_LOG(LogTemp,Display,TEXT("CF_DOOR_FARM_MODE %s mode=%d"),Pass?TEXT("PASS"):TEXT("FAIL"),Mode);UE_LOG(LogTemp,Display,TEXT("CF_DOOR_FARM %s"),Pass?TEXT("PASS"):TEXT("FAIL"));FPlatformMisc::RequestExitWithStatus(false,Pass?0:1);};
+    AHomeModule* Door=nullptr;AWorkStation* Farm=nullptr;ACreatureCharacter* RestoredPet=nullptr;
+    if(Mode==2)
+    {
+        if(!Hero->LoadProgress(TEXT("DoorFarmBlocked"))){Finish(false);return;}
+        for(TActorIterator<AWildEncounter> It(World);It;++It)It->SetActorTickEnabled(false);
+        for(TActorIterator<ACreatureCharacter> It(World);It;++It)
+            if(It->Tamer==Hero->GetController())RestoredPet=*It;
+            else {It->SetActorTickEnabled(false);It->GetCharacterMovement()->DisableMovement();}
+        for(TActorIterator<AHomeModule> It(World);It;++It)if(It->GetKind()==EHomeModuleKind::Door)Door=*It;
+        for(TActorIterator<AWorkStation> It(World);It;++It)if(It->bPlayerBuilt && It->RequiredSpecialty==EWorkSpecialty::Farming)Farm=*It;
+        if(!Door || Door->DoorState!=1 || !Farm || !RestoredPet || RestoredPet->WorkSite!=Farm || RestoredPet->Activity!=ECreatureActivity::Work ||
+            Farm->Crop->Seeds!=1 || Farm->StoredFood!=0 || Farm->Crop->bPlanted || Farm->Crop->GrowthWork!=0){Finish(false);return;}
+        Hero->GetCharacterMovement()->DisableMovement();
+    }
+    else Door=CFDoorNavigationQA::Room(World,Hero,0);
     const bool NoRoof=FParse::Param(FCommandLine::Get(),TEXT("CFDoorFarmNoRoof"));
     int32 RemovedRoofs=0;
     if(NoRoof)for(TActorIterator<AHomeModule> It(World);It;++It)if(It->GetKind()==EHomeModuleKind::Roof){It->Destroy();++RemovedRoofs;}
     UE_LOG(LogTemp,Display,TEXT("CF_DOOR_FARM_FIXTURE roof=%d removed=%d"),!NoRoof,RemovedRoofs);
     auto* Definition=LoadObject<UCreatureDefinition>(nullptr,TEXT("/Game/Creatures/DA_Mosskip.DA_Mosskip"));
-    auto Finish=[](bool Pass)
-    {UE_LOG(LogTemp,Display,TEXT("CF_DOOR_FARM %s"),Pass?TEXT("PASS"):TEXT("FAIL"));FPlatformMisc::RequestExitWithStatus(false,Pass?0:1);};
     if(!Door || !Definition || (NoRoof && RemovedRoofs!=1)){Finish(false);return;}
     const FTransform FarmTransform(FRotator::ZeroRotator,FVector(-400,-700,5),FVector(2,1,.7));
-    Hero->Building->Selected=EWorkSpecialty::Farming;
-    auto* Farm=Hero->Building->BuildAt(FarmTransform);
+    if(Mode!=2){Hero->Building->Selected=EWorkSpecialty::Farming;Farm=Hero->Building->BuildAt(FarmTransform);}
     if(!Farm){UE_LOG(LogTemp,Display,TEXT("CF_DOOR_FARM_FIXTURE %s"),*Hero->Feedback);Finish(false);return;}
-    Farm->Crop->Seeds=1;
+    if(Mode!=2)Farm->Crop->Seeds=1;
     const auto Timer=MakeShared<FTimerHandle>();
-    World->GetTimerManager().SetTimer(*Timer,[World,Hero,Door,Farm,Definition,Timer,Finish,Phase=0,At=World->GetTimeSeconds(),Pet=static_cast<ACreatureCharacter*>(nullptr),Previous=FVector::ZeroVector,Travel=0.,Continuous=true]() mutable
+    World->GetTimerManager().SetTimer(*Timer,[World,Hero,Door,Farm,Definition,Timer,Finish,Mode,Phase=Mode==2?1:0,At=World->GetTimeSeconds(),Pet=RestoredPet,Previous=RestoredPet?RestoredPet->GetActorLocation():FVector::ZeroVector,Travel=0.,Continuous=true]() mutable
     {
         auto End=[&](bool Pass)
         {
@@ -59,6 +74,11 @@ void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero)
             if(!Unchanged || Pet->GetActorLocation().Y>-1000){End(false);return;}
             if(Elapsed<12)return;
             UE_LOG(LogTemp,Display,TEXT("CF_DOOR_FARM_CLOSED PASS"));
+            if(Mode==1)
+            {
+                Hero->SetActorLocation(FVector(-530,-900,60));
+                End(Hero->SaveProgress(TEXT("DoorFarmBlocked")));return;
+            }
             Hero->SetActorLocation(FVector(-400,-720,60));
             const auto Rotation=(FVector(-555,-1000,120)-Hero->FirstPersonCamera->GetComponentLocation()).Rotation();
             Hero->GetController()->SetControlRotation(Rotation);Hero->FirstPersonCamera->SetWorldRotation(Rotation);
