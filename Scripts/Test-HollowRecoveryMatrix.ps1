@@ -26,7 +26,7 @@ try {
     foreach($cap in $FrameCaps){foreach($attempt in 1..$Repeats){
         $label="FPS-$cap-Run-$attempt";$log=Join-Path $run ($label+'.log')
         $arguments=@('-game','-nullrhi','-nosound','-unattended','-nop4','-CFHollowRecoveryTest',('-ExecCmds="t.MaxFPS '+$cap+'"'),('-abslog="'+$log+'"'))
-        if($TraceRoaming){$arguments+='-CFRoamTrace'}
+        if($TraceRoaming){$arguments+=@('-CFRoamTrace','-CFHollowFailureSnapshot')}
         if($Editor){$arguments=@((Join-Path $projectRoot 'CreatureFrontier.uproject'))+$arguments}
         $process=Start-Process -FilePath $exe -WorkingDirectory $root -WindowStyle Hidden -PassThru -ArgumentList $arguments
         $done=$process.WaitForExit(210000)

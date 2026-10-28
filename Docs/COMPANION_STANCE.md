@@ -1,5 +1,13 @@
 # 伙伴护主与避战姿态
 
+## 失败现场快照负向验证（2026-10-29）
+
+D534570E带巡游跟踪的 `Saved/HollowRecoveryMatrix/20261029-043817-511d93a0/` 两个60样本已正常结束通过，没有因此解释旧失败。脚本跟踪参数实际进入进程，巡游选点/到达日志存在。
+
+新增仅显式 `CFHollowFailureSnapshot` 下的失败现场保存：使用 `HollowFailure-<随机GUID>` 唯一槽，保留原FAIL及退出请求；重新反序列化核对格式、玩家生命与位置，日志记录阶段/集火目标。当前快照不保存所有瞬时速度、导航内部状态或随机数流，不能当成完整确定性重放。恢复脚本的TraceRoaming模式同时请求此快照，旧已构建D534包不含该新实现。
+
+81B66D2B Editor编译成功，`CFHollowFailureProbe` 显式负向入口实际运行：`Saved/HollowFailureSnapshot-Probe-20261029.log` 保留 `FAIL diagnostic-negative-control`，且 `saved=1 verified=1`；唯一文件 `Saved/SaveGames/HollowFailure-2413A47040A1150831E5F984EB6EA5FD.sav` 实际存在，SHA-256 `09D7E1812FE3E75D730985C237BD9C4F7C604608FE89C2EAEE3CE1785BE7E7B0`。引擎进程退出0但日志明确失败，不能计为恢复玩法通过。本次证明的是失败保存路径，不是原卡路复现或新Windows验证。后续同模块正常恢复路径仍需验证，稳定入口不变。
+
 ## 视线诊断包与巡游跟踪（2026-10-29）
 
 B81AE173 Editor的 `Saved/HollowRecoveryMatrix/20261029-043417-eff6c586/` 两个60样本正常结束通过，未据此撤销旧Windows失败。独立Windows视线诊断包 `E:\CreatureFrontierBuilds\Windows-Route-Sight-Diagnostics` 构建成功，内部EXE SHA-256为 `D534570ED9BD4B12E7DF6845155FCA320E40FDAB06092B460B4D6ABFA3D63274`。包含局部停留、胶囊阻挡和视线阻挡日志，没有玩法修复。

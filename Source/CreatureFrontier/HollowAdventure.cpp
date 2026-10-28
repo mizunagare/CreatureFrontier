@@ -104,7 +104,21 @@ struct FAdventure
         UE_LOG(LogTemp,Display,TEXT("CF_HOLLOW_ADVENTURE_SHOT %s viewport=%.0fx%.0f frame=%llu"),Name,HUD->GetLayoutAudit().Viewport.X,HUD->GetLayoutAudit().Viewport.Y,HUD->GetLayoutAudit().Frame);
     }
     bool Fail(const TCHAR* Reason)
-    {UE_LOG(LogTemp,Error,TEXT("CF_HOLLOW_ADVENTURE FAIL %s index=%d return=%d hero=%s hp=%.1f pet=%s hp=%.1f enemy=%s hp=%.1f skill=%d incoming=%d"),Reason,Index,Returning,*Hero->GetActorLocation().ToString(),Hero->Health,*Pet->GetActorLocation().ToString(),Pet->Health,*Enemy->GetActorLocation().ToString(),Enemy->Health,Skill,Incoming);FPlatformMisc::RequestExitWithStatus(false,1);return false;}
+    {
+        UE_LOG(LogTemp,Error,TEXT("CF_HOLLOW_ADVENTURE FAIL %s index=%d return=%d hero=%s hp=%.1f pet=%s hp=%.1f enemy=%s hp=%.1f skill=%d incoming=%d"),Reason,Index,Returning,*Hero->GetActorLocation().ToString(),Hero->Health,*Pet->GetActorLocation().ToString(),Pet->Health,*Enemy->GetActorLocation().ToString(),Enemy->Health,Skill,Incoming);
+        if(FParse::Param(FCommandLine::Get(),TEXT("CFHollowFailureSnapshot")))
+        {
+            // 只在显式诊断失败后保存到唯一槽，不覆盖玩家槽或测试输入。
+            const FString Slot=TEXT("HollowFailure-")+FGuid::NewGuid().ToString(EGuidFormats::Digits);
+            const bool Saved=Hero->SaveProgress(Slot);
+            const auto* Snapshot=Saved?Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot,0)):nullptr;
+            const bool Verified=Snapshot && Snapshot->FormatVersion==FrontierCurrentSaveVersion && Snapshot->Health==Hero->Health &&
+                Snapshot->PlayerTransform.GetLocation().Equals(Hero->GetActorLocation(),.01);
+            UE_LOG(LogTemp,Display,TEXT("CF_HOLLOW_FAILURE_SNAPSHOT saved=%d verified=%d slot=%s index=%d stage=%d battle=%d focus=%s"),
+                Saved,Verified,*Slot,Index,RecoveryStage,Battle,*GetNameSafe(Pet->FocusTarget));
+        }
+        FPlatformMisc::RequestExitWithStatus(false,1);return false;
+    }
     void Drive(const FVector& Goal)
     {const auto Delta=Goal-Hero->GetActorLocation();Input->Direction=FVector(Delta.X,Delta.Y,0).GetSafeNormal();Hero->SetActorRotation(Input->Direction.Rotation());Hero->GetController()->SetControlRotation(Input->Direction.Rotation());}
     bool Tick()
@@ -320,6 +334,9 @@ void StartAdventure(UWorld* World,ACFPlayerCharacter* Hero,ACreatureCharacter* P
     if(FParse::Param(FCommandLine::Get(),TEXT("CFHollowAdventurePreview")))
     {State->Shots=FPaths::ProjectSavedDir()/TEXT("HollowAdventurePreview")/FGuid::NewGuid().ToString(EGuidFormats::Digits);IFileManager::Get().MakeDirectory(*State->Shots,true);UE_LOG(LogTemp,Display,TEXT("CF_HOLLOW_ADVENTURE_ROOT %s"),*State->Shots);}
     UE_LOG(LogTemp,Display,TEXT("CF_HOLLOW_ADVENTURE_START resident=%s hp=%.1f petHP=%.1f"),*State->Enemy->GetActorLocation().ToString(),State->Enemy->Health,Pet->Health);
+    // 显式负向诊断用于验证失败快照路径；必定失败，不能计入正常恢复通过。
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFHollowFailureProbe")))
+    {State->Fail(TEXT("diagnostic-negative-control"));return;}
     FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([State](float){return State->Tick();}),.1f);
 }
 }
