@@ -1,5 +1,9 @@
 # 中文开发与显示约定
 
+## 后续文案补漏（2026-10-28）
+
+补齐FieldRecoveryScenario和FormationScenario两条英文预览反馈，不改玩法、协议或存档。Editor再次编译成功；`Saved/Chinese-Formation-Editor.log` 与 `Saved/Chinese-FieldRecovery-Short-Editor.log` 实际预览进程退出0且各自成功标记存在。1280×720两张新图已查看：编队反馈主体中文可读，末尾预览说明按原预算省略；野外反馈首轮长句被省略造成否定含义不清，已缩为“路线恢复：实际抵达采集，获得水晶×1、经验×1”，重新取图全文可见。最终图为 `Saved/FormationPreview/followers.png`、`Saved/FieldRecovery/Recovered.png`。仅证明所列Editor尺寸，不将Windows-Care-Route的94进程借用为这次后续文案的打包验收；没有重打包，也未声称所有窗口/Unicode输入均验收。
+
 从本轮起，面向玩家的文字统一为简体中文，后续开发说明、文档和新增代码注释使用中文。规则也写入仓库根目录 `AGENTS.md`，供后续会话遵循。
 
 ## 范围

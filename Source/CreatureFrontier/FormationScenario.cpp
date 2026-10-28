@@ -147,7 +147,7 @@ void RunFormationScenario(UWorld* World,ACFPlayerCharacter* Hero)
             const FVector Camera(1100,300,430); const FRotator View=(FVector(1100,-220,0)-Camera).Rotation();
             Hero->FirstPersonCamera->DetachFromComponent(FDetachmentTransformRules::KeepWorldTransform); Hero->FirstPersonCamera->bUsePawnControlRotation=false;
             Hero->FirstPersonCamera->SetWorldLocationAndRotation(Camera,View); Hero->GetController()->SetControlRotation(View);
-            Hero->Feedback=TEXT("Formation navigation verified - three followers, no teleport. Preview camera only");
+            Hero->Feedback=TEXT("编队导航已验证：三名伙伴跟随，无传送；仅调整预览镜头");
             const FString Root=FPaths::ProjectSavedDir()/TEXT("FormationPreview"); IFileManager::Get().MakeDirectory(*Root,true);
             FTimerHandle Shot,Done; World->GetTimerManager().SetTimer(Shot,[Root](){FScreenshotRequest::RequestScreenshot(Root/TEXT("followers.png"),false,false);},3.f,false);
             World->GetTimerManager().SetTimer(Done,[](){FPlatformMisc::RequestExitWithStatus(false,0);},5.f,false);

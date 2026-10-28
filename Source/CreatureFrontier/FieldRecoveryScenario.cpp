@@ -186,7 +186,7 @@ void RunFieldRecoveryScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
             Run->Pass &= Run->OpenPath && Resource->Remaining==1 && InventoryAndKnowledge(Hero,1) && Worker->Experience==1 &&
                 FVector::Dist2D(Run->Start,Worker->GetActorLocation())>300 && Resource->CanReach(Worker,220);
             if(!Run->Pass) { Fail(); return; }
-            if(Preview) { Hero->Feedback=TEXT("Field route reopened: real arrival, one crystal, one XP; no remote output"); FScreenshotRequest::RequestScreenshot(ImageRoot/TEXT("Recovered.png"),false,false); }
+            if(Preview) { Hero->Feedback=TEXT("路线恢复：实际抵达采集，获得水晶×1、经验×1"); FScreenshotRequest::RequestScreenshot(ImageRoot/TEXT("Recovered.png"),false,false); }
             Advance(3); return;
         }
         if(Run->Phase==3)

@@ -1,5 +1,7 @@
 # 幻兽边境 · Creature Frontier
 
+当前限定验收包：`E:\CreatureFrontierBuilds\Windows-Care-Route\CreatureFrontier.exe`，内部EXE SHA-256为 `C01D79EC11F40F0134CC2E6EF1D0AFB0D4EA3249BD82BFF2ED43C69967EB8F8E`。陪伴提示与实际互动共用只读判据；该固定程序完整90类/94进程已正常结束，94日志均有成功标记且无失败/致命错误，哈希复核未变。另有34旧档读取、三尺寸新救助链和原坏输入复验，详见[陪伴提示验收](Docs/CARE_AVAILABILITY.md)。源码随后补齐的两条测试预览中文提示尚不在此包内。下文旧“当前”均为历史交付；双倒地、正式美术、系统输入及性能等缺口仍在。
+
 当前限定验收包：`E:\CreatureFrontierBuilds\Windows-Rescue-Views\CreatureFrontier.exe`。[倒地伙伴救助](Docs/COMPANION_RESCUE.md)已完成自然倒地保存—新进程P救助/F恢复行动/QG战斗返家—第三进程读取；同一EXE的90类/94进程完整回归、16份真实格式28档的34进程读取及三尺寸九进程图形链通过，九张动态实战图已逐张查看。仍为灰盒，遮挡、双倒地、系统输入、正式美术与性能有缺口；后续[陪伴提示一致性](Docs/CARE_AVAILABILITY.md)正在独立验证，不包含于此包。旧包和玩家档保留。下述“当前”表述均为此前交付记录。
 
 当前限定验收包更新为 `E:\CreatureFrontierBuilds\Windows-Checkpoint-Shots\CreatureFrontier.exe`：[洞窟倒地冷启动恢复](Docs/HOLLOW_CHECKPOINT.md)完成同一EXE的86类/90进程回归、15份真实格式28旧档的32进程读取，以及三尺寸九进程恢复链/24张逐图检查。原倒地输入在每组恢复内未改写；旧包与玩家档保留。仍是灰盒，伙伴同时倒下、系统级输入与正式美术/性能尚未全面验收。下述恢复反馈包记录为历史交付，后续救助提示改动尚不包含在新验收包中。
