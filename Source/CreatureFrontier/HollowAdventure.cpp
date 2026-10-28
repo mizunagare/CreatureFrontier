@@ -129,9 +129,15 @@ struct FAdventure
             const auto* Capsule=Hero->GetCapsuleComponent();
             const bool Blocked=World->SweepSingleByChannel(Hit,Now,Now+Input->Direction.GetSafeNormal()*100,FQuat::Identity,ECC_Pawn,
                 FCollisionShape::MakeCapsule(Capsule->GetScaledCapsuleRadius(),Capsule->GetScaledCapsuleHalfHeight()),Query);
+            FHitResult Sight;
+            const FVector Eye=Hero->FirstPersonCamera->GetComponentLocation();
+            World->LineTraceSingleByChannel(Sight,Eye,Enemy->GetActorLocation(),ECC_Visibility,Query);
             UE_LOG(LogTemp,Display,TEXT("CF_HOLLOW_ROUTE_STALL index=%d hero=%s goal=%s input=%s velocity=%s blocked=%d actor=%s component=%s impact=%s battle=%d focus=%s"),
                 Index,*Now.ToString(),Points.IsValidIndex(Index)?*Points[Index].ToString():TEXT("none"),*Input->Direction.ToString(),
                 *Hero->GetVelocity().ToString(),Blocked,*GetNameSafe(Hit.GetActor()),*GetNameSafe(Hit.GetComponent()),*Hit.ImpactPoint.ToString(),Battle,*GetNameSafe(Pet->FocusTarget));
+            UE_LOG(LogTemp,Display,TEXT("CF_HOLLOW_ROUTE_SIGHT index=%d actor=%s component=%s enemy=%s enemyHP=%.1f pet=%s petHP=%.1f aimed=%s"),
+                Index,*GetNameSafe(Sight.GetActor()),*GetNameSafe(Sight.GetComponent()),*Enemy->GetActorLocation().ToString(),Enemy->Health,
+                *PetNow.ToString(),Pet->Health,*GetNameSafe(Hero->TraceCreature()));
         }
         Incoming |= Mode==3 && RecoveryStage==2?(Hero->Health<SecondHeroHP || Pet->Health<SecondPetHP):(Hero->Health<100 || Pet->Health<Pet->GetMaxHealth());Skill |= Pet->SpecialCooldownRemaining>0 && Pet->Stamina<=80;
         if(!Returning && Now.Y<-2200)Shot(TEXT("Entrance"));
