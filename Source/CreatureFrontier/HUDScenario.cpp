@@ -108,5 +108,12 @@ void RunHUDScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Preview)
     State->Boss=Make(Stone,FVector(900,-900,40),false);State->Boss->bAlpha=true;
     State->Bag=Hero->Inventory->GetStacks();
     State->Root=FPaths::ProjectSavedDir()/TEXT("HUDPreview")/FGuid::NewGuid().ToString(EGuidFormats::Digits);IFileManager::Get().MakeDirectory(*State->Root,true);UE_LOG(LogTemp,Display,TEXT("CF_HUD_PREVIEW_ROOT %s"),*State->Root);
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFHUDStancePreview")))
+    {
+        Hero->ClearCompanionSelection();
+        if(!CFInputQA::Press(Hero,EKeys::F8) || !State->Pet->bAvoidCombat)
+        {UE_LOG(LogTemp,Error,TEXT("CF_HUD_STANCE FAIL input"));FPlatformMisc::RequestExitWithStatus(false,1);return;}
+        UE_LOG(LogTemp,Display,TEXT("CF_HUD_STANCE PASS avoid=1"));
+    }
     State->Deadline=FPlatformTime::Seconds()+45;State->Setup();FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([State](float){return State->Tick();}),.1f);
 }
