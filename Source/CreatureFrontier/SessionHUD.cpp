@@ -49,6 +49,7 @@ void ACFHUD::DrawControlHelp(ACFPlayerCharacter* Player)
         TEXT("E storage crate (3m) | arrows / Enter / Backspace"),
         TEXT("V aim crate: delivery sink | V away clears future sink"),
         TEXT("G garden sow/tend/harvest (3m) | F2/F3 seed +/-"),
+        TEXT("F4 name own idle companion (2.5m) | input pauses world"),
         TEXT("T rest | P treat aimed companion"),
         TEXT("J feed aimed companion | H heal yourself"),
         TEXT("Y pet companion (2.5m, safe, follow / rest)"),

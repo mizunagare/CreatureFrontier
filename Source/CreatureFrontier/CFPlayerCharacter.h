@@ -29,6 +29,7 @@ public:
     float Health = 100.0f;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Inventory")
     TObjectPtr<UInventoryComponent> Inventory;
+    UPROPERTY(VisibleAnywhere,BlueprintReadOnly) TObjectPtr<class UCompanionNamingComponent> Naming;
     UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Category="Equipment") TObjectPtr<UPlayerEquipmentComponent> Equipment;
     void CraftSpear();
     void CraftVest();
@@ -64,6 +65,7 @@ public:
     class AResourceNode* TraceResource() const;
     void GatherAimedResource();
     void InteractGarden();
+    void GardenOrSpecial();
     void DepositGardenSeed();
     void WithdrawGardenSeed();
     bool SelectCompanion(ACreatureCharacter* Pet);

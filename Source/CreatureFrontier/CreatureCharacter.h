@@ -19,11 +19,13 @@ public:
     friend class UCompanionCargoComponent;
     ACreatureCharacter();
     UPROPERTY(BlueprintReadOnly) FGuid PersistentId;
+    UPROPERTY(BlueprintReadOnly) FString Nickname;
     UPROPERTY(VisibleAnywhere,BlueprintReadOnly) TObjectPtr<class UInventoryComponent> CargoInventory;
     UPROPERTY(VisibleAnywhere,BlueprintReadOnly) TObjectPtr<class UCompanionCargoComponent> Cargo;
     virtual void OnConstruction(const FTransform& Transform) override;
     UFUNCTION(BlueprintPure, Category="Creature")
     FString GetCreatureName() const;
+    FString GetSpeciesName() const;
     UFUNCTION(BlueprintPure, Category="Work")
     float GetWorkEfficiency(const AWorkStation* Site) const;
 
@@ -39,6 +41,7 @@ public:
     UPROPERTY(Replicated,BlueprintReadOnly,Category="Care") float PettingCooldown=0;
     void AddBond(int32 Amount);
     void RespondToPetting();
+    void AcknowledgeName();
     FString GetBondLabel() const;
     UPROPERTY()
     TObjectPtr<AWorkStation> WorkSite;

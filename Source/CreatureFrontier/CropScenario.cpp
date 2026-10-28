@@ -20,6 +20,7 @@
 #include "HAL/FileManager.h"
 #include "TimerManager.h"
 #include "UnrealClient.h"
+#include "InputRoutingQA.h"
 
 namespace CFCropQA
 {
@@ -40,13 +41,21 @@ void RunCropScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
     if(Mode==3)
     {
         const FString Slot=TEXT("FrontierFarmingAutomation");
-        auto* Old=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot,0));Pass=Old && Old->FormatVersion<24;
+        auto* Old=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot,0));Pass=Old && Old->FormatVersion<=24;
+        const auto* Expected=Old?Old->Facilities.FindByPredicate([](const FFacilitySaveRecord& R){return R.Specialty==EWorkSpecialty::Farming;}):nullptr;
         for(int32 Attempt=0;Attempt<2;++Attempt)
         {
             Pass &= Hero->LoadProgress(Slot);auto* Site=Garden(World);auto* Pet=Farmer(World,Hero);
-            Pass &= Site && Pet && Pet->WorkSite==Site && Site->StoredFood==1 && Site->Crop->Seeds==0 && !Site->Crop->bPlanted &&
-                Site->Crop->GrowthWork==0 && Hero->Inventory->Count(EFrontierItem::Seeds)==0;
-            if(Pet && Site){Pet->SetActorTickEnabled(false);Pet->Tick(.1f);Pass &= Site->StoredFood==1 && !Site->Crop->bPlanted;}
+            if(Old && Old->FormatVersion==24)
+                Pass &= Expected && Site && Pet && Pet->WorkSite==Site && Site->PersistentId==Expected->Id && Site->StoredFood==Expected->StoredFood &&
+                    Site->Crop->Seeds==Expected->Seeds && Site->Crop->bPlanted==Expected->bPlanted && Site->Crop->GrowthWork==Expected->GrowthWork &&
+                    Hero->Inventory->Count(EFrontierItem::Seeds)==Old->InventoryStacks.FindRef(EFrontierItem::Seeds);
+            else
+            {
+                Pass &= Site && Pet && Pet->WorkSite==Site && Site->StoredFood==1 && Site->Crop->Seeds==0 && !Site->Crop->bPlanted &&
+                    Site->Crop->GrowthWork==0 && Hero->Inventory->Count(EFrontierItem::Seeds)==0;
+                if(Pet && Site){Pet->SetActorTickEnabled(false);Pet->Tick(.1f);Pass &= Site->StoredFood==1 && !Site->Crop->bPlanted;}
+            }
         }
         UE_LOG(LogTemp,Display,TEXT("CF_CROP_LEGACY_READ %s"),Pass?TEXT("PASS"):TEXT("FAIL"));FPlatformMisc::RequestExitWithStatus(false,Pass?0:1);return;
     }
@@ -62,7 +71,7 @@ void RunCropScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
         auto* Site=Hero->Building->BuildAt(FTransform(FRotator::ZeroRotator,FVector(-400,-700,-15),FVector(2,1,.7)));
         if(!Site || !Leaf){UE_LOG(LogTemp,Error,TEXT("CF_CROP FAIL fixture"));FPlatformMisc::RequestExitWithStatus(false,1);return;}
         Hero->SetActorLocation(FVector(-400,-930,40));Hero->FirstPersonCamera->SetWorldRotation((Site->GetActorLocation()-Hero->FirstPersonCamera->GetComponentLocation()).Rotation());
-        Hero->DepositGardenSeed();Hero->DepositGardenSeed();Hero->InteractGarden();Hero->InteractGarden();
+        Pass &= CFInputQA::UniqueBindings(Hero) && CFInputQA::Press(Hero,EKeys::F2) && CFInputQA::Press(Hero,EKeys::F2) && CFInputQA::Press(Hero,EKeys::G) && CFInputQA::Press(Hero,EKeys::G);
         Pass &= Site->Crop->Seeds==1 && Hero->Inventory->Count(EFrontierItem::Seeds)==1 && Site->Crop->bPlanted && Site->Crop->GrowthWork==1;
         Hero->InteractGarden();Pass &= Site->Crop->GrowthWork==1;
         Hero->Health=0;Hero->InteractGarden();Pass &= Site->Crop->GrowthWork==1;Hero->Health=100;

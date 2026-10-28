@@ -45,7 +45,7 @@ bool ACFPlayerCharacter::SelectCompanion(ACreatureCharacter* Pet)
     if (GetWorld()->LineTraceSingleByChannel(Hit,FirstPersonCamera->GetComponentLocation(),Pet->GetActorLocation(),ECC_Visibility,Params) && Hit.GetActor() != Pet)
     { Feedback = TEXT("Companion selection is blocked by cover"); return false; }
     SelectedCompanion = Pet; bSingleCompanionMode = true;
-    Feedback = Pet->GetCreatureName()+TEXT(" selected. F/E/T/Q/G affect only this companion; K returns to ALL");
+    Feedback = Pet->GetCreatureName()+TEXT(" selected. F/E/T/Q and G skill affect this companion; G aimed at a garden tends it; K returns to ALL");
     return true;
 }
 

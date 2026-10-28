@@ -24,11 +24,17 @@
 #include "StorageInteractionComponent.h"
 #include "CompanionCargoComponent.h"
 #include "FarmCropComponent.h"
+#include "CompanionNamingComponent.h"
 #include "HomeModule.h"
 #include "ResearchComponent.h"
 
 void ACFPlayerCharacter::CraftSpear() { Equipment->CraftSpear(); }
 void ACFPlayerCharacter::InteractGarden() {if(auto* Site=TraceFacility()) Site->Crop->Interact(this,0);}
+void ACFPlayerCharacter::GardenOrSpecial()
+{
+    if(auto* Site=TraceFacility();Site && Site->RequiredSpecialty==EWorkSpecialty::Farming) {Site->Crop->Interact(this,0);return;}
+    CommandSpecial();
+}
 void ACFPlayerCharacter::DepositGardenSeed() {if(auto* Site=TraceFacility()) Site->Crop->Interact(this,1);}
 void ACFPlayerCharacter::WithdrawGardenSeed() {if(auto* Site=TraceFacility()) Site->Crop->Interact(this,2);}
 void ACFPlayerCharacter::CraftVest() { Equipment->CraftVest(); }
@@ -85,7 +91,7 @@ bool ACFPlayerCharacter::SaveProgress(const FString& Slot)
 {
     if (!HasAuthority() || !GetController()) return false;
     auto* Save = Cast<UFrontierSaveGame>(UGameplayStatics::CreateSaveGameObject(UFrontierSaveGame::StaticClass()));
-    Save->FormatVersion=24;
+    Save->FormatVersion=25;
     Save->MapName = UGameplayStatics::GetCurrentLevelName(this, true);
     Save->PlayerTransform = GetActorTransform();
     Save->ViewRotation = GetController()->GetControlRotation();
@@ -108,6 +114,7 @@ bool ACFPlayerCharacter::SaveProgress(const FString& Slot)
     {
         FCreatureSaveRecord Record;
         Record.Id=It->PersistentId;
+        Record.Nickname=It->Nickname;
         Record.CreatureClass = It->GetClass();
         Record.Definition = It->Definition.Get();
         Record.Transform = It->GetActorTransform();
@@ -163,7 +170,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
 {
     if (!HasAuthority() || !GetController()) return false;
     auto* Save = Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot, 0));
-    if (!Save || Save->FormatVersion < 1 || Save->FormatVersion > 24 ||
+    if (!Save || Save->FormatVersion < 1 || Save->FormatVersion > 25 ||
         Save->MapName != UGameplayStatics::GetCurrentLevelName(this, true) ||
         !FMath::IsFinite(Save->Health) || Save->Health < 0 || Save->Health > 100 ||
         Save->Resources < 0 || Save->PlayerTransform.ContainsNaN() || Save->ViewRotation.ContainsNaN())
@@ -237,6 +244,9 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
     TSet<FGuid> CreatureIds;
     for(auto& Record:Save->Creatures)
     {
+        if(Save->FormatVersion<25) Record.Nickname.Empty();
+        if(!UCompanionNamingComponent::IsValidName(Record.Nickname) || (!Record.Nickname.IsEmpty() && (!Record.bOwned || Record.Disposition!=ECreatureDisposition::Tamed)))
+        {Feedback=TEXT("Invalid companion name; world unchanged");return false;}
         if(Save->FormatVersion<22) { Record.Id=FGuid::NewGuid(); Record.CargoItems.Reset(); Record.DeliveryCrateId.Invalidate(); Record.bReturningCargo=false; }
         if(!Record.Id.IsValid() || CreatureIds.Contains(Record.Id)) { Feedback=TEXT("Invalid or duplicate creature identity; world unchanged"); return false; }
         CreatureIds.Add(Record.Id);
@@ -288,6 +298,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
             return false;
         }
         Pet->PersistentId=Record.Id;
+        Pet->Nickname=Record.Nickname;
         Pet->Definition = LoadedDefinition;
         Pet->EncounterId = Record.EncounterId;
         Pet->Level = Record.Level;
@@ -370,7 +381,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
             (Pet->GetFieldResource() || (IsValid(Pet->WorkSite) && Pet->WorkSite->RequiredSpecialty != EWorkSpecialty::Feeding));
         Pet->Cargo->RestoreSnapshot(Record,HomeRestore.Find(Record.DeliveryCrateId));
     }
-    CancelMeleeAttack(); Building->Cancel();
+    Naming->Close(); CancelMeleeAttack(); Building->Cancel();
     ResourceRestore.Commit();
     HomeRestore.Commit();
     for (auto* Site : OldBuilt) Site->Destroy();
@@ -422,6 +433,7 @@ float ACFPlayerCharacter::TakeDamage(float Amount, const FDamageEvent& Event, AC
     Feedback = Health <= 0.0f ? TEXT("Downed - R respawns at base without resetting the world | F9 load") : TEXT("Taking damage!");
     if (Health <= 0.0f)
     {
+        Naming->Close();
         Storage->Close();
         DeliverySelection.Reset(); bDeliverySelection=false;
         GetCharacterMovement()->StopMovementImmediately(); GetCharacterMovement()->DisableMovement(); StopJumping();
@@ -549,6 +561,7 @@ void ACFPlayerCharacter::HealCompanion()
 
 ACFPlayerCharacter::ACFPlayerCharacter()
 {
+    Naming=CreateDefaultSubobject<UCompanionNamingComponent>(TEXT("Naming"));
     FirstPersonCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FirstPersonCamera"));
     FirstPersonCamera->SetupAttachment(GetCapsuleComponent());
     FirstPersonCamera->SetRelativeLocation(FVector(-10.0f, 0.0f, 64.0f));
@@ -579,7 +592,7 @@ void ACFPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
     PlayerInputComponent->BindKey(EKeys::T, IE_Pressed, this, &ACFPlayerCharacter::CommandRest);
     PlayerInputComponent->BindKey(EKeys::P, IE_Pressed, this, &ACFPlayerCharacter::HealCompanion);
     PlayerInputComponent->BindKey(EKeys::Q, IE_Pressed, this, &ACFPlayerCharacter::CommandFocus);
-    PlayerInputComponent->BindKey(EKeys::G, IE_Pressed, this, &ACFPlayerCharacter::CommandSpecial);
+    PlayerInputComponent->BindKey(EKeys::G, IE_Pressed, this, &ACFPlayerCharacter::GardenOrSpecial);
     PlayerInputComponent->BindKey(EKeys::R, IE_Pressed, this, &ACFPlayerCharacter::RequestRespawn);
     PlayerInputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &ACFPlayerCharacter::TogglePauseMenu).bExecuteWhenPaused=true;
     PlayerInputComponent->BindKey(EKeys::F5, IE_Pressed, this, &ACFPlayerCharacter::QuickSave).bExecuteWhenPaused=true;
@@ -593,9 +606,9 @@ void ACFPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
     PlayerInputComponent->BindKey(EKeys::Left, IE_Pressed, Storage.Get(), &UStorageInteractionComponent::WithdrawStack);
     PlayerInputComponent->BindKey(EKeys::Y, IE_Pressed, this, &ACFPlayerCharacter::PetAimedCompanion);
     PlayerInputComponent->BindKey(EKeys::M, IE_Pressed, this, &ACFPlayerCharacter::GatherAimedResource);
-    PlayerInputComponent->BindKey(EKeys::G,IE_Pressed,this,&ACFPlayerCharacter::InteractGarden);
     PlayerInputComponent->BindKey(EKeys::F2,IE_Pressed,this,&ACFPlayerCharacter::DepositGardenSeed);
     PlayerInputComponent->BindKey(EKeys::F3,IE_Pressed,this,&ACFPlayerCharacter::WithdrawGardenSeed);
+    PlayerInputComponent->BindKey(EKeys::F4,IE_Pressed,Naming.Get(),&UCompanionNamingComponent::OpenAimed);
     PlayerInputComponent->BindKey(EKeys::Zero, IE_Pressed, CaptureComponent.Get(), &UCaptureComponent::ToggleDevice);
     PlayerInputComponent->BindKey(EKeys::One, IE_Pressed, this, &ACFPlayerCharacter::CraftCaptureDevice);
     PlayerInputComponent->BindKey(EKeys::Two, IE_Pressed, this, &ACFPlayerCharacter::CraftMedicine);

@@ -1,5 +1,6 @@
 #include "SquadScenario.h"
 #include "CFPlayerCharacter.h"
+#include "InputRoutingQA.h"
 #include "CreatureCharacter.h"
 #include "CreatureDefinition.h"
 #include "WorkStation.h"
@@ -78,10 +79,10 @@ void RunSquadScenario(UWorld* World, ACFPlayerCharacter* Hero)
     Enemy->Health = 1000; Enemy->SetActorTickEnabled(false); Enemy->GetCharacterMovement()->DisableMovement();
     Aim(Enemy); Hero->CommandFocus();
     bool Combat = Ember->FocusTarget == Enemy && !Leaf->FocusTarget && !Stone->FocusTarget;
-    Hero->CommandSpecial(); Ember->Tick(0);
-    Combat &= Ember->SpecialWindupRemaining > 0 && Ember->Stamina == 80 && Leaf->Stamina == 100 && Stone->Stamina == 100;
-    Hero->CommandSpecial(); Stone->Tick(0);
-    Combat &= Stone->SpecialWindupRemaining == 0 && Stone->Stamina == 100;
+    const bool RoutedEmber=CFInputQA::Press(Hero,EKeys::G); Ember->Tick(0);
+    Combat &= RoutedEmber && Ember->SpecialWindupRemaining > 0 && Ember->Stamina == 80 && Leaf->Stamina == 100 && Stone->Stamina == 100;
+    const bool RoutedStone=CFInputQA::Press(Hero,EKeys::G); Stone->Tick(0);
+    Combat &= RoutedStone && Stone->SpecialWindupRemaining == 0 && Stone->Stamina == 100;
     bool Reject = !Hero->SelectCompanion(Enemy) && Hero->IsCommandTarget(Ember);
     const FVector Old = Leaf->GetActorLocation(); Leaf->SetActorLocation(FVector(1500,-900,40));
     Reject &= !Hero->SelectCompanion(Leaf) && Hero->IsCommandTarget(Ember); Leaf->SetActorLocation(Old);

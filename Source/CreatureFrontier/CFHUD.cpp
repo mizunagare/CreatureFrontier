@@ -76,8 +76,9 @@ void ACFHUD::DrawHUD()
         if (Creature->bAlpha && Creature->Disposition != ECreatureDisposition::Tamed)
             DrawText(FString::Printf(TEXT("ALPHA - Crystal Quake %s %.1fs"), Creature->AlphaWindup > 0 ? TEXT("INCOMING") : TEXT("cooldown"),
                 Creature->AlphaWindup > 0 ? Creature->AlphaWindup : Creature->AlphaCooldown), FLinearColor(1,.3f,.05f), X-130, Y+115);
+        const FString Identity=Creature->Nickname.IsEmpty()?Creature->GetCreatureName():Creature->GetCreatureName()+TEXT(" / ")+Creature->GetSpeciesName();
         DrawText(FString::Printf(TEXT("%s (%s)  Lv%d  HP %.0f/%.0f  Capture %.0f%%"),
-            *Creature->GetCreatureName(), Creature->Disposition == ECreatureDisposition::Tamed ? TEXT("Companion") : TEXT("Wild"),
+            *Identity, Creature->Disposition == ECreatureDisposition::Tamed ? TEXT("Companion") : TEXT("Wild"),
             Creature->Level, Creature->Health, Creature->GetMaxHealth(), Player->CaptureComponent->CalculateCaptureChance(Creature)*100.0f),
             FLinearColor::White, X-130, Y+25);
         if (Creature->Disposition == ECreatureDisposition::Tamed)
@@ -156,7 +157,7 @@ void ACFHUD::DrawHUD()
         // Draw every background before text: Canvas may batch font glyphs across rows.
         if (Highlight != INDEX_NONE) DrawRect(FLinearColor(.08f,.22f,.28f,.9f),Left+6,103+(Highlight-Start)*70,Width-12,66);
         DrawText(FString::Printf(TEXT("TEAM  %d companions | %d-%d"),Pets.Num(),Pets.IsEmpty()?0:Start+1,FMath::Min(Start+Rows,Pets.Num())),FLinearColor::White,Left+14,30);
-        DrawText(TEXT("[ / ] browse | Enter select | Tab close"),FLinearColor::Yellow,Left+14,52);
+        DrawText(TEXT("[ / ] browse | Enter select | F4 name | Tab close"),FLinearColor::Yellow,Left+14,52);
         DrawText(TEXT("Live world - NOT paused | selection: 12m + sight"),FLinearColor::White,Left+14,73);
         if (Pets.IsEmpty()) DrawText(TEXT("No companions yet - capture a wild creature"),FLinearColor::Green,Left+14,110);
         for (int32 I=Start; I<FMath::Min(Start+Rows,Pets.Num()); ++I)
@@ -170,6 +171,7 @@ void ACFHUD::DrawHUD()
             if (Pet->Health <= 0) Status = TEXT("DOWNED - aim + P to treat");
             else if (Pet->FeedingSite.IsValid()) Status = TEXT("Seeking food");
             else if (Pet->bResumeWorkAfterRest) Status = TEXT("Auto rest / work pending");
+            if(!Pet->Nickname.IsEmpty()) Status=Pet->GetSpeciesName()+TEXT(" | ")+Status;
             if (Pet->WorkSite) { FString Job=UEnum::GetValueAsString(Pet->WorkSite->RequiredSpecialty); Job.RemoveFromStart(TEXT("EWorkSpecialty::")); Status+=TEXT(" | ")+Job; }
             if(Pet->GetFieldResource()) Status+=TEXT(" | Field resource");
             if(Pet->CarriedFood>0) Status+=FString::Printf(TEXT(" | cargo %d"),Pet->CarriedFood);

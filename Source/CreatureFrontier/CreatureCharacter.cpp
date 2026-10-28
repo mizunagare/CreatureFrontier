@@ -141,6 +141,10 @@ void ACreatureCharacter::RefreshAppearance()
 
 FString ACreatureCharacter::GetCreatureName() const
 {
+    return Disposition==ECreatureDisposition::Tamed && !Nickname.IsEmpty()?Nickname:GetSpeciesName();
+}
+FString ACreatureCharacter::GetSpeciesName() const
+{
     return Definition && !Definition->DisplayName.IsEmpty() ? Definition->DisplayName.ToString() : TEXT("Wildling");
 }
 

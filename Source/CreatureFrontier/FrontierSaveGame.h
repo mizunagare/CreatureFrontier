@@ -31,6 +31,7 @@ struct FCreatureSaveRecord
 {
     GENERATED_BODY()
     UPROPERTY() FGuid Id;
+    UPROPERTY() FString Nickname;
     UPROPERTY() TSoftClassPtr<ACreatureCharacter> CreatureClass;
     UPROPERTY() TSoftObjectPtr<UCreatureDefinition> Definition;
     UPROPERTY() FTransform Transform;

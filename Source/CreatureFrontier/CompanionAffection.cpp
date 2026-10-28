@@ -16,6 +16,11 @@ void ACreatureCharacter::RespondToPetting()
     if(HasAuthority() && Health>0 && Disposition==ECreatureDisposition::Tamed)
     { AddBond(2); PettingCooldown=30; AffectionPoseRemaining=2; }
 }
+void ACreatureCharacter::AcknowledgeName()
+{
+    if(HasAuthority() && Health>0 && Disposition==ECreatureDisposition::Tamed)
+        AffectionPoseRemaining=FMath::Max(AffectionPoseRemaining,.8f);
+}
 bool ACFPlayerCharacter::PetCompanion(ACreatureCharacter* Pet)
 {
     if(!HasAuthority() || Health<=0 || IsPauseMenuOpen() || !IsValid(Pet) || Pet->Health<=0 || Pet->Disposition!=ECreatureDisposition::Tamed || Pet->Tamer!=GetController() || GetDistanceTo(Pet)>250)
