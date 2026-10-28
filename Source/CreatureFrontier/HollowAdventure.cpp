@@ -415,6 +415,14 @@ void RunHollowAdventure(UWorld* World,ACFPlayerCharacter* Hero,int Mode)
                 const auto* Shape=Hero->GetCapsuleComponent();
                 World->SweepSingleByChannel(Block,Now,Now+Movement->Direction*100,FQuat::Identity,ECC_Pawn,
                     FCollisionShape::MakeCapsule(Shape->GetScaledCapsuleRadius(),Shape->GetScaledCapsuleHalfHeight()),Params);
+                const auto* AI=Cast<AAIController>(Pet->GetController());
+                const FVector Segment=AI?AI->GetImmediateMoveDestination():Pet->GetActorLocation();
+                FHitResult PetHit;FCollisionQueryParams PetQuery(SCENE_QUERY_STAT(HollowDynamicPet),false,Pet);
+                const auto* PetShape=Pet->GetCapsuleComponent();const FVector PetPosition=Pet->GetActorLocation();
+                World->SweepSingleByChannel(PetHit,PetPosition,PetPosition+(Segment-PetPosition).GetSafeNormal2D()*100,FQuat::Identity,ECC_Pawn,
+                    FCollisionShape::MakeCapsule(PetShape->GetScaledCapsuleRadius(),PetShape->GetScaledCapsuleHalfHeight()),PetQuery);
+                UE_LOG(LogTemp,Display,TEXT("CF_HOLLOW_DYNAMIC_PATH moveStatus=%d segment=%s blocker=%s component=%s heroBlock=%d penetrating=%d depth=%.3f"),
+                    AI?static_cast<int32>(AI->GetMoveStatus()):-1,*Segment.ToString(),*GetNameSafe(PetHit.GetActor()),*GetNameSafe(PetHit.GetComponent()),PetHit.GetActor()==Hero,PetHit.bStartPenetrating,PetHit.PenetrationDepth);
                 UE_LOG(LogTemp,Display,TEXT("CF_HOLLOW_DYNAMIC_SAMPLE time=%.2f hero=%s velocity=%s pet=%s petVelocity=%s activity=%d focus=%s blocker=%s petBlock=%d heroHP=%.1f petHP=%.1f enemyHP=%.1f distance=%.1f"),
                     FPlatformTime::Seconds()-Started,*Now.ToString(),*Hero->GetVelocity().ToString(),*Pet->GetActorLocation().ToString(),*Pet->GetVelocity().ToString(),
                     static_cast<int32>(Pet->Activity),*GetNameSafe(Pet->FocusTarget),*GetNameSafe(Block.GetActor()),Block.GetActor()==Pet,Hero->Health,Pet->Health,Enemy->Health,FVector::Dist2D(Now,Goal));
