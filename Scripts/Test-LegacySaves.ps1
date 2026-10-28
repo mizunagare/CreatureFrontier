@@ -8,7 +8,8 @@ param([Parameter(Mandatory=$true)][string]$LegacyBuildRoot,
 $ErrorActionPreference='Stop'
 $projectRoot=Split-Path $PSScriptRoot -Parent
 $exe=Join-Path $BuildRoot 'CreatureFrontier\Binaries\Win64\CreatureFrontier.exe'
-if(!(Test-Path -LiteralPath $exe)){throw 'Current executable missing'}
+if(!(Test-Path -LiteralPath $exe)){throw '当前构建的可执行程序不存在'}
+$buildHash=(Get-FileHash -LiteralPath $exe).Hash
 $run=Join-Path $projectRoot ('Saved\CargoLegacyAudit\'+(Get-Date -Format 'yyyyMMdd-HHmmss')+'-Verified')
 New-Item -ItemType Directory -Path $run | Out-Null
 $cases=@(
@@ -51,7 +52,7 @@ if($IncludeNames){$cases+=@{Slot='NameCross';Flag='CFNameRead';Marker='CF_NAME_R
 foreach($case in $cases){
     $source=Join-Path $LegacyBuildRoot ('CreatureFrontier\Saved\SaveGames\'+$case.Slot+'.sav')
     $target=Join-Path $BuildRoot ('CreatureFrontier\Saved\SaveGames\'+$case.Slot+'.sav')
-    if(!(Test-Path -LiteralPath $source)){throw "Legacy input missing: $source"}
+    if(!(Test-Path -LiteralPath $source)){throw "缺少旧版输入存档：$source"}
     New-Item -ItemType Directory -Path (Split-Path $target -Parent) -Force | Out-Null
     $backup=Join-Path $run ($case.Slot+'.current-backup')
     $existed=Test-Path -LiteralPath $target
@@ -67,16 +68,18 @@ foreach($case in $cases){
             $done=$process.WaitForExit(60000)
             if(!$done){$process.Kill();$process.WaitForExit()}
             $pass=$done -and $process.ExitCode -eq 0 -and (Test-Path -LiteralPath $log) -and [bool](Select-String -LiteralPath $log -SimpleMatch $case.Marker)
+            if($pass){$pass=!(Select-String -LiteralPath $log -Pattern 'CF_\w+ FAIL|Fatal error|Assertion failed' -Quiet)}
+            if((Get-FileHash -LiteralPath $exe).Hash -ne $buildHash){throw '旧档审计期间测试程序发生变化'}
             $results += [pscustomobject]@{Slot=$case.Slot; Attempt=$attempt; Pass=$pass; InputSHA256=(Get-FileHash -LiteralPath $legacyInput).Hash; BuildSHA256=(Get-FileHash -LiteralPath $exe).Hash}
             $results | Export-Csv -LiteralPath (Join-Path $run 'Results.csv') -NoTypeInformation
-            Write-Host "$($case.Flag) attempt=$attempt pass=$pass"
-            if(!$pass){throw "Legacy read failed; see $log"}
+            Write-Host "$($case.Flag) 第 $attempt 次读取，通过：$pass"
+            if(!$pass){throw "旧档读取失败，详见：$log"}
         }
     } finally {
         if($existed){
             Copy-Item -LiteralPath $backup -Destination $target
-            if((Get-FileHash -LiteralPath $target).Hash -ne $originalHash){throw "Test slot restore mismatch: $target"}
+            if((Get-FileHash -LiteralPath $target).Hash -ne $originalHash){throw "测试存档槽恢复校验不一致：$target"}
         } elseif(Test-Path -LiteralPath $target){Remove-Item -LiteralPath $target}
     }
 }
-Write-Host "Legacy audit passed; current test slots restored. Evidence: $run"
+Write-Host "旧档审计通过，当前测试存档槽已恢复。证据：$run"

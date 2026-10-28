@@ -9,17 +9,18 @@ if (-not $BuildRoot) {
             [pscustomobject]@{ Root=$_.FullName; Built=(Get-Item -LiteralPath $binary).LastWriteTimeUtc }
         }
     } | Sort-Object Built -Descending)
-    if ($candidates.Count -eq 0) { throw 'No packaged Development build found' }
+    if ($candidates.Count -eq 0) { throw '找不到已打包的 Development 构建' }
     $BuildRoot = $candidates[0].Root
 }
-if ($TimeoutSeconds -lt 10 -or $TimeoutSeconds -gt 60) { throw 'TimeoutSeconds must be between 10 and 60' }
-Write-Host "Testing build: $BuildRoot"
+if ($TimeoutSeconds -lt 10 -or $TimeoutSeconds -gt 60) { throw '超时时间必须为 10 至 60 秒' }
+Write-Host "正在测试构建：$BuildRoot"
 $exePath = Join-Path $BuildRoot 'CreatureFrontier\Binaries\Win64\CreatureFrontier.exe'
-if (-not (Test-Path -LiteralPath $exePath)) { throw "Development game executable not found: $exePath" }
+if (-not (Test-Path -LiteralPath $exePath)) { throw "找不到 Development 游戏程序：$exePath" }
+$buildHash=(Get-FileHash -LiteralPath $exePath).Hash
 $runName = (Get-Date -Format 'yyyyMMdd-HHmmss') + '-' + [Guid]::NewGuid().ToString('N').Substring(0,8)
 $testLogRoot = Join-Path $projectRoot (Join-Path 'Saved\PackagedTests' $runName)
 New-Item -ItemType Directory -Path $testLogRoot -Force | Out-Null
-Write-Host "Fresh test logs: $testLogRoot"
+Write-Host "本次测试日志：$testLogRoot"
 $cases = @(
     @{Flag='CFRescueMemoryTest'; Marker='CF_RESCUE_MEMORY PASS mode=0'; RequiredMarkers=@('CF_RESCUE_PAUSED_HEAL PASS')},
     @{Flag='CFRescueMemoryWrite'; Marker='CF_RESCUE_MEMORY PASS mode=1'},
@@ -140,20 +141,24 @@ foreach ($case in $cases) {
         $caseTimeout=if($case.Timeout){[int]$case.Timeout}else{$TimeoutSeconds}
         if (-not $testProcess.WaitForExit($caseTimeout * 1000)) {
             $testProcess.Kill()
-            throw "$label exceeded $caseTimeout seconds; test process stopped. Inspect $logPath"
+            throw "$label 超过 $caseTimeout 秒，已停止测试进程。详见：$logPath"
         }
-        if ($testProcess.ExitCode -ne 0) { throw "$label failed with exit code $($testProcess.ExitCode)" }
+        if ($testProcess.ExitCode -ne 0) { throw "$label 测试失败，退出码：$($testProcess.ExitCode)" }
+        if ((Get-FileHash -LiteralPath $exePath).Hash -ne $buildHash) { throw '完整回归期间测试程序发生变化' }
+        if (Select-String -LiteralPath $logPath -Pattern 'CF_\w+ FAIL|Fatal error|Assertion failed' -Quiet) {
+            throw "$label 日志包含失败标记。详见：$logPath"
+        }
         if (-not (Select-String -LiteralPath $logPath -SimpleMatch $case.Marker -Quiet)) {
-            throw "$label did not emit its success marker; inspect $logPath"
+            throw "$label 未输出必要成功标记。详见：$logPath"
         }
         if ($case.SeedMarker -and -not (Select-String -LiteralPath $logPath -SimpleMatch $case.SeedMarker -Quiet)) {
-            throw "$label ignored its replay seed; inspect $logPath"
+            throw "$label 未使用指定的回放种子。详见：$logPath"
         }
         if ($case.Pattern -and -not (Select-String -LiteralPath $logPath -Pattern $case.Pattern -Quiet)) {
-            throw "$label did not exercise two short completed legs; inspect $logPath"
+            throw "$label 未实际完成两段短程巡游。详见：$logPath"
         }
         foreach($requiredMarker in $case.RequiredMarkers){if(!(Select-String -LiteralPath $logPath -SimpleMatch $requiredMarker -Quiet)){throw "缺少专项必要标记：$requiredMarker；$logPath"}}
         if($preservedPath -and (Get-FileHash -LiteralPath $preservedPath).Hash -ne $preservedHash){throw "倒地输入存档被改写：$preservedPath"}
-        Write-Host "${label}: PASS"
+        Write-Host "${label}：通过"
     }
 }
