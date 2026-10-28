@@ -575,7 +575,7 @@ void ACFPlayerCharacter::CommandRest()
 
 void ACFPlayerCharacter::HealCompanion()
 {
-    if (!HasAuthority() || Health <= 0) return;
+    if (!HasAuthority() || Health <= 0 || UGameplayStatics::IsGamePaused(this)) return;
     auto* Pet = TraceCreature();
     if (!Pet || Pet->Tamer != GetController()) { Feedback = TEXT("瞄准自己的伙伴使用药品"); return; }
     if (Pet->Health >= Pet->GetMaxHealth()) { Feedback = TEXT("伙伴生命已满"); return; }

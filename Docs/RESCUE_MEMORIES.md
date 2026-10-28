@@ -1,4 +1,18 @@
-# 脱险归家共同经历（Editor互动首版，尚未Windows交付）
+# 脱险归家共同经历（开发验收中，尚未Windows交付）
+
+## 暂停治疗事务修复（当前候选）
+
+补查直接调用边界时发现HealCompanion未检查世界暂停，但RecordRescued会拒绝暂停内推进，造成先扣一药/回血40、经历仍Downed。先补断言，`Saved/RescuePausedHeal-Before.log` 实际出现CF_RESCUE_PAUSED_HEAL FAIL hp=40 medicine=0 state=1和总专项FAIL；Editor进程仍退出0，不能以退出码认定通过。这里验证直接入口，不宣称普通UI-only窗口能用实体P键绕过输入屏蔽。
+
+修复只在HealCompanion资源事务前增加IsGamePaused保护，暂停时扣药/生命/经历均不变，正常治疗门槛及40生命数值不改，格式仍29。专项保留失败结果再恢复后续测试夹具，不清除失败记录。Test-Packaged及Test-RescueMemory新增必须出现CF_RESCUE_PAUSED_HEAL PASS的门槛，旧程序没有新断言不能冒充已覆盖。
+
+Editor模块 `1767E78FACD7397CA48CA1404420EAE279E37F7A810E992D10879AC2FA5BB497` 编译成功，`Saved/RescueMemoryQA/20261028-193040-31f5e201/` 七进程通过，暂停断言为hp0/medicine1/state1。Windows修复版 `E:\CreatureFrontierBuilds\Windows-Rescue-Pause` 构建成功，内部EXE SHA-256 `17704D0850003170E81816F303191A4869775F1D59C2F840A7B23922F5E30812`；`Saved/RescueMemoryQA/20261028-193322-9ea02121/` 七进程也独立通过同一暂停断言。
+
+该修复程序 `Saved/RescueAdventureQA/20261028-193258-b2506d68/` 实际自然写入—1280图形安静归家—独立读取三进程通过，五张新图均已查看。新倒地输入 `CF98EECADFC48F4AA40F6748D20E1A1D4FFBE98ADA3AD742A4457EED39B34500` 在续行内不变。`Saved/CargoLegacyAudit/20261028-193248-Verified/` 的16份真实稳定包源文件、34读取进程全部通过，旧源与测试槽已校验/恢复；未借用修复前包结果。
+
+修复版完整97类/101进程现于 `Saved/PackagedTests/20261028-193632-195405c6/` 运行，尚未结束。独立图形副本 `E:\CreatureFrontierBuilds\Windows-Rescue-Pause-Graphics` 不复制正在使用的Saved目录；启动程序、内部EXE及五个Pak/IoStore文件逐一校验与17704D08原包相同，只复制上述明确的倒地输入，避免与完整回归共享可写槽。960 `Saved/RescueAdventureQA/20261028-193644-02bc4870/` 安静续行/读取与1920庆祝 `193824-d6141749` 续行/读取均退出0、必要标记齐全，两组十图已逐张查看；1920正常Playing回应、实际行走4429.3厘米。连同1280共七个进程、15张新图；它们复用同一CF98E...倒地输入且前后哈希不变，不冒充三份独立自然写入样本。原包EXE再次复核未变。更多生命周期（包括主人销毁/控制权变化）、双倒地、实体输入、正式品质和性能仍待。
+
+修复前FFB1B14C的完整回归 `Saved/PackagedTests/20261028-191934-43586cf7/` 已实际结束0，101份日志均有成功标记、无失败/致命错误、程序哈希未变，但不包含后来补出的暂停治疗断言，故不升级为交付。其指纹相同的独立副本还完成960 `192616-03aecc25` 安静和1920 `192812-425fa2b0` 庆祝各两进程、共十张已查看新图，输入仍为旧C2A67B76；与此前1280五图合为修复前15图，仅保留为基线，不能替代17704D08验收。稳定可玩包仍是Windows-Care-Route。以下“完整回归中/未检查其他尺寸”等为上一候选历史状态。
 
 ## 自然同行全链与Windows候选（完整回归中）
 

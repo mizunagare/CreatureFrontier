@@ -71,6 +71,13 @@ void RunRescueMemoryScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
         Pass &= Hero->SaveProgress(TEXT("RescueMemoryDowned"));
         if(Mode==0)
         {
+            // 世界暂停必须同时阻止扣药、回血和经历推进，不能只靠UI屏蔽输入。
+            UGameplayStatics::SetGamePaused(World,true);Hero->HealCompanion();
+            const bool PausedHeal=Pet->Health==0 && Hero->Inventory->Count(EFrontierItem::Medicine)==1 && Pet->Memory->GetRescueMemory()==ERescueJourneyMemory::Downed;
+            UE_LOG(LogTemp,Display,TEXT("CF_RESCUE_PAUSED_HEAL %s hp=%.1f medicine=%d state=%d"),PausedHeal?TEXT("PASS"):TEXT("FAIL"),Pet->Health,Hero->Inventory->Count(EFrontierItem::Medicine),int32(Pet->Memory->GetRescueMemory()));
+            Pass &= PausedHeal;UGameplayStatics::SetGamePaused(World,false);
+            // 恢复后续用药夹具，不抹掉上面失败的结果。
+            Pet->Health=0;Hero->Inventory->Restore({{EFrontierItem::Medicine,1}});
             // 药品失败不能推进，成功只消耗一药；救助后重复治疗不重置经历。
             Hero->Inventory->Consume(EFrontierItem::Medicine,1);Hero->HealCompanion();Pass &= Pet->Health==0 && Pet->Memory->GetRescueMemory()==ERescueJourneyMemory::Downed;
             Hero->Inventory->Restore({{EFrontierItem::Medicine,1}});Hero->HealCompanion();

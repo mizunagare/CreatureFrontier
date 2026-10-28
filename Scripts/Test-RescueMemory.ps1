@@ -39,6 +39,7 @@ try{
         if(!$process.WaitForExit(60000)){$process.Kill();$process.WaitForExit();throw "测试超时：$log"}
         $marker=if($index -lt 5){'CF_RESCUE_MEMORY PASS mode='+$index}elseif($index -eq 5){'CF_RESCUE_RECALL PASS'}else{'CF_RESCUE_RECALL_READ PASS'}
         if($process.ExitCode -ne 0 -or !(Select-String -LiteralPath $log -SimpleMatch $marker -Quiet) -or (Select-String -LiteralPath $log -Pattern 'CF_\w+ FAIL|Fatal error|Assertion failed' -Quiet)){throw "测试未通过：$log"}
+        if($index -eq 0 -and !(Select-String -LiteralPath $log -SimpleMatch 'CF_RESCUE_PAUSED_HEAL PASS' -Quiet)){throw '程序未验证暂停治疗边界'}
         if((Get-FileHash -LiteralPath $fingerprint).Hash -ne $hash){throw '测试期间模块发生变化'}
         $results += [pscustomobject]@{Case=$flag;Pass=$true;BuildSHA256=$hash;Log=$log}
         $results | Export-Csv -LiteralPath (Join-Path $evidence 'Results.csv') -NoTypeInformation
