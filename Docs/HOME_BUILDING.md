@@ -1,5 +1,13 @@
 # P2 — 模块化房间首版
 
+## 临时Editor门材质实例核对（2026-10-29）
+
+新增 `Content/Python/audit_home_instance.py`，在独立Editor命令let会话生成Transient门并赋予既有DA_Door，只读检查四个StaticMesh零件使用的MID和Tint，finally销毁临时门，不保存世界/资产。`Saved/HomeInstanceAudit-20261029-0200.log` 首次实际读取四件均为(0.30,0.19,0.10,1)，且共用同一MID。
+
+补充逐件RGBA误差小于0.0001的显式比对后，`Saved/HomeInstanceAudit-20261029-0204-Verified.log` 真实执行退出零，输出 `CF_HOME_INSTANCE_AUDIT PASS transient=1 saved=0 matched=4`，无Python错误。当前Editor构造样本没有发现颜色赋值丢失；共享MID也意味着现有设计没有独立门框/门扇配色。此结果不能替代打包游戏运行时或有光照渲染验证，尚不能断言灰色观感由光照导致，更不能据此宣称美术已修复。
+
+下一表现步骤应在后续开发候选中读取真实游戏建造门的MID/颜色并采集光照对照，再判断是否拆分配色或调整材质；不修改正在完整回归的EAA71545。此次仅新增诊断脚本，未改C++、已烘焙资源或现有资产；主Windows完整回归仍在 `Saved/PackagedTests/20261029-015528-01feb06f/` 运行，程序哈希复核未变，稳定交付不变。
+
 ## EAA71545旧档与完整队形矩阵完成（2026-10-29）
 
 `Saved/CargoLegacyAudit/20261029-015318-Verified/` 的38个读取结果全部通过，日志无失败/致命标记，使用固定EAA71545程序，输入只读及目标槽恢复由原脚本核对。其后主作业已进入 `Saved/PackagedTests/20261029-015528-01feb06f/` 完整游戏回归，目前未结束；下方“旧档读取仍在进行”为历史状态。
