@@ -28,6 +28,9 @@ $cases = @(
     @{Flag='CFDefenseRead'; Marker='CF_DEFENSE_READ PASS'},
     @{Flag='CFHUDLayoutTest'; Marker='CF_HUD_LAYOUT PASS'},
     @{Flag='CFHollowTest'; Marker='CF_HOLLOW PASS'},
+    @{Flag='CFHollowAdventureTest'; Marker='CF_HOLLOW_ADVENTURE PASS'; Timeout=90},
+    @{Flag='CFHollowAdventureWrite'; Marker='CF_HOLLOW_ADVENTURE_WRITE PASS'; Timeout=90},
+    @{Flag='CFHollowAdventureRead'; Marker='CF_HOLLOW_ADVENTURE_READ PASS'},
     @{Flag='CFHollowRouteTest'; Marker='CF_HOLLOW_ROUTE PASS'},
     @{Flag='CFHollowWrite'; Marker='CF_HOLLOW_WRITE PASS'},
     @{Flag='CFHollowRead'; Marker='CF_HOLLOW_READ PASS'},
@@ -114,9 +117,10 @@ foreach ($case in $cases) {
         $testProcess = Start-Process -FilePath $exePath -WorkingDirectory $BuildRoot `
             -ArgumentList $arguments `
             -WindowStyle Hidden -PassThru
-        if (-not $testProcess.WaitForExit($TimeoutSeconds * 1000)) {
+        $caseTimeout=if($case.Timeout){[int]$case.Timeout}else{$TimeoutSeconds}
+        if (-not $testProcess.WaitForExit($caseTimeout * 1000)) {
             $testProcess.Kill()
-            throw "$label exceeded $TimeoutSeconds seconds; test process stopped. Inspect $logPath"
+            throw "$label exceeded $caseTimeout seconds; test process stopped. Inspect $logPath"
         }
         if ($testProcess.ExitCode -ne 0) { throw "$label failed with exit code $($testProcess.ExitCode)" }
         if (-not (Select-String -LiteralPath $logPath -SimpleMatch $case.Marker -Quiet)) {

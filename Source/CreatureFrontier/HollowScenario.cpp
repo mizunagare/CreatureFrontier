@@ -24,6 +24,8 @@
 #include "GameFramework/Controller.h"
 #include "NavMesh/NavMeshBoundsVolume.h"
 
+TArray<FVector> MakeHollowRoutePoints()
+{return {FVector(-450,-1100,40),FVector(0,-1750,40),FVector(0,-2300,40),FVector(0,-2700,40),FVector(260,-2850,40),FVector(260,-3250,40),FVector(-300,-3350,40),FVector(-550,-3750,40),FVector(-550,-3930,40)};}
 namespace CFHollowQA
 {
 AResourceNode* Node(UWorld* World,uint32 Index)
@@ -114,7 +116,7 @@ void RunHollowScenario(UWorld* World,ACFPlayerCharacter* Hero,int Mode)
         }
         if(!Path || !Path->IsValid() || Path->IsPartial() || Path->PathPoints.Num()<4){UE_LOG(LogTemp,Error,TEXT("CF_HOLLOW_ROUTE FAIL path"));FPlatformMisc::RequestExitWithStatus(false,1);return;}
         auto State=MakeShared<FRoute>();State->World=World;State->Hero=Hero;State->Pet=Pet;State->Movement=NewObject<UHomeMovementProbe>(Hero);State->Movement->RegisterComponent();
-        State->Points={FVector(-450,-1100,40),FVector(0,-1750,40),FVector(0,-2300,40),FVector(0,-2700,40),FVector(260,-2850,40),FVector(260,-3250,40),FVector(-300,-3350,40),FVector(-550,-3750,40),FVector(-550,-3930,40)};
+        State->Points=MakeHollowRoutePoints();
         State->Previous=Hero->GetActorLocation();State->Deadline=FPlatformTime::Seconds()+55;
         FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([State](float){return State->Tick();}),.1f);return;
     }
