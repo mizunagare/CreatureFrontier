@@ -1,7 +1,9 @@
-param([string]$BuildRoot='', [switch]$Editor, [switch]$ReuseInput,
+param([string]$BuildRoot='', [switch]$Editor, [switch]$ReuseInput, [switch]$Preview,
+      [int]$Width=1280, [int]$Height=720,
       [string]$EngineRoot='D:\Epic\UE_5.8')
 $ErrorActionPreference='Stop'
 $projectRoot=Split-Path $PSScriptRoot -Parent
+if($Width -lt 640 -or $Width -gt 4096 -or $Height -lt 360 -or $Height -gt 2160){throw '预览尺寸超出安全范围'}
 if($Editor){
     $exe=Join-Path $EngineRoot 'Engine\Binaries\Win64\UnrealEditor.exe'
     $working=$projectRoot
@@ -29,7 +31,10 @@ $results=@()
 Write-Host "救助证据目录：$run"
 foreach($case in $cases){
     $log=Join-Path $run ($case.Flag+'.log')
-    $arguments=$prefix+@('-nullrhi','-nosound','-unattended','-nop4',('-'+$case.Flag),('-abslog="'+$log+'"'))
+    $arguments=$prefix+@('-nosound','-unattended','-nop4',('-'+$case.Flag),('-abslog="'+$log+'"'))
+    if($Preview -and $case.Flag -eq 'CFRescueNaturalResume'){
+        $arguments+=@('-CFRescuePreview','-RenderOffscreen','-ForceRes',('-ResX='+$Width),('-ResY='+$Height),'-norhithread','-forcerhibypass','-ExecCmds="t.MaxFPS 60,r.MotionBlurQuality 0,r.DefaultFeature.MotionBlur 0,r.AntiAliasingMethod 1"')
+    }else{$arguments+='-nullrhi'}
     $process=Start-Process -FilePath $exe -WorkingDirectory $working -ArgumentList $arguments -WindowStyle Hidden -PassThru
     if(!$process.WaitForExit($case.Timeout*1000)){$process.Kill();$process.WaitForExit();throw "救助测试超时：$log"}
     if($process.ExitCode -ne 0 -or !(Select-String -LiteralPath $log -SimpleMatch $case.Marker -Quiet) -or (Select-String -LiteralPath $log -Pattern 'CF_RESCUE.*FAIL|Fatal error|Assertion failed' -Quiet)){throw "救助测试失败：$log"}
@@ -39,9 +44,29 @@ foreach($case in $cases){
     if(!(Test-Path -LiteralPath $inputCopy)){Copy-Item -LiteralPath $source -Destination $inputCopy}
     if((Get-FileHash -LiteralPath $inputCopy).Hash -ne $inputHash){throw '留存输入副本哈希不符'}
     if($case.Flag -eq 'CFRescueNaturalRead'){Copy-Item -LiteralPath (Join-Path $saveRoot 'RescueNaturalFinal.sav') -Destination (Join-Path $run 'Final.sav')}
+    if($Preview -and $case.Flag -eq 'CFRescueNaturalResume'){
+        $contents=Get-Content -LiteralPath $log -Raw
+        $rootMatch=[regex]::Match($contents,'CF_RESCUE_SHOT_ROOT [^\r\n]*[/\\]([A-F0-9]{32})')
+        if(!$rootMatch.Success){throw '缺少新生成取景目录'}
+        $shots=Join-Path (Split-Path $saveRoot -Parent) ('RescuePreview\'+$rootMatch.Groups[1].Value)
+        $frames=@()
+        foreach($scene in @('Restored','Rescued','Home')){
+            $match=[regex]::Match($contents,('CF_RESCUE_SHOT '+$scene+' viewport='+$Width+'x'+$Height+' frame=(\d+)'))
+            if(!$match.Success){throw "缺少实际取景帧：$scene"};$frames+=$match.Groups[1].Value
+            $sourceImage=Join-Path $shots ($scene+'.png')
+            if(!(Test-Path -LiteralPath $sourceImage) -or (Get-Item -LiteralPath $sourceImage).Length -lt 1000){throw "缺少取景图片：$scene"}
+            $header=New-Object byte[] 24;$stream=[IO.File]::OpenRead($sourceImage)
+            try{$read=$stream.Read($header,0,24)}finally{$stream.Dispose()}
+            $pngWidth=[int]$header[16]*16777216+[int]$header[17]*65536+[int]$header[18]*256+[int]$header[19]
+            $pngHeight=[int]$header[20]*16777216+[int]$header[21]*65536+[int]$header[22]*256+[int]$header[23]
+            if($read -ne 24 -or $header[0] -ne 137 -or $header[1] -ne 80 -or $pngWidth -ne $Width -or $pngHeight -ne $Height){throw "PNG尺寸或格式不符：$scene"}
+            Copy-Item -LiteralPath $sourceImage -Destination (Join-Path $run ($scene+'.png'))
+        }
+        if(@($frames | Sort-Object -Unique).Count -ne 3){throw '取景布局帧重复'}
+    }
     if((Get-FileHash -LiteralPath $exe).Hash -ne $buildHash){throw '测试程序发生变化'}
     if($module -and (Get-FileHash -LiteralPath $module).Hash -ne $moduleHash){throw 'Editor游戏模块发生变化'}
-    $results+=[pscustomobject]@{Flag=$case.Flag;Pass=$true;Editor=[bool]$Editor;InputSHA256=$inputHash;BuildSHA256=$buildHash;ModuleSHA256=$moduleHash;Log=$log}
+    $results+=[pscustomobject]@{Flag=$case.Flag;Pass=$true;Editor=[bool]$Editor;Preview=[bool]$Preview;Resolution=($Width.ToString()+'x'+$Height);InputSHA256=$inputHash;BuildSHA256=$buildHash;ModuleSHA256=$moduleHash;Log=$log}
     $results | Export-Csv -LiteralPath (Join-Path $run 'Results.csv') -NoTypeInformation
     Write-Host "$($case.Flag)：通过，输入文件未改写"
 }

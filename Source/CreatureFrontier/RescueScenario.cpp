@@ -21,6 +21,34 @@
 #include "WorldLoot.h"
 #include "BaseBuildingComponent.h"
 #include "Algo/Reverse.h"
+#include "CFHUD.h"
+#include "GameFramework/PlayerController.h"
+#include "UnrealClient.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
+#include "Misc/Paths.h"
+#include "HAL/FileManager.h"
+
+namespace
+{
+struct FRescueShots
+{
+    FString Root,Aiming;TSet<FString> Taken;uint64 LastFrame=MAX_uint64,AimFrame=0;
+    bool Ready(ACFPlayerCharacter* Hero,ACreatureCharacter* Pet,const TCHAR* Name)
+    {
+        if(Root.IsEmpty())return true;
+        if(Taken.Contains(Name))return !FScreenshotRequest::IsScreenshotRequested();
+        const auto View=(Pet->GetActorLocation()-Hero->FirstPersonCamera->GetComponentLocation()).Rotation();Hero->GetController()->SetControlRotation(View);Hero->FirstPersonCamera->SetWorldRotation(View);
+        auto* PC=Cast<APlayerController>(Hero->GetController());auto* HUD=PC?Cast<ACFHUD>(PC->GetHUD()):nullptr;
+        if(!HUD || FScreenshotRequest::IsScreenshotRequested())return false;
+        const auto& Audit=HUD->GetLayoutAudit();if(!Audit.bFits || !Audit.bNoOverlap || !Audit.bCenterClear || Audit.Frame==LastFrame)return false;
+        if(Aiming!=Name){Aiming=Name;AimFrame=Audit.Frame;return false;}if(Audit.Frame<=AimFrame)return false;
+        // 请求前保持一个布局帧，让真实镜头与身体姿态进入渲染；不暂停世界。
+        LastFrame=Audit.Frame;Taken.Add(Name);FScreenshotRequest::RequestScreenshot(Root/(FString(Name)+TEXT(".png")),true,false);
+        UE_LOG(LogTemp,Display,TEXT("CF_RESCUE_SHOT %s viewport=%.0fx%.0f frame=%llu"),Name,Audit.Viewport.X,Audit.Viewport.Y,Audit.Frame);return false;
+    }
+};
+}
 
 void RunRescueGateScenario(UWorld* World, ACFPlayerCharacter* Hero)
 {
@@ -123,8 +151,11 @@ void RunNaturalRescueResume(UWorld* World, ACFPlayerCharacter* Hero, bool ReadFi
     auto* Input=NewObject<UHomeMovementProbe>(Hero);Input->RegisterComponent();auto Points=MakeHollowRoutePoints();Algo::Reverse(Points);Points.Add(FVector(-250,-400,40));
     // 先到最近的原路线点，后沿原折返通道返家，不把伙伴移回基地。
     int32 Nearest=0;for(int32 I=1;I<Points.Num();++I)if(FVector::Dist2D(Hero->GetActorLocation(),Points[I])<FVector::Dist2D(Hero->GetActorLocation(),Points[Nearest]))Nearest=I;
+    auto Shots=MakeShared<FRescueShots>();
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFRescuePreview")))
+    {Shots->Root=FPaths::ProjectSavedDir()/TEXT("RescuePreview")/FGuid::NewGuid().ToString(EGuidFormats::Digits);IFileManager::Get().MakeDirectory(*Shots->Root,true);UE_LOG(LogTemp,Display,TEXT("CF_RESCUE_SHOT_ROOT %s"),*Shots->Root);}
     const double Deadline=FPlatformTime::Seconds()+120;CFInputQA::Press(Hero,EKeys::LeftShift);
-    FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([World,Hero,Pet,Enemy,Camp,Input,Points,Snapshot,Deadline,Index=Nearest,Stage=0,Skill=false,Travel=0.f,Previous=Pet->GetActorLocation()](float) mutable
+    FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([World,Hero,Pet,Enemy,Camp,Input,Points,Snapshot,Shots,Deadline,Index=Nearest,Stage=0,Skill=false,Travel=0.f,Previous=Pet->GetActorLocation()](float) mutable
     {
         const float Step=FVector::Dist(Pet->GetActorLocation(),Previous);Travel+=Step;Previous=Pet->GetActorLocation();
         if(FPlatformTime::Seconds()>Deadline || Hero->Health<=0 || (Stage>0 && Pet->Health<=0) || Step>160)
@@ -132,6 +163,10 @@ void RunNaturalRescueResume(UWorld* World, ACFPlayerCharacter* Hero, bool ReadFi
         auto Aim=[Hero](AActor* Actor){const auto View=(Actor->GetActorLocation()-Hero->FirstPersonCamera->GetComponentLocation()).Rotation();Hero->GetController()->SetControlRotation(View);Hero->FirstPersonCamera->SetWorldRotation(View);};
         if(Stage==0)
         {
+            if(!Shots->Root.IsEmpty() && !Shots->Taken.Contains(TEXT("Restored")) && Hero->GetDistanceTo(Pet)<450)
+            {CFInputQA::Release(Hero,EKeys::LeftShift);Input->Direction=(Hero->GetActorLocation()-Pet->GetActorLocation()).GetSafeNormal2D();Aim(Pet);return true;}
+            if(!Shots->Root.IsEmpty() && !Hero->Pace->IsSlowWalking())CFInputQA::Press(Hero,EKeys::LeftShift);
+            Input->Direction=FVector::ZeroVector;if(!Shots->Ready(Hero,Pet,TEXT("Restored")))return true;
             // 先用真实侧移取得对敌人的视线，避免救起后仍被伙伴胶囊挡住指令射线。
             Aim(Enemy);if(Hero->TraceCreature()!=Enemy){const FVector Toward=(Enemy->GetActorLocation()-Hero->GetActorLocation()).GetSafeNormal2D();Input->Direction=FVector(-Toward.Y,Toward.X,0);return true;}
             Aim(Pet);if(Hero->TraceCreature()!=Pet){Input->Direction=(Pet->GetActorLocation()-Hero->GetActorLocation()).GetSafeNormal2D();return true;}
@@ -143,6 +178,7 @@ void RunNaturalRescueResume(UWorld* World, ACFPlayerCharacter* Hero, bool ReadFi
         }
         if(Stage==1)
         {
+            if(!Shots->Ready(Hero,Pet,TEXT("Rescued")))return true;
             Input->Direction=FVector::ZeroVector;Skill |= Pet->SpecialCooldownRemaining>0;
             if(Enemy->Health>0){Aim(Enemy);if(Hero->TraceCreature()==Enemy){CFInputQA::Press(Hero,EKeys::Q);if(!Skill)CFInputQA::Press(Hero,EKeys::G);}return true;}
             Stage=2;CFInputQA::Press(Hero,EKeys::F);
@@ -150,6 +186,7 @@ void RunNaturalRescueResume(UWorld* World, ACFPlayerCharacter* Hero, bool ReadFi
         if(Index<Points.Num())
         {if(FVector::Dist2D(Hero->GetActorLocation(),Points[Index])<70){++Index;Input->Direction=FVector::ZeroVector;}else{Input->Direction=(Points[Index]-Hero->GetActorLocation()).GetSafeNormal2D();Hero->GetController()->SetControlRotation(Input->Direction.Rotation());}return true;}
         Input->Direction=FVector::ZeroVector;if(Pet->GetDistanceTo(Hero)>300)return true;
+        if(!Shots->Ready(Hero,Pet,TEXT("Home")))return true;
         CFInputQA::Release(Hero,EKeys::LeftShift);const bool Pass=Skill && Travel>2000 && Snapshot() && Hero->SaveProgress(TEXT("RescueNaturalFinal"));
         UE_LOG(LogTemp,Display,TEXT("CF_RESCUE_NATURAL_RESUME %s petHP=%.1f travel=%.1f skill=%d"),Pass?TEXT("PASS"):TEXT("FAIL"),Pet->Health,Travel,Skill);FPlatformMisc::RequestExitWithStatus(false,Pass?0:1);return false;
     }),.1f);
