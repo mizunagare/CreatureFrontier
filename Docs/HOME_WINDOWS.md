@@ -1,5 +1,15 @@
 # 开放窗墙
 
+## 改建后的伙伴真实通行与安全封回
+
+复用门导航场景，新增显式 `-CFHomeReplaceNavigation`（同用CFDoorNavigationTest或CFDoorNavigationRotatedTest）。付费围合房间先将门替换实墙，伙伴在外跟随且无完整入室路径；把实墙原位换门框后，由真实Actor Tick/导航/碰撞进入。伙伴中心经过开口时尝试封墙必须拒绝且材料不变，随后正常入室，再调整玩家目的地让伙伴真实离开，最终门框换实墙。成功替换核对身份/地板/变换及成本返还，封回后等待1秒再验证室内目标无完整路径。
+
+仅夹具调整玩家站位和初始化伙伴；伙伴生成后不再传送、不手动Tick/停AI，采样移动连续、生命保持。环境既有生物/遭遇被隔离，只有单只苔跳兽；替换直接调用正式事务，并非本场景已验证硬件或双确认输入，更不是开放世界完整自然冒险。
+
+Editor模块 `D92E6A3D9E9717A27922188D8C62E79FECF894BB2099685CE59AB9A5AADAD9FC` 重建成功，实际30上限三进程：`Saved/HomeReplace-Navigation-Sealed-20261029.log` 原朝向行程596.3厘米、`HomeReplace-Navigation-Rotated-20261029.log` 90度597.7厘米，两者封闭/进入/占位拒绝/离开/连续与封回导航标记均PASS；`HomeReplace-DoorNavRegression-20261029.log` 原门开关导航回归PASS596.4厘米。三进程退出0、上限回显核对、无失败/致命/断言。首版未加封回延迟的D6D70CE样本独立保留，不混同新模块证据。
+
+Windows、更多物种/群体拥堵、自然任务改道、图形与跨存档通行仍待；315341DF包不含新QA，不以其八项矩阵冒充此链验收。原恢复卡路与门状态存档缺口保留，稳定入口不升。
+
 ## Windows扩展矩阵与旋转冷启动完成
 
 新候选 `E:\CreatureFrontierBuilds\Windows-Home-Replacement-Matrix` 独立Development打包成功，原进程36941退出0、BuildCookRun74秒，内部EXE `315341DFB744340522969BBE045A91CFD70D7366879A36F5F85013A6A4F13D08`，格式32。保留所有旧包和玩家存档；D盘6.65GB、E盘36.02GB可用，无手动删除。

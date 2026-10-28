@@ -133,11 +133,13 @@ AHomeModule* CFDoorNavigationQA::Room(UWorld* World,ACFPlayerCharacter* Hero,flo
 void RunHomeDoorNavigationScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Rotated)
 {
     const float Orientation=Rotated?90.f:0.f;
+    const bool Replacing=FParse::Param(FCommandLine::Get(),TEXT("CFHomeReplaceNavigation"));
     auto* Door=CFDoorNavigationQA::Room(World,Hero,Orientation);
+    if(Door && Replacing){Hero->HomeBuilding->Selected=EHomeModuleKind::Wall;Door=Hero->HomeBuilding->ReplaceWall(Door);}
     auto* Definition=LoadObject<UCreatureDefinition>(nullptr,TEXT("/Game/Creatures/DA_Mosskip.DA_Mosskip"));
     if(!Door || !Definition){UE_LOG(LogTemp,Error,TEXT("CF_DOOR_NAV FAIL fixture %s"),*Hero->Feedback);FPlatformMisc::RequestExitWithStatus(false,1);return;}
     const auto Poll=MakeShared<FTimerHandle>();
-    World->GetTimerManager().SetTimer(*Poll,[World,Hero,Door,Definition,Poll,Orientation,Phase=0,At=World->GetTimeSeconds(),Pet=static_cast<ACreatureCharacter*>(nullptr),
+    World->GetTimerManager().SetTimer(*Poll,[World,Hero,Door,Definition,Poll,Orientation,Replacing,Phase=0,At=World->GetTimeSeconds(),Pet=static_cast<ACreatureCharacter*>(nullptr),
         Previous=FVector::ZeroVector,Travel=0.,ClosedMaxY=-DBL_MAX,Closed=false,Opened=false,Entered=false,Occupied=false,Exited=false,Continuous=true]() mutable
     {
         const double Elapsed=World->GetTimeSeconds()-At;
@@ -145,6 +147,7 @@ void RunHomeDoorNavigationScenario(UWorld* World,ACFPlayerCharacter* Hero,bool R
         {
             UE_LOG(LogTemp,Display,TEXT("CF_DOOR_NAV %s yaw=%.0f phase=%d closed=%d open=%d entered=%d occupied=%d exited=%d continuous=%d travel=%.1f pet=%s feedback=%s"),
                 Passed?TEXT("PASS"):TEXT("FAIL"),Orientation,Phase,Closed,Opened,Entered,Occupied,Exited,Continuous,Travel,Pet?*Pet->GetActorLocation().ToString():TEXT("无"),*Hero->Feedback);
+            if(Replacing)UE_LOG(LogTemp,Display,TEXT("CF_HOME_REPLACE_NAV %s yaw=%.0f closed=%d entered=%d occupied=%d exited=%d"),Passed?TEXT("PASS"):TEXT("FAIL"),Orientation,Closed,Entered,Occupied,Exited);
             FTimerHandle Handle=*Poll;World->GetTimerManager().ClearTimer(Handle);FPlatformMisc::RequestExitWithStatus(false,Passed?0:1);
         };
         if(Pet)
@@ -166,22 +169,42 @@ void RunHomeDoorNavigationScenario(UWorld* World,ACFPlayerCharacter* Hero,bool R
         {
             ClosedMaxY=FMath::Max(ClosedMaxY,CFDoorNavigationQA::Original(Pet->GetActorLocation(),Orientation).Y);
             if(Elapsed<4)return;
-            Closed=Door->DoorState==1 && ClosedMaxY<-1030 && Pet->Activity==ECreatureActivity::Follow &&
+            Closed=(Replacing?Door->GetKind()==EHomeModuleKind::Wall:Door->DoorState==1) && ClosedMaxY<-1030 && Pet->Activity==ECreatureActivity::Follow &&
                 CFDoorNavigationQA::Original(Pet->GetFollowDestination(),Orientation).Y>-950 && !CFDoorNavigationQA::PathInside(World,Pet,Orientation);
             UE_LOG(LogTemp,Display,TEXT("CF_DOOR_NAV_CLOSED %s maxY=%.1f destination=%s"),Closed?TEXT("PASS"):TEXT("FAIL"),ClosedMaxY,*Pet->GetFollowDestination().ToString());
             if(!Closed){Finish(false);return;}
             // 只调整玩家取景/开门位置；伙伴此后始终由真实导航和碰撞移动。
-            Hero->SetActorLocation(CFDoorNavigationQA::Point(FVector(-400,-720,60),Orientation));Opened=CFDoorNavigationQA::Toggle(Hero,Door,Orientation) && Door->DoorState==2;
+            Hero->SetActorLocation(CFDoorNavigationQA::Point(FVector(-400,-720,60),Orientation));
+            if(Replacing)
+            {
+                const auto Id=Door->PersistentId;const auto Floor=Door->FloorId;const auto Transform=Door->GetActorTransform();
+                const int32 Before=Hero->Inventory->Count(EFrontierItem::Material),Refund=Door->PaidMaterials/2;
+                Hero->HomeBuilding->Selected=EHomeModuleKind::Doorway;Door=Hero->HomeBuilding->ReplaceWall(Door);
+                Opened=Door && Door->PersistentId==Id && Door->FloorId==Floor && Door->GetActorTransform().Equals(Transform) && Hero->Inventory->Count(EFrontierItem::Material)==Before-Door->PaidMaterials+Refund;
+            }
+            else Opened=CFDoorNavigationQA::Toggle(Hero,Door,Orientation) && Door->DoorState==2;
             CFDoorNavigationQA::Facing(Hero,90+Orientation);
             if(!Opened){Finish(false);return;}
             At=World->GetTimeSeconds();Phase=2;return;
         }
         if(Phase==2)
         {
+            if(Replacing && !Occupied)
+            {
+                const double Y=CFDoorNavigationQA::Original(Pet->GetActorLocation(),Orientation).Y;
+                if(Y>-1030 && Y<-970)
+                {
+                    const int32 Before=Hero->Inventory->Count(EFrontierItem::Material);
+                    Hero->HomeBuilding->Selected=EHomeModuleKind::Wall;
+                    Occupied=!Hero->HomeBuilding->ReplaceWall(Door) && IsValid(Door) && Hero->Inventory->Count(EFrontierItem::Material)==Before;
+                    if(!Occupied){Finish(false);return;}
+                }
+                else if(Y>=-970){Finish(false);return;}
+            }
             if(CFDoorNavigationQA::Original(Pet->GetActorLocation(),Orientation).Y<-930 && Elapsed<12)return;
             Entered=CFDoorNavigationQA::Original(Pet->GetActorLocation(),Orientation).Y>-930 && Pet->GetActorLocation().Z>40 && CFDoorNavigationQA::PathInside(World,Pet,Orientation);
             if(!Entered){Finish(false);return;}
-            Occupied=!CFDoorNavigationQA::Toggle(Hero,Door,Orientation) && Door->DoorState==2 && Hero->Feedback.Contains(TEXT("活动范围"));
+            if(!Replacing)Occupied=!CFDoorNavigationQA::Toggle(Hero,Door,Orientation) && Door->DoorState==2 && Hero->Feedback.Contains(TEXT("活动范围"));
             if(!Occupied){Finish(false);return;}
             Hero->SetActorLocation(CFDoorNavigationQA::Point(FVector(-400,-1250,60),Orientation));CFDoorNavigationQA::Facing(Hero,-90+Orientation);
             At=World->GetTimeSeconds();Phase=3;return;
@@ -190,8 +213,23 @@ void RunHomeDoorNavigationScenario(UWorld* World,ACFPlayerCharacter* Hero,bool R
         {
             if(CFDoorNavigationQA::Original(Pet->GetActorLocation(),Orientation).Y>-1050 && Elapsed<12)return;
             Exited=CFDoorNavigationQA::Original(Pet->GetActorLocation(),Orientation).Y<-1050;
-            const bool Reclosed=Exited && CFDoorNavigationQA::Toggle(Hero,Door,Orientation) && Door->DoorState==1;
-            Finish(Closed && Opened && Entered && Occupied && Exited && Reclosed && Travel>400);return;
+            bool Reclosed=false;
+            if(Exited && Replacing)
+            {
+                const auto Id=Door->PersistentId;const int32 Before=Hero->Inventory->Count(EFrontierItem::Material),Refund=Door->PaidMaterials/2;
+                Hero->HomeBuilding->Selected=EHomeModuleKind::Wall;Door=Hero->HomeBuilding->ReplaceWall(Door);
+                Reclosed=Door && Door->PersistentId==Id && Hero->Inventory->Count(EFrontierItem::Material)==Before-Door->PaidMaterials+Refund;
+            }
+            else Reclosed=Exited && CFDoorNavigationQA::Toggle(Hero,Door,Orientation) && Door->DoorState==1;
+            const bool Passed=Closed && Opened && Entered && Occupied && Exited && Reclosed && Travel>400;
+            if(Replacing && Passed){At=World->GetTimeSeconds();Phase=4;return;}
+            Finish(Passed);return;
+        }
+        if(Phase==4 && Elapsed>=1)
+        {
+            const bool Sealed=Door->GetKind()==EHomeModuleKind::Wall && !CFDoorNavigationQA::PathInside(World,Pet,Orientation);
+            UE_LOG(LogTemp,Display,TEXT("CF_HOME_REPLACE_NAV_SEALED %s"),Sealed?TEXT("PASS"):TEXT("FAIL"));
+            Finish(Sealed && Closed && Opened && Entered && Occupied && Exited && Continuous);return;
         }
     },.1f,true);
 }
