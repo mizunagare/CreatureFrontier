@@ -45,9 +45,9 @@ $cases = @(
     @{Flag='CFHollowDownedResume'; Marker='CF_HOLLOW_DOWNED_RESUME PASS'; Timeout=195; PreserveSlot='HollowDownedCross'},
     @{Flag='CFHollowCheckpointRead'; Marker='CF_HOLLOW_CHECKPOINT_READ PASS'},
     @{Flag='CFRescueGatesTest'; Marker='CF_RESCUE_GATES PASS'},
-    @{Flag='CFRescueNaturalWrite'; Marker='CF_RESCUE_NATURAL_WRITE PASS'; Timeout=115},
-    @{Flag='CFRescueNaturalResume'; Marker='CF_RESCUE_NATURAL_RESUME PASS'; Timeout=135; PreserveSlot='RescueNaturalDowned'},
-    @{Flag='CFRescueNaturalRead'; Marker='CF_RESCUE_NATURAL_READ PASS'},
+    @{Flag='CFRescueNaturalWrite'; Marker='CF_RESCUE_NATURAL_WRITE PASS'; Timeout=115; Arguments=@('-CFRescueJourney'); RequiredMarkers=@('CF_RESCUE_JOURNEY_SOURCE PASS')},
+    @{Flag='CFRescueNaturalResume'; Marker='CF_RESCUE_NATURAL_RESUME PASS'; Timeout=135; PreserveSlot='RescueNaturalDowned'; Arguments=@('-CFRescueJourney'); RequiredMarkers=@('CF_RESCUE_JOURNEY_COMMIT PASS','CF_RESCUE_JOURNEY_RESPONSE PASS')},
+    @{Flag='CFRescueNaturalRead'; Marker='CF_RESCUE_NATURAL_READ PASS'; Arguments=@('-CFRescueJourney'); RequiredMarkers=@('CF_RESCUE_JOURNEY_READ PASS')},
     @{Flag='CFHollowRouteTest'; Marker='CF_HOLLOW_ROUTE PASS'},
     @{Flag='CFHollowWrite'; Marker='CF_HOLLOW_WRITE PASS'},
     @{Flag='CFHollowRead'; Marker='CF_HOLLOW_READ PASS'},
@@ -151,6 +151,7 @@ foreach ($case in $cases) {
         if ($case.Pattern -and -not (Select-String -LiteralPath $logPath -Pattern $case.Pattern -Quiet)) {
             throw "$label did not exercise two short completed legs; inspect $logPath"
         }
+        foreach($requiredMarker in $case.RequiredMarkers){if(!(Select-String -LiteralPath $logPath -SimpleMatch $requiredMarker -Quiet)){throw "缺少专项必要标记：$requiredMarker；$logPath"}}
         if($preservedPath -and (Get-FileHash -LiteralPath $preservedPath).Hash -ne $preservedHash){throw "倒地输入存档被改写：$preservedPath"}
         Write-Host "${label}: PASS"
     }

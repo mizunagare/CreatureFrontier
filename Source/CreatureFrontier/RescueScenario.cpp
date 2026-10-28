@@ -20,6 +20,8 @@
 #include "GameFramework/Controller.h"
 #include "WorldLoot.h"
 #include "BaseBuildingComponent.h"
+#include "CompanionMemoryComponent.h"
+#include "Framework/Application/SlateApplication.h"
 #include "Algo/Reverse.h"
 #include "CFHUD.h"
 #include "GameFramework/PlayerController.h"
@@ -131,6 +133,7 @@ void RunRescueGateScenario(UWorld* World, ACFPlayerCharacter* Hero)
 
 void RunNaturalRescueCheckpoint(UWorld* World, ACFPlayerCharacter* Hero)
 {
+    const bool Journey=FParse::Param(FCommandLine::Get(),TEXT("CFRescueJourney"));
     AWildEncounter* Camp=nullptr;for(TActorIterator<AWildEncounter> It(World);It;++It)if(It->EncounterId==TEXT("EmberHollow"))Camp=*It;
     auto* Enemy=Camp?Camp->GetResident():nullptr;auto* Definition=LoadObject<UCreatureDefinition>(nullptr,TEXT("/Game/Creatures/DA_Craglet.DA_Craglet"));
     if(!Enemy || !Definition || Enemy->Level!=3){FPlatformMisc::RequestExitWithStatus(false,1);return;}
@@ -142,7 +145,7 @@ void RunNaturalRescueCheckpoint(UWorld* World, ACFPlayerCharacter* Hero)
     auto* Input=NewObject<UHomeMovementProbe>(Hero);Input->RegisterComponent();
     auto Points=MakeHollowRoutePoints();const double Deadline=FPlatformTime::Seconds()+100;
     if(!CFInputQA::Press(Hero,EKeys::LeftShift)){FPlatformMisc::RequestExitWithStatus(false,1);return;}
-    FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([World,Hero,Pet,Enemy,Camp,Input,Points,Deadline,Index=0,Previous=Hero->GetActorLocation(),Travel=0.f,Engaged=false](float) mutable
+    FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([World,Hero,Pet,Enemy,Camp,Input,Points,Deadline,Journey,Index=0,Previous=Hero->GetActorLocation(),Travel=0.f,Engaged=false](float) mutable
     {
         const FVector Now=Hero->GetActorLocation();const float Step=FVector::Dist2D(Now,Previous);Travel+=Step;Previous=Now;
         if(FPlatformTime::Seconds()>Deadline || Hero->Health<=0 || Step>160 || !Enemy->IsActorTickEnabled() || !Pet->IsActorTickEnabled() || Camp->GetResident()!=Enemy)
@@ -151,7 +154,9 @@ void RunNaturalRescueCheckpoint(UWorld* World, ACFPlayerCharacter* Hero)
         {
             Input->Direction=FVector::ZeroVector;CFInputQA::Release(Hero,EKeys::LeftShift);
             AResourceNode* Cache=nullptr;for(TActorIterator<AResourceNode> It(World);It;++It)if(It->PersistentId==FGuid(0xCF170000,0,0,11))Cache=*It;
-            const bool Pass=Engaged && Travel>2000 && Now.Y<-2700 && Enemy->Health>0 && Enemy->Health<Enemy->GetMaxHealth() && Cache && Cache->Remaining==6 && Hero->Inventory->Count(EFrontierItem::Medicine)==1 && Hero->Inventory->Count(EFrontierItem::Material)==7 && Hero->SaveProgress(TEXT("RescueNaturalDowned"));
+            const bool Recorded=Pet->Memory->GetRescueMemory()==ERescueJourneyMemory::Downed && Pet->Memory->GetRescueSource()==Camp->EncounterId;
+            if(Journey)UE_LOG(LogTemp,Display,TEXT("CF_RESCUE_JOURNEY_SOURCE %s state=%d source=%s heroDistance=%.1f"),Recorded?TEXT("PASS"):TEXT("FAIL"),int32(Pet->Memory->GetRescueMemory()),*Pet->Memory->GetRescueSource().ToString(),Hero->GetDistanceTo(Pet));
+            const bool Pass=Engaged && Travel>2000 && Now.Y<-2700 && Enemy->Health>0 && Enemy->Health<Enemy->GetMaxHealth() && Cache && Cache->Remaining==6 && Hero->Inventory->Count(EFrontierItem::Medicine)==1 && Hero->Inventory->Count(EFrontierItem::Material)==7 && (!Journey || Recorded) && Hero->SaveProgress(TEXT("RescueNaturalDowned"));
             UE_LOG(LogTemp,Display,TEXT("CF_RESCUE_NATURAL_WRITE %s travel=%.1f heroHP=%.1f petHP=%.1f enemyHP=%.1f pet=%s"),Pass?TEXT("PASS"):TEXT("FAIL"),Travel,Hero->Health,Pet->Health,Enemy->Health,*Pet->PersistentId.ToString());FPlatformMisc::RequestExitWithStatus(false,Pass?0:1);return false;
         }
         if(Now.Y<-2700 && Enemy->Disposition==ECreatureDisposition::Hostile)
@@ -168,27 +173,31 @@ void RunNaturalRescueCheckpoint(UWorld* World, ACFPlayerCharacter* Hero)
 
 void RunNaturalRescueResume(UWorld* World, ACFPlayerCharacter* Hero, bool ReadFinal)
 {
+    const bool Journey=FParse::Param(FCommandLine::Get(),TEXT("CFRescueJourney"));
+    const bool Celebrate=FParse::Param(FCommandLine::Get(),TEXT("CFRescueJourneyCelebrate"));
     if(FParse::Param(FCommandLine::Get(),TEXT("CFRescueReturnReplay"))){ReplayRescueReturn(World,Hero);return;}
     const auto* Source=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("RescueNaturalDowned"),0));
     const auto* Record=Source?Source->Creatures.FindByPredicate([](const auto& R){return R.bOwned && R.Health==0;}):nullptr;
-    if(!Record || !Hero->LoadProgress(ReadFinal?TEXT("RescueNaturalFinal"):TEXT("RescueNaturalDowned")))
+    if(!Record || (Journey && (Record->RescueJourney!=static_cast<uint8>(ERescueJourneyMemory::Downed) || Record->RescueSource!=TEXT("EmberHollow"))) || !Hero->LoadProgress(ReadFinal?TEXT("RescueNaturalFinal"):TEXT("RescueNaturalDowned")))
     {UE_LOG(LogTemp,Error,TEXT("CF_RESCUE_NATURAL_LOAD FAIL source"));FPlatformMisc::RequestExitWithStatus(false,1);return;}
     ACreatureCharacter* Pet=nullptr;AWildEncounter* Camp=nullptr;
     for(TActorIterator<ACreatureCharacter> It(World);It;++It)if(It->PersistentId==Record->Id)Pet=*It;
     for(TActorIterator<AWildEncounter> It(World);It;++It)if(It->EncounterId==TEXT("EmberHollow"))Camp=*It;
-    auto Snapshot=[World,Hero,Pet,Camp]()
+    auto Snapshot=[World,Hero,Pet,Camp,Journey,Celebrate]()
     {
         int32 Materials=Hero->Inventory->Count(EFrontierItem::Material);for(TActorIterator<AWorldLoot> It(World);It;++It)Materials+=It->Materials;
         AResourceNode* Cache=nullptr;for(TActorIterator<AResourceNode> It(World);It;++It)if(It->PersistentId==FGuid(0xCF170000,0,0,11))Cache=*It;
         return Pet && Pet->Health>0 && Pet->Tamer==Hero->GetController() && Pet->GetDistanceTo(Hero)<300 && Hero->Health>0 &&
             FVector::Dist2D(Hero->GetActorLocation(),UBaseBuildingComponent::BaseOrigin())<800 && Camp && !Camp->GetResident() && Cache && Cache->Remaining==6 &&
-            Materials==9 && Hero->Inventory->Count(EFrontierItem::Medicine)==0 && Hero->Inventory->Count(EFrontierItem::Food)==9;
+            Materials==9 && Hero->Inventory->Count(EFrontierItem::Medicine)==0 && Hero->Inventory->Count(EFrontierItem::Food)==9 &&
+            (!Journey || (Pet->Memory->GetRescueSource()==TEXT("EmberHollow") && Pet->Memory->GetRescueMemory()==(Celebrate?ERescueJourneyMemory::Celebration:ERescueJourneyMemory::QuietThanks)));
     };
-    if(ReadFinal){const bool Pass=Snapshot();UE_LOG(LogTemp,Display,TEXT("CF_RESCUE_NATURAL_READ %s"),Pass?TEXT("PASS"):TEXT("FAIL"));FPlatformMisc::RequestExitWithStatus(false,Pass?0:1);return;}
+    if(ReadFinal){const bool Pass=Snapshot();if(Journey)UE_LOG(LogTemp,Display,TEXT("CF_RESCUE_JOURNEY_READ %s"),Pass?TEXT("PASS"):TEXT("FAIL"));UE_LOG(LogTemp,Display,TEXT("CF_RESCUE_NATURAL_READ %s"),Pass?TEXT("PASS"):TEXT("FAIL"));FPlatformMisc::RequestExitWithStatus(false,Pass?0:1);return;}
     auto* Enemy=Camp?Camp->GetResident():nullptr;const auto* EnemyRecord=Enemy?Source->Creatures.FindByPredicate([Enemy](const auto& R){return R.Id==Enemy->PersistentId;}):nullptr;
     bool Match=Pet && EnemyRecord && Pet->Health==0 && Pet->GetActorLocation().Equals(Record->Transform.GetLocation(),.1f) && Pet->Stamina==Record->Stamina && Pet->Nutrition==Record->Nutrition &&
         Enemy->Health==EnemyRecord->Health && Enemy->GetActorLocation().Equals(EnemyRecord->Transform.GetLocation(),.1f) && Hero->Health==Source->Health && Hero->GetActorLocation().Equals(Source->PlayerTransform.GetLocation(),.1f);
     for(int32 I=0;I<static_cast<int32>(EFrontierItem::Count);++I)Match &= Hero->Inventory->Count(static_cast<EFrontierItem>(I))==Source->InventoryStacks.FindRef(static_cast<EFrontierItem>(I));
+    if(Journey)Match &= Pet && Pet->Memory->GetRescueMemory()==ERescueJourneyMemory::Downed && Pet->Memory->GetRescueSource()==Record->RescueSource;
     UE_LOG(LogTemp,Display,TEXT("CF_RESCUE_NATURAL_LOAD %s"),Match?TEXT("PASS"):TEXT("FAIL"));
     if(!Match){FPlatformMisc::RequestExitWithStatus(false,1);return;}
     if(FParse::Param(FCommandLine::Get(),TEXT("CFRescueReturnProbe")))
@@ -216,7 +225,7 @@ void RunNaturalRescueResume(UWorld* World, ACFPlayerCharacter* Hero, bool ReadFi
     if(FParse::Param(FCommandLine::Get(),TEXT("CFRescuePreview")))
     {Shots->Root=FPaths::ProjectSavedDir()/TEXT("RescuePreview")/FGuid::NewGuid().ToString(EGuidFormats::Digits);IFileManager::Get().MakeDirectory(*Shots->Root,true);UE_LOG(LogTemp,Display,TEXT("CF_RESCUE_SHOT_ROOT %s"),*Shots->Root);}
     const double Deadline=FPlatformTime::Seconds()+120;CFInputQA::Press(Hero,EKeys::LeftShift);
-    FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([World,Hero,Pet,Enemy,Camp,Input,Points,Snapshot,Shots,Deadline,Index=Nearest,Stage=0,Skill=false,Travel=0.f,NextReturnLog=0.,Previous=Pet->GetActorLocation()](float) mutable
+    FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([World,Hero,Pet,Enemy,Camp,Input,Points,Snapshot,Shots,Deadline,Journey,Celebrate,Index=Nearest,Stage=0,Skill=false,Travel=0.f,NextReturnLog=0.,UIStarted=0.,Previous=Pet->GetActorLocation()](float) mutable
     {
         const float Step=FVector::Dist(Pet->GetActorLocation(),Previous);Travel+=Step;Previous=Pet->GetActorLocation();
         if(FPlatformTime::Seconds()>Deadline || Hero->Health<=0 || (Stage>0 && Pet->Health<=0) || Step>160)
@@ -227,6 +236,30 @@ void RunNaturalRescueResume(UWorld* World, ACFPlayerCharacter* Hero, bool ReadFi
             FPlatformMisc::RequestExitWithStatus(false,1);return false;
         }
         auto Aim=[Hero](AActor* Actor){const auto View=(Actor->GetActorLocation()-Hero->FirstPersonCamera->GetComponentLocation()).Rotation();Hero->GetController()->SetControlRotation(View);Hero->FirstPersonCamera->SetWorldRotation(View);};
+        if(Stage==3)
+        {
+            if(FPlatformTime::Seconds()-UIStarted<.3 || FScreenshotRequest::IsScreenshotRequested())return true;
+            TArray<int32> Counts;for(int32 I=0;I<static_cast<int32>(EFrontierItem::Count);++I)Counts.Add(Hero->Inventory->Count(static_cast<EFrontierItem>(I)));
+            const float HP=Pet->Health,HeroHP=Hero->Health,Stamina=Pet->Stamina,Nutrition=Pet->Nutrition,Cooldown=Pet->PettingCooldown;const int32 Bond=Pet->BondPoints,XP=Pet->Experience;const auto Crystal=Pet->Memory->GetMemory();
+            const FKeyEvent Event(Celebrate?EKeys::Two:EKeys::One,FModifierKeysState(),0,false,0,0);
+            bool Pass=FSlateApplication::Get().ProcessKeyDownEvent(Event);FSlateApplication::Get().ProcessKeyUpEvent(Event);
+            Pass &= !Pet->Memory->IsOpen() && !UGameplayStatics::IsGamePaused(World) && Pet->Memory->GetRescueMemory()==(Celebrate?ERescueJourneyMemory::Celebration:ERescueJourneyMemory::QuietThanks) &&
+                Pet->Memory->GetMemory()==Crystal && Pet->Health==HP && Hero->Health==HeroHP && Pet->Stamina==Stamina && Pet->Nutrition==Nutrition && Pet->PettingCooldown==Cooldown && Pet->BondPoints==Bond && Pet->Experience==XP;
+            for(int32 I=0;I<Counts.Num();++I)Pass &= Counts[I]==Hero->Inventory->Count(static_cast<EFrontierItem>(I));
+            UE_LOG(LogTemp,Display,TEXT("CF_RESCUE_JOURNEY_COMMIT %s celebrate=%d"),Pass?TEXT("PASS"):TEXT("FAIL"),Celebrate);
+            if(!Pass){FPlatformMisc::RequestExitWithStatus(false,1);return false;}Stage=4;UIStarted=FPlatformTime::Seconds();return true;
+        }
+        if(Stage==4)
+        {
+            // 用正常Actor Tick推进动作，不冻结伙伴或手动更新展示姿态。
+            if(FPlatformTime::Seconds()-UIStarted<.15)return true;
+            const bool Pose=Pet->GetVisualState()==(Celebrate?TEXT("Playing"):TEXT("Affection"));
+            if(!Pose){UE_LOG(LogTemp,Error,TEXT("CF_RESCUE_JOURNEY_RESPONSE FAIL visual=%s"),*Pet->GetVisualState().ToString());FPlatformMisc::RequestExitWithStatus(false,1);return false;}
+            if(!Shots->Ready(Hero,Pet,TEXT("MemoryResponse")))return true;
+            const bool Pass=Skill && Travel>2000 && Snapshot() && Hero->SaveProgress(TEXT("RescueNaturalFinal"));
+            UE_LOG(LogTemp,Display,TEXT("CF_RESCUE_JOURNEY_RESPONSE %s visual=%s"),Pass?TEXT("PASS"):TEXT("FAIL"),*Pet->GetVisualState().ToString());
+            UE_LOG(LogTemp,Display,TEXT("CF_RESCUE_NATURAL_RESUME %s petHP=%.1f travel=%.1f skill=%d"),Pass?TEXT("PASS"):TEXT("FAIL"),Pet->Health,Travel,Skill);FPlatformMisc::RequestExitWithStatus(false,Pass?0:1);return false;
+        }
         if(Stage==0)
         {
             if(!Shots->Root.IsEmpty() && !Shots->Taken.Contains(TEXT("Restored")) && Hero->GetDistanceTo(Pet)<450)
@@ -237,7 +270,7 @@ void RunNaturalRescueResume(UWorld* World, ACFPlayerCharacter* Hero, bool ReadFi
             Aim(Enemy);if(Hero->TraceCreature()!=Enemy){const FVector Toward=(Enemy->GetActorLocation()-Hero->GetActorLocation()).GetSafeNormal2D();bool Avoided=false;Input->Direction=RescueWalkingDirection(World,Hero,Hero->GetActorLocation()+FVector(-Toward.Y,Toward.X,0)*200,Avoided);return true;}
             Aim(Pet);if(Hero->TraceCreature()!=Pet){bool Avoided=false;Input->Direction=RescueWalkingDirection(World,Hero,Pet->GetActorLocation(),Avoided);return true;}
             Input->Direction=FVector::ZeroVector;const FVector Position=Pet->GetActorLocation();
-            const bool Pass=CFInputQA::Press(Hero,EKeys::P) && Pet->Health==40 && Pet->GetActorLocation().Equals(Position) && Hero->Inventory->Count(EFrontierItem::Medicine)==0;
+            const bool Pass=CFInputQA::Press(Hero,EKeys::P) && Pet->Health==40 && Pet->GetActorLocation().Equals(Position) && Hero->Inventory->Count(EFrontierItem::Medicine)==0 && (!Journey || Pet->Memory->GetRescueMemory()==ERescueJourneyMemory::Rescued);
             UE_LOG(LogTemp,Display,TEXT("CF_RESCUE_NATURAL_TREAT %s"),Pass?TEXT("PASS"):TEXT("FAIL"));if(!Pass){FPlatformMisc::RequestExitWithStatus(false,1);return false;}
             // 救助不会自动取消休息，按现有提示F恢复行动后才能接受Q/G。
             if(!CFInputQA::Press(Hero,EKeys::F) || Pet->Activity!=ECreatureActivity::Follow){FPlatformMisc::RequestExitWithStatus(false,1);return false;}Stage=1;
@@ -272,7 +305,23 @@ void RunNaturalRescueResume(UWorld* World, ACFPlayerCharacter* Hero, bool ReadFi
             return true;
         }
         Input->Direction=FVector::ZeroVector;if(Pet->GetDistanceTo(Hero)>300)return true;
+        if(Journey)
+        {
+            Aim(Pet);
+            if(Pet->GetDistanceTo(Hero)>220 || Hero->TraceCreature()!=Pet){bool Avoided=false;Input->Direction=RescueWalkingDirection(World,Hero,Pet->GetActorLocation(),Avoided);return true;}
+            if(Pet->Memory->GetRescueMemory()!=ERescueJourneyMemory::Pending)return true;
+        }
         if(!Shots->Ready(Hero,Pet,TEXT("Home")))return true;
+        if(Journey)
+        {
+            CFInputQA::Release(Hero,EKeys::LeftShift);Aim(Pet);
+            bool Pass=CFInputQA::Press(Hero,EKeys::F7) && Pet->Memory->IsOpen() && UGameplayStatics::IsGamePaused(World);
+            const FKeyEvent Cancel(EKeys::Escape,FModifierKeysState(),0,false,0,0);Pass &= FSlateApplication::Get().ProcessKeyDownEvent(Cancel);FSlateApplication::Get().ProcessKeyUpEvent(Cancel);
+            Pass &= !UGameplayStatics::IsGamePaused(World) && Pet->Memory->GetRescueMemory()==ERescueJourneyMemory::Pending && CFInputQA::Press(Hero,EKeys::F7) && Pet->Memory->IsOpen();
+            if(!Pass){UE_LOG(LogTemp,Error,TEXT("CF_RESCUE_JOURNEY_OPEN FAIL feedback=%s"),*Hero->Feedback);FPlatformMisc::RequestExitWithStatus(false,1);return false;}
+            if(!Shots->Root.IsEmpty())FScreenshotRequest::RequestScreenshot(Shots->Root/TEXT("MemoryDialog.png"),true,false);
+            Stage=3;UIStarted=FPlatformTime::Seconds();return true;
+        }
         CFInputQA::Release(Hero,EKeys::LeftShift);const bool Pass=Skill && Travel>2000 && Snapshot() && Hero->SaveProgress(TEXT("RescueNaturalFinal"));
         UE_LOG(LogTemp,Display,TEXT("CF_RESCUE_NATURAL_RESUME %s petHP=%.1f travel=%.1f skill=%d"),Pass?TEXT("PASS"):TEXT("FAIL"),Pet->Health,Travel,Skill);FPlatformMisc::RequestExitWithStatus(false,Pass?0:1);return false;
     }),.1f);
