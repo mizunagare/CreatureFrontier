@@ -17,6 +17,52 @@
 #include "HAL/FileManager.h"
 #include "Containers/Ticker.h"
 #include "UnrealClient.h"
+#include "FrontierSaveGame.h"
+
+void RunRescueRecallLifecycle(UWorld* World,ACFPlayerCharacter* Hero)
+{
+    ACreatureCharacter* Pet=nullptr;
+    auto* PC=Cast<APlayerController>(Hero->GetController());
+    auto Find=[World]()->ACreatureCharacter*{for(TActorIterator<ACreatureCharacter> It(World);It;++It)if(It->PersistentId==FGuid(0xCF290000,0,0,1))return *It;return nullptr;};
+    auto Reset=[&]()
+    {
+        if(!PC || !Hero->LoadProgress(TEXT("RescueMemoryHome")))return false;
+        for(TActorIterator<ACreatureCharacter> It(World);It;++It)
+        {It->SetActorTickEnabled(false);It->GetCharacterMovement()->DisableMovement();if(It->Disposition!=ECreatureDisposition::Tamed)It->SetActorLocation(FVector(3000,-3000,40));}
+        Pet=Find();if(!Pet)return false;
+        Pet->Memory->RestoreSnapshot(ECrystalJourneyMemory::None);
+        Hero->SetActorLocation(Pet->GetActorLocation()+FVector(0,200,0));
+        return Pet->Memory->GetRescueMemory()==ERescueJourneyMemory::Pending;
+    };
+    if(!Reset()){UE_LOG(LogTemp,Error,TEXT("CF_RESCUE_LIFECYCLE FAIL fixture"));FPlatformMisc::RequestExitWithStatus(false,1);return;}
+    const bool Opened=Pet->Memory->Open(Hero);
+    PC->UnPossess();
+    const bool Released=Opened && !Pet->Memory->IsOpen() && !UGameplayStatics::IsGamePaused(World) && !PC->bShowMouseCursor && Pet->Memory->GetRescueMemory()==ERescueJourneyMemory::Pending;
+    UE_LOG(LogTemp,Display,TEXT("CF_RESCUE_LIFECYCLE_UNPOSSESS %s open=%d paused=%d cursor=%d"),Released?TEXT("PASS"):TEXT("FAIL"),Pet->Memory->IsOpen(),UGameplayStatics::IsGamePaused(World),PC->bShowMouseCursor);
+    // 恢复专项夹具和输入，但不清除刚才的失败结果。
+    PC->Possess(Hero);Pet->Memory->Close();UGameplayStatics::SetGamePaused(World,false);PC->bShowMouseCursor=false;PC->SetInputMode(FInputModeGameOnly());
+    bool Swap=Reset() && Pet->Memory->Open(Hero);
+    auto* Other=World->SpawnActor<ACFPlayerCharacter>(FVector(-1000,-1000,40),FRotator::ZeroRotator);
+    if(Other){PC->Possess(Other);Swap &= !Pet->Memory->IsOpen() && !UGameplayStatics::IsGamePaused(World) && !PC->bShowMouseCursor && !Pet->Memory->Open(Hero);PC->Possess(Hero);Other->Destroy();}else Swap=false;
+    bool Same=Reset() && Pet->Memory->Open(Hero);
+    // 无变化通知不应关窗；真正再次Possess在本引擎中会先UnPossess，必须释放窗口。
+    PC->OnPossessedPawnChanged.Broadcast(Hero,Hero);Same &= Pet->Memory->IsOpen() && UGameplayStatics::IsGamePaused(World);
+    PC->Possess(Hero);const bool Restart=!Pet->Memory->IsOpen() && !UGameplayStatics::IsGamePaused(World) && !PC->bShowMouseCursor && Pet->Memory->GetRescueMemory()==ERescueJourneyMemory::Pending;
+    Pet->Memory->Close();
+    bool Bad=Reset() && Pet->Memory->Open(Hero);
+    auto* Snapshot=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("RescueMemoryHome"),0));
+    auto* Record=Snapshot?Snapshot->Creatures.FindByPredicate([](const auto& R){return R.Id==FGuid(0xCF290000,0,0,1);}):nullptr;
+    if(Record){Record->RescueJourney=255;Bad &= UGameplayStatics::SaveGameToSlot(Snapshot,TEXT("RescueLifecycleBad"),0) && !Hero->LoadProgress(TEXT("RescueLifecycleBad")) && Find()==Pet && Pet->Memory->IsOpen() && UGameplayStatics::IsGamePaused(World) && PC->bShowMouseCursor && Hero->Feedback.Contains(TEXT("脱险经历"));}else Bad=false;
+    Pet->Memory->Close();
+    bool Loaded=Reset() && Pet->Memory->Open(Hero);auto* Previous=Pet;
+    Loaded &= Hero->LoadProgress(TEXT("RescueMemoryHome")) && Find()!=Previous && !UGameplayStatics::IsGamePaused(World) && !PC->bShowMouseCursor;
+    bool Target=Reset() && Pet->Memory->Open(Hero);auto* Memory=Pet->Memory.Get();Pet->Destroy();Target &= !Memory->IsOpen() && !UGameplayStatics::IsGamePaused(World) && !PC->bShowMouseCursor;
+    bool Owner=Reset() && Pet->Memory->Open(Hero);Memory=Pet->Memory.Get();Hero->Destroy();
+    Owner &= !Memory->IsOpen() && !UGameplayStatics::IsGamePaused(World) && IsValid(PC) && !PC->bShowMouseCursor && Pet->Memory->GetRescueMemory()==ERescueJourneyMemory::Pending;
+    UE_LOG(LogTemp,Display,TEXT("CF_RESCUE_LIFECYCLE_OWNER %s open=%d paused=%d"),Owner?TEXT("PASS"):TEXT("FAIL"),Memory->IsOpen(),UGameplayStatics::IsGamePaused(World));
+    const bool Pass=Released && Swap && Same && Restart && Bad && Loaded && Target && Owner;
+    UE_LOG(LogTemp,Display,TEXT("CF_RESCUE_LIFECYCLE %s unpossess=%d swap=%d sameNotice=%d restart=%d bad=%d load=%d target=%d owner=%d"),Pass?TEXT("PASS"):TEXT("FAIL"),Released,Swap,Same,Restart,Bad,Loaded,Target,Owner);FPlatformMisc::RequestExitWithStatus(false,Pass?0:1);
+}
 
 namespace CFRescueRecallQA
 {

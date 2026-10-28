@@ -6,6 +6,8 @@ class ACFPlayerCharacter;
 class AResourceNode;
 class SWidget;
 class ACreatureCharacter;
+class APlayerController;
+class APawn;
 UENUM(BlueprintType)
 enum class ECrystalJourneyMemory : uint8 { None, Pending, QuietThanks, Celebration };
 UENUM(BlueprintType)
@@ -45,6 +47,9 @@ private:
     bool CanRecall(ACFPlayerCharacter* Hero) const;
     UPROPERTY(VisibleAnywhere,BlueprintReadOnly,meta=(AllowPrivateAccess="true")) ECrystalJourneyMemory Memory=ECrystalJourneyMemory::None;
     TWeakObjectPtr<ACFPlayerCharacter> Listener;
+    TWeakObjectPtr<APlayerController> DialogController;
+    UFUNCTION() void HandleDialogPawnChanged(APawn* Previous,APawn* Current);
+    UFUNCTION() void HandleDialogListenerDestroyed(AActor* DestroyedActor);
     TSharedPtr<SWidget> Dialog;
     // 打开时锁定经历，防止确认时误写另一个待分享事件。
     bool bRecallingRescue=false;

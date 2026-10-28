@@ -69,6 +69,8 @@ void ACFGameMode::BeginPlay()
 {
     Super::BeginPlay();
     SeedFrontierResources(GetWorld());
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFRescueRecallLifecycleTest")))
+    {FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunRescueRecallLifecycle(GetWorld(),Hero);},1.f,false);return;}
     if(FParse::Param(FCommandLine::Get(),TEXT("CFRescueRecallTest")) || FParse::Param(FCommandLine::Get(),TEXT("CFRescueRecallRead")))
     {const bool Read=FParse::Param(FCommandLine::Get(),TEXT("CFRescueRecallRead"));FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this,Read](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunRescueRecallScenario(GetWorld(),Hero,Read);},1.f,false);return;}
     const int32 RescueMemoryMode=FParse::Param(FCommandLine::Get(),TEXT("CFRescueMemoryWrite"))?1:FParse::Param(FCommandLine::Get(),TEXT("CFRescueMemoryRescueRead"))?2:FParse::Param(FCommandLine::Get(),TEXT("CFRescueMemoryHomeRead"))?3:FParse::Param(FCommandLine::Get(),TEXT("CFRescueMemoryFinalRead"))?4:0;

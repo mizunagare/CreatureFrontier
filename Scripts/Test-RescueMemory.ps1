@@ -18,7 +18,7 @@ New-Item -ItemType Directory -Path $evidence | Out-Null
 Write-Host "脱险经历证据：$evidence"
 $qaMutex=[System.Threading.Mutex]::new($false,'Local\CreatureFrontierRescueMemoryQA')
 if(!$qaMutex.WaitOne(0)){$qaMutex.Dispose();throw '脱险经历专项正在使用相同测试槽，请串行运行'}
-$slots=@('RescueMemoryDowned','RescueMemoryRescued','RescueMemoryHome','RescueMemoryBad','RescueMemoryLegacy28','RescueRecallDone')
+$slots=@('RescueMemoryDowned','RescueMemoryRescued','RescueMemoryHome','RescueMemoryBad','RescueMemoryLegacy28','RescueRecallDone','RescueLifecycleBad')
 $backups=@()
 $results=@()
 try{
@@ -30,14 +30,14 @@ try{
             $backups+=@{Path=$path;Backup=$backup;Hash=(Get-FileHash -LiteralPath $path).Hash}
         }
     }
-    $flags=@('CFRescueMemoryTest','CFRescueMemoryWrite','CFRescueMemoryRescueRead','CFRescueMemoryHomeRead','CFRescueMemoryFinalRead','CFRescueRecallTest','CFRescueRecallRead')
+    $flags=@('CFRescueMemoryTest','CFRescueMemoryWrite','CFRescueMemoryRescueRead','CFRescueMemoryHomeRead','CFRescueMemoryFinalRead','CFRescueRecallTest','CFRescueRecallRead','CFRescueRecallLifecycleTest')
     for($index=0;$index -lt $flags.Count;$index++){
         $flag=$flags[$index];$log=Join-Path $evidence ($flag+'.log')
         $testArgs=@('-game',('-'+$flag),'-nullrhi','-nosound','-unattended','-nop4',('-abslog="'+$log+'"'))
         if($Editor){$testArgs=@((Join-Path $projectRoot 'CreatureFrontier.uproject'))+$testArgs}
         $process=Start-Process -FilePath $exe -ArgumentList $testArgs -WindowStyle Hidden -PassThru
         if(!$process.WaitForExit(60000)){$process.Kill();$process.WaitForExit();throw "测试超时：$log"}
-        $marker=if($index -lt 5){'CF_RESCUE_MEMORY PASS mode='+$index}elseif($index -eq 5){'CF_RESCUE_RECALL PASS'}else{'CF_RESCUE_RECALL_READ PASS'}
+        $marker=if($index -lt 5){'CF_RESCUE_MEMORY PASS mode='+$index}elseif($index -eq 5){'CF_RESCUE_RECALL PASS'}elseif($index -eq 6){'CF_RESCUE_RECALL_READ PASS'}else{'CF_RESCUE_LIFECYCLE PASS'}
         if($process.ExitCode -ne 0 -or !(Select-String -LiteralPath $log -SimpleMatch $marker -Quiet) -or (Select-String -LiteralPath $log -Pattern 'CF_\w+ FAIL|Fatal error|Assertion failed' -Quiet)){throw "测试未通过：$log"}
         if($index -eq 0 -and !(Select-String -LiteralPath $log -SimpleMatch 'CF_RESCUE_PAUSED_HEAL PASS' -Quiet)){throw '程序未验证暂停治疗边界'}
         if((Get-FileHash -LiteralPath $fingerprint).Hash -ne $hash){throw '测试期间模块发生变化'}

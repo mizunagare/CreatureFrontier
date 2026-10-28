@@ -86,13 +86,17 @@ bool UCompanionMemoryComponent::CanRecall(ACFPlayerCharacter* Hero) const
 bool UCompanionMemoryComponent::Open(ACFPlayerCharacter* Hero)
 {
     auto* PC=IsValid(Hero)?Cast<APlayerController>(Hero->GetController()):nullptr;
-    if(IsOpen() || !CanRecall(Hero) || !PC || UGameplayStatics::IsGamePaused(this) || !GetWorld()->GetGameViewport() || !FSlateApplication::IsInitialized() ||
+    if(IsOpen() || !CanRecall(Hero) || !PC || PC->GetPawn()!=Hero || UGameplayStatics::IsGamePaused(this) || !GetWorld()->GetGameViewport() || !FSlateApplication::IsInitialized() ||
         Hero->Building->IsActive() || Hero->Storage->IsOpen() || Hero->IsBackpackOpen() || Hero->IsHelpVisible() || Hero->IsJournalOpen() || Hero->Naming->IsOpen()) return false;
     if(!UGameplayStatics::SetGamePaused(this,true)) return false;
     bRecallingRescue=Memory!=ECrystalJourneyMemory::Pending;
     Listener=Hero;if(Hero->IsRosterOpen())Hero->ToggleRoster();Hero->CancelMeleeAttack();Hero->GetCharacterMovement()->StopMovementImmediately();Hero->StopJumping();Hero->ConsumeMovementInputVector();
+    DialogController=PC;
+    PC->OnPossessedPawnChanged.AddUniqueDynamic(this,&UCompanionMemoryComponent::HandleDialogPawnChanged);
+    Hero->OnDestroyed.AddUniqueDynamic(this,&UCompanionMemoryComponent::HandleDialogListenerDestroyed);
     const auto* Pet=CastChecked<ACreatureCharacter>(GetOwner());
-    auto Choice=[this](int32 Reply){if(Reply==0)Close();else Commit(Reply==2);};
+    const TWeakObjectPtr<UCompanionMemoryComponent> WeakSelf(this);
+    auto Choice=[WeakSelf](int32 Reply){if(auto* Self=WeakSelf.Get()){if(Reply==0)Self->Close();else Self->Commit(Reply==2);}};
     auto Content=SNew(SBorder).BorderImage(FCoreStyle::Get().GetBrush("WhiteBrush")).BorderBackgroundColor(FLinearColor(.015f,.025f,.04f,.97f)).ForegroundColor(FLinearColor::White).HAlign(HAlign_Center).VAlign(VAlign_Center).Padding(24)
     [SNew(SBox).WidthOverride(760)[SNew(SVerticalBox)
         +SVerticalBox::Slot().AutoHeight().Padding(8)[SNew(STextBlock).Font(FCoreStyle::GetDefaultFontStyle("Regular",24)).Text(FText::FromString(bRecallingRescue?TEXT("一起平安归来 | 世界已暂停"):TEXT("从水晶高地归来 | 世界已暂停")))]
@@ -107,7 +111,7 @@ bool UCompanionMemoryComponent::Open(ACFPlayerCharacter* Hero)
 }
 bool UCompanionMemoryComponent::Commit(bool Celebrate)
 {
-    auto* Hero=Listener.Get();if(!IsOpen() || !CanShareAtHome(Hero) ||
+    auto* Hero=Listener.Get();auto* PC=DialogController.Get();if(!IsOpen() || !PC || PC->GetPawn()!=Hero || !CanShareAtHome(Hero) ||
         (bRecallingRescue?RescueMemory!=ERescueJourneyMemory::Pending:Memory!=ECrystalJourneyMemory::Pending)) return false;
     if(bRecallingRescue)RescueMemory=Celebrate?ERescueJourneyMemory::Celebration:ERescueJourneyMemory::QuietThanks;
     else Memory=Celebrate?ECrystalJourneyMemory::Celebration:ECrystalJourneyMemory::QuietThanks;
@@ -117,10 +121,18 @@ bool UCompanionMemoryComponent::Commit(bool Celebrate)
 void UCompanionMemoryComponent::Close()
 {
     if(!Dialog.IsValid())return;
+    auto* PC=DialogController.Get();
+    if(PC)PC->OnPossessedPawnChanged.RemoveDynamic(this,&UCompanionMemoryComponent::HandleDialogPawnChanged);
+    if(auto* Hero=Listener.Get())Hero->OnDestroyed.RemoveDynamic(this,&UCompanionMemoryComponent::HandleDialogListenerDestroyed);
     if(GetWorld() && GetWorld()->GetGameViewport())GetWorld()->GetGameViewport()->RemoveViewportWidgetContent(Dialog.ToSharedRef());Dialog.Reset();
-    if(auto* Hero=Listener.Get())if(auto* PC=Cast<APlayerController>(Hero->GetController())){PC->bShowMouseCursor=false;PC->SetInputMode(FInputModeGameOnly());}
-    Listener.Reset();bRecallingRescue=false;UGameplayStatics::SetGamePaused(this,false);
+    // 主人可能已失去控制或销毁，仍用打开窗口时的控制器恢复输入。
+    if(PC){PC->bShowMouseCursor=false;PC->SetInputMode(FInputModeGameOnly());}
+    Listener.Reset();DialogController.Reset();bRecallingRescue=false;UGameplayStatics::SetGamePaused(this,false);
 }
+void UCompanionMemoryComponent::HandleDialogPawnChanged(APawn* Previous,APawn* Current)
+{if(IsOpen() && (!Listener.IsValid() || Current!=Listener.Get()))Close();}
+void UCompanionMemoryComponent::HandleDialogListenerDestroyed(AActor* DestroyedActor)
+{Close();}
 void UCompanionMemoryComponent::CloseAll(UWorld* World)
 {if(World)for(TActorIterator<ACreatureCharacter> It(World);It;++It)It->Memory->Close();}
 void UCompanionMemoryComponent::EndPlay(const EEndPlayReason::Type Reason){Close();Super::EndPlay(Reason);}
