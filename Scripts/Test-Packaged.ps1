@@ -23,6 +23,10 @@ $testLogRoot = Join-Path $projectRoot (Join-Path 'Saved\PackagedTests' $runName)
 New-Item -ItemType Directory -Path $testLogRoot -Force | Out-Null
 Write-Host "本次测试日志：$testLogRoot"
 $cases = @(
+    @{Flag='CFWindowTest';Label='CFHomeReplacementWrite';Arguments=@('-CFHomeReplaceTest','-CFHomeReplaceInput','-CFHomeReplaceDoor','-CFHomeReplaceWrite');Marker='CF_HOME_REPLACE PASS support=1';RequiredMarkers=@('CF_HOME_REPLACE_WRITE PASS','CF_HOME_REPLACE_DOOR PASS transitions=4')},
+    @{Flag='CFWindowTest';Label='CFHomeReplacementRead1';Arguments=@('-CFHomeReplaceRead');Marker='CF_HOME_REPLACE_READ PASS loads=2 windows=1 roofs=1';PreserveSlot='HomeReplaceGood'},
+    @{Flag='CFWindowTest';Label='CFHomeReplacementRead2';Arguments=@('-CFHomeReplaceRead');Marker='CF_HOME_REPLACE_READ PASS loads=2 windows=1 roofs=1';PreserveSlot='HomeReplaceGood'},
+    @{Flag='CFWindowNavigationTest';Label='CFWindowNavigationRotated';Arguments=@('-CFWindowNavigationRotated','-ExecCmds="t.MaxFPS 30"');Marker='CF_WINDOW_NAV PASS phase=2 closed=1 continuous=1 windowBlocked=1 yaw=90';RequiredMarkers=@('CF_WINDOW_NAV_GUARD PASS samples=6','t.MaxFPS = "30"')},
     @{Flag='CFDoorFarmTest'; Marker='CF_DOOR_FARM PASS'; RequiredMarkers=@('CF_DOOR_FARM_CLOSED PASS','CF_DOOR_FARM_FIXTURE roof=1 removed=0')},
     @{Flag='CFDoorFarmTest'; Label='CFStanceFarm'; Arguments=@('-CFStanceFarmTest'); Marker='CF_STANCE_FARM PASS'; RequiredMarkers=@('CF_STANCE_FARM_SWITCH PASS','CF_DOOR_FARM_CLOSED PASS','CF_DOOR_FARM PASS')},
     @{Flag='CFDoorFarmTest'; Label='CFDoorFarmNoRoof'; Arguments=@('-CFDoorFarmNoRoof'); Marker='CF_DOOR_FARM PASS'; RequiredMarkers=@('CF_DOOR_FARM_CLOSED PASS','CF_DOOR_FARM_FIXTURE roof=0 removed=1')},

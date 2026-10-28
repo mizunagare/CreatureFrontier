@@ -1,5 +1,13 @@
 # 开放窗墙
 
+## 原位替换独立Windows候选
+
+`E:\CreatureFrontierBuilds\Windows-Home-Replacement` 独立Development打包成功（原进程64334退出0，BuildCookRun106.67秒），内部EXE SHA-256 `95C185CBB976576DBEB7F1BF3ED0063C5D6EFCBD15F24C346248B21C08B8EA6A`，格式32。保留旧包与全部玩家存档；磁盘检查允许新目录构建，无手动清理。编译仍有引擎废弃API与非首选编译器警告，Cook三条既有FText来源警告，未当作正式资源本地化完成。
+
+实际 `Test-HomeWindow.ps1 -BuildRoot E:/CreatureFrontierBuilds/Windows-Home-Replacement -Replacement` 的 `Saved/WindowPersistenceQA/20261029-063053-a90f711b/` 一写两读三进程通过，输入SHA-256 `9D202D582A6A57BEA3AE8B13B65CB3FC473855BE9F31DBCF5ED2C50F4BD884AF` 不变，原专用槽恢复。另一个Windows进程 `Saved/HomeReplace-Door-Windows-20261029.log` 核心/四转换标记通过、无失败/致命/断言，退出0。
+
+完整回归脚本新增替换写入（含绑定与门转换）、两次独立读取及旋转导航四项；脚本语法通过，候选自身整轮在 `Saved/PackagedTests/20261029-063145-938d48d5/`（原进程30814）运行中，尚未认定整轮成功。新包图形、旋转替换/容量与完整取消边界仍待，原恢复卡路问题保留，稳定入口不变。
+
 ## 门类替换与实体碰撞
 
 新增显式 `-CFHomeReplaceDoor` 扩展（同用CFWindowTest/HomeReplaceTest/HomeReplaceInput），在原实墙换窗/换回后，继续门框→关闭门→正常开门→窗墙→实墙四次替换。每次核对持久身份、安装位、地板支撑、支付材料与额外物品、实际背包全额成本及半额返还和屋顶仍存在；每步完整布局校验。新门必须默认关闭；门活动范围有玩家时拒绝且不扣料。中心实际Visibility射线验证关闭门阻挡、开启门畅通、换窗/门框无残留中心实体、实墙恢复阻挡，不只断言DoorState。
