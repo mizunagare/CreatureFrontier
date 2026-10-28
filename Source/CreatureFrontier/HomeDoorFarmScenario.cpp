@@ -19,6 +19,7 @@
 #include "AIController.h"
 #include "Components/CapsuleComponent.h"
 #include "Engine/OverlapResult.h"
+#include "InputRoutingQA.h"
 
 namespace CFDoorFarmVolumeQA
 {
@@ -28,6 +29,8 @@ bool InsideRoom(FVector Position)
 
 void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
 {
+    const bool AvoidTest=FParse::Param(FCommandLine::Get(),TEXT("CFStanceFarmTest"));
+    if(AvoidTest && Mode!=0){UE_LOG(LogTemp,Error,TEXT("CF_STANCE_FARM FAIL mode"));FPlatformMisc::RequestExitWithStatus(false,1);return;}
     // 固定房间只验证单伙伴工作，不替代自由放置、长期运输或自然冒险。
     auto Finish=[Mode](bool Pass)
     {UE_LOG(LogTemp,Display,TEXT("CF_DOOR_FARM_MODE %s mode=%d"),Pass?TEXT("PASS"):TEXT("FAIL"),Mode);UE_LOG(LogTemp,Display,TEXT("CF_DOOR_FARM %s"),Pass?TEXT("PASS"):TEXT("FAIL"));FPlatformMisc::RequestExitWithStatus(false,Pass?0:1);};
@@ -57,10 +60,15 @@ void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
     if(!Farm){UE_LOG(LogTemp,Display,TEXT("CF_DOOR_FARM_FIXTURE %s"),*Hero->Feedback);Finish(false);return;}
     if(Mode!=2)Farm->Crop->Seeds=1;
     const auto Timer=MakeShared<FTimerHandle>();
-    World->GetTimerManager().SetTimer(*Timer,[World,Hero,Door,Farm,FarmWeak=TWeakObjectPtr<AWorkStation>(Farm),Definition,Timer,Finish,Mode,Phase=Mode==2?1:0,At=World->GetTimeSeconds(),Pet=RestoredPet,Previous=RestoredPet?RestoredPet->GetActorLocation():FVector::ZeroVector,Travel=0.,Continuous=true,ExpectedMaterials=0,Diagnosed=false]() mutable
+    World->GetTimerManager().SetTimer(*Timer,[World,Hero,Door,Farm,FarmWeak=TWeakObjectPtr<AWorkStation>(Farm),Definition,Timer,Finish,Mode,AvoidTest,Phase=Mode==2?1:0,At=World->GetTimeSeconds(),Pet=RestoredPet,Previous=RestoredPet?RestoredPet->GetActorLocation():FVector::ZeroVector,Travel=0.,Continuous=true,ExpectedMaterials=0,Diagnosed=false]() mutable
     {
         auto End=[&](bool Pass)
         {
+            if(AvoidTest)
+            {
+                Pass &= Phase==2 && Pet && Pet->bAvoidCombat && Pet->WorkSite==Farm;
+                UE_LOG(LogTemp,Display,TEXT("CF_STANCE_FARM %s"),Pass?TEXT("PASS"):TEXT("FAIL"));
+            }
             const auto* LiveFarm=FarmWeak.Get();
             UE_LOG(LogTemp,Display,TEXT("CF_DOOR_FARM_STATE phase=%d food=%d seeds=%d growth=%.2f travel=%.1f continuous=%d pet=%s"),Phase,LiveFarm?LiveFarm->StoredFood:-1,LiveFarm?LiveFarm->Crop->Seeds:-1,LiveFarm?LiveFarm->Crop->GrowthWork:-1,Travel,Continuous,Pet?*Pet->GetActorLocation().ToString():TEXT("无"));
             // 清除定时器会释放捕获对象；完成回调必须先复制到当前调用栈。
@@ -119,6 +127,11 @@ void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
             // 使用玩家现有工作命令；看向上方避免优先命中门或野外资源。
             Hero->GetController()->SetControlRotation(FRotator(70,0,0));Hero->FirstPersonCamera->SetWorldRotation(FRotator(70,0,0));Hero->CommandWork();
             if(Pet->WorkSite!=Farm || Pet->Activity!=ECreatureActivity::Work){End(false);return;}
+            if(AvoidTest)
+            {
+                if(!CFInputQA::Press(Hero,EKeys::F8) || !Pet->bAvoidCombat || Pet->WorkSite!=Farm || Pet->Activity!=ECreatureActivity::Work){End(false);return;}
+                UE_LOG(LogTemp,Display,TEXT("CF_STANCE_FARM_SWITCH PASS"));
+            }
             Phase=1;At=World->GetTimeSeconds();return;
         }
         if(Phase==1)
