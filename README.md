@@ -1,16 +1,16 @@
 # 幻兽边境 · Creature Frontier
 
-正在验收[伙伴技能空间反馈](Docs/SKILL_SPATIAL_FEEDBACK.md)：三尺寸显示/实体墙遮挡对照和真实洞窟命中取景已通过，新包完整回归仍在执行，暂不替换下述慢行稳定包。
+当前可玩包：`E:\CreatureFrontierBuilds\Windows-SkillTrail-Framing\CreatureFrontier.exe`。[伙伴技能空间反馈](Docs/SKILL_SPATIAL_FEEDBACK.md)首版已通过同一EXE的81类/85进程回归、14份真实28旧档的30进程读取、三尺寸六张显示/遮挡对照图和15张洞窟实战图检查。旧包和玩家档保留，格式仍28。仍为灰盒，伙伴画外辨识、正式特效/美术与普通窗口持续按键尚未完整验收；下一步推进洞窟倒地后的综合恢复。
 
-最新进度：[左 Shift 慢行](Docs/PLAYER_PACE.md)已实现，按住慢行、松开恢复，帮助与状态提示使用中文。暂停、成功读档、失活回调和倒地会清除慢行状态。新包为 `E:\CreatureFrontierBuilds\Windows-Pace-Clock\CreatureFrontier.exe`，81类/85进程回归通过，三尺寸连续冒险的12张新图已逐张检查。系统层持续按键/Alt-Tab尚未验收。以下旧包记录保留作历史证据，不代表最新功能仍缺失。
+此前[左 Shift 慢行](Docs/PLAYER_PACE.md)已实现并保留：按住慢行、松开恢复，帮助与状态提示使用中文。暂停、成功读档、失活回调和倒地会清除慢行状态。历史包为 `E:\CreatureFrontierBuilds\Windows-Pace-Clock\CreatureFrontier.exe`，其81类/85进程回归和三尺寸12张图记录保留，不挪用为新包证据。系统层持续按键/Alt-Tab尚未验收。以下旧包记录均为历史证据，不代表最新功能仍缺失。
 
 原创第一人称生物伙伴RPG原型。通过结交或捕捉获得伙伴，并与伙伴共同生活、工作和战斗。
 
 最新慢行包另已通过14份真实28旧档、30个独立读取进程检查，测试槽已恢复。旧存档与构建均保留。
 
-本轮验证[洞窟连续冒险](Docs/HOLLOW_ADVENTURE.md)的存活路线：以模拟慢步输入带一级岩角兽从基地进入余烬洞窟，实际对抗自然生成的三级烬尾兽，拾取战利品、采集6份有限旧机件、返家加工并存读。研究资格/初始伙伴是测试夹具，不冒充全新角色完整成长链；键盘慢行操作仍待提供，满速W需停等慢伙伴。格式仍28。
+此前[洞窟连续冒险](Docs/HOLLOW_ADVENTURE.md)验证了模拟慢步输入的存活路线：带一级岩角兽进入余烬洞窟，对抗自然三级住民，拾取、采集6份有限旧机件、返家加工并存读。研究资格/初始伙伴是测试夹具，不冒充全新角色完整成长链；后续已提供左Shift慢行并重新验收，不再将“缺少慢行键”列为当前状态。格式仍28。
 
-当前可运行包：`E:\CreatureFrontierBuilds\Windows-Adventure-Candidate\CreatureFrontier.exe`（此固定包已完成本轮验收，目录名保留）。同一EXE连续80类/84进程本地回归、13份真实28旧档的28个读取进程通过；1280×720 D3D12完整冒险及四张实战新图逐张检查。当前仍为几何灰盒，伙伴技能空间表现、此区域倒地恢复、大队伍与正式美术/性能仍待完善。
+此前冒险包：`E:\CreatureFrontierBuilds\Windows-Adventure-Candidate\CreatureFrontier.exe`（历史包保留）。该包连续80类/84进程本地回归、13份真实28旧档的28个读取进程通过；1280×720 D3D12完整冒险及四张实战新图记录保留，不冒充最新包证据。当前仍为几何灰盒，此区域倒地恢复、大队伍与正式美术/性能仍待完善。
 
 此前[同行默认防御](Docs/COMPANION_DEFENSE.md)保留：已有伙伴不擅自攻击平静野生，可以带伙伴J分享食物结交；敌意支援和Q/G主动指挥保留。旧包Windows-Defense-Candidate及存档保留。
 
