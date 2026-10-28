@@ -171,6 +171,46 @@ void RunHomeWindowScenario(UWorld* World,ACFPlayerCharacter* Hero)
                 const auto Aim=(Wall->GetActorTransform().TransformPosition(FVector(145,0,170))-Hero->FirstPersonCamera->GetComponentLocation()).Rotation();
                 Hero->GetController()->SetControlRotation(Aim);Hero->FirstPersonCamera->SetWorldRotation(Aim);
                 Pass &= CFInputQA::Press(Hero,EKeys::Insert) && IsValid(Wall) && Hero->Inventory->Count(EFrontierItem::Material)==Before && Hero->Feedback.Contains(TEXT("再按Insert确认"));
+                if(FParse::Param(FCommandLine::Get(),TEXT("CFHomeReplaceCancel")))
+                {
+                    const auto Timer=MakeShared<FTimerHandle>();
+                    World->GetTimerManager().SetTimer(*Timer,[World,Hero,Wall,Roof,Id,Aim,Before,Refund,Pass,Timer,At=World->GetTimeSeconds(),Phase=0]() mutable
+                    {
+                        auto Finish=[&](bool Good){UE_LOG(LogTemp,Display,TEXT("CF_HOME_REPLACE_CANCEL %s phase=%d materials=%d feedback=%s"),Good?TEXT("PASS"):TEXT("FAIL"),Phase,Hero->Inventory->Count(EFrontierItem::Material),*Hero->Feedback);
+                            FTimerHandle Handle=*Timer;World->GetTimerManager().ClearTimer(Handle);FPlatformMisc::RequestExitWithStatus(false,Good?0:1);};
+                        auto Fresh=[&](){const bool Good=CFInputQA::Press(Hero,EKeys::Insert) && IsValid(Wall) && Hero->Inventory->Count(EFrontierItem::Material)==Before && Hero->Feedback.Contains(TEXT("再按Insert确认"));
+                            UE_LOG(LogTemp,Display,TEXT("CF_HOME_REPLACE_CANCEL_FRESH phase=%d good=%d materials=%d feedback=%s"),Phase,Good,Hero->Inventory->Count(EFrontierItem::Material),*Hero->Feedback);return Good;};
+                        if(!Pass){Finish(false);return;}
+                        if(Phase==0)
+                        {
+                            if(World->GetTimeSeconds()-At<5.4)return;
+                            Pass &= Fresh();
+                            // 真实预览Tick应在下一阶段前看到视线离开，不直接调用清理内部状态。
+                            Hero->GetController()->SetControlRotation(FRotator(70,0,0));Hero->FirstPersonCamera->SetWorldRotation(FRotator(70,0,0));
+                            Phase=1;At=World->GetTimeSeconds();return;
+                        }
+                        if(World->GetTimeSeconds()-At<.4)return;
+                        if(Phase==1)
+                        {
+                            Hero->GetController()->SetControlRotation(Aim);Hero->FirstPersonCamera->SetWorldRotation(Aim);
+                            Pass &= Fresh();
+                            for(int32 I=0;I<8;++I)Pass &= CFInputQA::Press(Hero,EKeys::V);
+                            Pass &= Fresh();
+                            Pass &= CFInputQA::Press(Hero,EKeys::B) && !Hero->Building->IsActive();
+                            Pass &= CFInputQA::Press(Hero,EKeys::B) && CFInputQA::Press(Hero,EKeys::Eight) && Fresh();
+                            Phase=2;At=World->GetTimeSeconds();return;
+                        }
+                        if(Phase==2)
+                        {
+                            Pass &= CFInputQA::Press(Hero,EKeys::Insert);
+                            AHomeModule* Replaced=nullptr;
+                            for(TActorIterator<AHomeModule> It(World);It;++It)if(!It->bPreview && It->PersistentId==Id && It->GetKind()==EHomeModuleKind::Window)Replaced=*It;
+                            Pass &= Replaced && IsValid(Roof) && Hero->Inventory->Count(EFrontierItem::Material)==Before-10+Refund;
+                            Finish(Pass);return;
+                        }
+                    },.1f,true);
+                    return;
+                }
                 if(FParse::Param(FCommandLine::Get(),TEXT("CFHomeReplacePreview")))
                 {
                     const FString Root=FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir()/TEXT("HomeReplacePreview")/FGuid::NewGuid().ToString(EGuidFormats::Digits));

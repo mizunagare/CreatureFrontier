@@ -1,5 +1,13 @@
 # 开放窗墙
 
+## 确认取消生命周期：部分通过，旋转高帧率失败待查
+
+新增显式 `-CFHomeReplaceCancel`（同用CFWindowTest/HomeReplaceTest/HomeReplaceInput），真实世界定时器等待5.4秒验证超时，再移开取景0.4秒、回望、V切换八模块一轮、B退出重进建造，逐次通过注册绑定按Insert应仅重新提示且旧墙/材料保持，最后有效确认才替换。不直接重置内部待确认字段，不写存档。
+
+5E63080F Editor构建成功，`Saved/HomeReplace-Cancel-20261029.log` 原朝向/实际30帧上限回显样本PASS phase=2。但同模块 `Saved/HomeReplace-Cancel-Rotated120-20261029.log` 90度/120上限在phase=2失败，不能外推取消完整通过。
+
+增加阶段诊断后Editor模块 `1A6F4BD2B7146FDDBE11FB5624F10A7AB23D8381D69A42ED0B2198E02F586E38` 构建成功，`Saved/HomeReplace-Cancel-Rotated120-Diagnostic-20261029.log` 再次FAIL phase=2。超时及三次重新提示均good=1、材料170；最终按键后材料仍170、反馈仍是首次确认提示，没有生成期望窗墙。尚未定位待确认被再次清理的原因，不将其归因于帧率/生产逻辑或QA取景，也不通过追加确认次数来掩盖。原失败日志保留；进程退出0不能覆盖FAIL。两个样本不是完整帧率矩阵，95C185CB Windows不含此QA，完整回归30814仍运行，稳定包不升。
+
 ## 旋转替换组合
 
 替换夹具新增显式 `-CFHomeReplaceRotated`，围绕原地板中心旋转90度，墙类朝向同步，地板/屋顶沿用规范吸附；所有玩家占位/距离测试坐标同步旋转，确认取景和碰撞射线从实际模块变换求取。没有新增替换生产分支或放宽支撑/碰撞。
