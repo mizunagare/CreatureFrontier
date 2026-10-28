@@ -106,6 +106,7 @@ public:
     bool IsRosterOpen() const { return bRosterOpen; }
     ACreatureCharacter* GetRosterHighlight() const { return RosterHighlight.Get(); }
     void CommandFollow();
+    void ToggleCompanionCombatStance();
     void CommandWork();
     void CommandRest();
     void HealCompanion();

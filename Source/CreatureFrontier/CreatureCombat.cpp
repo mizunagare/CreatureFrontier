@@ -65,6 +65,18 @@ void ACreatureCharacter::ClearCombatOrders()
     SpecialWindupRemaining = 0;
 }
 
+bool ACreatureCharacter::SetAvoidCombat(bool Avoid)
+{
+    if(!HasAuthority() || Health<=0 || Disposition!=ECreatureDisposition::Tamed || !Tamer)return false;
+    bAvoidCombat=Avoid;
+    if(Avoid)
+    {
+        ClearCombatOrders();
+        if(Activity==ECreatureActivity::Combat){StopNavigation();SetActivity(ECreatureActivity::Follow);}
+    }
+    return true;
+}
+
 void ACreatureCharacter::HandlePlayerDowned(const ACFPlayerCharacter* Player)
 {
     if(!HasAuthority() || !Player || Player->Health>0) return;

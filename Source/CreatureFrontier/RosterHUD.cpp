@@ -30,6 +30,7 @@ void ACFHUD::DrawRosterPanel(ACFPlayerCharacter* Player)
         Line(FString::Printf(TEXT("%s %s%s"),Index==Highlight?TEXT(">>"):TEXT("  "),Player->IsCommandTarget(Pet)?TEXT("[指挥中] "):TEXT(""),*Pet->GetCreatureName()),Color,Y);
         Line(FString::Printf(TEXT("等级%d | %.1f米 | 生命 %.0f/%.0f | 体力 %.0f | 饱食 %.0f"),Pet->Level,Player->GetDistanceTo(Pet)/100,Pet->Health,Pet->GetMaxHealth(),Pet->Stamina,Pet->Nutrition),Color,Y+20*U);
         FString Status=FrontierChinese::Activity(Pet->Activity);
+        Status+=Pet->bAvoidCombat?TEXT(" | 避战"):TEXT(" | 护主");
         if(Pet->Health<=0)Status=TEXT("已倒下：瞄准后按 P 治疗");else if(Pet->FeedingSite.IsValid())Status=TEXT("寻找食物");else if(Pet->bResumeWorkAfterRest)Status=TEXT("自动休息，等待复工");
         if(!Pet->Nickname.IsEmpty())Status=Pet->GetSpeciesName()+TEXT(" | ")+Status;
         if(Pet->WorkSite)Status+=TEXT(" | ")+FrontierChinese::Specialty(Pet->WorkSite->RequiredSpecialty);

@@ -17,7 +17,7 @@ class UCreatureDefinition;
 class UResourceDefinition;
 
 // 写盘与当前版本上限共用；历史迁移边界继续使用其原始版本号。
-inline constexpr int32 FrontierCurrentSaveVersion=30;
+inline constexpr int32 FrontierCurrentSaveVersion=31;
 
 USTRUCT()
 struct FResourceSaveRecord
@@ -43,6 +43,7 @@ struct FCreatureSaveRecord
     // 转成合法的 None 默认值，导致校验无法拒绝异常数据。
     UPROPERTY() uint8 CrystalJourney=0;
     UPROPERTY() uint8 RescueJourney=0;
+    UPROPERTY() uint8 CombatStance=0;
     UPROPERTY() FName RescueSource;
     UPROPERTY() TSoftClassPtr<ACreatureCharacter> CreatureClass;
     UPROPERTY() TSoftObjectPtr<UCreatureDefinition> Definition;

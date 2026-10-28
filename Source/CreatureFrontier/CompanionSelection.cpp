@@ -57,6 +57,20 @@ void ACFPlayerCharacter::ClearCompanionSelection()
     Feedback = TEXT("当前指挥全部伙伴，L 选择瞄准的单个伙伴");
 }
 
+void ACFPlayerCharacter::ToggleCompanionCombatStance()
+{
+    if(!HasAuthority() || Health<=0 || !GetController())return;
+    TArray<ACreatureCharacter*> Targets;
+    bool AnyGuard=false;
+    for(auto* Pet:GetCompanionRoster())
+        if(IsCommandTarget(Pet) && Pet->Health>0 && GetDistanceTo(Pet)<=1800)
+        {Targets.Add(Pet);AnyGuard |= !Pet->bAvoidCombat;}
+    int32 Count=0;
+    for(auto* Pet:Targets)if(Pet->SetAvoidCombat(AnyGuard))++Count;
+    Feedback=Count?FString::Printf(TEXT("%d位伙伴：%s | Q/G仍可明确出击 | F8切换"),Count,AnyGuard?TEXT("避战，不自动护主"):TEXT("自动护主")):
+        TEXT("18米内没有当前受指挥的存活伙伴");
+}
+
 bool ACFPlayerCharacter::IsCommandTarget(const ACreatureCharacter* Pet) const
 {
     if (!GetController() || !IsValid(Pet) || Pet->Tamer != GetController()) return false;

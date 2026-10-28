@@ -319,7 +319,7 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
         if (TickSpecial(DeltaSeconds)) return;
         ACreatureCharacter* Enemy = FocusTarget;
         float Best = 1000.0f;
-        if (!Enemy) for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It)
+        if (!Enemy && !bAvoidCombat) for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It)
         {
             // 自动支援只响应敌意；中性/温顺生物交由玩家决定是否集火。
             if (It->Disposition != ECreatureDisposition::Hostile || It->Health <= 0.0f || It->Activity == ECreatureActivity::ReturnHome) continue;
@@ -516,6 +516,7 @@ void ACreatureCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
 {
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
     DOREPLIFETIME(ACreatureCharacter, Health);
+    DOREPLIFETIME(ACreatureCharacter, bAvoidCombat);
     DOREPLIFETIME(ACreatureCharacter, bAlpha);
     DOREPLIFETIME(ACreatureCharacter, AlphaCooldown);
     DOREPLIFETIME(ACreatureCharacter, AlphaWindup);

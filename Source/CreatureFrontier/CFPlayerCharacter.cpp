@@ -143,6 +143,7 @@ bool ACFPlayerCharacter::SaveProgress(const FString& Slot)
         Record.CrystalJourney=static_cast<uint8>(It->Memory->GetMemory());
         Record.RescueJourney=static_cast<uint8>(It->Memory->GetRescueMemory());
         Record.RescueSource=It->Memory->GetRescueSource();
+        Record.CombatStance=It->bAvoidCombat?1:0;
         Record.Disposition = It->Disposition;
         Record.Activity = It->Activity;
         Record.WorkSiteName = IsValid(It->WorkSite) ? It->WorkSite->GetFName() : NAME_None;
@@ -259,6 +260,9 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
         if(Save->FormatVersion<22) { Record.Id=FGuid::NewGuid(); Record.CargoItems.Reset(); Record.DeliveryCrateId.Invalidate(); Record.bReturningCargo=false; }
         if(!Record.Id.IsValid() || CreatureIds.Contains(Record.Id)) { Feedback=TEXT("生物身份无效或重复，世界未改变"); return false; }
         const bool OwnedTamed=Record.bOwned && Record.Disposition==ECreatureDisposition::Tamed;
+        if(Save->FormatVersion<31)Record.CombatStance=0;
+        if(Record.CombatStance>1 || (Record.CombatStance!=0 && !OwnedTamed))
+        {Feedback=TEXT("伙伴战斗姿态无效，世界未改变");return false;}
         if(Save->FormatVersion<26)
         {Record.Preference=OwnedTamed?UCompanionPersonalityComponent::PreferenceForId(Record.Id):ECompanionPreference::None;Record.bPreferenceDiscovered=false;}
         if(!UCompanionPersonalityComponent::ValidateSnapshot(Record.Preference,Record.bPreferenceDiscovered,OwnedTamed))
@@ -348,6 +352,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
         Pet->BondPoints=Save->FormatVersion>=16?Record.BondPoints:0;
         Pet->PettingCooldown=Save->FormatVersion>=16?Record.PettingCooldown:0;
         Pet->Activity = Record.Activity;
+        Pet->bAvoidCombat=Record.CombatStance==1;
         for (TActorIterator<AWorkStation> It(GetWorld()); It; ++It)
             if (!Record.WorkSiteId.IsValid() && !It->bPlayerBuilt && It->GetFName() == Record.WorkSiteName) { Pet->WorkSite = *It; break; }
         Restored.Add(Pet);
@@ -619,6 +624,7 @@ void ACFPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
     PlayerInputComponent->BindAction(TEXT("Attack"), IE_Pressed, this, &ACFPlayerCharacter::Attack);
     PlayerInputComponent->BindAction(TEXT("Capture"), IE_Pressed, this, &ACFPlayerCharacter::CaptureTarget);
     PlayerInputComponent->BindKey(EKeys::F, IE_Pressed, this, &ACFPlayerCharacter::CommandFollow);
+    PlayerInputComponent->BindKey(EKeys::F8,IE_Pressed,this,&ACFPlayerCharacter::ToggleCompanionCombatStance);
     PlayerInputComponent->BindKey(EKeys::E, IE_Pressed, this, &ACFPlayerCharacter::CommandWork);
     PlayerInputComponent->BindKey(EKeys::T, IE_Pressed, this, &ACFPlayerCharacter::CommandRest);
     PlayerInputComponent->BindKey(EKeys::P, IE_Pressed, this, &ACFPlayerCharacter::HealCompanion);

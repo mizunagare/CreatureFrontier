@@ -106,6 +106,8 @@ void ACFGameMode::BeginPlay()
     if(AdventureMode || FParse::Param(FCommandLine::Get(),TEXT("CFHollowAdventureTest")))
     {FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this,AdventureMode](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunHollowAdventure(GetWorld(),Hero,AdventureMode);},1.f,false);return;}
     const int32 DefenseMode=FParse::Param(FCommandLine::Get(),TEXT("CFDefenseWrite"))?1:FParse::Param(FCommandLine::Get(),TEXT("CFDefenseRead"))?2:0;
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFStanceTest")))
+    {FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunCompanionStanceScenario(GetWorld(),Hero);},1.f,false);return;}
     if(DefenseMode || FParse::Param(FCommandLine::Get(),TEXT("CFDefenseTest")))
     {FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this,DefenseMode](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunCompanionDefenseScenario(GetWorld(),Hero,DefenseMode);},1.f,false);return;}
     if(FParse::Param(FCommandLine::Get(),TEXT("CFWildSightTest")))

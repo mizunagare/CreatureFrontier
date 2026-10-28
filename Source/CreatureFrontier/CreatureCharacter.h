@@ -87,6 +87,9 @@ public:
     UPROPERTY(Replicated, BlueprintReadOnly, Category="Combat")
     float GuardRemaining = 0.0f;
     UPROPERTY() TObjectPtr<ACreatureCharacter> FocusTarget;
+    // 避战只禁止自动支援，显式集火/技能仍由玩家决定。
+    UPROPERTY(Replicated,BlueprintReadOnly,Category="Combat") bool bAvoidCombat=false;
+    bool SetAvoidCombat(bool Avoid);
     bool OrderAttack(ACreatureCharacter* Target);
     bool RequestSpecial(ACreatureCharacter* Target);
     void ClearCombatOrders();

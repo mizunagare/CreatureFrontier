@@ -78,6 +78,7 @@ void ACFHUD::DrawWorldHUD(ACFPlayerCharacter* Player)
             FString QuietReason,PlayReason;const bool Quiet=Player->CanInteractCompanion(Creature,false,QuietReason),Play=Player->CanInteractCompanion(Creature,true,PlayReason);
             Rows.Add({Quiet?(Play?FString(TEXT("Y 安静陪伴 / F6 玩耍（安全距离2.5米）")):FString(TEXT("Y 安静陪伴 | F6 暂不可用："))+PlayReason):FString(TEXT("陪伴暂不可用："))+QuietReason,Yellow,2});
             Rows.Add({TEXT("J 喂食 | P 治疗 | F 跟随 | T 休息"),Yellow});
+            Rows.Add({FString::Printf(TEXT("F8 %s / Q 集火 / G 技能"),Creature->bAvoidCombat?TEXT("避战：不自动护主"):TEXT("自动护主")),Yellow});
             Rows.Add({TEXT("F4 命名 / F7 归家回忆（安全空闲时）"),Yellow});
             const auto Job=Creature->GetGatheringStatus();if(!Job.IsEmpty())Rows.Add({Job,Yellow,2});
             if(Creature->FeedingSite.IsValid())Rows.Add({TEXT("寻找食物中，保留工作指派"),Yellow});
