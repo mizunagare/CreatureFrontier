@@ -4,6 +4,7 @@
 #include "HomeLayout.h"
 #include "BaseBuildingComponent.h"
 #include "CFPlayerCharacter.h"
+#include "CFHUD.h"
 #include "CreatureCharacter.h"
 #include "CreatureDefinition.h"
 #include "WorkStation.h"
@@ -18,6 +19,8 @@
 #include "NavigationPath.h"
 #include "TimerManager.h"
 #include "HAL/PlatformMisc.h"
+#include "HAL/FileManager.h"
+#include "GameFramework/PlayerController.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
 #include "Misc/Paths.h"
@@ -97,6 +100,43 @@ void RunHomeWindowScenario(UWorld* World,ACFPlayerCharacter* Hero)
         Restored.ContainsByPredicate([SideId](const auto& R){return R.Id==SideId && R.Definition.Get() && R.Definition.Get()->Kind==EHomeModuleKind::Window;});
     const bool Pass=Built && Hole && Frame && PawnBlocked && Support && Rejected && Saved;
     UE_LOG(LogTemp,Display,TEXT("CF_WINDOW %s built=%d hole=%d frame=%d pawn=%d support=%d legacy=%d save=%d"),Pass?TEXT("PASS"):TEXT("FAIL"),Built,Hole,Frame,PawnBlocked,Support,Rejected,Saved);
+    if(Pass && FParse::Param(FCommandLine::Get(),TEXT("CFWindowPreview")))
+    {
+        const FString Root=FPaths::ProjectSavedDir()/TEXT("WindowPreview")/FGuid::NewGuid().ToString(EGuidFormats::Digits);
+        IFileManager::Get().MakeDirectory(*Root,true);
+        UE_LOG(LogTemp,Display,TEXT("CF_WINDOW_PREVIEW_ROOT %s"),*Root);
+        Hero->GetCharacterMovement()->DisableMovement();
+        Hero->Feedback=TEXT("开放窗墙：窗洞可观察外部，窗框保留碰撞 | 支撑屋顶时不可直接拆除");
+        auto Stage=MakeShared<int32>(0);auto Timer=MakeShared<FTimerHandle>();
+        World->GetTimerManager().SetTimer(*Timer,[World,Hero,Root,Stage,Timer]()
+        {
+            const TCHAR* Names[]={TEXT("Outside"),TEXT("Corner"),TEXT("Inside")};
+            if(*Stage>=6)
+            {
+                bool Ready=true;for(const auto* Name:Names)Ready &= IFileManager::Get().FileSize(*(Root/(FString(Name)+TEXT(".png"))))>1000;
+                World->GetTimerManager().ClearTimer(*Timer);
+                UE_LOG(LogTemp,Display,TEXT("CF_WINDOW_PREVIEW %s scenes=3"),Ready?TEXT("PASS"):TEXT("FAIL"));
+                FPlatformMisc::RequestExitWithStatus(false,Ready?0:1);return;
+            }
+            const int32 Scene=*Stage/2;
+            if(*Stage%2==0)
+            {
+                const FVector Positions[]={FVector(-400,-1300,90),FVector(-850,-1200,100),FVector(-400,-800,60)};
+                Hero->SetActorLocation(Positions[Scene]);
+                const auto View=(FVector(-400,-1000,140)-Hero->FirstPersonCamera->GetComponentLocation()).Rotation();
+                Hero->GetController()->SetControlRotation(View);Hero->FirstPersonCamera->SetWorldRotation(View);
+            }
+            else
+            {
+                auto* PC=Cast<APlayerController>(Hero->GetController());auto* HUD=PC?Cast<ACFHUD>(PC->GetHUD()):nullptr;
+                if(!HUD || !HUD->GetLayoutAudit().bFits || !HUD->GetLayoutAudit().bNoOverlap)
+                {World->GetTimerManager().ClearTimer(*Timer);UE_LOG(LogTemp,Error,TEXT("CF_WINDOW_PREVIEW FAIL layout"));FPlatformMisc::RequestExitWithStatus(false,1);return;}
+                FScreenshotRequest::RequestScreenshot(Root/(FString(Names[Scene])+TEXT(".png")),true,false);
+            }
+            ++*Stage;
+        },.6f,true);
+        return;
+    }
     FPlatformMisc::RequestExitWithStatus(false,Pass?0:1);
 }
 void UHomeMovementProbe::TickComponent(float DeltaTime,ELevelTick TickType,FActorComponentTickFunction* Tick)

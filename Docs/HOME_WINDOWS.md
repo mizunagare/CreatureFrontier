@@ -1,5 +1,13 @@
 # 开放窗墙
 
+## 格式31真实旧档与首个图形预览
+
+8A9EB670运行文件独立复制到 `Windows-Open-Window-QA`，排除Saved及PDB，47文件哈希逐一一致。`Saved/CargoLegacyAudit/20261029-045910-Verified/` 用格式31 `Windows-Stance-Lifecycle` 的19类真实存档各读取两次，共38次全部结束通过；CSV固定指纹已复核，脚本逐次核对源文件/输入不改写并恢复原槽。有限样本不等于所有历史坏档或窗墙32数据的旧程序兼容。
+
+75C72557 Editor新增 `CFWindowPreview`：窗墙专项正常建造、读档并通过原判据后，从屋外、转角、屋内三个视点实际渲染，核对HUD分区后截图；不修改正常建造规则。`Saved/WindowPersistenceQA/20261029-050126-a361b5ff/` 预览写入和两次冷读取实际通过，`Saved/WindowPreview/0F1CABBD4BA8AD5F2B090780C1BC0C2A/` 三张1280×720图已逐张查看，中文说明未见越界。屋内及转角可见真实开口；屋外正视能透过窗洞看到对面墙，辨识度较差，材质仍灰盒，不宣称最终表现。
+
+脚本新增 `-Preview -Resolution 1280x720`，渲染仅作用于Write进程，后续仍是无渲染的独立读取。补上截图实际尺寸校验及证据复制后再次执行 `Saved/WindowPersistenceQA/20261029-051140-9d0622c6/`，一写两读及三张PNG实际尺寸校验通过；本次新图未另行目视，不冒用前一组三图的读图记录。脚本也支持960×540和1920×1080，但尚未执行。Windows预览尚未重打包，原8A9EB670不含该入口；其完整回归仍在运行。
+
 ## 首个独立Windows候选
 
 `E:\CreatureFrontierBuilds\Windows-Open-Window` 已独立打包成功（格式32），内部EXE SHA-256为 `8A9EB670529FABFCC80FD84C29528EE3B5EF32ABF6E8CAC5434244E23273DAEE`。保留所有旧构建，未覆盖旧玩家存档。

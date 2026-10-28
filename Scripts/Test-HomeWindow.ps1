@@ -1,6 +1,7 @@
-param([switch]$Editor,[string]$BuildRoot='',[string]$EngineRoot='D:\Epic\UE_5.8')
+param([switch]$Editor,[string]$BuildRoot='',[string]$EngineRoot='D:\Epic\UE_5.8',[switch]$Preview,[string]$Resolution='1280x720')
 $ErrorActionPreference='Stop'
 if(($Editor -and $BuildRoot) -or (!$Editor -and !$BuildRoot)){throw '请只指定Editor或BuildRoot之一'}
+if($Resolution -notmatch '^(960x540|1280x720|1920x1080)$'){throw '窗墙预览仅支持960x540、1280x720或1920x1080'}
 $projectRoot=Split-Path $PSScriptRoot -Parent
 . (Join-Path $PSScriptRoot 'BuildFingerprint.ps1')
 $root=if($Editor){$projectRoot}else{(Resolve-Path -LiteralPath $BuildRoot).Path}
@@ -28,15 +29,33 @@ try {
                        @{Name='Read2';Flag='CFWindowRead';Marker='CF_WINDOW_READ PASS windows=2 loads=2'})){
         $log=Join-Path $run ($case.Name+'.log')
         $arguments=@('-game','-nullrhi','-nosound','-unattended','-nop4','-CFHomeTest',('-'+$case.Flag),('-abslog="'+$log+'"'))
+        if($Preview -and $case.Name -eq 'Write'){
+            $dimensions=$Resolution.Split('x')
+            $arguments=@($arguments | Where-Object {$_ -ne '-nullrhi'})+@('-CFWindowPreview','-RenderOffscreen','-ForceRes',('-ResX='+$dimensions[0]),('-ResY='+$dimensions[1]),'-norhithread','-forcerhibypass')
+        }
         if($Editor){$arguments=@((Join-Path $projectRoot 'CreatureFrontier.uproject'))+$arguments}
         $process=Start-Process -FilePath $exe -WorkingDirectory $root -WindowStyle Hidden -PassThru -ArgumentList $arguments
         if(!$process.WaitForExit(60000)){$process.Kill();$process.WaitForExit();throw '窗墙测试超时'}
         if($process.ExitCode -ne 0 -or !(Select-String -LiteralPath $log -SimpleMatch $case.Marker -Quiet) -or
            (Select-String -LiteralPath $log -Pattern '\bFAIL\b|Fatal error|Assertion failed' -Quiet)){throw "窗墙测试失败：$log"}
         if((Get-FrontierBuildFingerprint -LiteralPath $module) -ne $hash){throw '窗墙测试期间程序指纹变化'}
+        if($Preview -and $case.Name -eq 'Write'){
+            if(!(Select-String -LiteralPath $log -SimpleMatch 'CF_WINDOW_PREVIEW PASS scenes=3' -Quiet)){throw '窗墙预览未完成'}
+            $rootLine=(Select-String -LiteralPath $log -Pattern 'CF_WINDOW_PREVIEW_ROOT .*[/\\]([A-Fa-f0-9]{32})\s*$' | Select-Object -Last 1)
+            if(!$rootLine){throw '窗墙预览缺少独立截图目录'}
+            $id=$rootLine.Matches[0].Groups[1].Value
+            $shots=Join-Path (Split-Path $saveRoot -Parent) ('WindowPreview\'+$id)
+            Add-Type -AssemblyName System.Drawing
+            foreach($scene in @('Outside','Corner','Inside')){
+                $png=Join-Path $shots ($scene+'.png')
+                $bitmap=[Drawing.Image]::FromFile($png)
+                try {if(($bitmap.Width.ToString()+'x'+$bitmap.Height) -ne $Resolution){throw '窗墙截图实际尺寸不符'}}finally{$bitmap.Dispose()}
+                Copy-Item -LiteralPath $png -Destination (Join-Path $run ($scene+'.png'))
+            }
+        }
         $current=(Get-FileHash -LiteralPath (Join-Path $saveRoot 'WindowGood.sav')).Hash
         if($case.Name -eq 'Write'){$inputHash=$current}elseif($current -ne $inputHash){throw '窗墙读取改写了输入文件'}
-        $results += [pscustomobject]@{Case=$case.Name;Pass=$true;BuildSHA256=$hash;InputSHA256=$inputHash;Log=$log}
+        $results += [pscustomobject]@{Case=$case.Name;Pass=$true;Preview=[bool]$Preview;Resolution=$Resolution;BuildSHA256=$hash;InputSHA256=$inputHash;Log=$log}
         $results | Export-Csv -LiteralPath (Join-Path $run 'Results.csv') -NoTypeInformation
         Write-Host "$($case.Name) 通过"
     }
