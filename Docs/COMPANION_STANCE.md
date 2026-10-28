@@ -1,5 +1,16 @@
 # 伙伴护主与避战姿态
 
+## Windows 候选首批验收（2026-10-29）
+
+独立候选 `E:\CreatureFrontierBuilds\Windows-Stance-Lifecycle` 已构建成功，内部程序 SHA-256 为 `5DF05F08CC4FBAFFE70BB6803C0DBCE3795300E3DEE0155A056BEC061F81FF27`，存档格式31。旧稳定包及玩家存档不替换。
+
+- `Saved/StancePersistenceQA/20261029-035329-c4345e37/`：一写两次独立读取通过，输入哈希不变、专用槽恢复。
+- `Saved/DoorFarmQA/20261029-035341-bd7b7c1f/`：避战农业实际生产通过。
+- `Saved/HUDRenderQA/20261029-035402-a0e40c4e/`：960×540八场景自动检查通过；目前只实际查看伙伴卡一图，中文避战状态和F8提示可读，其余七图未目视，不宣称全部图形验收。
+- `Saved/PackagedTests/20261029-035444-b3e772a3/`：完整回归仍在运行，不能视作全部通过。
+
+已建立独立 `Windows-Stance-Lifecycle-QA` 副本，不复制Saved及调试符号，47个运行文件逐一核对哈希一致。格式30旧包 `Windows-Follow-Lifetime` 的存档读取审计正在该副本运行，尚未完成；避免与主回归共用测试槽。新Windows自然恢复六项矩阵仍待验证，不借用Editor结果。
+
 ## 自然恢复六项矩阵收尾与新候选（2026-10-29）
 
 0D33E0FA的 `Saved/HollowRecoveryMatrix/20261029-034022-bead19b3/` 已正常退出0，30/60/120帧上限各两次共六项完整恢复链全部通过；实际避战指令、九项自然倒地条件、复活保留、伙伴归队、明确技能战斗、六份采集与返家最终标记逐项核对，日志无FAIL/致命错误。六行CSV均固定同一模块指纹；运行后实际DLL哈希仍0D33E0FA。原HollowRecoveryCross专用槽实际还原SHA-256 `8C0C4A9782459082770C49A210AB917516F60A0FDFD56097E0FA5DCAF45D6F05`，与before一致。
