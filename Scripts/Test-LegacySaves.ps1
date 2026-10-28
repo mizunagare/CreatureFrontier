@@ -1,6 +1,7 @@
 param([Parameter(Mandatory=$true)][string]$LegacyBuildRoot,
       [Parameter(Mandatory=$true)][string]$BuildRoot,
-      [switch]$IncludeCrops)
+      [switch]$IncludeCrops,
+      [switch]$IncludeNames)
 
 $ErrorActionPreference='Stop'
 $projectRoot=Split-Path $PSScriptRoot -Parent
@@ -24,6 +25,7 @@ if($IncludeCrops -and (Test-Path -LiteralPath (Join-Path $LegacyBuildRoot 'Creat
     $cases += @{Slot='FrontierFarmingAutomation'; Flag='CFCropLegacyRead'; Marker='CF_CROP_LEGACY_READ PASS'}
 }
 $results=@()
+if($IncludeNames){$cases+=@{Slot='NameCross';Flag='CFNameRead';Marker='CF_NAME_READ PASS'};$cases+=@{Slot='NameCross';Flag='CFPersonalityLegacyRead';Marker='CF_PERSONALITY_LEGACY_READ PASS'}}
 foreach($case in $cases){
     $source=Join-Path $LegacyBuildRoot ('CreatureFrontier\Saved\SaveGames\'+$case.Slot+'.sav')
     $target=Join-Path $BuildRoot ('CreatureFrontier\Saved\SaveGames\'+$case.Slot+'.sav')

@@ -41,12 +41,12 @@ void RunCropScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
     if(Mode==3)
     {
         const FString Slot=TEXT("FrontierFarmingAutomation");
-        auto* Old=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot,0));Pass=Old && Old->FormatVersion<=24;
+        auto* Old=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot,0));Pass=Old && Old->FormatVersion<=25;
         const auto* Expected=Old?Old->Facilities.FindByPredicate([](const FFacilitySaveRecord& R){return R.Specialty==EWorkSpecialty::Farming;}):nullptr;
         for(int32 Attempt=0;Attempt<2;++Attempt)
         {
             Pass &= Hero->LoadProgress(Slot);auto* Site=Garden(World);auto* Pet=Farmer(World,Hero);
-            if(Old && Old->FormatVersion==24)
+            if(Old && Old->FormatVersion>=24)
                 Pass &= Expected && Site && Pet && Pet->WorkSite==Site && Site->PersistentId==Expected->Id && Site->StoredFood==Expected->StoredFood &&
                     Site->Crop->Seeds==Expected->Seeds && Site->Crop->bPlanted==Expected->bPlanted && Site->Crop->GrowthWork==Expected->GrowthWork &&
                     Hero->Inventory->Count(EFrontierItem::Seeds)==Old->InventoryStacks.FindRef(EFrontierItem::Seeds);

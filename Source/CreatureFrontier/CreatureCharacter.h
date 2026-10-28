@@ -22,6 +22,7 @@ public:
     UPROPERTY(BlueprintReadOnly) FString Nickname;
     UPROPERTY(VisibleAnywhere,BlueprintReadOnly) TObjectPtr<class UInventoryComponent> CargoInventory;
     UPROPERTY(VisibleAnywhere,BlueprintReadOnly) TObjectPtr<class UCompanionCargoComponent> Cargo;
+    UPROPERTY(VisibleAnywhere,BlueprintReadOnly) TObjectPtr<class UCompanionPersonalityComponent> Personality;
     virtual void OnConstruction(const FTransform& Transform) override;
     UFUNCTION(BlueprintPure, Category="Creature")
     FString GetCreatureName() const;
@@ -42,6 +43,7 @@ public:
     void AddBond(int32 Amount);
     void RespondToPetting();
     void AcknowledgeName();
+    void SetSocialResponse(bool Playful,bool Favorite);
     FString GetBondLabel() const;
     UPROPERTY()
     TObjectPtr<AWorkStation> WorkSite;
@@ -157,6 +159,7 @@ private:
     FName VisualState=TEXT("Idle");
     float PoseTime=0, RestPoseBlend=0, StrikePoseRemaining=0, HitPoseRemaining=0;
     float AffectionPoseRemaining=0;
+    bool bPlayfulResponse=false,bFavoriteResponse=false;
     FVector StrikeDirectionLocal=FVector::ForwardVector;
     void BeginStrikePose(const AActor* Target=nullptr);
     TArray<FTransform> NeutralFeet, NeutralAccents, NeutralEyes, NeutralPupils;

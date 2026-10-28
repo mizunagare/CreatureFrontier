@@ -1,6 +1,7 @@
 #include "CreatureCharacter.h"
 #include "CreatureDefinition.h"
 #include "CompanionCargoComponent.h"
+#include "CompanionPersonalityComponent.h"
 #include "FarmCropComponent.h"
 #include "CreatureAffinity.h"
 #include "AIController.h"
@@ -26,6 +27,7 @@ ACreatureCharacter::ACreatureCharacter()
     PrimaryActorTick.bCanEverTick = true;
     CargoInventory=CreateDefaultSubobject<UInventoryComponent>(TEXT("CargoInventory"));
     Cargo=CreateDefaultSubobject<UCompanionCargoComponent>(TEXT("Cargo"));
+    Personality=CreateDefaultSubobject<UCompanionPersonalityComponent>(TEXT("Personality"));
     bReplicates = true;
     SetReplicateMovement(true);
     AutoPossessAI = EAutoPossessAI::PlacedInWorldOrSpawned;
@@ -486,6 +488,7 @@ void ACreatureCharacter::Tame(AController* NewTamer)
     RetaliationTarget.Reset();
     RetaliationRemaining = 0;
     Disposition = ECreatureDisposition::Tamed;
+    Personality->EnsurePreference();
     Activity = ECreatureActivity::Follow;
     OnTamed();
 }

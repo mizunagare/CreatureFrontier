@@ -8,6 +8,7 @@
 #include "MaterialsScenario.h"
 #include "CropScenario.h"
 #include "NameScenario.h"
+#include "PersonalityScenario.h"
 #include "HomeScenario.h"
 #include "ExpeditionScenario.h"
 #include "CFPlayerCharacter.h"
@@ -61,6 +62,9 @@ void ACFGameMode::BeginPlay()
 {
     Super::BeginPlay();
     SeedFrontierResources(GetWorld());
+    const int32 PersonalityMode=FParse::Param(FCommandLine::Get(),TEXT("CFPersonalityWrite"))?1:FParse::Param(FCommandLine::Get(),TEXT("CFPersonalityRead"))?2:FParse::Param(FCommandLine::Get(),TEXT("CFPersonalityLegacyRead"))?3:0;
+    if(PersonalityMode || FParse::Param(FCommandLine::Get(),TEXT("CFPersonalityTest")))
+    {FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this,PersonalityMode](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0))) RunPersonalityScenario(GetWorld(),Hero,PersonalityMode);},1.f,false);return;}
     const int32 NameMode=FParse::Param(FCommandLine::Get(),TEXT("CFNameWrite"))?1:FParse::Param(FCommandLine::Get(),TEXT("CFNameRead"))?2:0;
     if(NameMode || FParse::Param(FCommandLine::Get(),TEXT("CFNameTest")))
     {FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this,NameMode](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0))) RunNameScenario(GetWorld(),Hero,NameMode);},1.f,false);return;}

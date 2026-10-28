@@ -2,6 +2,7 @@
 #include "CFPlayerCharacter.h"
 #include "CreatureCharacter.h"
 #include "CreatureDefinition.h"
+#include "CompanionPersonalityComponent.h"
 #include "CreatureAffinity.h"
 #include "PlayerEquipmentComponent.h"
 #include "CaptureComponent.h"
@@ -85,7 +86,8 @@ void ACFHUD::DrawHUD()
         {
             const FString ResourceStatus=Creature->GetGatheringStatus();
             if(!ResourceStatus.IsEmpty()) DrawText(ResourceStatus,FLinearColor::Yellow,X-130,Y-95);
-            DrawText(FString::Printf(TEXT("BOND %d/100 %s | Y pet (2.5m) | wait %.0fs"),Creature->BondPoints,*Creature->GetBondLabel(),FMath::CeilToFloat(Creature->PettingCooldown)),FLinearColor::Green,X-30,Y+165);
+            DrawText(FString::Printf(TEXT("BOND %d/100 | Y quiet / F6 play (2.5m) | wait %.0fs"),Creature->BondPoints,FMath::CeilToFloat(Creature->PettingCooldown)),FLinearColor::Green,X-30,Y+165);
+            DrawText(Creature->Personality->GetSummary(),FLinearColor(.7f,.9f,1),X-30,Y+185);
             if(Creature->CarriedFood>0 || (Creature->WorkSite && Creature->WorkSite->RequiredSpecialty==EWorkSpecialty::Transport))
                 DrawText(FString::Printf(TEXT("TRANSPORT cargo %d/3 food | Z recover within 6m"),Creature->CarriedFood),FLinearColor::Yellow,X-130,Y-125);
             if (Creature->bResumeWorkAfterRest)
@@ -150,19 +152,19 @@ void ACFHUD::DrawHUD()
     {
         const auto Pets = Player->GetCompanionRoster();
         const int32 Highlight = Pets.IndexOfByKey(Player->GetRosterHighlight());
-        const int32 Rows = FMath::Clamp(FMath::FloorToInt((Canvas->ClipY-160)/70),1,8);
+        const int32 Rows = FMath::Clamp(FMath::FloorToInt((Canvas->ClipY-160)/90),1,8);
         const int32 Start = Highlight == INDEX_NONE ? 0 : (Highlight/Rows)*Rows;
         const float Width = FMath::Min(470.f,Canvas->ClipX-36.f), Left = Canvas->ClipX-Width-18;
-        DrawRect(FLinearColor(.015f,.025f,.04f,.96f),Left,18,Width,100+Rows*70);
+        DrawRect(FLinearColor(.015f,.025f,.04f,.96f),Left,18,Width,100+Rows*90);
         // Draw every background before text: Canvas may batch font glyphs across rows.
-        if (Highlight != INDEX_NONE) DrawRect(FLinearColor(.08f,.22f,.28f,.9f),Left+6,103+(Highlight-Start)*70,Width-12,66);
+        if (Highlight != INDEX_NONE) DrawRect(FLinearColor(.08f,.22f,.28f,.9f),Left+6,103+(Highlight-Start)*90,Width-12,86);
         DrawText(FString::Printf(TEXT("TEAM  %d companions | %d-%d"),Pets.Num(),Pets.IsEmpty()?0:Start+1,FMath::Min(Start+Rows,Pets.Num())),FLinearColor::White,Left+14,30);
         DrawText(TEXT("[ / ] browse | Enter select | F4 name | Tab close"),FLinearColor::Yellow,Left+14,52);
         DrawText(TEXT("Live world - NOT paused | selection: 12m + sight"),FLinearColor::White,Left+14,73);
         if (Pets.IsEmpty()) DrawText(TEXT("No companions yet - capture a wild creature"),FLinearColor::Green,Left+14,110);
         for (int32 I=Start; I<FMath::Min(Start+Rows,Pets.Num()); ++I)
         {
-            const auto* Pet = Pets[I]; const float RowY = 103+(I-Start)*70;
+            const auto* Pet = Pets[I]; const float RowY = 103+(I-Start)*90;
             const auto Color = Pet->Health <= 0 ? FLinearColor(1,.35f,.3f) : FLinearColor::White;
             DrawText(FString::Printf(TEXT("%s %s Lv%d | %.1fm %s"),I==Highlight?TEXT(">>"):TEXT("  "),*Pet->GetCreatureName(),Pet->Level,Player->GetDistanceTo(Pet)/100,
                 Player->IsCommandTarget(Pet)?TEXT("[COMMAND]"):TEXT("")),Color,Left+14,RowY+3);
@@ -176,6 +178,7 @@ void ACFHUD::DrawHUD()
             if(Pet->GetFieldResource()) Status+=TEXT(" | Field resource");
             if(Pet->CarriedFood>0) Status+=FString::Printf(TEXT(" | cargo %d"),Pet->CarriedFood);
             DrawText(Status,FLinearColor::Green,Left+14,RowY+43);
+            DrawText(Pet->Personality->GetSummary(),FLinearColor(.7f,.9f,1),Left+14,RowY+63);
         }
     }
 }

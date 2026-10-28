@@ -1,6 +1,7 @@
 #include "BossScenario.h"
 #include "CreatureCharacter.h"
 #include "CreatureDefinition.h"
+#include "CompanionPersonalityComponent.h"
 #include "CFPlayerCharacter.h"
 #include "WorldLoot.h"
 #include "InventoryComponent.h"
@@ -95,7 +96,12 @@ void RunBossScenario(UWorld* World, ACFPlayerCharacter* Hero)
     Hero->SetActorLocation(Drop->GetActorLocation()+FVector(100,0,55));
     Loot &= Drop->Collect(Hero) && Drop->Materials == 7 && Drop->Medicine == 1 && Hero->Inventory->Count(EFrontierItem::Material) == 999;
     Loot &= !Drop->Collect(Hero); // Full inventory leaves the remainder in the world.
-    Saved &= Hero->SaveProgress(Slot) && Hero->LoadProgress(Slot);
+    // This fixture manually converts a captured boss back to wild (no release
+    // feature exists). Its retained companion-only preference must be rejected.
+    const bool RejectedFixture=Hero->SaveProgress(Slot) && !Hero->LoadProgress(Slot) && Hero->Feedback.Contains(TEXT("Invalid companion preference"));
+    UE_LOG(LogTemp,Display,TEXT("CF_BOSS_FIXTURE rejectedRetainedPreference=%d"),RejectedFixture);
+    Boss->Personality->RestoreSnapshot(ECompanionPreference::None,false);
+    Saved &= RejectedFixture && Hero->SaveProgress(Slot) && Hero->LoadProgress(Slot);
     Drop = nullptr; Drops = 0;
     for (TActorIterator<AWorldLoot> It(World); It; ++It) { Drop = *It; ++Drops; }
     Loot &= Drops == 1 && Drop && Drop->Materials == 7 && Drop->Medicine == 1 && Drop->GetActorScale3D().Equals(FVector::OneVector);

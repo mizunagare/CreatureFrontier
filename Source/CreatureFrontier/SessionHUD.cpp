@@ -52,7 +52,7 @@ void ACFHUD::DrawControlHelp(ACFPlayerCharacter* Player)
         TEXT("F4 name own idle companion (2.5m) | input pauses world"),
         TEXT("T rest | P treat aimed companion"),
         TEXT("J feed aimed companion | H heal yourself"),
-        TEXT("Y pet companion (2.5m, safe, follow / rest)"),
+        TEXT("Y quiet care / F6 play (2.5m, safe; play: follow, 20 energy/food)"),
         TEXT("B build | V cycle facility | X dismantle"),
         TEXT("Build: 8 facility / home | 9 rotate home wall"),
         TEXT("C backpack / recipes | 1 craft device (3)"),

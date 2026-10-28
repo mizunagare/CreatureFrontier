@@ -52,6 +52,9 @@ public:
     void FeedAimedCompanion();
     bool FeedCompanion(ACreatureCharacter* Pet);
     bool PetCompanion(ACreatureCharacter* Pet);
+    bool PlayWithCompanion(ACreatureCharacter* Pet);
+    bool InteractCompanion(ACreatureCharacter* Pet,bool Playful);
+    void PlayAimedCompanion();
     void PetAimedCompanion();
     AWorkStation* TraceFacility() const;
     void DepositTroughFood();

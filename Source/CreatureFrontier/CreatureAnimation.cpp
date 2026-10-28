@@ -26,7 +26,7 @@ void ACreatureCharacter::UpdateCreaturePresentation(float DeltaSeconds)
         !FeedingSite.IsValid() && ((WorkSite->RequiredSpecialty==EWorkSpecialty::Farming && FVector::Dist2D(GetActorLocation(),WorkSite->GetActorLocation())<=220) || bGatheringActive);
     const bool Charging=!Dead && (SpecialWindupRemaining>0 || AlphaWindup>0);
     VisualState=Dead?TEXT("Downed"):HitPoseRemaining>0?TEXT("Hurt"):Charging?TEXT("Charging"):StrikePoseRemaining>0?TEXT("Striking"):
-        AffectionPoseRemaining>0?TEXT("Affection"):Resting?TEXT("Resting"):Moving?TEXT("Moving"):Working?TEXT("Working"):TEXT("Idle");
+        AffectionPoseRemaining>0?(bPlayfulResponse?TEXT("Playing"):TEXT("Affection")):Resting?TEXT("Resting"):Moving?TEXT("Moving"):Working?TEXT("Working"):TEXT("Idle");
     RestPoseBlend=FMath::FInterpTo(RestPoseBlend,VisualState==TEXT("Resting")?1.f:0.f,Step,8.f);
     const bool Stone=Definition && Definition->Form==ECreatureForm::Stone;
     const float Gait=Time*(Stone?7.f:11.f);
@@ -36,7 +36,8 @@ void ACreatureCharacter::UpdateCreaturePresentation(float DeltaSeconds)
     FRotator Rotation(0,0,Moving?FMath::Sin(Gait)*2*Motion:0);
     FVector Scale(1+RestPoseBlend*.05f,1,1-RestPoseBlend*.28f+Breath*.006f);
     if(VisualState==TEXT("Working")) { Rotation.Pitch=FMath::Sin(Time*6)*8; Location.Z+=FMath::Abs(FMath::Sin(Time*6))*2; }
-    if(VisualState==TEXT("Affection")) { Rotation.Roll=FMath::Sin(Time*8)*9; Location.Z+=FMath::Abs(FMath::Sin(Time*8))*3; }
+    if(VisualState==TEXT("Affection")) { Rotation.Roll=FMath::Sin(Time*5)*(bFavoriteResponse?13:7); Rotation.Pitch=-6; Location.Z+=FMath::Abs(FMath::Sin(Time*5))*2; }
+    if(VisualState==TEXT("Playing")) { const float Joy=bFavoriteResponse?1.5f:1.f;Location.Z+=FMath::Abs(FMath::Sin(Time*10))*10*Joy;Rotation.Yaw=FMath::Sin(Time*5)*12*Joy;Scale.Z+=FMath::Sin(Time*10)*.06f; }
     if(VisualState==TEXT("Charging")) { Rotation.Pitch=-12; Location.Z-=8; Scale.Z-=.08f; }
     if(VisualState==TEXT("Striking"))
     {

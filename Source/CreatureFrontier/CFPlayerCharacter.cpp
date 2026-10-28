@@ -25,6 +25,7 @@
 #include "CompanionCargoComponent.h"
 #include "FarmCropComponent.h"
 #include "CompanionNamingComponent.h"
+#include "CompanionPersonalityComponent.h"
 #include "HomeModule.h"
 #include "ResearchComponent.h"
 
@@ -91,7 +92,7 @@ bool ACFPlayerCharacter::SaveProgress(const FString& Slot)
 {
     if (!HasAuthority() || !GetController()) return false;
     auto* Save = Cast<UFrontierSaveGame>(UGameplayStatics::CreateSaveGameObject(UFrontierSaveGame::StaticClass()));
-    Save->FormatVersion=25;
+    Save->FormatVersion=26;
     Save->MapName = UGameplayStatics::GetCurrentLevelName(this, true);
     Save->PlayerTransform = GetActorTransform();
     Save->ViewRotation = GetController()->GetControlRotation();
@@ -134,6 +135,8 @@ bool ACFPlayerCharacter::SaveProgress(const FString& Slot)
         Record.bOwned = It->Tamer == GetController();
         Record.CarriedFood=It->CarriedFood;
         Record.BondPoints=It->BondPoints; Record.PettingCooldown=It->PettingCooldown;
+        It->Personality->EnsurePreference();
+        Record.Preference=It->Personality->GetPreference();Record.bPreferenceDiscovered=It->Personality->IsDiscovered();
         Record.Disposition = It->Disposition;
         Record.Activity = It->Activity;
         Record.WorkSiteName = IsValid(It->WorkSite) ? It->WorkSite->GetFName() : NAME_None;
@@ -170,7 +173,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
 {
     if (!HasAuthority() || !GetController()) return false;
     auto* Save = Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot, 0));
-    if (!Save || Save->FormatVersion < 1 || Save->FormatVersion > 25 ||
+    if (!Save || Save->FormatVersion < 1 || Save->FormatVersion > 26 ||
         Save->MapName != UGameplayStatics::GetCurrentLevelName(this, true) ||
         !FMath::IsFinite(Save->Health) || Save->Health < 0 || Save->Health > 100 ||
         Save->Resources < 0 || Save->PlayerTransform.ContainsNaN() || Save->ViewRotation.ContainsNaN())
@@ -249,6 +252,11 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
         {Feedback=TEXT("Invalid companion name; world unchanged");return false;}
         if(Save->FormatVersion<22) { Record.Id=FGuid::NewGuid(); Record.CargoItems.Reset(); Record.DeliveryCrateId.Invalidate(); Record.bReturningCargo=false; }
         if(!Record.Id.IsValid() || CreatureIds.Contains(Record.Id)) { Feedback=TEXT("Invalid or duplicate creature identity; world unchanged"); return false; }
+        const bool OwnedTamed=Record.bOwned && Record.Disposition==ECreatureDisposition::Tamed;
+        if(Save->FormatVersion<26)
+        {Record.Preference=OwnedTamed?UCompanionPersonalityComponent::PreferenceForId(Record.Id):ECompanionPreference::None;Record.bPreferenceDiscovered=false;}
+        if(!UCompanionPersonalityComponent::ValidateSnapshot(Record.Preference,Record.bPreferenceDiscovered,OwnedTamed))
+        {Feedback=TEXT("Invalid companion preference; world unchanged");return false;}
         CreatureIds.Add(Record.Id);
         if(Save->FormatVersion<20) Record.FieldResourceId.Invalidate();
         if(Record.FieldResourceId.IsValid() && (!ResourceRestore.Find(Record.FieldResourceId) || !Record.bOwned || Record.Disposition!=ECreatureDisposition::Tamed || Record.Health<=0 ||
@@ -299,6 +307,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
         }
         Pet->PersistentId=Record.Id;
         Pet->Nickname=Record.Nickname;
+        Pet->Personality->RestoreSnapshot(Record.Preference,Record.bPreferenceDiscovered);
         Pet->Definition = LoadedDefinition;
         Pet->EncounterId = Record.EncounterId;
         Pet->Level = Record.Level;
@@ -605,6 +614,7 @@ void ACFPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
     PlayerInputComponent->BindKey(EKeys::Right, IE_Pressed, Storage.Get(), &UStorageInteractionComponent::DepositStack);
     PlayerInputComponent->BindKey(EKeys::Left, IE_Pressed, Storage.Get(), &UStorageInteractionComponent::WithdrawStack);
     PlayerInputComponent->BindKey(EKeys::Y, IE_Pressed, this, &ACFPlayerCharacter::PetAimedCompanion);
+    PlayerInputComponent->BindKey(EKeys::F6, IE_Pressed, this, &ACFPlayerCharacter::PlayAimedCompanion);
     PlayerInputComponent->BindKey(EKeys::M, IE_Pressed, this, &ACFPlayerCharacter::GatherAimedResource);
     PlayerInputComponent->BindKey(EKeys::F2,IE_Pressed,this,&ACFPlayerCharacter::DepositGardenSeed);
     PlayerInputComponent->BindKey(EKeys::F3,IE_Pressed,this,&ACFPlayerCharacter::WithdrawGardenSeed);

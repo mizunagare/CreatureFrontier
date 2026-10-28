@@ -8,6 +8,7 @@
 #include "ObjectiveTypes.h"
 #include "EquipmentTypes.h"
 #include "HomeLayout.h"
+#include "CompanionPersonalityComponent.h"
 #include "FrontierSaveGame.generated.h"
 
 class ACreatureCharacter;
@@ -32,6 +33,8 @@ struct FCreatureSaveRecord
     GENERATED_BODY()
     UPROPERTY() FGuid Id;
     UPROPERTY() FString Nickname;
+    UPROPERTY() ECompanionPreference Preference=ECompanionPreference::None;
+    UPROPERTY() bool bPreferenceDiscovered=false;
     UPROPERTY() TSoftClassPtr<ACreatureCharacter> CreatureClass;
     UPROPERTY() TSoftObjectPtr<UCreatureDefinition> Definition;
     UPROPERTY() FTransform Transform;
