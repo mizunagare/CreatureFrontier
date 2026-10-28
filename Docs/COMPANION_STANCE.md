@@ -1,5 +1,11 @@
 # 伙伴护主与避战姿态
 
+## 视线诊断包与巡游跟踪（2026-10-29）
+
+B81AE173 Editor的 `Saved/HollowRecoveryMatrix/20261029-043417-eff6c586/` 两个60样本正常结束通过，未据此撤销旧Windows失败。独立Windows视线诊断包 `E:\CreatureFrontierBuilds\Windows-Route-Sight-Diagnostics` 构建成功，内部EXE SHA-256为 `D534570ED9BD4B12E7DF6845155FCA320E40FDAB06092B460B4D6ABFA3D63274`。包含局部停留、胶囊阻挡和视线阻挡日志，没有玩法修复。
+
+恢复矩阵脚本新增可选 `-TraceRoaming`，复用现有 `CFRoamTrace` 记录自然巡游选点及到达，CSV记载开关。恢复存档槽的清理改为嵌套finally，确保恢复抛错时仍释放互斥锁；脚本语法通过，异常恢复故障注入尚未验证。新Windows的两个60样本正在 `Saved/HollowRecoveryMatrix/20261029-043817-511d93a0/` 运行，不宣称通过。禁止CI、旧稳定包/玩家档不变。
+
 ## 局部停留记录与视线阻挡补充（2026-10-29）
 
 8AFBB4D4的 `Saved/HollowRecoveryMatrix/20261029-042919-16d94785/` 两个60帧样本已正常结束通过。第一项在Index6出现一次局部停留记录，实际速度约170厘米/秒，胶囊前方无阻挡，Battle=1、Focus=None；随后不到三秒自然倒地并完成完整恢复链。该记录是诊断候选，不等同于持续卡死，不能证明原失败的原因。

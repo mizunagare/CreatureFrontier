@@ -1,4 +1,4 @@
-param([switch]$Editor,[string]$BuildRoot='',[string]$EngineRoot='D:\Epic\UE_5.8',
+param([switch]$Editor,[string]$BuildRoot='',[string]$EngineRoot='D:\Epic\UE_5.8',[switch]$TraceRoaming,
       [int[]]$FrameCaps=@(30,60,120),[ValidateRange(1,5)][int]$Repeats=2)
 $ErrorActionPreference='Stop'
 if(!$FrameCaps.Count -or @($FrameCaps | Select-Object -Unique).Count -ne $FrameCaps.Count){throw '帧率轴不能为空或重复'}
@@ -26,6 +26,7 @@ try {
     foreach($cap in $FrameCaps){foreach($attempt in 1..$Repeats){
         $label="FPS-$cap-Run-$attempt";$log=Join-Path $run ($label+'.log')
         $arguments=@('-game','-nullrhi','-nosound','-unattended','-nop4','-CFHollowRecoveryTest',('-ExecCmds="t.MaxFPS '+$cap+'"'),('-abslog="'+$log+'"'))
+        if($TraceRoaming){$arguments+='-CFRoamTrace'}
         if($Editor){$arguments=@((Join-Path $projectRoot 'CreatureFrontier.uproject'))+$arguments}
         $process=Start-Process -FilePath $exe -WorkingDirectory $root -WindowStyle Hidden -PassThru -ArgumentList $arguments
         $done=$process.WaitForExit(210000)
@@ -42,19 +43,22 @@ try {
             if(Select-String -LiteralPath $log -Pattern '\bFAIL\b|Fatal error|Assertion failed' -Quiet){$pass=$false}
         }
         if((Get-FrontierBuildFingerprint -LiteralPath $module) -ne $hash){throw '恢复矩阵期间程序指纹变化'}
-        $results += [pscustomobject]@{Case=$label;FrameCap=$cap;Attempt=$attempt;Pass=$pass;BuildSHA256=$hash;Log=$log}
+        $results += [pscustomobject]@{Case=$label;FrameCap=$cap;Attempt=$attempt;TraceRoaming=[bool]$TraceRoaming;Pass=$pass;BuildSHA256=$hash;Log=$log}
         $results | Export-Csv -LiteralPath (Join-Path $run 'Results.csv') -NoTypeInformation
         Write-Host "$label 通过：$pass"
         if(!$pass){throw "恢复矩阵失败：$log"}
     }}
 } finally {
-    if($existed){
-        Copy-Item -LiteralPath $backup -Destination $slot
-        if((Get-FileHash -LiteralPath $slot).Hash -ne $originalHash){throw '恢复矩阵原测试槽还原校验失败'}
-    } elseif(Test-Path -LiteralPath $slot){
-        Copy-Item -LiteralPath $slot -Destination (Join-Path $run 'HollowRecoveryCross-generated.sav')
-        Remove-Item -LiteralPath $slot
+    try {
+        if($existed){
+            Copy-Item -LiteralPath $backup -Destination $slot
+            if((Get-FileHash -LiteralPath $slot).Hash -ne $originalHash){throw '恢复矩阵原测试槽还原校验失败'}
+        } elseif(Test-Path -LiteralPath $slot){
+            Copy-Item -LiteralPath $slot -Destination (Join-Path $run 'HollowRecoveryCross-generated.sav')
+            Remove-Item -LiteralPath $slot
+        }
+    } finally {
+        $mutex.ReleaseMutex();$mutex.Dispose()
     }
-    $mutex.ReleaseMutex();$mutex.Dispose()
 }
 Write-Host '恢复帧率矩阵通过，原测试槽已还原；不代表真实键鼠输入或完整游戏验收'
