@@ -31,6 +31,7 @@ try {
         if($process.ExitCode -ne 0 -or !(Select-String -LiteralPath $log -SimpleMatch $case.Marker -Quiet) -or
             (Select-String -LiteralPath $log -Pattern '\bFAIL\b|Fatal error|Assertion failed' -Quiet)){throw "姿态专项失败：$log"}
         if($case.Name -eq 'Write' -and !(Select-String -LiteralPath $log -SimpleMatch 'CF_STANCE_BOUNDARIES PASS scope=1 guard=1 bounds=1 work=1' -Quiet)){throw '姿态写入缺少边界标记'}
+        if($case.Name -eq 'Write' -and !(Select-String -LiteralPath $log -SimpleMatch 'CF_STANCE_SKILL PASS explicit=1 cancel=1' -Quiet)){throw '姿态写入缺少技能执行与取消标记'}
         $input=Join-Path $saveRoot 'StanceGood.sav';$current=(Get-FileHash -LiteralPath $input).Hash
         if(!$inputHash){$inputHash=$current;Copy-Item -LiteralPath $input -Destination (Join-Path $run 'Input.sav')}
         if($current -ne $inputHash){throw '姿态读取改写了输入'}

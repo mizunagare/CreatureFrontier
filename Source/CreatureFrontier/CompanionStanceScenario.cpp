@@ -86,6 +86,24 @@ void RunCompanionStanceScenario(UWorld* World,ACFPlayerCharacter* Hero)
     Ally->Tick(.1f);
     const bool Explicit=Ordered && Enemy->Health<BeforeExplicit && Ally->bAvoidCombat;
     const bool Cancel=Ally->SetAvoidCombat(true) && !Ally->FocusTarget && Ally->SpecialWindupRemaining==0;
+    // G必须经过真实按键绑定、技能蓄力和唯一伤害结算；避战不屏蔽明确指令。
+    bool Skill=Hero->SelectCompanion(Ally) && CFInputQA::Press(Hero,EKeys::G);
+    const float BeforeSkill=Enemy->Health,BeforeStamina=Ally->Stamina;
+    Ally->Tick(.1f);
+    Skill &= Ally->SpecialWindupRemaining>0 && Ally->SpecialCooldownRemaining>0 && FMath::IsNearlyEqual(Ally->Stamina,BeforeStamina-20,.01f) && Enemy->Health==BeforeSkill;
+    for(int32 I=0;I<7;++I)Ally->Tick(.1f);
+    const float ExpectedDamage=Ally->GetAttackDamage()*Definition->SpecialDamageScale;
+    Skill &= Ally->bAvoidCombat && Ally->SpecialWindupRemaining==0 && FMath::IsNearlyEqual(Enemy->Health,BeforeSkill-ExpectedDamage,.01f);
+    Ally->SetAvoidCombat(true);
+    const float AfterSkill=Enemy->Health;
+    for(int32 I=0;I<120;++I)Ally->Tick(.1f);
+    Skill &= Enemy->Health==AfterSkill && !Ally->FocusTarget;
+    bool SkillCancel=CFInputQA::Press(Hero,EKeys::G);
+    Ally->Tick(.1f);SkillCancel &= Ally->SpecialWindupRemaining>0;
+    // 已在避战时先F8切护主、再F8切回避战，取消明确蓄力。
+    SkillCancel &= CFInputQA::Press(Hero,EKeys::F8) && CFInputQA::Press(Hero,EKeys::F8) && Ally->bAvoidCombat && Ally->SpecialWindupRemaining==0;
+    for(int32 I=0;I<8;++I)Ally->Tick(.1f);
+    SkillCancel &= Enemy->Health==AfterSkill && !Ally->FocusTarget;
     const bool Saved=Hero->SaveProgress(TEXT("StanceGood"));
     auto* Snapshot=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("StanceGood"),0));
     bool Invalid=Snapshot!=nullptr;
@@ -112,7 +130,8 @@ void RunCompanionStanceScenario(UWorld* World,ACFPlayerCharacter* Hero)
         Legacy=UGameplayStatics::SaveGameToSlot(Snapshot,TEXT("StanceLegacy30"),0) && Hero->LoadProgress(TEXT("StanceLegacy30"));
         Restored=Find();Legacy &= Restored && !Restored->bAvoidCombat;
     }
-    const bool Pass=Defaults && Passive && Explicit && Cancel && Invalid && Persist && Legacy && Scope && Guard && Bounds && Work;
+    const bool Pass=Defaults && Passive && Explicit && Cancel && Invalid && Persist && Legacy && Scope && Guard && Bounds && Work && Skill && SkillCancel;
+    UE_LOG(LogTemp,Display,TEXT("CF_STANCE_SKILL %s explicit=%d cancel=%d"),Skill && SkillCancel?TEXT("PASS"):TEXT("FAIL"),Skill,SkillCancel);
     UE_LOG(LogTemp,Display,TEXT("CF_STANCE_BOUNDARIES %s scope=%d guard=%d bounds=%d work=%d"),Scope && Guard && Bounds && Work?TEXT("PASS"):TEXT("FAIL"),Scope,Guard,Bounds,Work);
     UE_LOG(LogTemp,Display,TEXT("CF_STANCE %s defaults=%d passive=%d explicit=%d cancel=%d invalid=%d persist=%d legacy=%d"),Pass?TEXT("PASS"):TEXT("FAIL"),Defaults,Passive,Explicit,Cancel,Invalid,Persist,Legacy);
     FPlatformMisc::RequestExitWithStatus(false,Pass?0:1);
