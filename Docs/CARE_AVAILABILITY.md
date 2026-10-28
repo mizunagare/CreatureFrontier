@@ -1,5 +1,17 @@
 # 陪伴操作可用性（开发中）
 
+## 最新Windows验证（完整回归中）
+
+修正包 `E:\CreatureFrontierBuilds\Windows-Care-Route` 实际构建成功，内部EXE SHA-256 `C01D79EC11F40F0134CC2E6EF1D0AFB0D4EA3249BD82BFF2ED43C69967EB8F8E`。以下均是此固定程序的新结果，不借用Editor或A04A6D4E候选结果。
+
+原坏输入6241718D的1920×1080续行与独立最终读取已在 `Saved/RescueAdventureQA/20261028-181830-e0d86371/` 通过，输入不变，三张PNG/帧检查通过且均已查看，实际行走3945.8厘米。失败快照8A51A9FD的Windows对照也通过：`Saved/RescueReturn-Baseline-Windows.log` 直走仅0.2厘米受阻，`Saved/RescueReturn-Avoidance-Windows.log` 正常绕行583.5厘米到达；快照未改写。这里保留尸体碰撞，没有用规则变更掩盖夹具不会绕障的问题。
+
+此外重新自然生成三组不同输入，全部完成写入—D3D12救助战斗返家—独立最终读取，共九进程；九张动态图均已逐张查看，未新增越界/缺字。每组内原输入不变、输入与最终副本留存：960为 `Saved/RescueAdventureQA/20261028-182013-2228eb14/`（FC0FF5B4），1280为 `Saved/RescueAdventureQA/20261028-182113-eb387767/`（814253DD），1920为 `Saved/RescueAdventureQA/20261028-182212-a0d7246c/`（37C24940），完整哈希见各自Results.csv。不同组不冒充同一个输入。仍可能选中/遮挡前方敌人、战斗中实际承伤；只证明所列样本，不保证任意危险中停顿都安全。
+
+`Saved/CareQuery-Windows-Route.log` 的只读查询与完整原照料专项通过；`Saved/CargoLegacyAudit/20261028-181849-Verified/` 以Windows-Rescue-Views的16份真实28档运行17类读取各两次，共34进程全部通过，测试槽恢复校验。`Saved/HUDRenderQA/20261028-182457-7584b917/` 960十场景自动审计通过，其中Companion一图已查看，能安静陪伴但不能玩耍的原因两行内可读，其余九图未声称目视。
+
+该程序自己的完整90类/94进程已在 `Saved/PackagedTests/20261028-182346-ee1f863d/` 启动，当前仍在运行。稳定交付保持Windows-Rescue-Views，不提前宣布新包完整验收或最终游戏完成。下文“尚未打包/图形仍失败”为历史阶段，失败原始证据保留。
+
 ## 最新定位与修复验证
 
 1920失败中的回程卡点现有直接证据：`Saved/RescueAdventureQA/20261028-180518-ac7ea211/CFRescueNaturalResume.log` 每5秒扫掠持续命中CreatureCharacter_11、生命0；玩家行走模式1、输入未忽略、速度0、最后输入约(0.991,-0.131,0)。因此不是该次输入失效或导航无路，而是导航路径未考虑死亡生物的动态胶囊。早先独立位置探针 `Saved/RescueReturnProbe-Editor.log` 在出发存档场景中扫掠无阻，不能代替战斗后的世界状态，也不能据此排除尸体。
@@ -12,7 +24,7 @@
 
 随后原始坏输入6241718D的1920×1080 Editor D3D12全续行与独立最终读取在 `Saved/RescueAdventureQA/20261028-181320-3b2422df/` 通过，脚本退出0，三张实际PNG/独立帧检查通过且已逐张查看。伙伴47.2生命、实际行走4056.5厘米，玩家返家15生命，仍然承受真实危险；输入未改写，专用Editor原4AD07666档随后恢复。游戏模块SHA-256 `9341D3BB860C9B219C276523454C8940AE8A61B537B6AA171F5D27B1B175EAAF`。图中敌人仍可能遮挡伙伴或被选中，不能宣称任意取景延迟均安全或所有视觉问题解决。
 
-最新修正尚未重新打包，Windows坏样本复验、同包三尺寸及完整94进程仍待执行。下文此前失败记录保留，不把一次Editor通过扩大为全部平台验收。
+此处Editor阶段之后的Windows结果见上节；此前失败记录保留，不把一次Editor通过扩大为全部平台验收。
 
 ## 缺口与方案
 
