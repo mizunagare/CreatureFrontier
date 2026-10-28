@@ -16,6 +16,9 @@ class ACreatureCharacter;
 class UCreatureDefinition;
 class UResourceDefinition;
 
+// 写盘与当前版本上限共用；历史迁移边界继续使用其原始版本号。
+inline constexpr int32 FrontierCurrentSaveVersion=29;
+
 USTRUCT()
 struct FResourceSaveRecord
 {
@@ -39,6 +42,8 @@ struct FCreatureSaveRecord
     // Store the raw byte: enum-name deserialization may turn unknown names into
     // the valid None default before our snapshot validator can reject them.
     UPROPERTY() uint8 CrystalJourney=0;
+    UPROPERTY() uint8 RescueJourney=0;
+    UPROPERTY() FName RescueSource;
     UPROPERTY() TSoftClassPtr<ACreatureCharacter> CreatureClass;
     UPROPERTY() TSoftObjectPtr<UCreatureDefinition> Definition;
     UPROPERTY() FTransform Transform;

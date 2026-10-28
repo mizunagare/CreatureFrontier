@@ -69,18 +69,20 @@ void UCompanionMemoryComponent::RecordHarvest(AResourceNode* Source,ACFPlayerCha
     }
     if(Witnesses>0) Hero->Feedback=FString::Printf(TEXT("%d 位伙伴见证了水晶发现。一起回家后，瞄准伙伴按 F7"),Witnesses);
 }
-bool UCompanionMemoryComponent::CanRecall(ACFPlayerCharacter* Hero) const
+bool UCompanionMemoryComponent::CanShareAtHome(ACFPlayerCharacter* Hero) const
 {
     const auto* Pet=Cast<ACreatureCharacter>(GetOwner());
     if(!IsValid(Hero) || !Hero->HasAuthority() || Hero->Health<=0 || !Pet || Pet->IsActorBeingDestroyed() || Pet->GetWorld()!=Hero->GetWorld() ||
         Pet->Health<=0 || Pet->Disposition!=ECreatureDisposition::Tamed || Pet->Tamer!=Hero->GetController() || Hero->GetDistanceTo(Pet)>250 ||
-        Memory!=ECrystalJourneyMemory::Pending || (Pet->Activity!=ECreatureActivity::Follow && Pet->Activity!=ECreatureActivity::Rest) || Pet->FocusTarget || Pet->SpecialWindupRemaining>0 ||
+        (Pet->Activity!=ECreatureActivity::Follow && Pet->Activity!=ECreatureActivity::Rest) || Pet->FocusTarget || Pet->SpecialWindupRemaining>0 ||
         FVector::Dist(Hero->GetActorLocation(),UBaseBuildingComponent::BaseOrigin())>800 || !Hero->IsNearWorkStation()) return false;
     for(TActorIterator<ACreatureCharacter> It(GetWorld());It;++It)
         if(It->Disposition!=ECreatureDisposition::Tamed && It->Health>0 && It->Activity!=ECreatureActivity::ReturnHome && Pet->GetDistanceTo(*It)<600) return false;
     FHitResult Hit;FCollisionQueryParams Params(SCENE_QUERY_STAT(JourneyRecallSight),false,Hero);
     return !GetWorld()->LineTraceSingleByChannel(Hit,Hero->GetPawnViewLocation(),Pet->GetActorLocation(),ECC_Visibility,Params) || Hit.GetActor()==Pet;
 }
+bool UCompanionMemoryComponent::CanRecall(ACFPlayerCharacter* Hero) const
+{return Memory==ECrystalJourneyMemory::Pending && CanShareAtHome(Hero);}
 bool UCompanionMemoryComponent::Open(ACFPlayerCharacter* Hero)
 {
     auto* PC=IsValid(Hero)?Cast<APlayerController>(Hero->GetController()):nullptr;

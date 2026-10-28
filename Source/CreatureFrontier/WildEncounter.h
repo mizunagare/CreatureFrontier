@@ -21,6 +21,8 @@ public:
     UPROPERTY(EditAnywhere, Category="Encounter", meta=(ClampMin="1", ClampMax="600")) float RespawnSeconds = 60;
     UPROPERTY(EditAnywhere, Category="Encounter") FString RegionName = TEXT("野生栖息地");
     UPROPERTY(EditAnywhere, Category="Encounter") bool bBoss = false;
+    // 该栖息地真实住民造成的同行倒地可记录为脱险经历来源。
+    UPROPERTY(EditAnywhere, Category="Encounter") bool bRecordsRescueJourney = false;
     UPROPERTY(VisibleAnywhere, Category="Encounter") float Remaining = 0;
     ACreatureCharacter* GetResident() const;
     float GetSavedRemaining() const;

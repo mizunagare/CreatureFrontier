@@ -455,6 +455,7 @@ float ACreatureCharacter::TakeDamage(float DamageAmount, FDamageEvent const& Dam
         }
         if (Health <= 0.0f)
         {
+            Memory->RecordDowned(Attacker);
             CancelFieldResource();
             bResumeWorkAfterRest = false;
             AlphaWindup = 0;

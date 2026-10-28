@@ -134,7 +134,10 @@ void RunHollowScenario(UWorld* World,ACFPlayerCharacter* Hero,int Mode)
     Migration &= Hero->SaveProgress(TEXT("HollowMigrated"));auto* Missing=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("HollowMigrated"),0));
     if(!Missing){FPlatformMisc::RequestExitWithStatus(false,1);return;}
     Missing->ResourceNodes.RemoveAll([](const auto& R){return R.Id==FGuid(0xCF170000,0,0,11);});
-    Migration &= Missing->FormatVersion==28 && UGameplayStatics::SaveGameToSlot(Missing,TEXT("HollowMissing28"),0) && Hero->LoadProgress(TEXT("HollowMissing28")) && !Node(World,11) && Hero->LoadProgress(TEXT("HollowMissing28")) && !Node(World,11);
+    Migration &= Missing->FormatVersion==FrontierCurrentSaveVersion;
+    // 此例仍明确模拟28的缺失来源，而不是随当前版本更名。
+    Missing->FormatVersion=28;
+    Migration &= UGameplayStatics::SaveGameToSlot(Missing,TEXT("HollowMissing28"),0) && Hero->LoadProgress(TEXT("HollowMissing28")) && !Node(World,11) && Hero->LoadProgress(TEXT("HollowMissing28")) && !Node(World,11);
     Migration &= Hero->LoadProgress(TEXT("HollowMigrated"));Cache=Node(World,11);
     if(!Cache){FPlatformMisc::RequestExitWithStatus(false,1);return;}
     bool Harvest=Cache && !Cache->TryHarvest(Hero,Hero);Hero->SetActorLocation(FVector(-550,-3930,40));

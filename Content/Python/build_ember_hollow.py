@@ -82,7 +82,7 @@ for index,position in enumerate([(0,-2450,250),(400,-3250,250),(-450,-4000,250)]
 sites=[a for a in all_actors if isinstance(a,unreal.WildEncounter) and str(a.get_editor_property('encounter_id'))=='EmberHollow']
 assert len(sites)<=1
 site=sites[0] if sites else actors.spawn_actor_from_class(unreal.WildEncounter,unreal.Vector(-400,-3850,-50))
-for key,value in dict(encounter_id='EmberHollow',region_name='余烬洞窟',definition=unreal.load_asset('/Game/Creatures/DA_Cinderkit'),creature_level=3,respawn_seconds=150.0,boss=False).items():
+for key,value in dict(encounter_id='EmberHollow',region_name='余烬洞窟',definition=unreal.load_asset('/Game/Creatures/DA_Cinderkit'),creature_level=3,respawn_seconds=150.0,boss=False,records_rescue_journey=True).items():
     site.set_editor_property(key,value)
 site.set_actor_label('Ember Hollow Encounter')
 world=unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world()

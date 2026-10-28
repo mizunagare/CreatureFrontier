@@ -95,7 +95,7 @@ bool ACFPlayerCharacter::SaveProgress(const FString& Slot)
 {
     if (!HasAuthority() || !GetController()) return false;
     auto* Save = Cast<UFrontierSaveGame>(UGameplayStatics::CreateSaveGameObject(UFrontierSaveGame::StaticClass()));
-    Save->FormatVersion=28;
+    Save->FormatVersion=FrontierCurrentSaveVersion;
     Save->MapName = UGameplayStatics::GetCurrentLevelName(this, true);
     Save->PlayerTransform = GetActorTransform();
     Save->ViewRotation = GetController()->GetControlRotation();
@@ -141,6 +141,8 @@ bool ACFPlayerCharacter::SaveProgress(const FString& Slot)
         It->Personality->EnsurePreference();
         Record.Preference=It->Personality->GetPreference();Record.bPreferenceDiscovered=It->Personality->IsDiscovered();
         Record.CrystalJourney=static_cast<uint8>(It->Memory->GetMemory());
+        Record.RescueJourney=static_cast<uint8>(It->Memory->GetRescueMemory());
+        Record.RescueSource=It->Memory->GetRescueSource();
         Record.Disposition = It->Disposition;
         Record.Activity = It->Activity;
         Record.WorkSiteName = IsValid(It->WorkSite) ? It->WorkSite->GetFName() : NAME_None;
@@ -177,7 +179,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
 {
     if (!HasAuthority() || !GetController()) return false;
     auto* Save = Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot, 0));
-    if (!Save || Save->FormatVersion < 1 || Save->FormatVersion > 28 ||
+    if (!Save || Save->FormatVersion < 1 || Save->FormatVersion > FrontierCurrentSaveVersion ||
         Save->MapName != UGameplayStatics::GetCurrentLevelName(this, true) ||
         !FMath::IsFinite(Save->Health) || Save->Health < 0 || Save->Health > 100 ||
         Save->Resources < 0 || Save->PlayerTransform.ContainsNaN() || Save->ViewRotation.ContainsNaN())
@@ -264,6 +266,9 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
         if(Save->FormatVersion<27)Record.CrystalJourney=0;
         if(!UCompanionMemoryComponent::ValidateSnapshot(static_cast<ECrystalJourneyMemory>(Record.CrystalJourney),OwnedTamed,Save->Research.bCrystalSample))
         {Feedback=TEXT("伙伴回忆无效，世界未改变");return false;}
+        if(Save->FormatVersion<29){Record.RescueJourney=0;Record.RescueSource=NAME_None;}
+        if(!UCompanionMemoryComponent::ValidateRescueSnapshot(GetWorld(),Record.RescueJourney,Record.RescueSource,OwnedTamed))
+        {Feedback=TEXT("伙伴脱险经历无效，世界未改变");return false;}
         CreatureIds.Add(Record.Id);
         if(Save->FormatVersion<20) Record.FieldResourceId.Invalidate();
         if(Record.FieldResourceId.IsValid() && (!ResourceRestore.Find(Record.FieldResourceId) || !Record.bOwned || Record.Disposition!=ECreatureDisposition::Tamed || Record.Health<=0 ||
@@ -316,6 +321,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
         Pet->Nickname=Record.Nickname;
         Pet->Personality->RestoreSnapshot(Record.Preference,Record.bPreferenceDiscovered);
         Pet->Memory->RestoreSnapshot(static_cast<ECrystalJourneyMemory>(Record.CrystalJourney));
+        Pet->Memory->RestoreRescueSnapshot(static_cast<ERescueJourneyMemory>(Record.RescueJourney),Record.RescueSource);
         Pet->Definition = LoadedDefinition;
         Pet->EncounterId = Record.EncounterId;
         Pet->Level = Record.Level;
@@ -574,7 +580,9 @@ void ACFPlayerCharacter::HealCompanion()
     if (!Pet || Pet->Tamer != GetController()) { Feedback = TEXT("瞄准自己的伙伴使用药品"); return; }
     if (Pet->Health >= Pet->GetMaxHealth()) { Feedback = TEXT("伙伴生命已满"); return; }
     if (!Inventory->Consume(EFrontierItem::Medicine, 1)) { Feedback = TEXT("没有药品，在基地按2制作"); return; }
+    const bool WasDowned=Pet->Health<=0;
     Pet->Health = FMath::Min(Pet->GetMaxHealth(), Pet->Health + 40.0f);
+    if(WasDowned)Pet->Memory->RecordRescued(this);
     Feedback = TEXT("已治疗伙伴（恢复40生命）。T 基地休息，F 跟随");
 }
 

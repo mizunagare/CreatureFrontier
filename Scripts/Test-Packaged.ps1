@@ -21,6 +21,11 @@ $testLogRoot = Join-Path $projectRoot (Join-Path 'Saved\PackagedTests' $runName)
 New-Item -ItemType Directory -Path $testLogRoot -Force | Out-Null
 Write-Host "Fresh test logs: $testLogRoot"
 $cases = @(
+    @{Flag='CFRescueMemoryTest'; Marker='CF_RESCUE_MEMORY PASS mode=0'},
+    @{Flag='CFRescueMemoryWrite'; Marker='CF_RESCUE_MEMORY PASS mode=1'},
+    @{Flag='CFRescueMemoryRescueRead'; Marker='CF_RESCUE_MEMORY PASS mode=2'},
+    @{Flag='CFRescueMemoryHomeRead'; Marker='CF_RESCUE_MEMORY PASS mode=3'},
+    @{Flag='CFRescueMemoryFinalRead'; Marker='CF_RESCUE_MEMORY PASS mode=4'},
     @{Flag='CFSmokeTest'; Marker='CF_SMOKE PASS'},
     @{Flag='CFPaceTest'; Marker='CF_PACE PASS'},
     @{Flag='CFWildSightTest'; Marker='CF_WILD_SIGHT PASS'},

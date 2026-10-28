@@ -24,7 +24,7 @@ AResourceNode* Node(UWorld* World,uint32 Id)
 bool Snapshot(UWorld* World,ACFPlayerCharacter* Hero)
 {
     auto* Saved=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("MaterialsCross"),0));
-    bool Pass=Saved && Saved->FormatVersion>=23 && Saved->FormatVersion<=28 && Hero->Inventory->Count(EFrontierItem::Material)==2 &&
+    bool Pass=Saved && Saved->FormatVersion>=23 && Saved->FormatVersion<=FrontierCurrentSaveVersion && Hero->Inventory->Count(EFrontierItem::Material)==2 &&
         Hero->Inventory->Count(EFrontierItem::CaptureDevice)==2 && Hero->Inventory->Count(EFrontierItem::ResonanceDevice)==2;
     for(uint32 Id=8;Id<=10;++Id) Pass &= Node(World,Id) && Node(World,Id)->Remaining==0 &&
         Hero->Inventory->Count(static_cast<EFrontierItem>(static_cast<uint8>(EFrontierItem::Fiber)+Id-8))==1;

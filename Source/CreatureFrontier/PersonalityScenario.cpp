@@ -49,7 +49,7 @@ void RunPersonalityScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
     if(Mode==3)
     {
         auto* Old=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("NameCross"),0));
-        bool Pass=Old && Old->FormatVersion<=28 && Old->Creatures.Num()==2;
+        bool Pass=Old && Old->FormatVersion<=FrontierCurrentSaveVersion && Old->Creatures.Num()==2;
         for(int32 Attempt=0;Attempt<2;++Attempt)
         {
             Pass &= Hero->LoadProgress(TEXT("NameCross"));

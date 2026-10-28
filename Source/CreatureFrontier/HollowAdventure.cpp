@@ -44,7 +44,7 @@ ACreatureCharacter* AdventurePet(UWorld* World,ACFPlayerCharacter* Hero)
 bool DownedCheckpointMatches(UWorld* World,ACFPlayerCharacter* Hero,const UFrontierSaveGame* Save)
 {
     auto* Camp=HollowCamp(World);auto* Enemy=Camp?Camp->GetResident():nullptr;auto* Pet=AdventurePet(World,Hero);auto* Cache=HollowCache(World);
-    if(!Save || Save->FormatVersion!=28 || Save->Health!=0 || Hero->Health!=0 || !Pet || !Enemy || !Cache || Cache->Remaining!=6 ||
+    if(!Save || Save->FormatVersion<28 || Save->FormatVersion>FrontierCurrentSaveVersion || Save->Health!=0 || Hero->Health!=0 || !Pet || !Enemy || !Cache || Cache->Remaining!=6 ||
         Pet->Health<=0 || Pet->Health>=Pet->GetMaxHealth() || Enemy->Health<=0 || Enemy->Health>=Enemy->GetMaxHealth() ||
         Hero->GetActorLocation().Y>=-2700 || !Hero->GetActorLocation().Equals(Save->PlayerTransform.GetLocation(),.1f) ||
         Hero->GetCharacterMovement()->MovementMode!=MOVE_None || Hero->Pace->IsSlowWalking() || Hero->GetRespawnProtectionRemaining()>0)return false;

@@ -12,6 +12,7 @@
 #include "NameScenario.h"
 #include "PersonalityScenario.h"
 #include "MemoryScenario.h"
+#include "RescueMemoryScenario.h"
 #include "HUDScenario.h"
 #include "HomeScenario.h"
 #include "ExpeditionScenario.h"
@@ -67,6 +68,9 @@ void ACFGameMode::BeginPlay()
 {
     Super::BeginPlay();
     SeedFrontierResources(GetWorld());
+    const int32 RescueMemoryMode=FParse::Param(FCommandLine::Get(),TEXT("CFRescueMemoryWrite"))?1:FParse::Param(FCommandLine::Get(),TEXT("CFRescueMemoryRescueRead"))?2:FParse::Param(FCommandLine::Get(),TEXT("CFRescueMemoryHomeRead"))?3:FParse::Param(FCommandLine::Get(),TEXT("CFRescueMemoryFinalRead"))?4:0;
+    if(RescueMemoryMode || FParse::Param(FCommandLine::Get(),TEXT("CFRescueMemoryTest")))
+    {FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this,RescueMemoryMode](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunRescueMemoryScenario(GetWorld(),Hero,RescueMemoryMode);},1.f,false);return;}
     if(FParse::Param(FCommandLine::Get(),TEXT("CFRescueNaturalResume")) || FParse::Param(FCommandLine::Get(),TEXT("CFRescueNaturalRead")))
     {const bool Read=FParse::Param(FCommandLine::Get(),TEXT("CFRescueNaturalRead"));FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this,Read](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunNaturalRescueResume(GetWorld(),Hero,Read);},1.f,false);return;}
     if(FParse::Param(FCommandLine::Get(),TEXT("CFRescueNaturalWrite")))
