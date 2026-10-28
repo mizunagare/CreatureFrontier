@@ -1,5 +1,11 @@
 # 开放窗墙
 
+## 生命周期候选完整回归进行中
+
+完整回归新增两朝向改建通行与旋转开启/关闭门写入、各两次独立读取，要求封回导航/实际上限/门状态与输入不改写。脚本语法通过，解析当前定义132项、计划136进程。A0973D7B自身整轮在 `Saved/PackagedTests/20261029-071524-e1c850ea/`（原进程22182）运行中，新增前置案例已有通过输出，整轮尚未结束，不能用95C185CB旧128日志替代。
+
+恢复诊断使用47文件哈希一致的隔离副本，不与完整回归共用恢复测试槽，首个60样本已通过但旧卡路尚未复现/归因，第二样本仍运行。见 `Docs/HOLLOW_RECOVERY.md`。稳定入口不变。
+
 ## 门状态与伙伴通行Windows候选
 
 `E:\CreatureFrontierBuilds\Windows-Home-Replacement-Lifecycle` 独立Development打包成功（63259退出0，BuildCookRun75.22秒），内部EXE `A0973D7B85D3EFEFB0336A1C635FCB6FF4B0D8E2F373C2B4E98CF9AB38F03AC0`，格式32。旧包/玩家存档保留。

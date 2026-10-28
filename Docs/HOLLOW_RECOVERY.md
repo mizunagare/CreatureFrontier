@@ -1,5 +1,13 @@
 # 洞窟倒地与伙伴重聚（首版限定验收）
 
+## 最新候选诊断（尚未修复旧卡路）
+
+A0973D7B Windows生命周期候选的运行文件复制到独立 `E:\CreatureFrontierBuilds\Windows-Home-Replacement-Lifecycle-QA`，47个文件逐一源/目标哈希一致，未复制Saved/PDB。原候选自身完整回归另行运行，隔离恢复槽避免与它争用。
+
+实际执行 `Test-HollowRecoveryMatrix.ps1 -BuildRoot E:/CreatureFrontierBuilds/Windows-Home-Replacement-Lifecycle-QA -TraceRoaming -FrameCaps 60 -Repeats 2`，证据 `Saved/HollowRecoveryMatrix/20261029-071547-f989e54b/`、原进程32704仍运行。第一个样本CSV Pass=True，完成自然倒地、R复活、伙伴真实返家/重聚、二次战斗与采集，最终恢复标记travel=12488.7、harvested=6、skill/incoming=1；第二样本未结束，整轮未记通过，原槽最终恢复仍需等脚本结束。
+
+启用巡游诊断和失败唯一槽快照，不放宽伤害/路线/超时门槛。第一个样本未复现原5DF05F08交战前卡路，不代表已修复；路线Drive源码已设置角色与控制器朝向，不能无证据套用建筑QA取景夹具归因。稳定入口不变，下方旧候选状态均为历史记录。
+
 当前可玩包：`E:\CreatureFrontierBuilds\Windows-Recovery-Feedback\CreatureFrontier.exe`。同一EXE的83类/87进程完整回归、14份真实格式28旧档的30进程读取和三尺寸24张恢复图均通过本轮检查。旧构建/源档和常规玩家存档保留，存档格式仍28。这是灰盒限定验收，不是完整游戏或正式表现品质。
 
 下一项先验证自然倒地后保存、退出、新进程读取倒地世界，再R复活/重聚继续冒险；当前最终活档跨进程读取与同进程倒地读档不能替代它。伙伴同时倒下、任意封路/大队伍、系统级持续输入与普通窗口性能仍需后续。
