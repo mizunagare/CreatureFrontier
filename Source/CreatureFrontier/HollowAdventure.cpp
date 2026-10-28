@@ -187,6 +187,16 @@ struct FAdventure
                     if(Pet->Health>=Pet->GetMaxHealth() || Enemy->Health>=Enemy->GetMaxHealth())
                     {
                         // 通过真实集火指令建立自然伤害前置；玩家保持距离，避免被先击倒。
+                        if(Pet->FocusTarget!=Enemy && Hero->TraceCreature()!=Enemy)
+                        {
+                            // 距离进入准备区不代表已穿过洞壁看到敌人，仍沿原路线前进。
+                            if(Points.IsValidIndex(Index))
+                            {
+                                if(FVector::Dist2D(Now,Points[Index])<70)++Index;
+                                else Drive(Points[Index]);
+                            }
+                            return true;
+                        }
                         if(Pet->FocusTarget!=Enemy && Hero->TraceCreature()==Enemy)
                             if(!CFInputQA::Press(Hero,EKeys::Q))return Fail(TEXT("recovery-prepare-input"));
                         if(Hero->GetDistanceTo(Enemy)<450)Drive(Now+FVector(0,250,0));

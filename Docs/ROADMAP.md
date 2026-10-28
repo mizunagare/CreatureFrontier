@@ -1,5 +1,7 @@
 # 开发路线
 
+30帧矩阵首项FAIL超时，原QA槽哈希已恢复，其余未跑。发现距离准备区在未瞄准敌人时停掉原路线的QA缺口，改为继续沿原路寻找可见目标，不放宽判据。0C85530F已编译并启动新六项矩阵 `Saved/HollowRecoveryMatrix/20261029-025804-23e6549d/`，尚未完成，详见 `Docs/HOME_BUILDING.md`。
+
 恢复编排扩展验证已启动：CDD86D71在 `Saved/HollowRecoveryMatrix/20261029-025343-802a64b8/` 串行运行30/60/120上限×两次六进程，本地脚本新增固定指纹、实际上限回显、全链阶段标记和专用槽恢复保护。语法及两条非法参数拒绝路径通过；矩阵尚未完成，未声明多帧率通过。Windows新QA与跨进程仍待，见 `Docs/HOME_BUILDING.md`。
 
 CDD86D71首项恢复完整链已正常退出0，最终CF_HOLLOW_RECOVERY PASS且无FAIL，实际完成前置、自然倒地、复活保留、伙伴归队、技能战斗、六份采集及返家。日志 `Saved/HollowRecovery-Prepared-Pace-20261029-0250.log`。仅一次Editor成功，多次/不同帧率、跨进程及Windows仍待；不代表完整游戏交付，下方运行中为历史状态。
