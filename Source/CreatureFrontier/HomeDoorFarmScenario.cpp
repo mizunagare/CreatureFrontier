@@ -17,6 +17,8 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "InventoryComponent.h"
 #include "AIController.h"
+#include "Components/CapsuleComponent.h"
+#include "Engine/OverlapResult.h"
 
 void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
 {
@@ -70,6 +72,13 @@ void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
             if(!Diagnosed && Elapsed>=2)
             {
                 Diagnosed=true;auto* Nav=FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
+                TArray<FOverlapResult> Overlaps;FCollisionQueryParams Query(SCENE_QUERY_STAT(FarmHeroFixture),false,Hero);
+                const auto* Capsule=Hero->GetCapsuleComponent();
+                World->OverlapMultiByObjectType(Overlaps,Hero->GetActorLocation(),Hero->GetActorQuat(),FCollisionObjectQueryParams::AllObjects,
+                    FCollisionShape::MakeCapsule(Capsule->GetScaledCapsuleRadius(),Capsule->GetScaledCapsuleHalfHeight()),Query);
+                bool FarmOverlap=false;for(const auto& Overlap:Overlaps)FarmOverlap |= Overlap.GetActor()==Farm;
+                UE_LOG(LogTemp,Display,TEXT("CF_DOOR_FARM_HERO_FIXTURE overlapFarm=%d position=%s"),FarmOverlap,*Hero->GetActorLocation().ToString());
+                if(FarmOverlap && !FParse::Param(FCommandLine::Get(),TEXT("CFDoorFarmCancelOriginalAim"))){End(false);return;}
                 for(int32 Index=0;Index<2;++Index)
                 {
                     FNavLocation Goal;const bool Projected=Nav && Nav->ProjectPointToNavigation(Pet->GetFollowDestination(),Goal,Index==0?FVector(250,250,300):FVector(80,80,80));

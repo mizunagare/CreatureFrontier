@@ -26,6 +26,7 @@ if($process.ExitCode -ne 0 -or !(Select-String -LiteralPath $log -SimpleMatch 'C
    !(Select-String -LiteralPath $log -SimpleMatch 'CF_DOOR_FARM_CLOSED PASS' -Quiet) -or
    (Select-String -LiteralPath $log -Pattern '\bFAIL\b|Fatal error|Assertion failed' -Quiet)){throw "门与农圃专项未通过：$log"}
 if((Get-FrontierBuildFingerprint -LiteralPath $module) -ne $hash){throw '专项期间模块发生变化'}
+if($Mode -eq 'Cancel' -and !$OriginalAim -and !(Select-String -LiteralPath $log -SimpleMatch 'CF_DOOR_FARM_HERO_FIXTURE overlapFarm=0' -Quiet)){throw '取消后归队缺少玩家与农圃无重叠证据'}
 if(!(Select-String -LiteralPath $log -SimpleMatch ('CF_DOOR_FARM_MODE PASS mode='+$modeNumber) -Quiet)){throw '缺少对应存读模式的成功标记'}
 $fixtureMarker=if($NoRoof){'CF_DOOR_FARM_FIXTURE roof=0 removed=1'}else{'CF_DOOR_FARM_FIXTURE roof=1 removed=0'}
 if(!(Select-String -LiteralPath $log -SimpleMatch $fixtureMarker -Quiet)){throw '缺少预期屋顶对照标记'}
