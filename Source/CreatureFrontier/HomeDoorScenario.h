@@ -7,6 +7,7 @@ class ACreatureCharacter;
 void RunHomeDoorScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode=0);
 void RunHomeDoorNavigationScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Rotated=false);
 void RunHomeWindowNavigationScenario(UWorld* World,ACFPlayerCharacter* Hero);
+void RunHomeWindowSkillScenario(UWorld* World,ACFPlayerCharacter* Hero);
 void RunHomeDoorPlayerScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Rotated=false);
 void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode=0);
 namespace CFDoorNavigationQA
