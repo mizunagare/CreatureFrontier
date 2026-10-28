@@ -34,6 +34,9 @@ $cases = @(
     @{Flag='CFHollowAdventureRead'; Marker='CF_HOLLOW_ADVENTURE_READ PASS'},
     @{Flag='CFHollowRecoveryTest'; Marker='CF_HOLLOW_RECOVERY PASS'; Timeout=195},
     @{Flag='CFHollowRecoveryRead'; Marker='CF_HOLLOW_RECOVERY_READ PASS'},
+    @{Flag='CFHollowDownedWrite'; Marker='CF_HOLLOW_DOWNED_WRITE PASS'; Timeout=90},
+    @{Flag='CFHollowDownedResume'; Marker='CF_HOLLOW_DOWNED_RESUME PASS'; Timeout=195; PreserveSlot='HollowDownedCross'},
+    @{Flag='CFHollowCheckpointRead'; Marker='CF_HOLLOW_CHECKPOINT_READ PASS'},
     @{Flag='CFHollowRouteTest'; Marker='CF_HOLLOW_ROUTE PASS'},
     @{Flag='CFHollowWrite'; Marker='CF_HOLLOW_WRITE PASS'},
     @{Flag='CFHollowRead'; Marker='CF_HOLLOW_READ PASS'},
@@ -117,6 +120,8 @@ foreach ($case in $cases) {
         $logPath = Join-Path $testLogRoot ($label + '.log')
         $arguments = @('-nullrhi', '-nosound', '-unattended', '-nop4', "-$($case.Flag)", "-abslog=`"$logPath`"")
         if ($case.Arguments) { $arguments += $case.Arguments }
+        $preservedPath=if($case.PreserveSlot){Join-Path $BuildRoot ('CreatureFrontier\Saved\SaveGames\'+$case.PreserveSlot+'.sav')}else{''}
+        $preservedHash=if($preservedPath){(Get-FileHash -LiteralPath $preservedPath).Hash}else{''}
         $testProcess = Start-Process -FilePath $exePath -WorkingDirectory $BuildRoot `
             -ArgumentList $arguments `
             -WindowStyle Hidden -PassThru
@@ -135,6 +140,7 @@ foreach ($case in $cases) {
         if ($case.Pattern -and -not (Select-String -LiteralPath $logPath -Pattern $case.Pattern -Quiet)) {
             throw "$label did not exercise two short completed legs; inspect $logPath"
         }
+        if($preservedPath -and (Get-FileHash -LiteralPath $preservedPath).Hash -ne $preservedHash){throw "倒地输入存档被改写：$preservedPath"}
         Write-Host "${label}: PASS"
     }
 }

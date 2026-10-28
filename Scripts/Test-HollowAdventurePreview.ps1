@@ -1,18 +1,33 @@
 param([Parameter(Mandatory=$true)][string]$BuildRoot,
       [ValidateSet('960x540','1280x720','1920x1080')][string]$Resolution='1280x720',
-      [switch]$Recovery)
+      [switch]$Recovery,
+      [switch]$Checkpoint)
 $ErrorActionPreference='Stop'
 $projectRoot=Split-Path $PSScriptRoot -Parent
 $exe=Join-Path $BuildRoot 'CreatureFrontier\Binaries\Win64\CreatureFrontier.exe'
 if(!(Test-Path -LiteralPath $exe)){throw '缺少打包程序'}
 $hash=(Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash
-$folder=if($Recovery){'HollowRecoveryQA'}else{'HollowAdventureQA'}
+if($Checkpoint){$Recovery=$true}
+$folder=if($Checkpoint){'HollowCheckpointQA'}elseif($Recovery){'HollowRecoveryQA'}else{'HollowAdventureQA'}
 $evidence=Join-Path $projectRoot ('Saved\'+$folder+'\'+(Get-Date -Format 'yyyyMMdd-HHmmss')+'-'+[Guid]::NewGuid().ToString('N').Substring(0,8))
 New-Item -ItemType Directory -Path $evidence | Out-Null
 $log=Join-Path $evidence 'Adventure.log'
 Write-Host "连续冒险图形证据：$evidence"
+function Invoke-CheckpointNative([string]$Flag,[string]$Marker){
+    $nativeLog=Join-Path $evidence ($Flag+'.log')
+    $native=Start-Process -FilePath $exe -WorkingDirectory $BuildRoot -WindowStyle Hidden -PassThru -ArgumentList @('-nullrhi','-nosound','-unattended',('-'+$Flag),('-abslog="'+$nativeLog+'"'))
+    $nativeWatch=[Diagnostics.Stopwatch]::StartNew()
+    while(!$native.WaitForExit(200)){if($nativeWatch.Elapsed.TotalSeconds -gt 90){$native.Kill();$native.WaitForExit();throw "检查点独立进程超时：$Flag"}}
+    if($native.ExitCode -ne 0 -or !(Select-String -LiteralPath $nativeLog -Pattern $Marker -SimpleMatch -Quiet)){throw "检查点独立进程未通过：$nativeLog"}
+}
+$checkpointInput='';$checkpointInputHash=''
+if($Checkpoint){
+    Invoke-CheckpointNative 'CFHollowDownedWrite' 'CF_HOLLOW_DOWNED_WRITE PASS'
+    $checkpointInput=Join-Path $BuildRoot 'CreatureFrontier\Saved\SaveGames\HollowDownedCross.sav'
+    $checkpointInputHash=(Get-FileHash -LiteralPath $checkpointInput).Hash
+}
 $viewWidth,$viewHeight=$Resolution.Split('x') | ForEach-Object {[int]$_}
-$testFlag=if($Recovery){'-CFHollowRecoveryTest'}else{'-CFHollowAdventureTest'}
+$testFlag=if($Checkpoint){'-CFHollowDownedResume'}elseif($Recovery){'-CFHollowRecoveryTest'}else{'-CFHollowAdventureTest'}
 $arguments=@($testFlag,'-CFHollowAdventurePreview','-RenderOffscreen','-ForceRes',('-ResX='+$viewWidth),('-ResY='+$viewHeight),'-nosound','-unattended','-nop4','-norhithread','-forcerhibypass','-ExecCmds="t.MaxFPS 60,r.MotionBlurQuality 0,r.DefaultFeature.MotionBlur 0,r.AntiAliasingMethod 1"',('-abslog="'+$log+'"'))
 $process=Start-Process -FilePath $exe -WorkingDirectory $BuildRoot -ArgumentList $arguments -WindowStyle Hidden -PassThru
 $watch=[Diagnostics.Stopwatch]::StartNew();$sampledMemory=0L
@@ -22,15 +37,19 @@ while(!$process.WaitForExit(200)){
     try {$process.Refresh();$sampledMemory=[Math]::Max($sampledMemory,$process.WorkingSet64)} catch [InvalidOperationException] {}
 }
 $contents=Get-Content -LiteralPath $log -Raw
-$required=if($Recovery){'CF_HOLLOW_RECOVERY PASS '}else{'CF_HOLLOW_ADVENTURE PASS '}
+$required=if($Checkpoint){'CF_HOLLOW_DOWNED_RESUME PASS '}elseif($Recovery){'CF_HOLLOW_RECOVERY PASS '}else{'CF_HOLLOW_ADVENTURE PASS '}
 if($process.ExitCode -ne 0 -or $contents -notmatch 'Using Default RHI: D3D12' -or !$contents.Contains($required) -or $contents -notmatch 'CF_HOLLOW_ADVENTURE_BATTLE PASS ' -or $contents -match 'CF_HOLLOW_(?:ADVENTURE|RECOVERY).*FAIL|Fatal error|Assertion failed'){throw "连续冒险或D3D12未通过：$log"}
 if($Recovery -and ($contents -notmatch 'CF_HOLLOW_RECOVERY_RESPAWN PASS ' -or $contents -notmatch 'CF_HOLLOW_RECOVERY_REJOIN PASS ')){throw '缺少复活/返程断言'}
+if($Checkpoint -and $contents -notmatch 'CF_HOLLOW_DOWNED_LOAD PASS'){throw '缺少冷启动逐项匹配断言'}
 $rootMatch=[regex]::Match($contents,'CF_HOLLOW_ADVENTURE_ROOT [^\r\n]*[/\\]([A-F0-9]{32})')
 if(!$rootMatch.Success){throw '缺少独立截图目录'}
 $shots=Join-Path $BuildRoot ('CreatureFrontier\Saved\HollowAdventurePreview\'+$rootMatch.Groups[1].Value)
 $scenes=if($Recovery){@('Entrance','Downed','Revived','Rejoined','Skill','Impact','Cache','Home')}else{@('Entrance','Skill','Impact','Cache','Home')}
+$sceneFrames=@()
 foreach($scene in $scenes){
-    if($contents -notmatch ('CF_HOLLOW_ADVENTURE_SHOT '+$scene+' viewport='+$Resolution+' frame=\d+')){throw "缺少实际取景审计：$scene"}
+    $sceneMatch=[regex]::Match($contents,('CF_HOLLOW_ADVENTURE_SHOT '+$scene+' viewport='+$Resolution+' frame=(\d+)'))
+    if(!$sceneMatch.Success){throw "缺少实际取景审计：$scene"}
+    $sceneFrames+=$sceneMatch.Groups[1].Value
     $source=Join-Path $shots ($scene+'.png')
     if(!(Test-Path -LiteralPath $source) -or (Get-Item -LiteralPath $source).Length -lt 1000){throw "缺少新截图：$source"}
     $header=New-Object byte[] 24;$stream=[IO.File]::OpenRead($source)
@@ -39,13 +58,19 @@ foreach($scene in $scenes){
     $width=[int]$header[16]*16777216+[int]$header[17]*65536+[int]$header[18]*256+[int]$header[19]
     $height=[int]$header[20]*16777216+[int]$header[21]*65536+[int]$header[22]*256+[int]$header[23]
     if($width -ne $viewWidth -or $height -ne $viewHeight){throw '截图实际尺寸不符'}
-    Copy-Item -LiteralPath $source -Destination (Join-Path $evidence ($scene+'.png'))
+    $outputScene=if($Checkpoint -and $scene -eq 'Entrance'){'Restored'}else{$scene}
+    Copy-Item -LiteralPath $source -Destination (Join-Path $evidence ($outputScene+'.png'))
 }
+if(@($sceneFrames | Select-Object -Unique).Count -ne $scenes.Count){throw '取景使用了重复的布局帧，不能视为独立画面'}
 $frames=[regex]::Matches($contents,('\[(\d{4}\.\d{2}\.\d{2}-\d{2}\.\d{2}\.\d{2}:\d{3})\].*CF_HOLLOW_ADVENTURE_SHOT (Entrance|Home) viewport='+$Resolution+' frame=(\d+)'))
 if($frames.Count -ne 2){throw '缺少取景区间帧采样'}
 $firstTime=[DateTime]::ParseExact($frames[0].Groups[1].Value,'yyyy.MM.dd-HH.mm.ss:fff',[Globalization.CultureInfo]::InvariantCulture)
 $lastTime=[DateTime]::ParseExact($frames[1].Groups[1].Value,'yyyy.MM.dd-HH.mm.ss:fff',[Globalization.CultureInfo]::InvariantCulture)
 $fps=([long]$frames[1].Groups[3].Value-[long]$frames[0].Groups[3].Value)/($lastTime-$firstTime).TotalSeconds
 if((Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash -ne $hash){throw '测试期间程序改变'}
-[pscustomobject]@{Pass=$true;Recovery=[bool]$Recovery;Resolution=$Resolution;ShotIntervalFPS=[Math]::Round($fps,2);SampledWorkingSetMiB=[Math]::Round($sampledMemory/1MB,1);BuildSHA256=$hash;Log=$log} | Export-Csv -LiteralPath (Join-Path $evidence 'Results.csv') -NoTypeInformation
+if($Checkpoint){
+    Invoke-CheckpointNative 'CFHollowCheckpointRead' 'CF_HOLLOW_CHECKPOINT_READ PASS'
+    if((Get-FileHash -LiteralPath $checkpointInput).Hash -ne $checkpointInputHash){throw '原倒地输入被改写'}
+}
+[pscustomobject]@{Pass=$true;Recovery=[bool]$Recovery;Checkpoint=[bool]$Checkpoint;CheckpointInputSHA256=$checkpointInputHash;Resolution=$Resolution;ShotIntervalFPS=[Math]::Round($fps,2);SampledWorkingSetMiB=[Math]::Round($sampledMemory/1MB,1);BuildSHA256=$hash;Log=$log} | Export-Csv -LiteralPath (Join-Path $evidence 'Results.csv') -NoTypeInformation
 Write-Host "连续冒险与$($scenes.Count)图尺寸通过，仍需逐图查看：$evidence"

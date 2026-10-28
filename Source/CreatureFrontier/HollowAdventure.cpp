@@ -29,6 +29,9 @@
 #include "GenericPlatform/GenericPlatformInputDeviceMapper.h"
 #include "TimerManager.h"
 #include "BaseBuildingComponent.h"
+#include "FrontierSaveGame.h"
+#include "Kismet/GameplayStatics.h"
+#include "GameFramework/CharacterMovementComponent.h"
 
 namespace
 {
@@ -38,6 +41,32 @@ AWildEncounter* HollowCamp(UWorld* World)
 {for(TActorIterator<AWildEncounter> It(World);It;++It)if(It->EncounterId==TEXT("EmberHollow"))return *It;return nullptr;}
 ACreatureCharacter* AdventurePet(UWorld* World,ACFPlayerCharacter* Hero)
 {for(TActorIterator<ACreatureCharacter> It(World);It;++It)if(It->Tamer==Hero->GetController())return *It;return nullptr;}
+bool DownedCheckpointMatches(UWorld* World,ACFPlayerCharacter* Hero,const UFrontierSaveGame* Save)
+{
+    auto* Camp=HollowCamp(World);auto* Enemy=Camp?Camp->GetResident():nullptr;auto* Pet=AdventurePet(World,Hero);auto* Cache=HollowCache(World);
+    if(!Save || Save->FormatVersion!=28 || Save->Health!=0 || Hero->Health!=0 || !Pet || !Enemy || !Cache || Cache->Remaining!=6 ||
+        Pet->Health<=0 || Pet->Health>=Pet->GetMaxHealth() || Enemy->Health<=0 || Enemy->Health>=Enemy->GetMaxHealth() ||
+        Hero->GetActorLocation().Y>=-2700 || !Hero->GetActorLocation().Equals(Save->PlayerTransform.GetLocation(),.1f) ||
+        Hero->GetCharacterMovement()->MovementMode!=MOVE_None || Hero->Pace->IsSlowWalking() || Hero->GetRespawnProtectionRemaining()>0)return false;
+    for(int32 I=0;I<static_cast<int32>(EFrontierItem::Count);++I)
+        if(Hero->Inventory->Count(static_cast<EFrontierItem>(I))!=Save->InventoryStacks.FindRef(static_cast<EFrontierItem>(I)))return false;
+    int32 Creatures=0,Owned=0,Nodes=0;
+    for(TActorIterator<ACreatureCharacter> It(World);It;++It)
+    {
+        ++Creatures;if(It->Tamer==Hero->GetController())++Owned;
+        const auto* Record=Save->Creatures.FindByPredicate([&](const auto& R){return R.Id==It->PersistentId;});
+        if(!Record || !FMath::IsNearlyEqual(It->Health,Record->Health) || !FMath::IsNearlyEqual(It->Stamina,Record->Stamina) ||
+            !FMath::IsNearlyEqual(It->Nutrition,Record->Nutrition) || !FMath::IsNearlyEqual(It->SpecialCooldownRemaining,Record->SpecialCooldown) ||
+            It->Level!=Record->Level || It->Experience!=Record->Experience || It->EncounterId!=Record->EncounterId ||
+            (It->Tamer==Hero->GetController())!=Record->bOwned || !It->GetActorLocation().Equals(Record->Transform.GetLocation(),.1f))return false;
+    }
+    for(TActorIterator<AResourceNode> It(World);It;++It)
+    {
+        ++Nodes;const auto* Record=Save->ResourceNodes.FindByPredicate([&](const auto& R){return R.Id==It->PersistentId;});
+        if(!Record || It->Remaining!=Record->Remaining || !FMath::IsNearlyEqual(It->HarvestCooldown,Record->HarvestCooldown) || !FMath::IsNearlyEqual(It->RegrowRemaining,Record->RegrowRemaining))return false;
+    }
+    return Owned==1 && Creatures==Save->Creatures.Num() && Nodes==Save->ResourceNodes.Num();
+}
 bool AdventureSnapshot(UWorld* World,ACFPlayerCharacter* Hero)
 {
     auto* Cache=HollowCache(World);auto* Camp=HollowCamp(World);auto* Pet=AdventurePet(World,Hero);
@@ -56,6 +85,8 @@ struct FAdventure
     int32 RecoveryStage=0;float PetTravel=0,ReturnStartTravel=0,SecondHeroHP=0,SecondPetHP=0;double NextRecoveryLog=0;bool RecoveryAttackSent=false;
     TMap<EFrontierItem,int32> RecoveryBag;
     double DownedShotAfter=0,RejoinedShotAfter=0;
+    uint64 LastShotAuditFrame=MAX_uint64;
+    bool WriteDownedCheckpoint=false,ResumedCheckpoint=false;
     bool SameRecoveryBag() const
     {for(int32 I=0;I<static_cast<int32>(EFrontierItem::Count);++I)if(Hero->Inventory->Count(static_cast<EFrontierItem>(I))!=RecoveryBag.FindRef(static_cast<EFrontierItem>(I)))return false;return true;}
     void Shot(const TCHAR* Name)
@@ -63,6 +94,8 @@ struct FAdventure
         if(Shots.IsEmpty() || Taken.Contains(Name))return;
         auto* PC=Cast<APlayerController>(Hero->GetController());auto* HUD=PC?Cast<ACFHUD>(PC->GetHUD()):nullptr;
         if(!HUD || !HUD->GetLayoutAudit().bFits || !HUD->GetLayoutAudit().bNoOverlap || !HUD->GetLayoutAudit().bCenterClear)return;
+        if(FScreenshotRequest::IsScreenshotRequested() || LastShotAuditFrame==HUD->GetLayoutAudit().Frame)return;
+        LastShotAuditFrame=HUD->GetLayoutAudit().Frame;
         Taken.Add(Name);FScreenshotRequest::RequestScreenshot(Shots/(FString(Name)+TEXT(".png")),true,false);
         UE_LOG(LogTemp,Display,TEXT("CF_HOLLOW_ADVENTURE_SHOT %s viewport=%.0fx%.0f frame=%llu"),Name,HUD->GetLayoutAudit().Viewport.X,HUD->GetLayoutAudit().Viewport.Y,HUD->GetLayoutAudit().Frame);
     }
@@ -87,6 +120,14 @@ struct FAdventure
             // 受伤出发后必须由自然住民实际击倒；残血目标才能有效验证复活不补血。
             if(Now.Y>=-2700 || Enemy->GetDistanceTo(Hero)>300 || Enemy->Health<=0 || Enemy->Health>=Enemy->GetMaxHealth() || Pet->Health>=Pet->GetMaxHealth() || Camp->GetResident()!=Enemy || Pet->FocusTarget || Pet->SpecialWindupRemaining>0 || Hero->Pace->IsSlowWalking())return Fail(TEXT("natural-death-state"));
             Input->Direction=FVector::ZeroVector;
+            if(WriteDownedCheckpoint)
+            {
+                const bool Saved=Hero->SaveProgress(TEXT("HollowDownedCross"));
+                const auto* Snapshot=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("HollowDownedCross"),0));
+                const bool Pass=Saved && DownedCheckpointMatches(World,Hero,Snapshot);
+                UE_LOG(LogTemp,Display,TEXT("CF_HOLLOW_DOWNED_WRITE %s pet=%s enemy=%s petHP=%.1f enemyHP=%.1f"),Pass?TEXT("PASS"):TEXT("FAIL"),*Pet->PersistentId.ToString(),*Enemy->PersistentId.ToString(),Pet->Health,Enemy->Health);
+                FPlatformMisc::RequestExitWithStatus(false,Pass?0:1);return false;
+            }
             if(!Shots.IsEmpty())
             {
                 if(DownedShotAfter==0){Shot(TEXT("Downed"));if(Taken.Contains(TEXT("Downed")))DownedShotAfter=FPlatformTime::Seconds()+.35;return true;}
@@ -188,18 +229,39 @@ struct FAdventure
         const FGuid Id=Pet->PersistentId;
         bool Pass=Hero->Pace->IsSlowWalking() && CFInputQA::Release(Hero,EKeys::LeftShift) && !Hero->Pace->IsSlowWalking();
         Pass &= Travel>7000 && PetSouth<-3600 && Hero->CraftRecipe(TEXT("ScrapResonator")) && AdventureSnapshot(World,Hero);
-        const FString Slot=Mode==3?TEXT("HollowRecoveryCross"):TEXT("HollowAdventureCross");
+        const FString Slot=ResumedCheckpoint?TEXT("HollowCheckpointFinal"):Mode==3?TEXT("HollowRecoveryCross"):TEXT("HollowAdventureCross");
         Pass &= (Mode!=3 || RecoveryStage==2) && Hero->SaveProgress(Slot) && Hero->LoadProgress(Slot) && AdventureSnapshot(World,Hero);
         auto* Restored=AdventurePet(World,Hero);Pass &= Restored && Restored->PersistentId==Id;
-        UE_LOG(LogTemp,Display,TEXT("%s %s travel=%.1f petSouth=%.1f harvested=%d skill=%d incoming=%d"),Mode==3?TEXT("CF_HOLLOW_RECOVERY"):Mode==1?TEXT("CF_HOLLOW_ADVENTURE_WRITE"):TEXT("CF_HOLLOW_ADVENTURE"),Pass?TEXT("PASS"):TEXT("FAIL"),Travel,PetSouth,Harvested,Skill,Incoming);
+        UE_LOG(LogTemp,Display,TEXT("%s %s travel=%.1f petSouth=%.1f harvested=%d skill=%d incoming=%d"),ResumedCheckpoint?TEXT("CF_HOLLOW_DOWNED_RESUME"):Mode==3?TEXT("CF_HOLLOW_RECOVERY"):Mode==1?TEXT("CF_HOLLOW_ADVENTURE_WRITE"):TEXT("CF_HOLLOW_ADVENTURE"),Pass?TEXT("PASS"):TEXT("FAIL"),Travel,PetSouth,Harvested,Skill,Incoming);
         FPlatformMisc::RequestExitWithStatus(false,Pass?0:1);return false;
     }
 };
+void StartAdventure(UWorld* World,ACFPlayerCharacter* Hero,ACreatureCharacter* Pet,AWildEncounter* Camp,int Mode,bool WriteDowned=false,bool Resumed=false)
+{
+    auto State=MakeShared<FAdventure>();State->World=World;State->Hero=Hero;State->Pet=Pet;State->Enemy=Camp->GetResident();State->Camp=Camp;State->Mode=Mode;
+    State->WriteDownedCheckpoint=WriteDowned;State->ResumedCheckpoint=Resumed;
+    State->Input=NewObject<UHomeMovementProbe>(Hero);State->Input->RegisterComponent();State->Points=MakeHollowRoutePoints();State->Previous=Hero->GetActorLocation();State->PreviousPet=Pet->GetActorLocation();State->Deadline=FPlatformTime::Seconds()+(Mode==3?180:75);
+    if(!Resumed && (!CFInputQA::Press(Hero,EKeys::LeftShift) || !Hero->Pace->IsSlowWalking())){FPlatformMisc::RequestExitWithStatus(false,1);return;}
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFHollowAdventurePreview")))
+    {State->Shots=FPaths::ProjectSavedDir()/TEXT("HollowAdventurePreview")/FGuid::NewGuid().ToString(EGuidFormats::Digits);IFileManager::Get().MakeDirectory(*State->Shots,true);UE_LOG(LogTemp,Display,TEXT("CF_HOLLOW_ADVENTURE_ROOT %s"),*State->Shots);}
+    UE_LOG(LogTemp,Display,TEXT("CF_HOLLOW_ADVENTURE_START resident=%s hp=%.1f petHP=%.1f"),*State->Enemy->GetActorLocation().ToString(),State->Enemy->Health,Pet->Health);
+    FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([State](float){return State->Tick();}),.1f);
+}
 }
 void RunHollowAdventure(UWorld* World,ACFPlayerCharacter* Hero,int Mode)
 {
-    if(Mode==2 || Mode==4)
-    {const bool Pass=Hero->LoadProgress(Mode==4?TEXT("HollowRecoveryCross"):TEXT("HollowAdventureCross")) && AdventureSnapshot(World,Hero);UE_LOG(LogTemp,Display,TEXT("%s %s"),Mode==4?TEXT("CF_HOLLOW_RECOVERY_READ"):TEXT("CF_HOLLOW_ADVENTURE_READ"),Pass?TEXT("PASS"):TEXT("FAIL"));FPlatformMisc::RequestExitWithStatus(false,Pass?0:1);return;}
+    if(Mode==2 || Mode==4 || Mode==7)
+    {const bool Pass=Hero->LoadProgress(Mode==7?TEXT("HollowCheckpointFinal"):Mode==4?TEXT("HollowRecoveryCross"):TEXT("HollowAdventureCross")) && AdventureSnapshot(World,Hero);UE_LOG(LogTemp,Display,TEXT("%s %s"),Mode==7?TEXT("CF_HOLLOW_CHECKPOINT_READ"):Mode==4?TEXT("CF_HOLLOW_RECOVERY_READ"):TEXT("CF_HOLLOW_ADVENTURE_READ"),Pass?TEXT("PASS"):TEXT("FAIL"));FPlatformMisc::RequestExitWithStatus(false,Pass?0:1);return;}
+    if(Mode==6)
+    {
+        // 先保留磁盘中的期望值，再通过正常读档事务恢复，不重新赠送夹具物品或伙伴。
+        const auto* Snapshot=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("HollowDownedCross"),0));
+        const bool Pass=Snapshot && Hero->LoadProgress(TEXT("HollowDownedCross")) && DownedCheckpointMatches(World,Hero,Snapshot);
+        UE_LOG(LogTemp,Display,TEXT("CF_HOLLOW_DOWNED_LOAD %s"),Pass?TEXT("PASS"):TEXT("FAIL"));
+        if(!Pass){FPlatformMisc::RequestExitWithStatus(false,1);return;}
+        StartAdventure(World,Hero,AdventurePet(World,Hero),HollowCamp(World),3,false,true);return;
+    }
+    const bool WriteDowned=Mode==5;if(WriteDowned)Mode=3;
     auto* Camp=HollowCamp(World);auto* Enemy=Camp?Camp->GetResident():nullptr;auto* Stone=LoadObject<UCreatureDefinition>(nullptr,TEXT("/Game/Creatures/DA_Craglet.DA_Craglet"));
     if(!Camp || !Enemy || !Stone || Camp->bBoss || Enemy->Level!=3 || !Camp->IsActorTickEnabled() || AdventurePet(World,Hero))
     {UE_LOG(LogTemp,Error,TEXT("CF_HOLLOW_ADVENTURE FAIL natural-population"));FPlatformMisc::RequestExitWithStatus(false,1);return;}
@@ -209,12 +271,5 @@ void RunHollowAdventure(UWorld* World,ACFPlayerCharacter* Hero,int Mode)
     FResearchProgress Study;Study.bCrystalSample=true;Study.bCrystalStudy=true;Hero->Research->Restore(Study);
     const FTransform At(Hero->GetActorLocation()+FVector(0,180,0));auto* Pet=World->SpawnActorDeferred<ACreatureCharacter>(ACreatureCharacter::StaticClass(),At);
     if(!Pet){FPlatformMisc::RequestExitWithStatus(false,1);return;}Pet->Definition=Stone;Pet->FinishSpawning(At);Pet->Tame(Hero->GetController());
-    auto State=MakeShared<FAdventure>();State->World=World;State->Hero=Hero;State->Pet=Pet;State->Enemy=Enemy;State->Camp=Camp;State->Mode=Mode;
-    State->Input=NewObject<UHomeMovementProbe>(Hero);State->Input->RegisterComponent();State->Points=MakeHollowRoutePoints();State->Previous=Hero->GetActorLocation();State->PreviousPet=Pet->GetActorLocation();State->Deadline=FPlatformTime::Seconds()+75;
-    if(Mode==3)State->Deadline=FPlatformTime::Seconds()+180;
-    if(!CFInputQA::Press(Hero,EKeys::LeftShift) || !Hero->Pace->IsSlowWalking()){FPlatformMisc::RequestExitWithStatus(false,1);return;}
-    if(FParse::Param(FCommandLine::Get(),TEXT("CFHollowAdventurePreview")))
-    {State->Shots=FPaths::ProjectSavedDir()/TEXT("HollowAdventurePreview")/FGuid::NewGuid().ToString(EGuidFormats::Digits);IFileManager::Get().MakeDirectory(*State->Shots,true);UE_LOG(LogTemp,Display,TEXT("CF_HOLLOW_ADVENTURE_ROOT %s"),*State->Shots);}
-    UE_LOG(LogTemp,Display,TEXT("CF_HOLLOW_ADVENTURE_START resident=%s hp=%.1f petHP=%.1f"),*Enemy->GetActorLocation().ToString(),Enemy->Health,Pet->Health);
-    FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([State](float){return State->Tick();}),.1f);
+    StartAdventure(World,Hero,Pet,Camp,Mode,WriteDowned);
 }

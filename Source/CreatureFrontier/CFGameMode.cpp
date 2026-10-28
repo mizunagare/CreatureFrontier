@@ -66,6 +66,8 @@ void ACFGameMode::BeginPlay()
 {
     Super::BeginPlay();
     SeedFrontierResources(GetWorld());
+    const int32 CheckpointMode=FParse::Param(FCommandLine::Get(),TEXT("CFHollowDownedWrite"))?5:FParse::Param(FCommandLine::Get(),TEXT("CFHollowDownedResume"))?6:FParse::Param(FCommandLine::Get(),TEXT("CFHollowCheckpointRead"))?7:0;
+    if(CheckpointMode){FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this,CheckpointMode](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunHollowAdventure(GetWorld(),Hero,CheckpointMode);},1.f,false);return;}
     if(FParse::Param(FCommandLine::Get(),TEXT("CFHollowRecoveryTest")) || FParse::Param(FCommandLine::Get(),TEXT("CFHollowRecoveryRead")))
     {const int32 RecoveryMode=FParse::Param(FCommandLine::Get(),TEXT("CFHollowRecoveryRead"))?4:3;FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this,RecoveryMode](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunHollowAdventure(GetWorld(),Hero,RecoveryMode);},1.f,false);return;}
     if(FParse::Param(FCommandLine::Get(),TEXT("CFPaceTest")))
