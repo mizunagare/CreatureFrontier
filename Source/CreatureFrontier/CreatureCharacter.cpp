@@ -172,6 +172,13 @@ void ACreatureCharacter::NavigateTo(const FVector& Destination, float Acceptance
     auto* Nav = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
     if (!AI || !Nav) { StopNavigation(); return; }
     const double Now=GetWorld()->GetTimeSeconds();
+    if(Activity==ECreatureActivity::Combat && FocusTarget && Tamer && Tamer->GetPawn() &&
+        FParse::Param(FCommandLine::Get(),TEXT("CFHollowDetourTrace")))
+    {
+        FVector Candidate=FVector::ZeroVector;
+        const bool Found=FindFollowPathDetour(Destination,Cast<ACharacter>(Tamer->GetPawn()),Candidate);
+        UE_LOG(LogTemp,Display,TEXT("CF_HOLLOW_DETOUR_QUERY found=%d selected=%s queryOnly=1"),Found,*Candidate.ToString());
+    }
     if(Activity!=ECreatureActivity::Follow || FVector::Dist2D(GetActorLocation(),FollowPathDetour)<30 ||
         FVector::Dist2D(Destination,FollowPathDetourGoal)>100 || Now>FollowPathDetourExpires) bHasFollowPathDetour=false;
     if(Activity==ECreatureActivity::Follow && !bHasFollowPathDetour && Now>=NextFollowDetourSearch && AI->GetMoveStatus()==EPathFollowingStatus::Moving)

@@ -27,7 +27,7 @@ try {
         $log=Join-Path $run 'Inspection.log'
         $arguments=@('-game','-nullrhi','-nosound','-unattended','-nop4','-CFHollowRecoveryTest','-CFHollowInspectFailure',('-abslog="'+$log+'"'))
         if($Editor){$arguments=@((Join-Path $root 'CreatureFrontier.uproject'))+$arguments}
-        if($Dynamic){$arguments+=@('-CFHollowInspectDynamic',('-ExecCmds="t.MaxFPS '+$FrameCap+'"'))}
+        if($Dynamic){$arguments+=@('-CFHollowInspectDynamic','-CFHollowDetourTrace',('-ExecCmds="t.MaxFPS '+$FrameCap+'"'))}
         if($WaitForPartner){$arguments+='-CFHollowInspectWait'}
         $process=Start-Process -FilePath $exe -WorkingDirectory $root -WindowStyle Hidden -PassThru -ArgumentList $arguments
         if(!$process.WaitForExit(60000)){$process.Kill();$process.WaitForExit();throw '现场检查超时'}

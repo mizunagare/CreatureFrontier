@@ -30,7 +30,12 @@ bool ClearPath(const ACreatureCharacter* Self,const UNavigationPath* Path)
 {
     if(!Path || !Path->IsValid() || Path->IsPartial() || Path->PathPoints.Num()<2) return false;
     for(int32 Index=1;Index<Path->PathPoints.Num();++Index)
-        if(Blocker(Self,Path->PathPoints[Index-1],Path->PathPoints[Index])) return false;
+        if(const auto* Hit=Blocker(Self,Path->PathPoints[Index-1],Path->PathPoints[Index]))
+        {
+            if(FParse::Param(FCommandLine::Get(),TEXT("CFHollowDetourTrace")))
+                UE_LOG(LogTemp,Display,TEXT("CF_DETOUR_REJECT actor=%s segment=%d from=%s to=%s"),*GetNameSafe(Hit),Index,*Path->PathPoints[Index-1].ToString(),*Path->PathPoints[Index].ToString());
+            return false;
+        }
     return true;
 }
 }
@@ -45,17 +50,22 @@ bool ACreatureCharacter::FindFollowPathDetour(const FVector& Destination,const A
     if(!Nav || !IsValid(Blocker) || GetDistanceTo(Blocker)>350) return false;
     const float Radius=GetCapsuleComponent()->GetScaledCapsuleRadius()+Blocker->GetCapsuleComponent()->GetScaledCapsuleRadius()+80;
     float Best=MAX_flt;
+    const bool Trace=FParse::Param(FCommandLine::Get(),TEXT("CFHollowDetourTrace"));
     for(int32 Index=0;Index<16;++Index)
     {
         const float Angle=(Index%8)*PI/4;
         const float SearchRadius=Radius+(Index/8)*200;
         const FVector Candidate=Blocker->GetActorLocation()+FVector(FMath::Cos(Angle),FMath::Sin(Angle),0)*SearchRadius;
         FNavLocation Projected;
-        if(!Nav->ProjectPointToNavigation(Candidate,Projected,FVector(80,80,200))) continue;
+        if(!Nav->ProjectPointToNavigation(Candidate,Projected,FVector(80,80,200)))
+        {if(Trace)UE_LOG(LogTemp,Display,TEXT("CF_DETOUR_CANDIDATE index=%d reason=projection"),Index);continue;}
         auto* Approach=UNavigationSystemV1::FindPathToLocationSynchronously(GetWorld(),GetActorLocation(),Projected.Location,const_cast<ACreatureCharacter*>(this));
-        if(!FrontierFollowPath::ClearPath(this,Approach)) continue;
+        if(!FrontierFollowPath::ClearPath(this,Approach))
+        {if(Trace)UE_LOG(LogTemp,Display,TEXT("CF_DETOUR_CANDIDATE index=%d reason=approach projected=%s valid=%d partial=%d"),Index,*Projected.Location.ToString(),Approach && Approach->IsValid(),Approach && Approach->IsPartial());continue;}
         auto* Departure=UNavigationSystemV1::FindPathToLocationSynchronously(GetWorld(),Projected.Location,Destination,const_cast<ACreatureCharacter*>(this));
-        if(!FrontierFollowPath::ClearPath(this,Departure)) continue;
+        if(!FrontierFollowPath::ClearPath(this,Departure))
+        {if(Trace)UE_LOG(LogTemp,Display,TEXT("CF_DETOUR_CANDIDATE index=%d reason=departure projected=%s valid=%d partial=%d"),Index,*Projected.Location.ToString(),Departure && Departure->IsValid(),Departure && Departure->IsPartial());continue;}
+        if(Trace)UE_LOG(LogTemp,Display,TEXT("CF_DETOUR_CANDIDATE index=%d reason=accepted projected=%s"),Index,*Projected.Location.ToString());
         const float Cost=Approach->GetPathLength()+Departure->GetPathLength();
         if(Cost<Best) { Best=Cost; Out=Projected.Location; }
     }
