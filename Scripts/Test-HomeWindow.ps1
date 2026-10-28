@@ -1,4 +1,4 @@
-param([switch]$Editor,[string]$BuildRoot='',[string]$EngineRoot='D:\Epic\UE_5.8',[switch]$Preview,[string]$Resolution='1280x720',[switch]$Interactions)
+param([switch]$Editor,[string]$BuildRoot='',[string]$EngineRoot='D:\Epic\UE_5.8',[switch]$Preview,[string]$Resolution='1280x720',[switch]$Interactions,[switch]$Skills)
 $ErrorActionPreference='Stop'
 if(($Editor -and $BuildRoot) -or (!$Editor -and !$BuildRoot)){throw '请只指定Editor或BuildRoot之一'}
 if($Resolution -notmatch '^(960x540|1280x720|1920x1080)$'){throw '窗墙预览仅支持960x540、1280x720或1920x1080'}
@@ -31,6 +31,7 @@ try {
         @{Name='Input';Flag='CFWindowInputTest';Marker='CF_WINDOW_INPUT PASS phase=2 windows=2 materials=72'},
         @{Name='Navigation';Flag='CFWindowNavigationTest';Marker='CF_WINDOW_NAV PASS phase=2 closed=1 continuous=1 windowBlocked=1'},
         @{Name='Melee';Flag='CFWindowMeleeTest';Marker='CF_WINDOW_MELEE PASS sill=1 opening=2 upper=1 side=1'})}
+    if($Skills){$cases+=@{Name='Skill';Flag='CFWindowSkillTest';Marker='CF_WINDOW_SKILL PASS phase=3 charged=1';RequiredMarkers=@('CF_WINDOW_SKILL_BLOCKED PASS','CF_WINDOW_SKILL_SPLASH PASS')}}
     foreach($case in $cases){
         $log=Join-Path $run ($case.Name+'.log')
         $arguments=@('-game','-nullrhi','-nosound','-unattended','-nop4','-CFHomeTest',('-'+$case.Flag),('-abslog="'+$log+'"'))
@@ -43,6 +44,7 @@ try {
         if(!$process.WaitForExit(60000)){$process.Kill();$process.WaitForExit();throw '窗墙测试超时'}
         if($process.ExitCode -ne 0 -or !(Select-String -LiteralPath $log -SimpleMatch $case.Marker -Quiet) -or
            (Select-String -LiteralPath $log -Pattern '\bFAIL\b|Fatal error|Assertion failed' -Quiet)){throw "窗墙测试失败：$log"}
+        foreach($marker in $case.RequiredMarkers){if(!(Select-String -LiteralPath $log -SimpleMatch $marker -Quiet)){throw "缺少窗墙阶段标记：$marker"}}
         if((Get-FrontierBuildFingerprint -LiteralPath $module) -ne $hash){throw '窗墙测试期间程序指纹变化'}
         if($Preview -and $case.Name -eq 'Write'){
             if(!(Select-String -LiteralPath $log -SimpleMatch 'CF_WINDOW_PREVIEW PASS scenes=3' -Quiet)){throw '窗墙预览未完成'}
@@ -60,7 +62,7 @@ try {
         }
         $current=(Get-FileHash -LiteralPath (Join-Path $saveRoot 'WindowGood.sav')).Hash
         if($case.Name -eq 'Write'){$inputHash=$current}elseif($current -ne $inputHash){throw '窗墙读取改写了输入文件'}
-        $results += [pscustomobject]@{Case=$case.Name;Pass=$true;Preview=[bool]$Preview;Interactions=[bool]$Interactions;Resolution=$Resolution;BuildSHA256=$hash;InputSHA256=$inputHash;Log=$log}
+        $results += [pscustomobject]@{Case=$case.Name;Pass=$true;Preview=[bool]$Preview;Interactions=[bool]$Interactions;Skills=[bool]$Skills;Resolution=$Resolution;BuildSHA256=$hash;InputSHA256=$inputHash;Log=$log}
         $results | Export-Csv -LiteralPath (Join-Path $run 'Results.csv') -NoTypeInformation
         Write-Host "$($case.Name) 通过"
     }

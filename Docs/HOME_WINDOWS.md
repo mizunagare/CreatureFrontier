@@ -1,5 +1,13 @@
 # 开放窗墙
 
+## 含技能专项的独立Windows候选
+
+`E:\CreatureFrontierBuilds\Windows-Window-Combat` 已独立构建成功，内部EXE SHA-256 `F344CC5B39C6E000B834B87B671BE964BBEA4393A5B1DCAA1EE8588714321A1C`，格式32。旧包与玩家存档不覆盖。
+
+脚本新增独立可选 `-Skills`，要求遮挡、溅射与最终结算三个标记，不改变未选择技能时的六项组合。实际运行 `Scripts/Test-HomeWindow.ps1 -BuildRoot E:/CreatureFrontierBuilds/Windows-Window-Combat -Interactions -Skills`，`Saved/WindowPersistenceQA/20261029-055335-9c5591d4/` 一写两读、输入、导航、近战、技能共七项全部结束通过，固定同一EXE指纹。输入SHA-256保持 `95A35496EF4333C862B504F5A9B3F1978375EAFFDB963CA4F40CBA77F3D3B108`，原专用槽恢复；脚本语法通过。
+
+这补齐了新Windows技能专项的逻辑路径，不是新包图形、多帧率、自然战斗或完整回归。202738D9包的完整回归仍运行，应按启动时d4cba7a版本的测试定义审计，不把后来新增的技能案例或F344包七项结果混入其中。F344自身完整回归/图形/旧档扩展仍待，稳定入口不改，原恢复卡路问题保留。
+
 ## 伙伴焰系技能与逐目标溅射
 
 新增独立 `HomeWindowSkillScenario.cpp` 与 `CFWindowSkillTest`，避免继续把技能QA堆入玩家/房屋主体。没有修改生产技能、伤害或存档规则；Build.cs仅更新中文模块说明以刷新新增源文件构建。
