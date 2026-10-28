@@ -100,6 +100,8 @@ void ACFHUD::DrawWorldHUD(ACFPlayerCharacter* Player)
     }
     else if(auto* Node=Player->TraceResource()){Audit.Context=EFrontierHUDContext::Resource;Rows.Add({TEXT("资源"),Blue});Rows.Add({Node->GetStatus(),Yellow,4});}
     else if(Player->Storage->TraceCrate()){Audit.Context=EFrontierHUDContext::Storage;Rows.Add({TEXT("仓储"),Blue});Rows.Add({TEXT("E 打开（3米）| V 设为运输目标 | X 拆除前需清空"),Yellow,3});}
+    else if(auto* Door=AHomeModule::TraceDoor(Player))
+    {Audit.Context=EFrontierHUDContext::Door;Rows.Add({Door->DoorState==2?TEXT("木门 | 已开启"):TEXT("木门 | 已关闭"),Blue});Rows.Add({TEXT("E 开关（3米）| X 拆除 | 活动范围需无生物和障碍"),Yellow,3});}
     else if(auto* Site=Player->TraceFacility())
     {
         Audit.Context=Site->RequiredSpecialty==EWorkSpecialty::Farming?EFrontierHUDContext::Garden:Site->IsFoodStore()?EFrontierHUDContext::FoodStore:EFrontierHUDContext::Facility;

@@ -1,7 +1,7 @@
 #pragma once
 #include "CoreMinimal.h"
 
-enum class EFrontierHUDContext : uint8 { None, Companion, Wild, Resource, Garden, FoodStore, Storage, Facility, Building };
+enum class EFrontierHUDContext : uint8 { None, Companion, Wild, Resource, Garden, FoodStore, Storage, Facility, Building, Door };
 struct FFrontierHUDLayout
 {
     FVector2D Viewport;

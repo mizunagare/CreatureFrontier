@@ -15,7 +15,7 @@ namespace
 {
 FHomeModuleRecord Candidate(UHomeModuleDefinition* Definition,const FTransform& Transform,FGuid FloorId)
 {
-    FHomeModuleRecord Record; Record.Id=FGuid::NewGuid(); Record.Definition=Definition; Record.Transform=Transform; Record.FloorId=FloorId; Record.PaidMaterials=Definition?Definition->MaterialCost:0; if(Definition) Record.PaidExtraItems=Definition->ExtraCosts; return Record;
+    FHomeModuleRecord Record; Record.Id=FGuid::NewGuid(); Record.Definition=Definition; Record.Transform=Transform; Record.FloorId=FloorId; Record.PaidMaterials=Definition?Definition->MaterialCost:0; if(Definition) {Record.PaidExtraItems=Definition->ExtraCosts;Record.DoorState=Definition->Kind==EHomeModuleKind::Door?1:0;} return Record;
 }
 }
 void UHomeBuildingComponent::StartPreview()
@@ -30,7 +30,7 @@ void UHomeBuildingComponent::Cancel() { if(IsValid(Preview)) Preview->Destroy();
 void UHomeBuildingComponent::EndPlay(const EEndPlayReason::Type Reason) { Cancel(); Super::EndPlay(Reason); }
 void UHomeBuildingComponent::Cycle()
 {
-    Selected=static_cast<EHomeModuleKind>((static_cast<int32>(Selected)+1)%6); StartPreview();
+    Selected=static_cast<EHomeModuleKind>((static_cast<int32>(Selected)+1)%7); StartPreview();
 }
 void UHomeBuildingComponent::Rotate() { YawStep=1-YawStep; UpdatePreview(); }
 bool UHomeBuildingComponent::ValidatePlacement(const FTransform& Transform,FGuid FloorId,FString& Reason) const
@@ -49,7 +49,7 @@ bool UHomeBuildingComponent::ValidatePlacement(const FTransform& Transform,FGuid
     // 其他碰撞仍然生效，尤其是角色、设施及预设掩体。
     for(TActorIterator<AHomeModule> It(GetWorld());It;++It) Params.AddIgnoredActor(*It);
     const auto Objects=FCollisionObjectQueryParams(FCollisionObjectQueryParams::AllObjects);
-    for(const auto& Part:AHomeModule::Parts(Selected))
+    for(const auto& Part:AHomeModule::PlacementParts(Selected))
     {
         const FVector Position=Transform.GetLocation()+Transform.GetRotation().RotateVector(Part.Center);
         if(GetWorld()->OverlapAnyTestByObjectType(Position,Transform.GetRotation(),Objects,FCollisionShape::MakeBox(Part.Extent-FVector(1)),Params))
@@ -65,7 +65,7 @@ AHomeModule* UHomeBuildingComponent::BuildAt(const FTransform& Transform,FGuid F
     auto* Definition=UHomeModuleDefinition::LoadDefault(Selected);
     auto* Module=GetWorld()->SpawnActorDeferred<AHomeModule>(AHomeModule::StaticClass(),Transform,nullptr,nullptr,ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
     if(!Module) return nullptr;
-    Module->Definition=Definition; Module->PersistentId=FGuid::NewGuid(); Module->FloorId=FloorId; Module->PaidMaterials=Definition->MaterialCost; Module->FinishSpawning(Transform);
+    Module->Definition=Definition; Module->PersistentId=FGuid::NewGuid(); Module->FloorId=FloorId; Module->PaidMaterials=Definition->MaterialCost; Module->DoorState=Selected==EHomeModuleKind::Door?1:0; Module->FinishSpawning(Transform);
     Module->PaidExtraItems=Definition->ExtraCosts;
     auto Costs=Definition->ExtraCosts; Costs.Add(EFrontierItem::Material,Definition->MaterialCost);
     if(!Hero->Inventory->Transact(Costs,{})) { Module->Destroy(); return nullptr; }
@@ -107,7 +107,7 @@ void UHomeBuildingComponent::UpdatePreview()
         else SupportingFloor=HomeLayout::FindFloor(Hit.ImpactPoint,Layout);
         if(!SupportingFloor.IsValid()) { Status=TEXT("请瞄准可支撑的地板、墙或门框"); bValid=false; Preview->SetActorHiddenInGame(true); return; }
     }
-    const bool Wall=Selected==EHomeModuleKind::Wall || Selected==EHomeModuleKind::Doorway;
+    const bool Wall=Selected==EHomeModuleKind::Wall || Selected==EHomeModuleKind::Doorway || Selected==EHomeModuleKind::Door;
     FVector Position=Center;
     if(Wall)
     {

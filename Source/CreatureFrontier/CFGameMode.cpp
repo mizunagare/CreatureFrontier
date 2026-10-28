@@ -1,4 +1,5 @@
 #include "CFGameMode.h"
+#include "HomeDoorScenario.h"
 #include "HollowScenario.h"
 #include "BefriendingScenario.h"
 #include "ResourceNode.h"
@@ -69,6 +70,8 @@ void ACFGameMode::BeginPlay()
 {
     Super::BeginPlay();
     SeedFrontierResources(GetWorld());
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFDoorTest")) || FParse::Param(FCommandLine::Get(),TEXT("CFDoorOpenRead")) || FParse::Param(FCommandLine::Get(),TEXT("CFDoorClosedRead")))
+    {const int32 Mode=FParse::Param(FCommandLine::Get(),TEXT("CFDoorOpenRead"))?1:FParse::Param(FCommandLine::Get(),TEXT("CFDoorClosedRead"))?2:0;FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this,Mode](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunHomeDoorScenario(GetWorld(),Hero,Mode);},1.f,false);return;}
     if(FParse::Param(FCommandLine::Get(),TEXT("CFRescueRecallLifecycleTest")))
     {FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunRescueRecallLifecycle(GetWorld(),Hero);},1.f,false);return;}
     if(FParse::Param(FCommandLine::Get(),TEXT("CFRescueRecallTest")) || FParse::Param(FCommandLine::Get(),TEXT("CFRescueRecallRead")))

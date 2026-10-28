@@ -25,8 +25,14 @@ public:
     UPROPERTY(VisibleAnywhere,BlueprintReadOnly) TObjectPtr<class UInventoryComponent> StorageInventory;
     UPROPERTY() bool bPreview=false;
     UPROPERTY() bool bStaged=false;
+    // 0为非门模块，1为关闭，2为开启；保存原始字节以校验非法状态。
+    UPROPERTY() uint8 DoorState=0;
     EHomeModuleKind GetKind() const { return Definition?Definition->Kind:EHomeModuleKind::Floor; }
     static TArray<FHomePart> Parts(EHomeModuleKind Kind);
+    static TArray<FHomePart> PlacementParts(EHomeModuleKind Kind);
+    static FBox DoorReservation(const FTransform& Transform);
+    static AHomeModule* TraceDoor(class ACFPlayerCharacter* Hero);
+    bool ToggleDoor(class ACFPlayerCharacter* Hero);
     void SetPreviewTint(bool Valid);
     void ActivateInWorld();
 private:

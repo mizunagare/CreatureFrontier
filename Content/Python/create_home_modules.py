@@ -6,7 +6,8 @@ specs = [('DA_Floor', '木地板', unreal.HomeModuleKind.FLOOR, 8, (0.36, 0.23, 
          ('DA_Doorway', '开放门框', unreal.HomeModuleKind.DOORWAY, 8, (0.3, 0.19, 0.1)),
          ('DA_Roof', '平屋顶', unreal.HomeModuleKind.ROOF, 10, (0.16, 0.25, 0.28)),
          ('DA_Lantern', '水晶灯', unreal.HomeModuleKind.LANTERN, 4, (0.72, 0.42, 0.12)),
-         ('DA_Storage', '储物箱', unreal.HomeModuleKind.STORAGE, 6, (0.46, 0.28, 0.1))]
+         ('DA_Storage', '储物箱', unreal.HomeModuleKind.STORAGE, 6, (0.46, 0.28, 0.1)),
+         ('DA_Door', '木门', unreal.HomeModuleKind.DOOR, 12, (0.30, 0.19, 0.10))]
 for name, label, kind, cost, color in specs:
     path = '/Game/Home/' + name
     asset = unreal.load_asset(path)

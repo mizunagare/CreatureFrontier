@@ -42,7 +42,7 @@ void ACFHUD::DrawControlHelp(ACFPlayerCharacter* Player)
         TEXT("伙伴默认防御 | Q 主动集火 | G 技能"),
         TEXT("L 选择单个伙伴 | K 指挥全队"),
         TEXT("F 跟随/取消 | E 指派资源或附近设施（8米）"),
-        TEXT("E 打开箱子（3米）| 方向键/Enter/退格操作"),
+        TEXT("E 开关木门/打开箱子（3米）| 箱内方向键操作"),
         TEXT("瞄准箱子按 V 设运输目标 | 对空按 V 清除"),
         TEXT("G 播种/照料/收获（3米）| F2/F3 存取种子"),
         TEXT("F4 给自己的空闲伙伴命名（2.5米，输入时暂停）"),

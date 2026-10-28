@@ -8,7 +8,7 @@ assets = {
 }
 for key, name in [('Brush','再生灌木'),('Stone','石料矿床'),('Salvage','废料堆'),('Crystal','高地水晶矿'),('Fiber','河岸纤维'),('Ore','锈岭矿料'),('Scrap','废弃机械'),('HollowScrap','洞窟旧机件')]:
     assets['/Game/Resources/DA_' + key] = dict(display_name=name)
-for key, name in [('Floor','木地板'),('Wall','木墙'),('Doorway','开放门框'),('Roof','平屋顶'),('Lantern','水晶灯'),('Storage','储物箱')]:
+for key, name in [('Floor','木地板'),('Wall','木墙'),('Doorway','开放门框'),('Roof','平屋顶'),('Lantern','水晶灯'),('Storage','储物箱'),('Door','木门')]:
     assets['/Game/Home/DA_' + key] = dict(display_name=name)
 
 for path, fields in assets.items():

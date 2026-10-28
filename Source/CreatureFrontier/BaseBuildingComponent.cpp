@@ -13,6 +13,7 @@
 #include "EngineUtils.h"
 #include "HomeBuildingComponent.h"
 #include "HomeModule.h"
+#include "HomeLayout.h"
 
 UBaseBuildingComponent::UBaseBuildingComponent() { PrimaryComponentTick.bCanEverTick = true; }
 
@@ -98,6 +99,8 @@ bool UBaseBuildingComponent::ValidatePlacement(const FTransform& Transform, FStr
     if (Built >= 20) { Reason = TEXT("基地最多放置20个设施"); return false; }
     const int32 Cost = GetCost(Selected);
     if (Cost == 0 || Hero->Inventory->Count(EFrontierItem::Material) < Cost) { Reason = TEXT("材料不足"); return false; }
+    if(!HomeLayout::ClearsDoorReservations(FBox(FVector(-112,-62,-33),FVector(112,62,35)).TransformBy(Transform.ToMatrixWithScale()),HomeLayout::Collect(GetWorld())))
+    {Reason=TEXT("设施不能占用门扇活动空间");return false;}
     FCollisionQueryParams Params(SCENE_QUERY_STAT(BuildPlacement), false);
     if (IsValid(Preview)) Params.AddIgnoredActor(Preview);
     // 检查包括角色在内的完整实体体积，让支撑地面位于检测盒下方。

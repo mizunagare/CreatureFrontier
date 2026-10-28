@@ -12,6 +12,7 @@ struct FHomeModuleRecord
     UPROPERTY() int32 PaidMaterials=0;
     UPROPERTY() TMap<EFrontierItem,int32> PaidExtraItems;
     UPROPERTY() TMap<EFrontierItem,int32> StoredItems;
+    UPROPERTY() uint8 DoorState=0;
     UPROPERTY() TSoftObjectPtr<UHomeModuleDefinition> Definition;
     UPROPERTY() FTransform Transform;
 };
@@ -22,6 +23,7 @@ namespace HomeLayout
     bool Validate(const TArray<FHomeModuleRecord>& Records,FString& Reason);
     bool ValidateTerrain(UWorld* World,const FHomeModuleRecord& Record,FString& Reason);
     bool SupportsFacility(const FTransform& Facility,const TArray<FHomeModuleRecord>& Records);
+    bool ClearsDoorReservations(const FBox& Bounds,const TArray<FHomeModuleRecord>& Records);
     TArray<FHomeModuleRecord> Collect(UWorld* World);
     FGuid FindFloor(const FVector& Point,const TArray<FHomeModuleRecord>& Records);
 }

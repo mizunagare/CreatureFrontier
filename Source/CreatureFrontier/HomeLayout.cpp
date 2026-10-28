@@ -12,7 +12,7 @@
 namespace
 {
 bool Grid(double Value,double Step) { return FMath::IsNearlyEqual(Value,FMath::GridSnap(Value,Step),.01); }
-bool IsWall(EHomeModuleKind Kind) { return Kind==EHomeModuleKind::Wall || Kind==EHomeModuleKind::Doorway; }
+bool IsWall(EHomeModuleKind Kind) { return Kind==EHomeModuleKind::Wall || Kind==EHomeModuleKind::Doorway || Kind==EHomeModuleKind::Door; }
 bool At(const FHomeModuleRecord& Record,const FVector& Position,double Yaw)
 { return Record.Transform.GetLocation().Equals(Position,.01) && FMath::IsNearlyEqual(Record.Transform.Rotator().Yaw,Yaw,.01); }
 bool WallAt(const TArray<FHomeModuleRecord>& Records,const FVector& Position,double Yaw)
@@ -30,6 +30,7 @@ bool HomeLayout::IsCanonical(const FHomeModuleRecord& Record)
     const FVector Position=Record.Transform.GetLocation(); const auto Rotation=Record.Transform.Rotator();
     for(const auto& Cost:Record.PaidExtraItems) if(Cost.Key==EFrontierItem::Material || Cost.Key>=EFrontierItem::Count || Cost.Value<=0 || Cost.Value>999) return false;
     if(!UInventoryComponent::Validate(Record.StoredItems) || (Definition->Kind!=EHomeModuleKind::Storage && !Record.StoredItems.IsEmpty())) return false;
+    if(Definition->Kind==EHomeModuleKind::Door?(Record.DoorState!=1 && Record.DoorState!=2):Record.DoorState!=0)return false;
     if(FVector::Dist2D(Position,UBaseBuildingComponent::BaseOrigin())>1200 || !FMath::IsNearlyZero(Rotation.Pitch,.01) || !FMath::IsNearlyZero(Rotation.Roll,.01)) return false;
     if(IsWall(Definition->Kind))
         return FMath::IsNearlyEqual(Position.Z,-30.,.01) &&
@@ -80,6 +81,16 @@ bool HomeLayout::Validate(const TArray<FHomeModuleRecord>& Records,FString& Reas
             { Reason=TEXT("墙需吸附到支撑地板边缘"); return false; }
         }
     }
+    for(const auto& Door:Records)if(Door.Definition.Get()->Kind==EHomeModuleKind::Door)
+        for(const auto& Other:Records)if(Other.Id!=Door.Id)
+        {
+            const auto Reserved=AHomeModule::DoorReservation(Door.Transform);
+            if(Other.Definition.Get()->Kind==EHomeModuleKind::Door && Reserved.Intersect(AHomeModule::DoorReservation(Other.Transform)))
+            {Reason=TEXT("两扇门的活动空间重叠");return false;}
+            for(const auto& Part:AHomeModule::Parts(Other.Definition.Get()->Kind))
+                if(Reserved.Intersect(FBox(Part.Center-Part.Extent+FVector(1),Part.Center+Part.Extent-FVector(1)).TransformBy(Other.Transform.ToMatrixWithScale())))
+                {Reason=TEXT("门扇活动空间被其他房屋模块占用");return false;}
+        }
     Reason=TEXT("结构支撑有效"); return true;
 }
 FGuid HomeLayout::FindFloor(const FVector& Point,const TArray<FHomeModuleRecord>& Records)
@@ -105,6 +116,7 @@ TArray<FHomeModuleRecord> HomeLayout::Collect(UWorld* World)
         FHomeModuleRecord Record; Record.Id=It->PersistentId; Record.FloorId=It->FloorId;
         Record.Definition=It->Definition.Get(); Record.Transform=It->GetActorTransform(); Record.PaidMaterials=It->PaidMaterials; Record.PaidExtraItems=It->PaidExtraItems; Result.Add(Record);
         if(It->GetKind()==EHomeModuleKind::Storage) Result.Last().StoredItems=It->StorageInventory->GetStacks();
+        Result.Last().DoorState=It->DoorState;
     }
     return Result;
 }
@@ -119,7 +131,7 @@ bool HomeLayout::ValidateTerrain(UWorld* World,const FHomeModuleRecord& Record,F
         if(It->IsA<AHomeModule>() || (Station && Station->bPlayerBuilt) || It->IsA<AResourceNode>() || It->IsA<AWorldLoot>() || It->IsA<ACreatureCharacter>() || It->IsA<ACFPlayerCharacter>()) Params.AddIgnoredActor(*It);
     }
     const auto Objects=FCollisionObjectQueryParams(ECC_WorldStatic);
-    for(const auto& Part:AHomeModule::Parts(Record.Definition.Get()->Kind))
+    for(const auto& Part:AHomeModule::PlacementParts(Record.Definition.Get()->Kind))
         if(World->OverlapAnyTestByObjectType(Record.Transform.GetLocation()+Record.Transform.GetRotation().RotateVector(Part.Center),Record.Transform.GetRotation(),Objects,
             FCollisionShape::MakeBox(Part.Extent-FVector(1)),Params))
         { Reason=TEXT("模块与场景几何体相交"); return false; }
@@ -130,5 +142,11 @@ bool HomeLayout::ValidateTerrain(UWorld* World,const FHomeModuleRecord& Record,F
             if(!World->LineTraceSingleByChannel(Hit,Corner+FVector(0,0,15),Corner-FVector(0,0,30),ECC_Visibility,Params) || Hit.ImpactNormal.Z<.98 || !FMath::IsNearlyEqual(Hit.ImpactPoint.Z,-50.,2.))
             { Reason=TEXT("地板四角下方均需平坦地面"); return false; }
         }
+    return true;
+}
+bool HomeLayout::ClearsDoorReservations(const FBox& Bounds,const TArray<FHomeModuleRecord>& Records)
+{
+    for(const auto& Record:Records)if(Record.Definition.Get() && Record.Definition.Get()->Kind==EHomeModuleKind::Door &&
+        Bounds.Intersect(AHomeModule::DoorReservation(Record.Transform)))return false;
     return true;
 }

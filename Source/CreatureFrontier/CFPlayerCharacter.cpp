@@ -527,6 +527,7 @@ void ACFPlayerCharacter::CommandWork()
 {
     if (!HasAuthority() || Health <= 0 || UGameplayStatics::IsGamePaused(this) || Building->IsActive()) return;
     if(Storage->TryOpenAimed()) return;
+    if(auto* Door=AHomeModule::TraceDoor(this)){Door->ToggleDoor(this);return;}
     FHitResult Hit; FCollisionQueryParams Params(SCENE_QUERY_STAT(FieldOrder),false,this);
     const FVector Start=FirstPersonCamera->GetComponentLocation();
     GetWorld()->LineTraceSingleByChannel(Hit,Start,Start+FirstPersonCamera->GetForwardVector()*800,ECC_Visibility,Params);

@@ -23,6 +23,9 @@ $testLogRoot = Join-Path $projectRoot (Join-Path 'Saved\PackagedTests' $runName)
 New-Item -ItemType Directory -Path $testLogRoot -Force | Out-Null
 Write-Host "本次测试日志：$testLogRoot"
 $cases = @(
+    @{Flag='CFDoorTest'; Marker='CF_DOOR PASS'},
+    @{Flag='CFDoorOpenRead'; Marker='CF_DOOR_OPEN_READ PASS'},
+    @{Flag='CFDoorClosedRead'; Marker='CF_DOOR_CLOSED_READ PASS'},
     @{Flag='CFRescueMemoryTest'; Marker='CF_RESCUE_MEMORY PASS mode=0'; RequiredMarkers=@('CF_RESCUE_PAUSED_HEAL PASS')},
     @{Flag='CFRescueMemoryWrite'; Marker='CF_RESCUE_MEMORY PASS mode=1'},
     @{Flag='CFRescueMemoryRescueRead'; Marker='CF_RESCUE_MEMORY PASS mode=2'},
