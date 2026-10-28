@@ -288,8 +288,7 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
             if(WorkSite->RequiredSpecialty==EWorkSpecialty::Transport) { TickHauling(DeltaSeconds); return; }
             if(WorkSite->RequiredSpecialty!=EWorkSpecialty::Farming) { TickGathering(DeltaSeconds,OwnerPlayer); return; }
             if (ProgressSite.Get() != WorkSite.Get()) { WorkProgress = 0; ProgressSite = WorkSite; }
-            const FVector Offset = WorkSite->GetActorLocation() - GetActorLocation();
-            if (Offset.Size() > 220.0f) { NavigateTo(WorkSite->GetActorLocation(), 35.0f); WorkProgress = 0.0f; }
+            if (!CanReachFarm(WorkSite)) { ApproachFarm(WorkSite); WorkProgress = 0.0f; }
             else
             {
                 StopNavigation();

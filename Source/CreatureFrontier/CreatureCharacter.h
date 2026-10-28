@@ -203,6 +203,8 @@ private:
     UPROPERTY() TObjectPtr<class UStaticMesh> SphereShape;
     UPROPERTY() TObjectPtr<class UStaticMesh> CubeShape;
     void NavigateTo(const FVector& Destination, float Acceptance);
+    void ApproachFarm(AWorkStation* Site);
+    bool CanReachFarm(const AWorkStation* Site) const;
     void StopNavigation();
     bool CanHit(const AActor* Target) const;
     double NextNavigationUpdate = 0.0;
