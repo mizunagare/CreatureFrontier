@@ -23,6 +23,7 @@ AWildEncounter::AWildEncounter()
 void AWildEncounter::BeginPlay()
 {
     Super::BeginPlay();
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFPaceTest")))SetActorTickEnabled(false);
     for(const TCHAR* Flag:{TEXT("CFDefenseTest"),TEXT("CFDefenseWrite"),TEXT("CFDefenseRead")})
         if(FParse::Param(FCommandLine::Get(),Flag))SetActorTickEnabled(false);
     if(FParse::Param(FCommandLine::Get(),TEXT("CFWildSightTest")))SetActorTickEnabled(false);

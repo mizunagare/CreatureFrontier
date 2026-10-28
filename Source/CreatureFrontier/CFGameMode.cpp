@@ -66,6 +66,8 @@ void ACFGameMode::BeginPlay()
 {
     Super::BeginPlay();
     SeedFrontierResources(GetWorld());
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFPaceTest")))
+    {FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunPlayerPaceScenario(GetWorld(),Hero);},1.f,false);return;}
     const int32 AdventureMode=FParse::Param(FCommandLine::Get(),TEXT("CFHollowAdventureWrite"))?1:FParse::Param(FCommandLine::Get(),TEXT("CFHollowAdventureRead"))?2:0;
     if(AdventureMode || FParse::Param(FCommandLine::Get(),TEXT("CFHollowAdventureTest")))
     {FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this,AdventureMode](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunHollowAdventure(GetWorld(),Hero,AdventureMode);},1.f,false);return;}

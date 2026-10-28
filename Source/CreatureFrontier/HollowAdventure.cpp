@@ -23,6 +23,7 @@
 #include "Misc/Paths.h"
 #include "HAL/FileManager.h"
 #include "UnrealClient.h"
+#include "PlayerPaceComponent.h"
 
 namespace
 {
@@ -58,7 +59,7 @@ struct FAdventure
     bool Fail(const TCHAR* Reason)
     {UE_LOG(LogTemp,Error,TEXT("CF_HOLLOW_ADVENTURE FAIL %s index=%d return=%d hero=%s hp=%.1f pet=%s hp=%.1f enemy=%s hp=%.1f skill=%d incoming=%d"),Reason,Index,Returning,*Hero->GetActorLocation().ToString(),Hero->Health,*Pet->GetActorLocation().ToString(),Pet->Health,*Enemy->GetActorLocation().ToString(),Enemy->Health,Skill,Incoming);FPlatformMisc::RequestExitWithStatus(false,1);return false;}
     void Drive(const FVector& Goal)
-    {const auto Delta=Goal-Hero->GetActorLocation();Input->Direction=FVector(Delta.X,Delta.Y,0).GetSafeNormal()*.32f;Hero->SetActorRotation(Input->Direction.Rotation());Hero->GetController()->SetControlRotation(Input->Direction.Rotation());}
+    {const auto Delta=Goal-Hero->GetActorLocation();Input->Direction=FVector(Delta.X,Delta.Y,0).GetSafeNormal();Hero->SetActorRotation(Input->Direction.Rotation());Hero->GetController()->SetControlRotation(Input->Direction.Rotation());}
     bool Tick()
     {
         const FVector Now=Hero->GetActorLocation(),PetNow=Pet->GetActorLocation();
@@ -118,7 +119,8 @@ struct FAdventure
             if(FPlatformTime::Seconds()<FinishAfter)return true;
         }
         const FGuid Id=Pet->PersistentId;
-        bool Pass=Travel>7000 && PetSouth<-3600 && Hero->CraftRecipe(TEXT("ScrapResonator")) && AdventureSnapshot(World,Hero);
+        bool Pass=Hero->Pace->IsSlowWalking() && CFInputQA::Release(Hero,EKeys::LeftShift) && !Hero->Pace->IsSlowWalking();
+        Pass &= Travel>7000 && PetSouth<-3600 && Hero->CraftRecipe(TEXT("ScrapResonator")) && AdventureSnapshot(World,Hero);
         Pass &= Hero->SaveProgress(TEXT("HollowAdventureCross")) && Hero->LoadProgress(TEXT("HollowAdventureCross")) && AdventureSnapshot(World,Hero);
         auto* Restored=AdventurePet(World,Hero);Pass &= Restored && Restored->PersistentId==Id;
         UE_LOG(LogTemp,Display,TEXT("CF_HOLLOW_ADVENTURE%s %s travel=%.1f petSouth=%.1f harvested=%d skill=%d incoming=%d"),Mode==1?TEXT("_WRITE"):TEXT(""),Pass?TEXT("PASS"):TEXT("FAIL"),Travel,PetSouth,Harvested,Skill,Incoming);
@@ -140,6 +142,7 @@ void RunHollowAdventure(UWorld* World,ACFPlayerCharacter* Hero,int Mode)
     if(!Pet){FPlatformMisc::RequestExitWithStatus(false,1);return;}Pet->Definition=Stone;Pet->FinishSpawning(At);Pet->Tame(Hero->GetController());
     auto State=MakeShared<FAdventure>();State->World=World;State->Hero=Hero;State->Pet=Pet;State->Enemy=Enemy;State->Camp=Camp;State->Mode=Mode;
     State->Input=NewObject<UHomeMovementProbe>(Hero);State->Input->RegisterComponent();State->Points=MakeHollowRoutePoints();State->Previous=Hero->GetActorLocation();State->PreviousPet=Pet->GetActorLocation();State->Deadline=FPlatformTime::Seconds()+75;
+    if(!CFInputQA::Press(Hero,EKeys::LeftShift) || !Hero->Pace->IsSlowWalking()){FPlatformMisc::RequestExitWithStatus(false,1);return;}
     if(FParse::Param(FCommandLine::Get(),TEXT("CFHollowAdventurePreview")))
     {State->Shots=FPaths::ProjectSavedDir()/TEXT("HollowAdventurePreview")/FGuid::NewGuid().ToString(EGuidFormats::Digits);IFileManager::Get().MakeDirectory(*State->Shots,true);UE_LOG(LogTemp,Display,TEXT("CF_HOLLOW_ADVENTURE_ROOT %s"),*State->Shots);}
     UE_LOG(LogTemp,Display,TEXT("CF_HOLLOW_ADVENTURE_START resident=%s hp=%.1f petHP=%.1f"),*Enemy->GetActorLocation().ToString(),Enemy->Health,Pet->Health);

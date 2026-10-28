@@ -23,6 +23,7 @@ class CREATUREFRONTIER_API ACFPlayerCharacter : public ACharacter
 
 public:
     ACFPlayerCharacter();
+    UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Category="Movement") TObjectPtr<class UPlayerPaceComponent> Pace;
     virtual void BeginPlay() override;
     virtual float TakeDamage(float Amount, const FDamageEvent& Event, AController* EventInstigator, AActor* Causer) override;
     UPROPERTY(BlueprintReadOnly, Category="Player")

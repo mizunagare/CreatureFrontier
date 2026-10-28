@@ -30,6 +30,7 @@
 #include "CompanionMemoryComponent.h"
 #include "HomeModule.h"
 #include "ResearchComponent.h"
+#include "PlayerPaceComponent.h"
 
 void ACFPlayerCharacter::CraftSpear() { Equipment->CraftSpear(); }
 void ACFPlayerCharacter::InteractGarden() {if(auto* Site=TraceFacility()) Site->Crop->Interact(this,0);}
@@ -397,7 +398,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
             (Pet->GetFieldResource() || (IsValid(Pet->WorkSite) && Pet->WorkSite->RequiredSpecialty != EWorkSpecialty::Feeding));
         Pet->Cargo->RestoreSnapshot(Record,HomeRestore.Find(Record.DeliveryCrateId));
     }
-    UCompanionMemoryComponent::CloseAll(GetWorld());Naming->Close(); CancelMeleeAttack(); Building->Cancel();
+    UCompanionMemoryComponent::CloseAll(GetWorld());Naming->Close(); Pace->StopSlowWalk(); CancelMeleeAttack(); Building->Cancel();
     ResourceRestore.Commit();
     HomeRestore.Commit();
     for (auto* Site : OldBuilt) Site->Destroy();
@@ -449,6 +450,7 @@ float ACFPlayerCharacter::TakeDamage(float Amount, const FDamageEvent& Event, AC
     Feedback = Health <= 0.0f ? TEXT("已倒下，R 回基地复活并保留世界 | F9 读档") : TEXT("受到伤害！");
     if (Health <= 0.0f)
     {
+        Pace->StopSlowWalk();
         UCompanionMemoryComponent::CloseAll(GetWorld());
         Naming->Close();
         Storage->Close();
@@ -578,6 +580,7 @@ void ACFPlayerCharacter::HealCompanion()
 
 ACFPlayerCharacter::ACFPlayerCharacter()
 {
+    Pace=CreateDefaultSubobject<UPlayerPaceComponent>(TEXT("Pace"));
     Naming=CreateDefaultSubobject<UCompanionNamingComponent>(TEXT("Naming"));
     FirstPersonCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FirstPersonCamera"));
     FirstPersonCamera->SetupAttachment(GetCapsuleComponent());
@@ -596,6 +599,8 @@ ACFPlayerCharacter::ACFPlayerCharacter()
 void ACFPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
     Super::SetupPlayerInputComponent(PlayerInputComponent);
+    PlayerInputComponent->BindKey(EKeys::LeftShift,IE_Pressed,Pace.Get(),&UPlayerPaceComponent::StartSlowWalk);
+    PlayerInputComponent->BindKey(EKeys::LeftShift,IE_Released,Pace.Get(),&UPlayerPaceComponent::StopSlowWalk).bExecuteWhenPaused=true;
     PlayerInputComponent->BindAxis(TEXT("MoveForward"), this, &ACFPlayerCharacter::MoveForward);
     PlayerInputComponent->BindAxis(TEXT("MoveRight"), this, &ACFPlayerCharacter::MoveRight);
     PlayerInputComponent->BindAxis(TEXT("Turn"), this, &APawn::AddControllerYawInput);

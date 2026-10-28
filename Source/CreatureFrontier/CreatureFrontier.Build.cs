@@ -9,7 +9,7 @@ public class CreatureFrontier : ModuleRules
         {
             "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput", "GameplayTags", "AIModule", "NavigationSystem"
         });
-        PrivateDependencyModuleNames.AddRange(new[] { "Slate", "SlateCore" });
+        PrivateDependencyModuleNames.AddRange(new[] { "Slate", "SlateCore", "ApplicationCore" });
         if (Target.bBuildEditor) PrivateDependencyModuleNames.Add("UnrealEd");
     }
 }

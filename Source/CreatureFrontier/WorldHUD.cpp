@@ -8,6 +8,7 @@
 #include "CompanionCargoComponent.h"
 #include "CreatureAffinity.h"
 #include "PlayerEquipmentComponent.h"
+#include "PlayerPaceComponent.h"
 #include "CaptureComponent.h"
 #include "InventoryComponent.h"
 #include "BaseBuildingComponent.h"
@@ -29,7 +30,7 @@ void ACFHUD::DrawWorldHUD(ACFPlayerCharacter* Player)
         {FString::Printf(TEXT("生命 %.0f/100 | 材料 %d"),Player->Health,Player->Inventory->Count(EFrontierItem::Material))},
         {FString::Printf(TEXT("捕捉器 %d | 药品 %d | 食物 %d"),Player->Inventory->Count(EFrontierItem::CaptureDevice),Player->Inventory->Count(EFrontierItem::Medicine),Player->Inventory->Count(EFrontierItem::Food))},
         {FString::Printf(TEXT("伙伴 %d | 工作中 %d"),Companions,Working),Green},
-        {Player->GetCommandScopeText(),Green,2},
+        {(Player->Pace->IsSlowWalking()?FString(TEXT("慢行 | ")):FString())+Player->GetCommandScopeText(),Green,2},
         {FString::Printf(TEXT("%s | 攻击 %.0f | 距离 %.1f米 | 护甲 %.0f%%"),Player->Equipment->GetState().bSpearEquipped?TEXT("长矛"):TEXT("徒手"),Player->GetPlayerAttackDamage(),Player->GetPlayerMeleeRange()/100,Player->Equipment->GetDamageReduction()*100)},
         {FString::Printf(TEXT("右键 %s | 共鸣器 %d | 0 切换"),Player->CaptureComponent->UsesResonance()?TEXT("共鸣捕捉"):TEXT("普通捕捉"),Player->Inventory->Count(EFrontierItem::ResonanceDevice)),Yellow},
         {TEXT("F1 帮助 | C 背包 | Tab 队伍 | I 图鉴 | Esc 暂停")}});
