@@ -26,7 +26,7 @@ try {
     foreach($cap in $FrameCaps){foreach($attempt in 1..$Repeats){
         $label="FPS-$cap-Run-$attempt";$log=Join-Path $run ($label+'.log')
         $arguments=@('-game','-nullrhi','-nosound','-unattended','-nop4','-CFHollowRecoveryTest',('-ExecCmds="t.MaxFPS '+$cap+'"'),('-abslog="'+$log+'"'))
-        if($TraceRoaming){$arguments+=@('-CFRoamTrace','-CFHollowFailureSnapshot')}
+        if($TraceRoaming){$arguments+=@('-CFRoamTrace','-CFHollowFailureSnapshot','-CFHollowRouteTrace')}
         if($Editor){$arguments=@((Join-Path $projectRoot 'CreatureFrontier.uproject'))+$arguments}
         $process=Start-Process -FilePath $exe -WorkingDirectory $root -WindowStyle Hidden -PassThru -ArgumentList $arguments
         $done=$process.WaitForExit(210000)
@@ -43,6 +43,7 @@ try {
             if(Select-String -LiteralPath $log -Pattern '\bFAIL\b|Fatal error|Assertion failed' -Quiet){$pass=$false}
         }
         if((Get-FrontierBuildFingerprint -LiteralPath $module) -ne $hash){throw '恢复矩阵期间程序指纹变化'}
+        if($TraceRoaming -and $pass -and !(Select-String -LiteralPath $log -SimpleMatch 'CF_HOLLOW_ROUTE_SAMPLE' -Quiet)){throw '缺少原路线连续诊断标记'}
         $results += [pscustomobject]@{Case=$label;FrameCap=$cap;Attempt=$attempt;TraceRoaming=[bool]$TraceRoaming;Pass=$pass;BuildSHA256=$hash;Log=$log}
         $results | Export-Csv -LiteralPath (Join-Path $run 'Results.csv') -NoTypeInformation
         Write-Host "$label 通过：$pass"

@@ -34,6 +34,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "NavigationSystem.h"
 #include "NavigationPath.h"
+#include "AIController.h"
 
 namespace
 {
@@ -91,6 +92,7 @@ struct FAdventure
     bool WriteDownedCheckpoint=false,ResumedCheckpoint=false;
     float ObservedHeroHP=-1,ObservedPetHP=-1,ObservedEnemyHP=-1;
     double NextRouteLog=0;
+    double NextRouteSample=0;
     FVector RouteProgressAnchor=FVector::ZeroVector;
     double RouteProgressAt=0;
     bool SameRecoveryBag() const
@@ -126,6 +128,16 @@ struct FAdventure
     bool Tick()
     {
         const FVector Now=Hero->GetActorLocation(),PetNow=Pet->GetActorLocation();
+        // 固定频率记录原路线输入与真实路径段，覆盖未触发局部停滞阈值的振荡。
+        if(Mode==3 && RecoveryStage==0 && FParse::Param(FCommandLine::Get(),TEXT("CFHollowRouteTrace")) && FPlatformTime::Seconds()>=NextRouteSample)
+        {
+            NextRouteSample=FPlatformTime::Seconds()+.5;
+            const auto* AI=Cast<AAIController>(Pet->GetController());
+            UE_LOG(LogTemp,Display,TEXT("CF_HOLLOW_ROUTE_SAMPLE time=%.3f index=%d battle=%d hero=%s input=%s velocity=%s pet=%s petVelocity=%s petActivity=%d focusId=%s focus=%s moveStatus=%d segment=%s enemy=%s enemyHP=%.1f heroHP=%.1f petHP=%.1f aimed=%s"),
+                World->GetTimeSeconds(),Index,Battle,*Now.ToString(),*Input->Direction.ToString(),*Hero->GetVelocity().ToString(),*PetNow.ToString(),*Pet->GetVelocity().ToString(),
+                static_cast<int32>(Pet->Activity),Pet->FocusTarget?*Pet->FocusTarget->PersistentId.ToString():TEXT("none"),*GetNameSafe(Pet->FocusTarget),
+                AI?static_cast<int32>(AI->GetMoveStatus()):-1,AI?*AI->GetImmediateMoveDestination().ToString():TEXT("none"),*Enemy->GetActorLocation().ToString(),Enemy->Health,Hero->Health,Pet->Health,*GetNameSafe(Hero->TraceCreature()));
+        }
         // 只记录QA自然交战时序，不更改目标、生命、输入或恢复判据。
         if(Mode==3 && RecoveryStage==0 && (Hero->Health!=ObservedHeroHP || Pet->Health!=ObservedPetHP || Enemy->Health!=ObservedEnemyHP))
         {
