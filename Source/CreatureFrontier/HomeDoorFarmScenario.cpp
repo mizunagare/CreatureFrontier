@@ -68,7 +68,8 @@ void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
         {
             if(Elapsed<8)return;
             End(Farm->StoredFood==0 && Farm->Crop->Seeds==1 && !Farm->Crop->bPlanted && Farm->Crop->GrowthWork==0 &&
-                !Pet->WorkSite && Pet->Activity==ECreatureActivity::Follow);return;
+                !Pet->WorkSite && Pet->Activity==ECreatureActivity::Follow && Travel>300 && Pet->GetActorLocation().Y>-1000 &&
+                FVector::Dist2D(Pet->GetActorLocation(),Pet->GetFollowDestination())<65);return;
         }
         if(Phase==0 && Elapsed>=2)
         {
@@ -107,6 +108,17 @@ void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
             const auto Rotation=(FVector(-555,-1000,120)-Hero->FirstPersonCamera->GetComponentLocation()).Rotation();
             Hero->GetController()->SetControlRotation(Rotation);Hero->FirstPersonCamera->SetWorldRotation(Rotation);
             if(!Door->ToggleDoor(Hero) || Door->DoorState!=2){End(false);return;}
+            if(Mode==3)
+            {
+                UE_LOG(LogTemp,Display,TEXT("CF_DOOR_FARM_CANCEL_AIM goal=%s"),*Pet->GetFollowDestination().ToString());
+                // 跟随队位位于玩家身后；开门取景方向不应被误当成室内归队夹具。
+                if(!FParse::Param(FCommandLine::Get(),TEXT("CFDoorFarmCancelOriginalAim")))
+                {
+                    Hero->SetActorLocation(FVector(-440,-940,60));
+                    Hero->GetController()->SetControlRotation(FRotator(0,-160,0));Hero->FirstPersonCamera->SetWorldRotation(FRotator(0,-160,0));
+                }
+                UE_LOG(LogTemp,Display,TEXT("CF_DOOR_FARM_CANCEL_FOLLOW goal=%s"),*Pet->GetFollowDestination().ToString());
+            }
             FNavLocation Goal;auto* Nav=FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
             const bool Projected=Nav && Nav->ProjectPointToNavigation(Farm->GetActorLocation(),Goal,FVector(250,250,300));
             auto* Path=Projected?UNavigationSystemV1::FindPathToLocationSynchronously(World,Pet->GetActorLocation(),Goal.Location,Pet):nullptr;

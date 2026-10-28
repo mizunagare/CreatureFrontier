@@ -1,4 +1,4 @@
-param([string]$EngineRoot='D:\Epic\UE_5.8',[string]$BuildRoot='',[switch]$NoRoof,[ValidateSet('Test','Write','Read','Cancel','Dismantle')][string]$Mode='Test')
+param([string]$EngineRoot='D:\Epic\UE_5.8',[string]$BuildRoot='',[switch]$NoRoof,[ValidateSet('Test','Write','Read','Cancel','Dismantle')][string]$Mode='Test',[switch]$OriginalAim)
 $ErrorActionPreference='Stop'
 . (Join-Path $PSScriptRoot 'BuildFingerprint.ps1')
 $projectRoot=Split-Path $PSScriptRoot -Parent
@@ -10,6 +10,7 @@ New-Item -ItemType Directory -Path $run | Out-Null
 $log=Join-Path $run 'CFDoorFarmTest.log'
 Write-Host "门与农圃工作专项：$run"
 if($NoRoof -and $Mode -ne 'Test'){throw '跨进程链固定使用有顶房间'}
+if($OriginalAim -and $Mode -ne 'Cancel'){throw '原取景复放只用于取消后跟随样本'}
 $flag='CFDoorFarm'+$Mode
 if($Mode -in @('Cancel','Dismantle')){$flag+='Test'}
 $modeNumber=if($Mode -eq 'Write'){1}elseif($Mode -eq 'Read'){2}elseif($Mode -eq 'Cancel'){3}elseif($Mode -eq 'Dismantle'){4}else{0}
@@ -17,6 +18,7 @@ $arguments=@((Join-Path $projectRoot 'CreatureFrontier.uproject'),'-game',('-'+$
 $exe=Join-Path $EngineRoot 'Engine\Binaries\Win64\UnrealEditor-Cmd.exe'
 if($BuildRoot){$exe=$module;$arguments=$arguments[1..($arguments.Count-1)]}
 if($NoRoof){$arguments+='-CFDoorFarmNoRoof'}
+if($OriginalAim){$arguments+='-CFDoorFarmCancelOriginalAim'}
 $process=Start-Process -FilePath $exe -ArgumentList $arguments -WindowStyle Hidden -PassThru
 if(!$process.WaitForExit(60000)){$process.Kill();$process.WaitForExit();throw '门与农圃专项超时'}
 if(!(Test-Path -LiteralPath $log)){throw '专项未生成日志'}
