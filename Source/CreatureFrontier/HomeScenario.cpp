@@ -123,6 +123,44 @@ void RunHomeWindowInputScenario(UWorld* World,ACFPlayerCharacter* Hero)
 
 void RunHomeWindowScenario(UWorld* World,ACFPlayerCharacter* Hero)
 {
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFHomeReplaceTest")))
+    {
+        Hero->GetCharacterMovement()->DisableMovement();Hero->SetActorLocation(FVector(-400,-1250,60));
+        Hero->Inventory->Restore({{EFrontierItem::Material,200}});
+        auto Build=[Hero](EHomeModuleKind Kind,FVector At,FGuid Floor=FGuid())
+        {Hero->HomeBuilding->Selected=Kind;return Hero->HomeBuilding->BuildAt(FTransform(At),Floor);};
+        auto* Floor=Build(EHomeModuleKind::Floor,FVector(-400,-800,-40));
+        auto* Wall=Floor?Build(EHomeModuleKind::Wall,FVector(-400,-1000,-30),Floor->PersistentId):nullptr;
+        auto* Opposite=Wall?Build(EHomeModuleKind::Wall,FVector(-400,-600,-30),Floor->PersistentId):nullptr;
+        auto* Roof=Opposite?Build(EHomeModuleKind::Roof,FVector(-400,-800,280),Floor->PersistentId):nullptr;
+        bool Pass=Roof && !Hero->HomeBuilding->Dismantle(Wall);
+        if(Pass)
+        {
+            const FGuid Id=Wall->PersistentId;const auto Transform=Wall->GetActorTransform();
+            const int32 Before=Hero->Inventory->Count(EFrontierItem::Material),Refund=Wall->PaidMaterials/2;
+            Hero->HomeBuilding->Selected=EHomeModuleKind::Window;
+            auto* Window=Hero->HomeBuilding->ReplaceWall(Wall);
+            Pass=Window && IsValid(Roof) && Window->PersistentId==Id && Window->FloorId==Floor->PersistentId && Window->GetActorTransform().Equals(Transform) &&
+                Window->PaidMaterials==10 && Hero->Inventory->Count(EFrontierItem::Material)==Before-10+Refund;
+            if(Window)
+            {
+                const int32 After=Hero->Inventory->Count(EFrontierItem::Material);
+                Pass &= !Hero->HomeBuilding->ReplaceWall(Window) && Hero->Inventory->Count(EFrontierItem::Material)==After;
+                Hero->HomeBuilding->Selected=EHomeModuleKind::Wall;Hero->Inventory->Restore({{EFrontierItem::Material,0}});
+                Pass &= !Hero->HomeBuilding->ReplaceWall(Window) && IsValid(Window) && Window->GetKind()==EHomeModuleKind::Window && Hero->Inventory->Count(EFrontierItem::Material)==0;
+                Hero->Inventory->Restore({{EFrontierItem::Material,After}});
+                Hero->SetActorLocation(FVector(-400,-1000,140));
+                Pass &= !Hero->HomeBuilding->ReplaceWall(Window) && IsValid(Window) && Hero->Inventory->Count(EFrontierItem::Material)==After;
+                Hero->SetActorLocation(FVector(-400,-1250,60));
+                auto* Restored=Hero->HomeBuilding->ReplaceWall(Window);
+                const int32 Cost=UHomeModuleDefinition::LoadDefault(EHomeModuleKind::Wall)->MaterialCost;
+                Pass &= Restored && Restored->PersistentId==Id && Restored->PaidMaterials==Cost && Hero->Inventory->Count(EFrontierItem::Material)==After-Cost+5 && IsValid(Roof);
+                FString Reason;Pass &= HomeLayout::Validate(HomeLayout::Collect(World),Reason);
+            }
+        }
+        UE_LOG(LogTemp,Display,TEXT("CF_HOME_REPLACE %s support=%d"),Pass?TEXT("PASS"):TEXT("FAIL"),IsValid(Roof));
+        FPlatformMisc::RequestExitWithStatus(false,Pass?0:1);return;
+    }
     if(FParse::Param(FCommandLine::Get(),TEXT("CFWindowMeleeTest"))){RunHomeWindowMeleeScenario(World,Hero);return;}
     if(FParse::Param(FCommandLine::Get(),TEXT("CFWindowInputTest"))){RunHomeWindowInputScenario(World,Hero);return;}
     if(FParse::Param(FCommandLine::Get(),TEXT("CFWindowRead")))

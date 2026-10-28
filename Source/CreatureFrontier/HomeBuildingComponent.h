@@ -19,6 +19,7 @@ public:
     FString GetHint() const;
     AHomeModule* BuildAt(const FTransform& Transform,FGuid FloorId=FGuid());
     bool Dismantle(AHomeModule* Module);
+    AHomeModule* ReplaceWall(AHomeModule* Module);
     bool ValidatePlacement(const FTransform& Transform,FGuid FloorId,FString& Reason) const;
     EHomeModuleKind Selected=EHomeModuleKind::Floor;
     AHomeModule* GetPreview() const { return Preview; }

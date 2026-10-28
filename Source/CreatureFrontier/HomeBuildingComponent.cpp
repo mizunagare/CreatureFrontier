@@ -88,6 +88,57 @@ bool UHomeBuildingComponent::Dismantle(AHomeModule* Module)
     if(Module->PaidMaterials<2 || Module->PaidMaterials>100 || !Hero->Inventory->GrantItems(Refunds)) { Hero->Feedback=TEXT("请为全部拆除返还物腾出背包空间"); return false; }
     Module->Destroy(); Hero->Feedback=TEXT("已拆除房屋模块，返还一半材料"); return true;
 }
+AHomeModule* UHomeBuildingComponent::ReplaceWall(AHomeModule* Module)
+{
+    auto* Hero=Cast<ACFPlayerCharacter>(GetOwner());
+    auto Reject=[Hero](const FString& Reason)->AHomeModule*{if(Hero)Hero->Feedback=Reason;return nullptr;};
+    const auto IsWall=[](EHomeModuleKind Kind){return Kind==EHomeModuleKind::Wall || Kind==EHomeModuleKind::Window || Kind==EHomeModuleKind::Doorway || Kind==EHomeModuleKind::Door;};
+    if(!IsInGameThread() || !Hero || !Hero->HasAuthority() || Hero->Health<=0 || UGameplayStatics::IsGamePaused(this) ||
+       !IsValid(Module) || Module->GetWorld()!=GetWorld() || Module->IsActorBeingDestroyed() || Module->bPreview || Module->bStaged ||
+       !Module->Definition || !IsWall(Module->GetKind()) || !IsWall(Selected) || Hero->GetDistanceTo(Module)>600)
+        return Reject(TEXT("请在存活且未暂停时，选择6米内的墙类模块进行替换"));
+    if(Module->GetKind()==Selected)return Reject(TEXT("同类模块无需替换"));
+    auto* Definition=UHomeModuleDefinition::LoadDefault(Selected);
+    if(!Definition || !Definition->IsValidDefinition() || !Hero->Research->Has(Definition->RequiredResearch))
+        return Reject(TEXT("替换定义缺失或尚未解锁"));
+    auto Layout=HomeLayout::Collect(GetWorld());
+    auto* Old=Layout.FindByPredicate([Module](const FHomeModuleRecord& Record){return Record.Id==Module->PersistentId;});
+    if(!Old || !HomeLayout::IsCanonical(*Old))return Reject(TEXT("原模块记录无效，未进行替换"));
+    const auto RefundRecord=*Old;
+    auto Proposed=Candidate(Definition,Module->GetActorTransform(),Module->FloorId);
+    Proposed.Id=Module->PersistentId;
+    *Old=Proposed;
+    FString Reason;
+    if(!HomeLayout::Validate(Layout,Reason) || !HomeLayout::ValidateTerrain(GetWorld(),Proposed,Reason))return Reject(Reason);
+    FCollisionQueryParams Params(SCENE_QUERY_STAT(HomeReplace),false);
+    for(TActorIterator<AHomeModule> It(GetWorld());It;++It)Params.AddIgnoredActor(*It);
+    const auto Transform=Module->GetActorTransform();
+    const auto Objects=FCollisionObjectQueryParams(FCollisionObjectQueryParams::AllObjects);
+    for(const auto& Part:AHomeModule::PlacementParts(Selected))
+        if(GetWorld()->OverlapAnyTestByObjectType(Transform.TransformPosition(Part.Center),Transform.GetRotation(),Objects,FCollisionShape::MakeBox(Part.Extent-FVector(1)),Params))
+            return Reject(TEXT("替换后实体空间被地形、设施或生物占用"));
+    if(Selected==EHomeModuleKind::Door || Module->GetKind()==EHomeModuleKind::Door)
+    {
+        const auto Reserved=AHomeModule::DoorReservation(Transform);
+        if(GetWorld()->OverlapAnyTestByObjectType(Reserved.GetCenter(),FQuat::Identity,Objects,FCollisionShape::MakeBox(Reserved.GetExtent()),Params))
+            return Reject(TEXT("门的活动范围被占用，不能替换"));
+    }
+    auto Costs=Definition->ExtraCosts;Costs.Add(EFrontierItem::Material,Definition->MaterialCost);
+    TMap<EFrontierItem,int32> Refunds={{EFrontierItem::Material,RefundRecord.PaidMaterials/2}};
+    for(const auto& Cost:RefundRecord.PaidExtraItems)if(Cost.Value>=2)Refunds.Add(Cost.Key,Cost.Value/2);
+    // 先构造无碰撞暂存实体；背包事务失败时，旧实体及其持久身份完全保留。
+    auto* Replacement=GetWorld()->SpawnActorDeferred<AHomeModule>(AHomeModule::StaticClass(),Transform,nullptr,nullptr,ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+    if(!Replacement)return Reject(TEXT("无法创建替换模块"));
+    Replacement->bStaged=true;Replacement->Definition=Definition;Replacement->PersistentId=Proposed.Id;
+    Replacement->FloorId=Proposed.FloorId;Replacement->PaidMaterials=Proposed.PaidMaterials;
+    Replacement->PaidExtraItems=Proposed.PaidExtraItems;Replacement->DoorState=Proposed.DoorState;Replacement->FinishSpawning(Transform);
+    const auto Before=Hero->Inventory->GetStacks();
+    if(!Hero->Inventory->Transact(Costs,Refunds)){Replacement->Destroy();return Reject(TEXT("替换需要足额材料及返还物资的背包空间"));}
+    if(!Module->Destroy()){Hero->Inventory->Restore(Before);Replacement->Destroy();return Reject(TEXT("旧模块不能移除，替换已取消"));}
+    Replacement->ActivateInWorld();
+    Hero->Feedback=TEXT("墙体已原位替换，保留支撑并返还旧模块一半材料");
+    return Replacement;
+}
 void UHomeBuildingComponent::UpdatePreview()
 {
     auto* Hero=Cast<ACFPlayerCharacter>(GetOwner()); if(!Hero || !Preview) return;
