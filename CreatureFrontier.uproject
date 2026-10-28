@@ -2,7 +2,7 @@
   "FileVersion": 3,
   "EngineAssociation": "5.8",
   "Category": "Games",
-  "Description": "First-person creature-catching RPG prototype.",
+  "Description": "第一人称生物捕捉与伙伴生活角色扮演游戏原型。",
   "Modules": [
     {
       "Name": "CreatureFrontier",

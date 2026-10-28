@@ -47,8 +47,8 @@ foreach ($case in $cases) {
                 (Select-String -LiteralPath $logPath -SimpleMatch 'CF_WORLD_ROAM pass=0 travel=0.00 path=0.00 legs=0 continuous=1 within=1' -Quiet)
         } else { $marker = Select-String -LiteralPath $logPath -SimpleMatch 'CF_WORLD PASS' -Quiet }
     }
-    # UE can return zero even after RequestExitWithStatus(false,1). The exact
-    # rejection and unchanged OTHER world assertions are the negative oracle.
+    # UE 调用 RequestExitWithStatus(false,1) 后仍可能返回零。
+    # 负向测试以明确拒绝标记及 OTHER 世界未改变的断言为准。
     $validExit=if($case.Frozen){$exitCode -in @(0,1)}else{$exitCode -eq 0}
     $pass = !$timeout -and $validExit -and $seedConfirmed -and $capConfirmed -and $fixture -and $marker
     $expected=if($case.Frozen){'RejectFrozen'}else{'AcceptRoaming'}

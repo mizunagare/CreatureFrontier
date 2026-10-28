@@ -113,7 +113,7 @@ bool Faults(UWorld* World,ACFPlayerCharacter* Hero)
     if(!Check(TEXT("downed_recover"))) return false;
     Pass &= Hero->LoadProgress(Slot) && Mid(World,Hero);
     auto* Crate=Box(World); Hero->SetActorLocation(FVector(-650,-1000,40)); Hero->Inventory->Consume(EFrontierItem::Material,3);
-    Pass &= Crate && Hero->HomeBuilding->Dismantle(Crate); // A valid empty-box removal, with real refund capacity.
+    Pass &= Crate && Hero->HomeBuilding->Dismantle(Crate); // 合法拆除空箱，且实际具备接收返还物资的容量。
     Pass &= Hero->SaveProgress(TEXT("CargoOrphan")) && Hero->LoadProgress(TEXT("CargoOrphan")); Pet=Worker(World,Hero);
     Pass &= !Box(World) && Pet && Pet->Cargo->Count()==3 && !Pet->Cargo->HasOrder() && !Pet->GetFieldResource() && Pet->Activity==ECreatureActivity::Follow && Hero->Inventory->Count(EFrontierItem::Material)==999;
     if(!Check(TEXT("crate_removed"))) return false;

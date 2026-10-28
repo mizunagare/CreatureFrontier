@@ -6,7 +6,7 @@
 class ACreatureCharacter;
 class UCreatureDefinition;
 
-// A persistent population slot, not a timer that blindly creates more actors.
+// 持久化的种群槽位，而非不检查数量就不断生成角色的定时器。
 UCLASS()
 class CREATUREFRONTIER_API AWildEncounter : public AActor
 {

@@ -28,7 +28,7 @@ bool UStorageInteractionComponent::TryOpenAimed()
 {
     if(IsOpen()) { Close(); return true; }
     auto* Crate=TraceCrate(); if(!Crate) return false;
-    Open(Crate); return true; // A failed storage interaction must not issue a work order.
+    Open(Crate); return true; // 仓储交互失败时不能下达工作指令。
 }
 AHomeModule* UStorageInteractionComponent::TraceCrate() const
 {
