@@ -15,6 +15,7 @@
 #include "Misc/Parse.h"
 #include "WildEncounter.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "InventoryComponent.h"
 
 void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
 {
@@ -47,15 +48,28 @@ void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
     if(!Farm){UE_LOG(LogTemp,Display,TEXT("CF_DOOR_FARM_FIXTURE %s"),*Hero->Feedback);Finish(false);return;}
     if(Mode!=2)Farm->Crop->Seeds=1;
     const auto Timer=MakeShared<FTimerHandle>();
-    World->GetTimerManager().SetTimer(*Timer,[World,Hero,Door,Farm,Definition,Timer,Finish,Mode,Phase=Mode==2?1:0,At=World->GetTimeSeconds(),Pet=RestoredPet,Previous=RestoredPet?RestoredPet->GetActorLocation():FVector::ZeroVector,Travel=0.,Continuous=true]() mutable
+    World->GetTimerManager().SetTimer(*Timer,[World,Hero,Door,Farm,FarmWeak=TWeakObjectPtr<AWorkStation>(Farm),Definition,Timer,Finish,Mode,Phase=Mode==2?1:0,At=World->GetTimeSeconds(),Pet=RestoredPet,Previous=RestoredPet?RestoredPet->GetActorLocation():FVector::ZeroVector,Travel=0.,Continuous=true,ExpectedMaterials=0]() mutable
     {
         auto End=[&](bool Pass)
         {
-            UE_LOG(LogTemp,Display,TEXT("CF_DOOR_FARM_STATE phase=%d food=%d seeds=%d growth=%.2f travel=%.1f continuous=%d pet=%s"),Phase,Farm->StoredFood,Farm->Crop->Seeds,Farm->Crop->GrowthWork,Travel,Continuous,Pet?*Pet->GetActorLocation().ToString():TEXT("无"));
+            const auto* LiveFarm=FarmWeak.Get();
+            UE_LOG(LogTemp,Display,TEXT("CF_DOOR_FARM_STATE phase=%d food=%d seeds=%d growth=%.2f travel=%.1f continuous=%d pet=%s"),Phase,LiveFarm?LiveFarm->StoredFood:-1,LiveFarm?LiveFarm->Crop->Seeds:-1,LiveFarm?LiveFarm->Crop->GrowthWork:-1,Travel,Continuous,Pet?*Pet->GetActorLocation().ToString():TEXT("无"));
             FTimerHandle Handle=*Timer;World->GetTimerManager().ClearTimer(Handle);Finish(Pass);
         };
         const double Elapsed=World->GetTimeSeconds()-At;
         if(Pet){const auto Now=Pet->GetActorLocation();const double Step=FVector::Dist2D(Now,Previous);Travel+=Step;Previous=Now;Continuous &= Step<120;if(!Continuous || Pet->Health<=0 || Hero->Health<=0){End(false);return;}}
+        if(Phase==4)
+        {
+            if(Elapsed<8)return;
+            End(!FarmWeak.IsValid() && !Pet->WorkSite && Pet->Activity==ECreatureActivity::Follow &&
+                Hero->Inventory->Count(EFrontierItem::Material)==ExpectedMaterials && Hero->Inventory->Count(EFrontierItem::Seeds)==1);return;
+        }
+        if(Phase==3)
+        {
+            if(Elapsed<8)return;
+            End(Farm->StoredFood==0 && Farm->Crop->Seeds==1 && !Farm->Crop->bPlanted && Farm->Crop->GrowthWork==0 &&
+                !Pet->WorkSite && Pet->Activity==ECreatureActivity::Follow);return;
+        }
         if(Phase==0 && Elapsed>=2)
         {
             Hero->SetActorLocation(FVector(-510,-730,60));
@@ -79,6 +93,16 @@ void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
                 Hero->SetActorLocation(FVector(-530,-900,60));
                 End(Hero->SaveProgress(TEXT("DoorFarmBlocked")));return;
             }
+            if(Mode==4)
+            {
+                const int32 Before=Hero->Inventory->Count(EFrontierItem::Material);
+                if(Hero->Building->DismantleStation(Farm) || !IsValid(Farm) || Pet->WorkSite!=Farm || Hero->Inventory->Count(EFrontierItem::Material)!=Before){End(false);return;}
+                // 正常取出预留种子后才允许拆除，不直接清空资源绕过保护。
+                if(!Farm->Crop->Interact(Hero,2) || !Hero->Building->DismantleStation(Farm)){End(false);return;}
+                ExpectedMaterials=Before+UBaseBuildingComponent::GetCost(EWorkSpecialty::Farming)/2;
+                Phase=4;At=World->GetTimeSeconds();return;
+            }
+            if(Mode==3){Hero->CommandFollow();if(Pet->WorkSite || Pet->Activity!=ECreatureActivity::Follow){End(false);return;}}
             Hero->SetActorLocation(FVector(-400,-720,60));
             const auto Rotation=(FVector(-555,-1000,120)-Hero->FirstPersonCamera->GetComponentLocation()).Rotation();
             Hero->GetController()->SetControlRotation(Rotation);Hero->FirstPersonCamera->SetWorldRotation(Rotation);
@@ -87,7 +111,7 @@ void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
             const bool Projected=Nav && Nav->ProjectPointToNavigation(Farm->GetActorLocation(),Goal,FVector(250,250,300));
             auto* Path=Projected?UNavigationSystemV1::FindPathToLocationSynchronously(World,Pet->GetActorLocation(),Goal.Location,Pet):nullptr;
             UE_LOG(LogTemp,Display,TEXT("CF_DOOR_FARM_PATH projected=%d goal=%s valid=%d partial=%d activity=%d stamina=%.1f nutrition=%.1f"),Projected,*Goal.Location.ToString(),Path && Path->IsValid(),Path && Path->IsPartial(),static_cast<int32>(Pet->Activity),Pet->Stamina,Pet->Nutrition);
-            Phase=2;At=World->GetTimeSeconds();return;
+            Phase=Mode==3?3:2;At=World->GetTimeSeconds();return;
         }
         if(Phase==2)
         {

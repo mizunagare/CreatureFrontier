@@ -1,4 +1,4 @@
-param([string]$EngineRoot='D:\Epic\UE_5.8',[string]$BuildRoot='',[switch]$NoRoof,[ValidateSet('Test','Write','Read')][string]$Mode='Test')
+param([string]$EngineRoot='D:\Epic\UE_5.8',[string]$BuildRoot='',[switch]$NoRoof,[ValidateSet('Test','Write','Read','Cancel','Dismantle')][string]$Mode='Test')
 $ErrorActionPreference='Stop'
 . (Join-Path $PSScriptRoot 'BuildFingerprint.ps1')
 $projectRoot=Split-Path $PSScriptRoot -Parent
@@ -11,7 +11,8 @@ $log=Join-Path $run 'CFDoorFarmTest.log'
 Write-Host "门与农圃工作专项：$run"
 if($NoRoof -and $Mode -ne 'Test'){throw '跨进程链固定使用有顶房间'}
 $flag='CFDoorFarm'+$Mode
-$modeNumber=if($Mode -eq 'Write'){1}elseif($Mode -eq 'Read'){2}else{0}
+if($Mode -in @('Cancel','Dismantle')){$flag+='Test'}
+$modeNumber=if($Mode -eq 'Write'){1}elseif($Mode -eq 'Read'){2}elseif($Mode -eq 'Cancel'){3}elseif($Mode -eq 'Dismantle'){4}else{0}
 $arguments=@((Join-Path $projectRoot 'CreatureFrontier.uproject'),'-game',('-'+$flag),'-nullrhi','-nosound','-unattended','-nop4',('-abslog="'+$log+'"'))
 $exe=Join-Path $EngineRoot 'Engine\Binaries\Win64\UnrealEditor-Cmd.exe'
 if($BuildRoot){$exe=$module;$arguments=$arguments[1..($arguments.Count-1)]}
