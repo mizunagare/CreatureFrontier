@@ -377,6 +377,35 @@ void RunHollowAdventure(UWorld* World,ACFPlayerCharacter* Hero,int Mode)
         FHitResult Sight;World->LineTraceSingleByChannel(Sight,Hero->FirstPersonCamera->GetComponentLocation(),Enemy->GetActorLocation(),ECC_Visibility,Query);
         UE_LOG(LogTemp,Display,TEXT("CF_HOLLOW_INSPECT_SIGHT actor=%s component=%s hero=%s hp=%.1f control=%s camera=%s"),*GetNameSafe(Sight.GetActor()),*GetNameSafe(Sight.GetComponent()),*Hero->GetActorLocation().ToString(),Hero->Health,*Hero->GetController()->GetControlRotation().ToString(),*Hero->FirstPersonCamera->GetComponentRotation().ToString());
         UE_LOG(LogTemp,Display,TEXT("CF_HOLLOW_INSPECT %s snapshotOnly=1 transientReplay=0"),Ready?TEXT("PASS"):TEXT("FAIL"));
+        if(Ready && FParse::Param(FCommandLine::Get(),TEXT("CFHollowInspectDynamic")))
+        {
+            // 快照不保存集火与路径瞬态。此处显式重建假设，仅作受控观察，不冒充原失败重放。
+            Pet->FocusTarget=Enemy;
+            auto* Movement=NewObject<UHomeMovementProbe>(Hero);Movement->RegisterComponent();
+            UGameplayStatics::SetGamePaused(World,false);
+            const double Started=FPlatformTime::Seconds();const FVector Start=Hero->GetActorLocation();
+            UE_LOG(LogTemp,Display,TEXT("CF_HOLLOW_DYNAMIC_BEGIN reconstructedFocus=1 deterministicReplay=0"));
+            FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([World,Hero,Pet,Enemy,Movement,Goal,Started,Start](float)
+            {
+                if(!IsValid(Hero) || !IsValid(Pet) || !IsValid(Enemy))
+                {UE_LOG(LogTemp,Error,TEXT("CF_HOLLOW_DYNAMIC FAIL actors"));FPlatformMisc::RequestExitWithStatus(false,1);return false;}
+                const FVector Now=Hero->GetActorLocation();
+                Movement->Direction=(Goal-Now).GetSafeNormal2D();
+                Hero->SetActorRotation(Movement->Direction.Rotation());Hero->GetController()->SetControlRotation(Movement->Direction.Rotation());
+                FHitResult Block;FCollisionQueryParams Params(SCENE_QUERY_STAT(HollowDynamic),false,Hero);
+                const auto* Shape=Hero->GetCapsuleComponent();
+                World->SweepSingleByChannel(Block,Now,Now+Movement->Direction*100,FQuat::Identity,ECC_Pawn,
+                    FCollisionShape::MakeCapsule(Shape->GetScaledCapsuleRadius(),Shape->GetScaledCapsuleHalfHeight()),Params);
+                UE_LOG(LogTemp,Display,TEXT("CF_HOLLOW_DYNAMIC_SAMPLE time=%.2f hero=%s velocity=%s pet=%s petVelocity=%s activity=%d focus=%s blocker=%s petBlock=%d heroHP=%.1f petHP=%.1f enemyHP=%.1f distance=%.1f"),
+                    FPlatformTime::Seconds()-Started,*Now.ToString(),*Hero->GetVelocity().ToString(),*Pet->GetActorLocation().ToString(),*Pet->GetVelocity().ToString(),
+                    static_cast<int32>(Pet->Activity),*GetNameSafe(Pet->FocusTarget),*GetNameSafe(Block.GetActor()),Block.GetActor()==Pet,Hero->Health,Pet->Health,Enemy->Health,FVector::Dist2D(Now,Goal));
+                if(FPlatformTime::Seconds()-Started<15)return true;
+                Movement->Direction=FVector::ZeroVector;
+                UE_LOG(LogTemp,Display,TEXT("CF_HOLLOW_DYNAMIC OBSERVED displacement=%.1f distance=%.1f reconstructedFocus=1 deterministicReplay=0"),FVector::Dist2D(Start,Now),FVector::Dist2D(Now,Goal));
+                FPlatformMisc::RequestExitWithStatus(false,0);return false;
+            }),.5f);
+            return;
+        }
         FPlatformMisc::RequestExitWithStatus(false,Ready?0:1);return;
     }
     if(Mode==2 || Mode==4 || Mode==7)
