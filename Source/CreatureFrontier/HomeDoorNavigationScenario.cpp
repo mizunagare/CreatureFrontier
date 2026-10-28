@@ -13,9 +13,12 @@
 #include "EngineUtils.h"
 #include "TimerManager.h"
 #include "Components/CapsuleComponent.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 
 void RunHomeWindowNavigationScenario(UWorld* World,ACFPlayerCharacter* Hero)
 {
+    const float Orientation=FParse::Param(FCommandLine::Get(),TEXT("CFWindowNavigationRotated"))?90.f:0.f;
     // 闭区间相交也包含恰落在墙平面的端点，避免分两次采样穿墙却漏报。
     const auto CrossesWindow=[](const FVector& A,const FVector& B)
     {
@@ -35,9 +38,10 @@ void RunHomeWindowNavigationScenario(UWorld* World,ACFPlayerCharacter* Hero)
     UE_LOG(LogTemp,Display,TEXT("CF_WINDOW_NAV_GUARD PASS samples=6"));
     for(TActorIterator<AWildEncounter> It(World);It;++It)It->SetActorTickEnabled(false);
     for(TActorIterator<ACreatureCharacter> It(World);It;++It){It->SetActorTickEnabled(false);It->GetCharacterMovement()->DisableMovement();}
-    Hero->GetCharacterMovement()->DisableMovement();Hero->SetActorLocation(FVector(-400,-1250,60));Hero->Inventory->Restore({{EFrontierItem::Material,300}});
-    auto Build=[Hero](EHomeModuleKind Kind,FVector Position,FGuid Floor=FGuid(),double Yaw=0.)
-    {Hero->HomeBuilding->Selected=Kind;return Hero->HomeBuilding->BuildAt(FTransform(FRotator(0,Yaw,0),Position),Floor);};
+    Hero->GetCharacterMovement()->DisableMovement();Hero->SetActorLocation(CFDoorNavigationQA::Point(FVector(-400,-1250,60),Orientation));Hero->Inventory->Restore({{EFrontierItem::Material,300}});
+    auto Build=[Hero,Orientation](EHomeModuleKind Kind,FVector Position,FGuid Floor=FGuid(),double Yaw=0.)
+    {Hero->HomeBuilding->Selected=Kind;const bool Wall=Kind==EHomeModuleKind::Wall || Kind==EHomeModuleKind::Window || Kind==EHomeModuleKind::Door;
+        return Hero->HomeBuilding->BuildAt(FTransform(FRotator(0,Wall?FMath::Fmod(Yaw+Orientation,180.):0,0),CFDoorNavigationQA::Point(Position,Orientation)),Floor);};
     auto* Floor=Build(EHomeModuleKind::Floor,FVector(-400,-800,-40));
     const FGuid FloorId=Floor?Floor->PersistentId:FGuid();
     auto* Window=Floor?Build(EHomeModuleKind::Window,FVector(-400,-1000,-30),FloorId):nullptr;
@@ -46,43 +50,44 @@ void RunHomeWindowNavigationScenario(UWorld* World,ACFPlayerCharacter* Hero)
     auto* Definition=LoadObject<UCreatureDefinition>(nullptr,TEXT("/Game/Creatures/DA_Mosskip.DA_Mosskip"));
     if(!Built || !Definition){UE_LOG(LogTemp,Error,TEXT("CF_WINDOW_NAV FAIL fixture %s"),*Hero->Feedback);FPlatformMisc::RequestExitWithStatus(false,1);return;}
     const auto Timer=MakeShared<FTimerHandle>();
-    World->GetTimerManager().SetTimer(*Timer,[World,Hero,Door,Definition,Timer,CrossesWindow,Phase=0,At=World->GetTimeSeconds(),Pet=static_cast<ACreatureCharacter*>(nullptr),Previous=FVector::ZeroVector,Travel=0.,Continuous=true,NoWindowCross=true,Closed=false]() mutable
+    World->GetTimerManager().SetTimer(*Timer,[World,Hero,Door,Definition,Timer,CrossesWindow,Orientation,Phase=0,At=World->GetTimeSeconds(),Pet=static_cast<ACreatureCharacter*>(nullptr),Previous=FVector::ZeroVector,Travel=0.,Continuous=true,NoWindowCross=true,Closed=false]() mutable
     {
         auto Finish=[&](bool Pass)
         {
-            UE_LOG(LogTemp,Display,TEXT("CF_WINDOW_NAV %s phase=%d closed=%d continuous=%d windowBlocked=%d travel=%.1f pet=%s feedback=%s"),Pass?TEXT("PASS"):TEXT("FAIL"),Phase,Closed,Continuous,NoWindowCross,Travel,Pet?*Pet->GetActorLocation().ToString():TEXT("无"),*Hero->Feedback);
+            UE_LOG(LogTemp,Display,TEXT("CF_WINDOW_NAV %s phase=%d closed=%d continuous=%d windowBlocked=%d yaw=%.0f travel=%.1f pet=%s feedback=%s"),Pass?TEXT("PASS"):TEXT("FAIL"),Phase,Closed,Continuous,NoWindowCross,Orientation,Travel,Pet?*Pet->GetActorLocation().ToString():TEXT("无"),*Hero->Feedback);
             FTimerHandle Handle=*Timer;World->GetTimerManager().ClearTimer(Handle);FPlatformMisc::RequestExitWithStatus(false,Pass?0:1);
         };
         const float Elapsed=World->GetTimeSeconds()-At;
         if(Pet)
         {
             const FVector Now=Pet->GetActorLocation();const double Step=FVector::Dist2D(Now,Previous);Travel+=Step;Continuous &= Step<120;
-            NoWindowCross &= !CrossesWindow(Previous,Now);
+            NoWindowCross &= !CrossesWindow(CFDoorNavigationQA::Original(Previous,Orientation),CFDoorNavigationQA::Original(Now,Orientation));
             Previous=Now;
             if(!Continuous || !NoWindowCross || Pet->Health<=0 || !Pet->IsActorTickEnabled() || Pet->GetCapsuleComponent()->GetCollisionEnabled()==ECollisionEnabled::NoCollision){Finish(false);return;}
         }
         if(Phase==0 && Elapsed>=2)
         {
             // 计入模块原点与角色高度差后仍需在正常3米交互范围内，并避开门扇活动区。
-            Hero->SetActorLocation(FVector(-475,-800,60));Hero->GetController()->SetControlRotation(FRotator(0,180,0));
-            Pet=World->SpawnActorDeferred<ACreatureCharacter>(ACreatureCharacter::StaticClass(),FTransform(FVector(-400,-1350,60)),nullptr,nullptr,ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
-            if(!Pet){Finish(false);return;}Pet->Definition=Definition;Pet->FinishSpawning(FTransform(FVector(-400,-1350,60)));Pet->Tame(Hero->GetController());Pet->SetActivity(ECreatureActivity::Follow);
+            Hero->SetActorLocation(CFDoorNavigationQA::Point(FVector(-475,-800,60),Orientation));Hero->GetController()->SetControlRotation(FRotator(0,180+Orientation,0));
+            const FTransform Spawn(CFDoorNavigationQA::Point(FVector(-400,-1350,60),Orientation));
+            Pet=World->SpawnActorDeferred<ACreatureCharacter>(ACreatureCharacter::StaticClass(),Spawn,nullptr,nullptr,ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+            if(!Pet){Finish(false);return;}Pet->Definition=Definition;Pet->FinishSpawning(Spawn);Pet->Tame(Hero->GetController());Pet->SetActivity(ECreatureActivity::Follow);
             Previous=Pet->GetActorLocation();At=World->GetTimeSeconds();Phase=1;return;
         }
         if(Phase==1 && Elapsed>=4)
         {
-            Closed=Door->DoorState==1 && !CFDoorNavigationQA::PathInside(World,Pet,0);
+            Closed=Door->DoorState==1 && !CFDoorNavigationQA::PathInside(World,Pet,Orientation);
             if(!Closed){Finish(false);return;}
             const auto View=(Door->GetActorTransform().TransformPosition(FVector(0,0,125))-Hero->FirstPersonCamera->GetComponentLocation()).Rotation();Hero->GetController()->SetControlRotation(View);Hero->FirstPersonCamera->SetWorldRotation(View);
             if(!Door->ToggleDoor(Hero)){Finish(false);return;}
-            Hero->GetController()->SetControlRotation(FRotator(0,180,0));Hero->FirstPersonCamera->SetWorldRotation(FRotator(0,180,0));
+            Hero->GetController()->SetControlRotation(FRotator(0,180+Orientation,0));Hero->FirstPersonCamera->SetWorldRotation(FRotator(0,180+Orientation,0));
             At=World->GetTimeSeconds();Phase=2;return;
         }
         if(Phase==2)
         {
-            const FVector Now=Pet->GetActorLocation();const bool Inside=Now.X>-560 && Now.X<-240 && Now.Y>-960 && Now.Y<-640 && FVector::Dist2D(Now,Pet->GetFollowDestination())<100;
+            const FVector Now=Pet->GetActorLocation(),Local=CFDoorNavigationQA::Original(Now,Orientation);const bool Inside=Local.X>-560 && Local.X<-240 && Local.Y>-960 && Local.Y<-640 && FVector::Dist2D(Now,Pet->GetFollowDestination())<100;
             if(!Inside && Elapsed<15)return;
-            Finish(Inside && Closed && Continuous && NoWindowCross && Travel>600 && CFDoorNavigationQA::PathInside(World,Pet,0));return;
+            Finish(Inside && Closed && Continuous && NoWindowCross && Travel>600 && CFDoorNavigationQA::PathInside(World,Pet,Orientation));return;
         }
     },.1f,true);
 }
