@@ -25,6 +25,7 @@ Write-Host "本次测试日志：$testLogRoot"
 $cases = @(
     @{Flag='CFDoorFarmTest'; Marker='CF_DOOR_FARM PASS'; RequiredMarkers=@('CF_DOOR_FARM_CLOSED PASS','CF_DOOR_FARM_FIXTURE roof=1 removed=0')},
     @{Flag='CFDoorFarmTest'; Label='CFDoorFarmNoRoof'; Arguments=@('-CFDoorFarmNoRoof'); Marker='CF_DOOR_FARM PASS'; RequiredMarkers=@('CF_DOOR_FARM_CLOSED PASS','CF_DOOR_FARM_FIXTURE roof=0 removed=1')},
+    @{Flag='CFHomePaletteTest'; Marker='CF_HOME_PALETTE PASS built=1 opened=1 closed=1'; RequiredMarkers=@('CF_HOME_PALETTE_PREVIEW PASS','CF_HOME_PALETTE_INDEPENDENT stage=settled pass=1')},
     @{Flag='CFDoorTest'; Marker='CF_DOOR PASS'},
     @{Flag='CFDoorOpenRead'; Marker='CF_DOOR_OPEN_READ PASS'},
     @{Flag='CFDoorClosedRead'; Marker='CF_DOOR_CLOSED_READ PASS'},
