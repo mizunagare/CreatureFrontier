@@ -6,10 +6,11 @@ param([Parameter(Mandatory=$true)][string]$LegacyBuildRoot,
       [switch]$IncludeJourneys)
 
 $ErrorActionPreference='Stop'
+. (Join-Path $PSScriptRoot 'BuildFingerprint.ps1')
 $projectRoot=Split-Path $PSScriptRoot -Parent
 $exe=Join-Path $BuildRoot 'CreatureFrontier\Binaries\Win64\CreatureFrontier.exe'
 if(!(Test-Path -LiteralPath $exe)){throw '当前构建的可执行程序不存在'}
-$buildHash=(Get-FileHash -LiteralPath $exe).Hash
+$buildHash=Get-FrontierBuildFingerprint -LiteralPath $exe
 $run=Join-Path $projectRoot ('Saved\CargoLegacyAudit\'+(Get-Date -Format 'yyyyMMdd-HHmmss')+'-Verified')
 New-Item -ItemType Directory -Path $run | Out-Null
 $cases=@(
@@ -41,6 +42,12 @@ if(Test-Path -LiteralPath (Join-Path $LegacyBuildRoot 'CreatureFrontier\Saved\Sa
     $cases += @{Slot='HollowAdventureCross';Flag='CFHollowAdventureRead';Marker='CF_HOLLOW_ADVENTURE_READ PASS'}
 }
 if($IncludeJourneys){$cases+=@{Slot='MemoryDoneCross';Flag='CFMemoryDoneRead';Marker='CF_MEMORY_DONE_READ PASS'}}
+if($IncludeJourneys){
+    foreach($case in @(@{Slot='RescueMemoryHome';Flag='CFRescueMemoryFinalRead';Marker='CF_RESCUE_MEMORY PASS mode=4'},
+                       @{Slot='RescueRecallDone';Flag='CFRescueRecallRead';Marker='CF_RESCUE_RECALL_READ PASS'})){
+        if(Test-Path -LiteralPath (Join-Path $LegacyBuildRoot ('CreatureFrontier\Saved\SaveGames\'+$case.Slot+'.sav'))){$cases+=$case}
+    }
+}
 if(Test-Path -LiteralPath (Join-Path $LegacyBuildRoot 'CreatureFrontier\Saved\SaveGames\HollowRecoveryCross.sav')){
     $cases+=@{Slot='HollowRecoveryCross';Flag='CFHollowRecoveryRead';Marker='CF_HOLLOW_RECOVERY_READ PASS'}
 }
@@ -59,6 +66,7 @@ foreach($case in $cases){
     $originalHash=if($existed){(Get-FileHash -LiteralPath $target).Hash}else{''}
     if($existed){Copy-Item -LiteralPath $target -Destination $backup}
     $legacyInput=Join-Path $run ($case.Slot+'.legacy-input')
+    $sourceHash=(Get-FileHash -LiteralPath $source).Hash
     Copy-Item -LiteralPath $source -Destination $legacyInput
     try {
         Copy-Item -LiteralPath $legacyInput -Destination $target
@@ -69,8 +77,9 @@ foreach($case in $cases){
             if(!$done){$process.Kill();$process.WaitForExit()}
             $pass=$done -and $process.ExitCode -eq 0 -and (Test-Path -LiteralPath $log) -and [bool](Select-String -LiteralPath $log -SimpleMatch $case.Marker)
             if($pass){$pass=!(Select-String -LiteralPath $log -Pattern 'CF_\w+ FAIL|Fatal error|Assertion failed' -Quiet)}
-            if((Get-FileHash -LiteralPath $exe).Hash -ne $buildHash){throw '旧档审计期间测试程序发生变化'}
-            $results += [pscustomobject]@{Slot=$case.Slot; Attempt=$attempt; Pass=$pass; InputSHA256=(Get-FileHash -LiteralPath $legacyInput).Hash; BuildSHA256=(Get-FileHash -LiteralPath $exe).Hash}
+            if((Get-FrontierBuildFingerprint -LiteralPath $exe) -ne $buildHash){throw '旧档审计期间测试程序发生变化'}
+            if((Get-FileHash -LiteralPath $target).Hash -ne $sourceHash -or (Get-FileHash -LiteralPath $legacyInput).Hash -ne $sourceHash -or (Get-FileHash -LiteralPath $source).Hash -ne $sourceHash){throw '旧档读取改写了输入、留存副本或稳定包源文件'}
+            $results += [pscustomobject]@{Slot=$case.Slot; Attempt=$attempt; Pass=$pass; InputSHA256=$sourceHash; BuildSHA256=$buildHash}
             $results | Export-Csv -LiteralPath (Join-Path $run 'Results.csv') -NoTypeInformation
             Write-Host "$($case.Flag) 第 $attempt 次读取，通过：$pass"
             if(!$pass){throw "旧档读取失败，详见：$log"}

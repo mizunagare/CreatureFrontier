@@ -110,7 +110,7 @@ void RunFieldWorkScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
     Pet->AssignFieldResource(Node); Pet->SetActivity(ECreatureActivity::Follow);
     Baseline &= !Pet->GetFieldResource();
     Pet->AssignFieldResource(Node); Pet->Health=0; Pet->Tick(.1f);
-    // A downed worker may never settle shared stock, even if externally modified health bypasses TakeDamage.
+    // 即使外部直接修改生命值绕过 TakeDamage，倒地的工作伙伴也不得结算公共库存。
     Baseline &= !Node->TryHarvest(Hero,Pet); Pet->Health=Pet->GetMaxHealth();
     Pet->AssignFieldResource(Node); Pet->Nutrition=0; Pet->Tick(.1f);
     Baseline &= Pet->Activity==ECreatureActivity::Rest && Pet->bResumeWorkAfterRest;

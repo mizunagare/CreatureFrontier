@@ -155,7 +155,7 @@ void RunHomeScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
     RoofDefinition->MaterialCost=OriginalCost;
     PaidRefund &= Build(Hero,EHomeModuleKind::Roof,FVector(0,-800,280),FloorBId) && Hero->Inventory->Count(EFrontierItem::Material)==111;
     PaidRefund &= Hero->LoadProgress(Slot) && SnapshotOK(World,Hero);
-    // A floor with no walls still cannot be pulled out from under an indoor station.
+    // 即使没有墙壁，也不能拆除室内设施脚下的地板。
     Hero->SetActorLocation(FVector(350,-1050,40));
     bool Support=Hero->HomeBuilding->Dismantle(Find(World,EHomeModuleKind::Roof,FVector(0,-800,280))) &&
         Hero->HomeBuilding->Dismantle(Find(World,EHomeModuleKind::Wall,FVector(0,-1000,-30))) &&

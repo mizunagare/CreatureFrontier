@@ -89,7 +89,7 @@ void RunFormationScenario(UWorld* World,ACFPlayerCharacter* Hero)
             const int32 Slot=Ordered.IndexOfByKey(Pet);
             const float Side=Slot%3==0?0.f:Slot%3==1?-130.f:130.f;
             const FVector Nominal=Hero->GetActorLocation()+Facing.RotateVector(FVector(-170.f-(Slot/3)*150.f,Side,0));
-            // A temporary avoidance/occupied-slot waypoint is not evidence of docking in formation.
+            // 临时避让点或被占据队位的绕行点，不能作为已归队的依据。
             Arrived &= Slot!=INDEX_NONE && FVector::Dist2D(Pet->GetActorLocation(),Nominal)<=30 && Pet->GetVelocity().Size2D()<10;
         }
         const double Elapsed=World->GetTimeSeconds()-Trial->Started;

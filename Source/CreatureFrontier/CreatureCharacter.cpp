@@ -327,7 +327,7 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
         SetActivity(Enemy ? ECreatureActivity::Combat : ECreatureActivity::Follow);
         if(GetCharacterMovement()->bUseRVOAvoidance!=(Enemy==nullptr)) GetCharacterMovement()->SetAvoidanceEnabled(Enemy==nullptr);
         const FVector Destination = Enemy ? Enemy->GetActorLocation() : GetFollowDestination();
-        // A nav path may bend back through a companion even when the final-goal ray is clear.
+        // 即使通往最终目标的射线畅通，导航路径仍可能折返并穿过伙伴。
         // 只有期望方向与实际路径方向的局部通道均畅通时，才绕过自身转向处理。
         const auto* FollowAI=Cast<AAIController>(GetController());
         const bool ClearSegment=!FollowAI || FollowAI->GetMoveStatus()!=EPathFollowingStatus::Moving ||

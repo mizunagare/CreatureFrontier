@@ -44,7 +44,7 @@ void RunBuildingScenario(UWorld* World, ACFPlayerCharacter* Hero)
     Hero->Inventory->Restore({{EFrontierItem::Material,2}});
     Reject &= !Builder->BuildAt(At(-300,-700)) && Hero->Inventory->Count(EFrontierItem::Material) == 2;
     Hero->Inventory->Restore({{EFrontierItem::Material,90}});
-    // An actual pawn occupying the footprint prevents placement.
+    // 实际角色占据建造范围时，应拒绝放置。
     auto* Blocker = World->SpawnActor<ACreatureCharacter>(FVector(-300,-700,40),FRotator::ZeroRotator);
     Reject &= !Builder->BuildAt(At(-300,-700));
     Blocker->Destroy();
