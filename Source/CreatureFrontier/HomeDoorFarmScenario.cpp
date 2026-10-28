@@ -16,6 +16,7 @@
 #include "WildEncounter.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "InventoryComponent.h"
+#include "AIController.h"
 
 void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
 {
@@ -48,7 +49,7 @@ void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
     if(!Farm){UE_LOG(LogTemp,Display,TEXT("CF_DOOR_FARM_FIXTURE %s"),*Hero->Feedback);Finish(false);return;}
     if(Mode!=2)Farm->Crop->Seeds=1;
     const auto Timer=MakeShared<FTimerHandle>();
-    World->GetTimerManager().SetTimer(*Timer,[World,Hero,Door,Farm,FarmWeak=TWeakObjectPtr<AWorkStation>(Farm),Definition,Timer,Finish,Mode,Phase=Mode==2?1:0,At=World->GetTimeSeconds(),Pet=RestoredPet,Previous=RestoredPet?RestoredPet->GetActorLocation():FVector::ZeroVector,Travel=0.,Continuous=true,ExpectedMaterials=0]() mutable
+    World->GetTimerManager().SetTimer(*Timer,[World,Hero,Door,Farm,FarmWeak=TWeakObjectPtr<AWorkStation>(Farm),Definition,Timer,Finish,Mode,Phase=Mode==2?1:0,At=World->GetTimeSeconds(),Pet=RestoredPet,Previous=RestoredPet?RestoredPet->GetActorLocation():FVector::ZeroVector,Travel=0.,Continuous=true,ExpectedMaterials=0,Diagnosed=false]() mutable
     {
         auto End=[&](bool Pass)
         {
@@ -66,6 +67,18 @@ void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
         }
         if(Phase==3)
         {
+            if(!Diagnosed && Elapsed>=2)
+            {
+                Diagnosed=true;auto* Nav=FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
+                for(int32 Index=0;Index<2;++Index)
+                {
+                    FNavLocation Goal;const bool Projected=Nav && Nav->ProjectPointToNavigation(Pet->GetFollowDestination(),Goal,Index==0?FVector(250,250,300):FVector(80,80,80));
+                    auto* Path=Projected?UNavigationSystemV1::FindPathToLocationSynchronously(World,Pet->GetActorLocation(),Goal.Location,Pet):nullptr;
+                    UE_LOG(LogTemp,Display,TEXT("CF_DOOR_FARM_FOLLOW_PATH sample=%d desired=%s projected=%d point=%s valid=%d partial=%d length=%.1f"),Index,*Pet->GetFollowDestination().ToString(),Projected,*Goal.Location.ToString(),Path && Path->IsValid(),Path && Path->IsPartial(),Path?Path->GetPathLength():-1);
+                }
+                const auto* AI=Cast<AAIController>(Pet->GetController());
+                UE_LOG(LogTemp,Display,TEXT("CF_DOOR_FARM_FOLLOW_AI state=%d immediate=%s"),AI?static_cast<int32>(AI->GetMoveStatus()):-1,AI?*AI->GetImmediateMoveDestination().ToString():TEXT("无"));
+            }
             if(Elapsed<8)return;
             End(Farm->StoredFood==0 && Farm->Crop->Seeds==1 && !Farm->Crop->bPlanted && Farm->Crop->GrowthWork==0 &&
                 !Pet->WorkSite && Pet->Activity==ECreatureActivity::Follow && Travel>300 && Pet->GetActorLocation().Y>-1000 &&

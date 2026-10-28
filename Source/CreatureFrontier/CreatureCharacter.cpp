@@ -183,7 +183,10 @@ void ACreatureCharacter::NavigateTo(const FVector& Destination, float Acceptance
         }
     const FVector NavigationGoal=bHasFollowPathDetour?FollowPathDetour:Destination;
     FNavLocation Projected;
-    if (!Nav->ProjectPointToNavigation(NavigationGoal, Projected, FVector(250,250,300)))
+    // 跟随先寻找队位附近的同层表面，避免室内队位被宽范围投影吸到屋顶。
+    // 局部没有导航面时仍保留原有宽范围后备，兼容坡地与原先可达的路线。
+    const bool LocalFollow=Activity==ECreatureActivity::Follow && Nav->ProjectPointToNavigation(NavigationGoal,Projected,FVector(80,80,120));
+    if (!LocalFollow && !Nav->ProjectPointToNavigation(NavigationGoal, Projected, FVector(250,250,300)))
     {
         const APawn* FollowOwner=Activity==ECreatureActivity::Follow && Tamer?Tamer->GetPawn():nullptr;
         if(!FollowOwner || !Nav->ProjectPointToNavigation(FollowOwner->GetActorLocation(),Projected,FVector(250,250,300)))
