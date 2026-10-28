@@ -171,7 +171,8 @@ void UHomeBuildingComponent::UpdatePreview()
     if(Selected==EHomeModuleKind::Lantern || Selected==EHomeModuleKind::Storage) Position=FVector(FMath::GridSnap(Hit.ImpactPoint.X,100.),FMath::GridSnap(Hit.ImpactPoint.Y,100.),-30);
     Placement=FTransform(FRotator(0,Wall?YawStep*90:0,0),Position);
     bValid=ValidatePlacement(Placement,SupportingFloor,Status);
-    Preview->SetActorTransform(Placement); Preview->SetActorHiddenInGame(false); Preview->SetPreviewTint(bValid);
+    Preview->SetActorTransform(Placement); Preview->SetActorHiddenInGame(PendingReplacement.IsValid()); Preview->SetPreviewTint(bValid);
+    if(PendingReplacement.IsValid())Status=TEXT("原位替换待确认；再按Insert确认，移开视线取消");
 }
 void UHomeBuildingComponent::Confirm() { PendingReplacement.Reset(); UpdatePreview(); if(bValid) BuildAt(Placement,SupportingFloor); }
 void UHomeBuildingComponent::ConfirmAimedReplacement()

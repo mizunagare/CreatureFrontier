@@ -146,6 +146,17 @@ void RunHomeWindowScenario(UWorld* World,ACFPlayerCharacter* Hero)
                 const auto Aim=(Wall->GetActorTransform().TransformPosition(FVector(145,0,170))-Hero->FirstPersonCamera->GetComponentLocation()).Rotation();
                 Hero->GetController()->SetControlRotation(Aim);Hero->FirstPersonCamera->SetWorldRotation(Aim);
                 Pass &= CFInputQA::Press(Hero,EKeys::Insert) && IsValid(Wall) && Hero->Inventory->Count(EFrontierItem::Material)==Before && Hero->Feedback.Contains(TEXT("再按Insert确认"));
+                if(FParse::Param(FCommandLine::Get(),TEXT("CFHomeReplacePreview")))
+                {
+                    const FString Root=FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir()/TEXT("HomeReplacePreview")/FGuid::NewGuid().ToString(EGuidFormats::Digits));
+                    IFileManager::Get().MakeDirectory(*Root,true);
+                    UE_LOG(LogTemp,Display,TEXT("CF_HOME_REPLACE_PREVIEW_ROOT %s"),*Root);
+                    FTimerHandle Shot,Exit;
+                    World->GetTimerManager().SetTimer(Shot,[Root](){FScreenshotRequest::RequestScreenshot(Root/TEXT("Confirm.png"),false,false);},.6f,false);
+                    World->GetTimerManager().SetTimer(Exit,[Hero,Wall,Root,Before,Pass](){const bool Ready=Pass && IsValid(Wall) && Hero->Inventory->Count(EFrontierItem::Material)==Before && IFileManager::Get().FileSize(*(Root/TEXT("Confirm.png")))>1000;
+                        UE_LOG(LogTemp,Display,TEXT("CF_HOME_REPLACE_PREVIEW %s"),Ready?TEXT("PASS"):TEXT("FAIL"));FPlatformMisc::RequestExitWithStatus(false,Ready?0:1);},1.5f,false);
+                    return;
+                }
                 Pass &= CFInputQA::Press(Hero,EKeys::Nine) && CFInputQA::Press(Hero,EKeys::Insert) && IsValid(Wall) && Hero->Inventory->Count(EFrontierItem::Material)==Before;
                 Pass &= CFInputQA::Press(Hero,EKeys::Insert);
                 for(TActorIterator<AHomeModule> It(World);It;++It)if(!It->bPreview && It->PersistentId==Id && It->GetKind()==EHomeModuleKind::Window)Window=*It;
