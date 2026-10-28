@@ -16,6 +16,23 @@
 
 void RunHomeWindowNavigationScenario(UWorld* World,ACFPlayerCharacter* Hero)
 {
+    // 闭区间相交也包含恰落在墙平面的端点，避免分两次采样穿墙却漏报。
+    const auto CrossesWindow=[](const FVector& A,const FVector& B)
+    {
+        const double AY=A.Y+1000.,BY=B.Y+1000.;
+        if((AY>0 && BY>0) || (AY<0 && BY<0))return false;
+        if(AY==BY)return FMath::Max(A.X,B.X)>=-600 && FMath::Min(A.X,B.X)<=-200;
+        const double X=FMath::Lerp(A.X,B.X,-AY/(BY-AY));
+        return X>=-600 && X<=-200;
+    };
+    const bool Guard=CrossesWindow(FVector(-400,-1100,60),FVector(-400,-900,60)) &&
+        CrossesWindow(FVector(-400,-1100,60),FVector(-400,-1000,60)) &&
+        CrossesWindow(FVector(-400,-1000,60),FVector(-400,-900,60)) &&
+        CrossesWindow(FVector(-700,-1000,60),FVector(-100,-1000,60)) &&
+        !CrossesWindow(FVector(-100,-1100,60),FVector(-100,-900,60)) &&
+        !CrossesWindow(FVector(-400,-1100,60),FVector(-400,-1050,60));
+    if(!Guard){UE_LOG(LogTemp,Error,TEXT("CF_WINDOW_NAV_GUARD FAIL"));FPlatformMisc::RequestExitWithStatus(false,1);return;}
+    UE_LOG(LogTemp,Display,TEXT("CF_WINDOW_NAV_GUARD PASS samples=6"));
     for(TActorIterator<AWildEncounter> It(World);It;++It)It->SetActorTickEnabled(false);
     for(TActorIterator<ACreatureCharacter> It(World);It;++It){It->SetActorTickEnabled(false);It->GetCharacterMovement()->DisableMovement();}
     Hero->GetCharacterMovement()->DisableMovement();Hero->SetActorLocation(FVector(-400,-1250,60));Hero->Inventory->Restore({{EFrontierItem::Material,300}});
@@ -29,7 +46,7 @@ void RunHomeWindowNavigationScenario(UWorld* World,ACFPlayerCharacter* Hero)
     auto* Definition=LoadObject<UCreatureDefinition>(nullptr,TEXT("/Game/Creatures/DA_Mosskip.DA_Mosskip"));
     if(!Built || !Definition){UE_LOG(LogTemp,Error,TEXT("CF_WINDOW_NAV FAIL fixture %s"),*Hero->Feedback);FPlatformMisc::RequestExitWithStatus(false,1);return;}
     const auto Timer=MakeShared<FTimerHandle>();
-    World->GetTimerManager().SetTimer(*Timer,[World,Hero,Door,Definition,Timer,Phase=0,At=World->GetTimeSeconds(),Pet=static_cast<ACreatureCharacter*>(nullptr),Previous=FVector::ZeroVector,Travel=0.,Continuous=true,NoWindowCross=true,Closed=false]() mutable
+    World->GetTimerManager().SetTimer(*Timer,[World,Hero,Door,Definition,Timer,CrossesWindow,Phase=0,At=World->GetTimeSeconds(),Pet=static_cast<ACreatureCharacter*>(nullptr),Previous=FVector::ZeroVector,Travel=0.,Continuous=true,NoWindowCross=true,Closed=false]() mutable
     {
         auto Finish=[&](bool Pass)
         {
@@ -40,8 +57,7 @@ void RunHomeWindowNavigationScenario(UWorld* World,ACFPlayerCharacter* Hero)
         if(Pet)
         {
             const FVector Now=Pet->GetActorLocation();const double Step=FVector::Dist2D(Now,Previous);Travel+=Step;Continuous &= Step<120;
-            if((Previous.Y+1000)*(Now.Y+1000)<0)
-            {const double X=FMath::Lerp(Previous.X,Now.X,(-1000.-Previous.Y)/(Now.Y-Previous.Y));NoWindowCross &= X<-600 || X>-200;}
+            NoWindowCross &= !CrossesWindow(Previous,Now);
             Previous=Now;
             if(!Continuous || !NoWindowCross || Pet->Health<=0 || !Pet->IsActorTickEnabled() || Pet->GetCapsuleComponent()->GetCollisionEnabled()==ECollisionEnabled::NoCollision){Finish(false);return;}
         }
