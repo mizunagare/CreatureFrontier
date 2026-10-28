@@ -16,10 +16,12 @@ if(!$process.WaitForExit(60000)){$process.Kill();$process.WaitForExit();throw '�
 if($process.ExitCode -ne 0 -or !(Test-Path -LiteralPath $log)){throw '门材质专项未正常结束'}
 if(!(Select-String -LiteralPath $log -SimpleMatch 'CF_HOME_PALETTE PASS built=1 opened=1 closed=1' -Quiet) -or
     (Select-String -LiteralPath $log -Pattern '\bFAIL\b|Fatal error|Assertion failed' -Quiet)){throw "门材质专项未通过：$log"}
-foreach($stage in @('built','opened','closed','settled')){
+if(!(Select-String -LiteralPath $log -SimpleMatch 'CF_HOME_PALETTE_PREVIEW PASS' -Quiet)){throw '门预览颜色切换未通过'}
+foreach($stage in @('built','normalGuard','reconstructed','previewValid','previewInvalid','previewValidAgain','restored','opened','closed','settled')){
     $parts=@(Select-String -LiteralPath $log -Pattern ('CF_HOME_PALETTE_PART stage='+$stage+' part=Part[0-3] dynamic=1 matches=1'))
     if($parts.Count -ne 4){throw "门材质阶段 $stage 没有四个零件匹配证据"}
+    if(!(Select-String -LiteralPath $log -SimpleMatch "CF_HOME_PALETTE_INDEPENDENT stage=$stage pass=1" -Quiet)){throw "门材质阶段 $stage 没有独立实例证据"}
 }
 if((Get-FrontierBuildFingerprint -LiteralPath $module) -ne $hash){throw '门材质专项期间程序模块变化'}
 [pscustomobject]@{Case='CFHomePaletteTest';Pass=$true;BuildSHA256=$hash;Log=$log} | Export-Csv -LiteralPath (Join-Path $run 'Results.csv') -NoTypeInformation
-Write-Host '四阶段材质实例参数核对通过；无渲染模式不证明像素颜色或光照品质'
+Write-Host '十阶段材质实例、预览切换及恢复核对通过；无渲染模式不证明像素颜色或光照品质'
