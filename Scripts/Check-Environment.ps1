@@ -1,6 +1,6 @@
 $ErrorActionPreference = "Continue"
 
-Write-Host "Creature Frontier environment check"
+Write-Host "幻兽边境开发环境检查"
 
 $engineCandidates = @(
     "C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe",
@@ -18,7 +18,7 @@ if (Test-Path -LiteralPath $manifestDirectory) {
                     $engineCandidates += Join-Path $manifest.InstallLocation "Engine\Binaries\Win64\UnrealEditor.exe"
                 }
             } catch {
-                Write-Verbose "Could not read Epic manifest $($_.FullName)"
+                Write-Verbose "无法读取 Epic 安装清单：$($_.FullName)"
             }
         }
 }
@@ -27,20 +27,20 @@ $engine = $engineCandidates | Where-Object { Test-Path -LiteralPath $_ } | Selec
 $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
 
 [pscustomobject]@{
-    UnrealEditor = if ($engine) { $engine } else { "MISSING" }
-    VisualStudio = if (Test-Path -LiteralPath $vswhere) { & $vswhere -latest -property installationPath } else { "MISSING" }
-    Git = if (Get-Command git -ErrorAction SilentlyContinue) { git --version } else { "MISSING" }
+    '虚幻编辑器' = if ($engine) { $engine } else { "未安装" }
+    'Visual Studio' = if (Test-Path -LiteralPath $vswhere) { & $vswhere -latest -property installationPath } else { "未安装" }
+    Git = if (Get-Command git -ErrorAction SilentlyContinue) { git --version } else { "未安装" }
     GitLFS = if (Get-Command git -ErrorAction SilentlyContinue) {
         $lfsVersion = git lfs version 2>$null
-        if ($LASTEXITCODE -eq 0) { $lfsVersion } else { "MISSING" }
-    } else { "MISSING" }
+        if ($LASTEXITCODE -eq 0) { $lfsVersion } else { "未安装" }
+    } else { "未安装" }
     DotNetSDK = if (Get-Command dotnet -ErrorAction SilentlyContinue) {
         $sdks = @(dotnet --list-sdks)
-        if ($sdks.Count -gt 0) { $sdks -join ", " } else { "MISSING (runtime only)" }
-    } else { "MISSING" }
+        if ($sdks.Count -gt 0) { $sdks -join ", " } else { "未安装（仅有运行时）" }
+    } else { "未安装" }
 } | Format-List
 
 if (-not $engine) {
-    Write-Warning "Install UE 5.8 with Templates and Feature Packs through Epic Games Launcher."
+    Write-Warning "请通过 Epic Games 启动器安装 UE 5.8，并勾选模板和功能包。"
     exit 1
 }

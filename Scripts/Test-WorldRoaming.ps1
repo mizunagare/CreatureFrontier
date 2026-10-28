@@ -6,12 +6,12 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-if (!$Seeds.Count -or !$FrameCaps.Count) { throw 'Seed and frame-cap lists must not be empty' }
-if (@($Seeds | Select-Object -Unique).Count -ne $Seeds.Count) { throw 'Duplicate seeds' }
-if (@($FrameCaps | Select-Object -Unique).Count -ne $FrameCaps.Count) { throw 'Duplicate frame caps' }
-foreach ($cap in $FrameCaps) { if ($cap -lt 0 -or $cap -gt 240) { throw 'Frame cap must be 0..240' } }
+if (!$Seeds.Count -or !$FrameCaps.Count) { throw '随机种子和帧率上限列表不能为空' }
+if (@($Seeds | Select-Object -Unique).Count -ne $Seeds.Count) { throw '随机种子不能重复' }
+if (@($FrameCaps | Select-Object -Unique).Count -ne $FrameCaps.Count) { throw '帧率上限不能重复' }
+foreach ($cap in $FrameCaps) { if ($cap -lt 0 -or $cap -gt 240) { throw '帧率上限必须在 0 至 240 之间' } }
 $binary = Join-Path $BuildRoot 'CreatureFrontier\Binaries\Win64\CreatureFrontier.exe'
-if (!(Test-Path -LiteralPath $binary)) { throw "Missing binary: $binary" }
+if (!(Test-Path -LiteralPath $binary)) { throw "未找到游戏程序：$binary" }
 $binary = (Resolve-Path -LiteralPath $binary).Path
 $BuildRoot = (Resolve-Path -LiteralPath $BuildRoot).Path
 $binaryHash = (Get-FileHash -LiteralPath $binary -Algorithm SHA256).Hash
@@ -19,7 +19,7 @@ $projectRoot = Split-Path $PSScriptRoot -Parent
 $runName = (Get-Date -Format 'yyyyMMdd-HHmmss') + '-' + [Guid]::NewGuid().ToString('N').Substring(0,8)
 $logRoot = Join-Path $projectRoot "Saved\WorldRoaming\$runName"
 New-Item -ItemType Directory -Path $logRoot | Out-Null
-Write-Host "Logs: $logRoot"
+Write-Host "日志目录：$logRoot"
 $results = @()
 $cases = @()
 foreach ($seed in $Seeds) { foreach ($cap in $FrameCaps) { foreach ($repeat in 1..$Repeats) {
@@ -55,8 +55,8 @@ foreach ($case in $cases) {
     $results += [pscustomobject]@{Seed=$seed;FrameCap=$cap;Repeat=$repeat;Expected=$expected;Pass=$pass;Timeout=$timeout;
         ExitCode=$exitCode;SeedConfirmed=$seedConfirmed;CapConfirmed=$capConfirmed;Fixture=$fixture;SHA256=$binaryHash;Log=$logPath}
     $results | Export-Csv -LiteralPath (Join-Path $logRoot 'Results.csv') -NoTypeInformation -Encoding UTF8
-    Write-Host "seed=$seed cap=$cap repeat=$repeat expected=$expected pass=$pass"
+    Write-Host "随机种子=$seed 帧率上限=$cap 重复次数=$repeat 预期=$expected 通过=$pass"
 }
 $failed = @($results | Where-Object { !$_.Pass })
-if ($failed.Count) { throw "$($failed.Count)/$($results.Count) failed; inspect $logRoot" }
-Write-Host "World roaming: $($results.Count)/$($results.Count) PASS; SHA256=$binaryHash"
+if ($failed.Count) { throw "$($failed.Count)/$($results.Count) 项失败；请检查日志目录：$logRoot" }
+Write-Host "世界巡游：$($results.Count)/$($results.Count) 项通过；程序指纹 SHA256=$binaryHash"
