@@ -174,6 +174,8 @@ struct FAdventure
             return true;
         }
         if(!Defeated && Enemy->Disposition==ECreatureDisposition::Hostile && Now.Y<-2700)Battle=true;
+        // 恢复QA提前进入可瞄准的交战准备区，不等待残血玩家先被自然索敌。
+        if(Mode==3 && RecoveryStage==0 && Now.Y<-2700 && Hero->GetDistanceTo(Enemy)<750)Battle=true;
         if(Battle && !Defeated)
         {
             Input->Direction=FVector::ZeroVector;
@@ -182,7 +184,23 @@ struct FAdventure
                 const auto View=(Enemy->GetActorLocation()-Hero->FirstPersonCamera->GetComponentLocation()).Rotation();Hero->GetController()->SetControlRotation(View);Hero->FirstPersonCamera->SetWorldRotation(View);
                 if(Mode==3 && RecoveryStage==0)
                 {
-                    if(Pet->Health>=Pet->GetMaxHealth())return true;
+                    if(Pet->Health>=Pet->GetMaxHealth() || Enemy->Health>=Enemy->GetMaxHealth())
+                    {
+                        // 通过真实集火指令建立自然伤害前置；玩家保持距离，避免被先击倒。
+                        if(Pet->FocusTarget!=Enemy && Hero->TraceCreature()==Enemy)
+                            if(!CFInputQA::Press(Hero,EKeys::Q))return Fail(TEXT("recovery-prepare-input"));
+                        if(Hero->GetDistanceTo(Enemy)<450)Drive(Now+FVector(0,250,0));
+                        Hero->GetController()->SetControlRotation(View);Hero->FirstPersonCamera->SetWorldRotation(View);
+                        return true;
+                    }
+                    if(Pet->FocusTarget)
+                    {
+                        if(!CFInputQA::Press(Hero,EKeys::F) || Pet->FocusTarget)return Fail(TEXT("recovery-prepare-follow"));
+                        // 取消显式集火不关闭自动护主；及时松开慢行接近并用近战吸引敌人，
+                        // 避免在远处缓慢接近期间让自动支援先击败自然住民。
+                        if(!CFInputQA::Release(Hero,EKeys::LeftShift) || Hero->Pace->IsSlowWalking())return Fail(TEXT("recovery-prepare-pace"));
+                        UE_LOG(LogTemp,Display,TEXT("CF_HOLLOW_RECOVERY_PREPARED PASS heroHP=%.1f petHP=%.1f enemyHP=%.1f"),Hero->Health,Pet->Health,Enemy->Health);
+                    }
                     if(Hero->GetDistanceTo(Enemy)>160)Drive(Enemy->GetActorLocation());
                     Hero->GetController()->SetControlRotation(View);Hero->FirstPersonCamera->SetWorldRotation(View);
                     if(!RecoveryAttackSent && Hero->GetDistanceTo(Enemy)<=180 && Hero->TraceCreature()==Enemy)
