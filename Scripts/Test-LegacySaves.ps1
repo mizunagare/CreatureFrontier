@@ -30,6 +30,9 @@ $results=@()
 if(Test-Path -LiteralPath (Join-Path $LegacyBuildRoot 'CreatureFrontier\Saved\SaveGames\BefriendCross.sav')){
     $cases += @{Slot='BefriendCross';Flag='CFBefriendRead';Marker='CF_BEFRIEND_READ PASS'}
 }
+if(Test-Path -LiteralPath (Join-Path $LegacyBuildRoot 'CreatureFrontier\Saved\SaveGames\HollowCross.sav')){
+    $cases += @{Slot='HollowCross';Flag='CFHollowRead';Marker='CF_HOLLOW_READ PASS'}
+}
 if($IncludeJourneys){$cases+=@{Slot='MemoryDoneCross';Flag='CFMemoryDoneRead';Marker='CF_MEMORY_DONE_READ PASS'}}
 if($IncludeMemories){$cases+=@{Slot='PersonalityCross';Flag='CFMemoryLegacyRead';Marker='CF_MEMORY_LEGACY_READ PASS'}}
 if($IncludeNames){$cases+=@{Slot='NameCross';Flag='CFNameRead';Marker='CF_NAME_READ PASS'};$cases+=@{Slot='NameCross';Flag='CFPersonalityLegacyRead';Marker='CF_PERSONALITY_LEGACY_READ PASS'}}

@@ -25,6 +25,21 @@ bool ACreatureCharacter::OrderAttack(ACreatureCharacter* Target)
     return true;
 }
 
+APawn* ACreatureCharacter::FindVisibleWildThreat(APawn* Player) const
+{
+    APawn* Result=nullptr;float Closest=TNumericLimits<float>::Max();
+    auto Consider=[&](APawn* Candidate)
+    {
+        if(!IsValid(Candidate))return;
+        const float Distance=FVector::Dist2D(GetActorLocation(),Candidate->GetActorLocation());
+        if(Distance<=AggroRange && Distance<Closest && HasClearSight(Candidate)){Result=Candidate;Closest=Distance;}
+    };
+    Consider(Player);
+    for(TActorIterator<ACreatureCharacter> It(GetWorld());It;++It)
+        if(It->Disposition==ECreatureDisposition::Tamed && It->Health>0)Consider(*It);
+    return Result;
+}
+
 bool ACreatureCharacter::IsSpecialReady() const
 {
     return Health > 0 && Nutrition > 0 && Disposition == ECreatureDisposition::Tamed && Stamina >= 20 &&
@@ -42,6 +57,7 @@ bool ACreatureCharacter::RequestSpecial(ACreatureCharacter* Target)
 
 void ACreatureCharacter::ClearCombatOrders()
 {
+    SeenThreat.Reset();SeenThreatRemaining=0;LastSeenThreatLocation=FVector::ZeroVector;
     FocusTarget = nullptr;
     SpecialTarget.Reset();
     bSpecialRequested = false;

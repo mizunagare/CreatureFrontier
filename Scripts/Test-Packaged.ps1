@@ -22,6 +22,7 @@ New-Item -ItemType Directory -Path $testLogRoot -Force | Out-Null
 Write-Host "Fresh test logs: $testLogRoot"
 $cases = @(
     @{Flag='CFSmokeTest'; Marker='CF_SMOKE PASS'},
+    @{Flag='CFWildSightTest'; Marker='CF_WILD_SIGHT PASS'},
     @{Flag='CFHUDLayoutTest'; Marker='CF_HUD_LAYOUT PASS'},
     @{Flag='CFHollowTest'; Marker='CF_HOLLOW PASS'},
     @{Flag='CFHollowRouteTest'; Marker='CF_HOLLOW_ROUTE PASS'},

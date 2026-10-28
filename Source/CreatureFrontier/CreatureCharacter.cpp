@@ -239,6 +239,7 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
     GuardRemaining = FMath::Max(0.0f, GuardRemaining - DeltaSeconds);
     SkillPulseRemaining = FMath::Max(0.0f, SkillPulseRemaining - DeltaSeconds);
     RetaliationRemaining = FMath::Max(0.0f, RetaliationRemaining - DeltaSeconds);
+    SeenThreatRemaining=FMath::Max(0.f,SeenThreatRemaining-DeltaSeconds);
     AlphaCooldown = FMath::Max(0.0f, AlphaCooldown - DeltaSeconds);
     AutoFeedCooldown = FMath::Max(0.0f,AutoFeedCooldown-DeltaSeconds);
     PettingCooldown=FMath::Max(0.f,PettingCooldown-DeltaSeconds);
@@ -320,7 +321,7 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
         {
             if (It->Disposition == ECreatureDisposition::Tamed || It->Health <= 0.0f || It->Activity == ECreatureActivity::ReturnHome) continue;
             const float Distance = OwnerPlayer->GetDistanceTo(*It);
-            if (Distance < Best) { Best = Distance; Enemy = *It; }
+            if (Distance < Best && HasClearSight(*It)) { Best = Distance; Enemy = *It; }
         }
         SetActivity(Enemy ? ECreatureActivity::Combat : ECreatureActivity::Follow);
         if(GetCharacterMovement()->bUseRVOAvoidance!=(Enemy==nullptr)) GetCharacterMovement()->SetAvoidanceEnabled(Enemy==nullptr);
@@ -352,28 +353,31 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
     if (!IsValid(Player)) { AlphaWindup = 0; StopNavigation(); return; }
     if (const auto* Hero = Cast<ACFPlayerCharacter>(Player); Hero && Hero->Health <= 0.0f) { AlphaWindup = 0; StopNavigation(); return; }
 
-    APawn* Target = Player;
-    float Closest = GetDistanceTo(Player);
-    for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It)
-    {
-        if (It->Disposition != ECreatureDisposition::Tamed || It->Health <= 0) continue;
-        const float Distance = GetDistanceTo(*It);
-        if (Distance < Closest) { Closest = Distance; Target = *It; }
-    }
+    APawn* Target=FindVisibleWildThreat(Player);
     bool bProvoked = false;
     if (auto* Aggressor = RetaliationTarget.Get(); Aggressor && RetaliationRemaining > 0 && GetDistanceTo(Aggressor) <= 2000.0f)
     {
         const auto* Pet = Cast<ACreatureCharacter>(Aggressor);
         if (!Pet || Pet->Health > 0) { Target = Aggressor; bProvoked = true; }
     }
-    const FVector Offset = Target->GetActorLocation() - GetActorLocation();
-    const float Distance2D = Offset.Size2D();
     // 温顺物种允许靠近结交；受伤、被挑衅或首领仍走原战斗规则。
     if(!bAlpha && !bProvoked && Definition && Definition->PeacefulFoodCost>=1 && Definition->PeacefulFoodCost<=10 &&
         FMath::IsNearlyEqual(Health,GetMaxHealth(),.01f))
     {TickRoaming(DeltaSeconds);return;}
-    if ((AlphaWindup > 0 || Distance2D <= AggroRange || bProvoked) && TickAlphaAttack(DeltaSeconds, Target)) return;
-    if (Distance2D <= AggroRange || bProvoked)
+    // 没有视线时只追到最后看见的位置，不能持续读取墙后目标的新坐标。
+    if(Target && !bProvoked)
+    {SeenThreat=Target;LastSeenThreatLocation=Target->GetActorLocation();SeenThreatRemaining=3.f;}
+    if(AlphaWindup>0 && TickAlphaAttack(DeltaSeconds,Target))return;
+    if(!Target)
+    {
+        auto* Remembered=SeenThreat.Get();
+        const auto* RememberedPet=Cast<ACreatureCharacter>(Remembered);
+        if(Remembered && SeenThreatRemaining>0 && (!RememberedPet || RememberedPet->Health>0))
+        {Disposition=ECreatureDisposition::Hostile;SetActivity(ECreatureActivity::Combat);NavigateTo(LastSeenThreatLocation,65.f);return;}
+        SeenThreat.Reset();SeenThreatRemaining=0;TickRoaming(DeltaSeconds);return;
+    }
+    if (TickAlphaAttack(DeltaSeconds, Target)) return;
+    if (Target)
     {
         Disposition = ECreatureDisposition::Hostile;
         SetActivity(ECreatureActivity::Combat);
@@ -490,6 +494,7 @@ void ACreatureCharacter::Tame(AController* NewTamer)
     if (!HasAuthority() || !IsValid(NewTamer) || Activity == ECreatureActivity::ReturnHome) return;
     bHasHabitat = false;
     Tamer = NewTamer;
+    ClearCombatOrders();
     AlphaWindup = 0;
     RetaliationTarget.Reset();
     RetaliationRemaining = 0;

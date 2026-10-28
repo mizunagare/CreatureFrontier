@@ -181,6 +181,10 @@ private:
     UPROPERTY() TObjectPtr<UStaticMeshComponent> AlphaWarning;
     UPROPERTY() TObjectPtr<UStaticMeshComponent> CargoPack;
     bool HasClearSight(const AActor* Target) const;
+    APawn* FindVisibleWildThreat(APawn* Player) const;
+    TWeakObjectPtr<APawn> SeenThreat;
+    FVector LastSeenThreatLocation=FVector::ZeroVector;
+    float SeenThreatRemaining=0;
     bool TickSpecial(float DeltaSeconds);
     void ResolveSpecial();
     UPROPERTY() TObjectPtr<UStaticMeshComponent> SkillIndicator;

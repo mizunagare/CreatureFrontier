@@ -66,6 +66,8 @@ void ACFGameMode::BeginPlay()
 {
     Super::BeginPlay();
     SeedFrontierResources(GetWorld());
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFWildSightTest")))
+    {FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunWildSightScenario(GetWorld(),Hero);},1.f,false);return;}
     const int32 HollowMode=FParse::Param(FCommandLine::Get(),TEXT("CFHollowWrite"))?1:FParse::Param(FCommandLine::Get(),TEXT("CFHollowRead"))?2:FParse::Param(FCommandLine::Get(),TEXT("CFHollowRouteTest"))?3:FParse::Param(FCommandLine::Get(),TEXT("CFHollowPreview"))?4:0;
     if(HollowMode || FParse::Param(FCommandLine::Get(),TEXT("CFHollowTest")))
     {FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this,HollowMode](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunHollowScenario(GetWorld(),Hero,HollowMode);},1.f,false);return;}
