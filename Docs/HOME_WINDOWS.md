@@ -1,5 +1,11 @@
 # 开放窗墙
 
+## 旋转专项脚本入口
+
+`Test-HomeWindow.ps1` 新增显式可选 `-RotatedNavigation`，保持默认三项行为不变。新增案例独立检查yaw=90、六样本端点守卫以及30帧上限回显，旧包忽略旋转参数不能凭普通绕行成功误过。CSV记录套件开关；不会将全套选项误作每个进程实际渲染。
+
+实际 `Test-HomeWindow.ps1 -Editor -RotatedNavigation` 在4DAFFACF模块完成一写两读及旋转导航四进程，`Saved/WindowPersistenceQA/20261029-061003-b53a0183/` 全部通过，窗墙输入不变、原专用槽恢复。脚本语法解析通过。F344格式31输入审计另在 `Saved/CargoLegacyAudit/20261029-060935-Verified/` 运行中，尚未记作完整通过；自身完整回归39312仍运行。
+
 ## 旋转朝向伙伴绕行
 
 现有窗墙导航夹具支持附加 `-CFWindowNavigationRotated`（与 `-CFWindowNavigationTest` 同用），绕房间中心旋转90度；模块通过正常付费建造，墙/门/窗朝向规范化，地板屋顶保持原吸附规则。路径查询、终点区域及窗墙穿越判据转回相同局部坐标，开门仍走正常距离/视线/活动区校验，伙伴生成后不传送、不停Tick。
