@@ -35,9 +35,22 @@ foreach($case in $cases){
     if($Preview -and $case.Flag -eq 'CFRescueNaturalResume'){
         $arguments+=@('-CFRescuePreview','-RenderOffscreen','-ForceRes',('-ResX='+$Width),('-ResY='+$Height),'-norhithread','-forcerhibypass','-ExecCmds="t.MaxFPS 60,r.MotionBlurQuality 0,r.DefaultFeature.MotionBlur 0,r.AntiAliasingMethod 1"')
     }else{$arguments+='-nullrhi'}
+    $startedUtc=[DateTime]::UtcNow
     $process=Start-Process -FilePath $exe -WorkingDirectory $working -ArgumentList $arguments -WindowStyle Hidden -PassThru
     if(!$process.WaitForExit($case.Timeout*1000)){$process.Kill();$process.WaitForExit();throw "救助测试超时：$log"}
-    if($process.ExitCode -ne 0 -or !(Select-String -LiteralPath $log -SimpleMatch $case.Marker -Quiet) -or (Select-String -LiteralPath $log -Pattern 'CF_RESCUE.*FAIL|Fatal error|Assertion failed' -Quiet)){throw "救助测试失败：$log"}
+    if($process.ExitCode -ne 0 -or !(Select-String -LiteralPath $log -SimpleMatch $case.Marker -Quiet) -or (Select-String -LiteralPath $log -Pattern 'CF_RESCUE.*FAIL|Fatal error|Assertion failed' -Quiet)){
+        $failureRecords=@()
+        foreach($slot in @('RescueReturnFailure','RescueBattleFailure')){
+            $failureSource=Join-Path $saveRoot ($slot+'.sav')
+            if((Test-Path -LiteralPath $failureSource) -and (Get-Item -LiteralPath $failureSource).LastWriteTimeUtc -ge $startedUtc){
+                Copy-Item -LiteralPath $failureSource -Destination (Join-Path $run ($slot+'.sav'))
+                $failureRecords+=[pscustomobject]@{Flag=$case.Flag;Slot=$slot;SHA256=(Get-FileHash -LiteralPath $failureSource).Hash;Pass=$false;Log=$log}
+            }
+        }
+        if($failureRecords.Count){$failureRecords | Export-Csv -LiteralPath (Join-Path $run 'Failures.csv') -NoTypeInformation}
+        if($inputHash -and (Get-FileHash -LiteralPath $source).Hash -ne $inputHash){throw "救助失败且原输入被改写：$log"}
+        throw "救助测试失败：$log"
+    }
     if(!$inputHash){$inputHash=(Get-FileHash -LiteralPath $source).Hash}
     if((Get-FileHash -LiteralPath $source).Hash -ne $inputHash){throw '倒地输入存档被改写'}
     $inputCopy=Join-Path $run 'Input.sav'

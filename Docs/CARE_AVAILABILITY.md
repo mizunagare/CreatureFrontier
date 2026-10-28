@@ -1,5 +1,19 @@
 # 陪伴操作可用性（开发中）
 
+## 最新定位与修复验证
+
+1920失败中的回程卡点现有直接证据：`Saved/RescueAdventureQA/20261028-180518-ac7ea211/CFRescueNaturalResume.log` 每5秒扫掠持续命中CreatureCharacter_11、生命0；玩家行走模式1、输入未忽略、速度0、最后输入约(0.991,-0.131,0)。因此不是该次输入失效或导航无路，而是导航路径未考虑死亡生物的动态胶囊。早先独立位置探针 `Saved/RescueReturnProbe-Editor.log` 在出发存档场景中扫掠无阻，不能代替战斗后的世界状态，也不能据此排除尸体。
+
+本轮增加失败瞬间专用快照和脚本留存，仅使用RescueReturnFailure/RescueBattleFailure槽，不写正常玩家档。上述失败实际保存RescueReturnFailure成功；Failures.csv与原始副本已留存，SHA-256 `8A51A9FDD9B673C6FB1D9BF5F5AEF184D7113267EAE0C00CCCD8E09072E6EBAB`。脚本只收本次进程之后新写的失败快照，并在失败时核对原输入，避免拿陈旧样本或退出码当成功。
+
+修正限于QA驾驶：前向胶囊扫掠阻挡时选择可通行的侧向/绕行输入，仍由玩家移动组件实际行走；同样用于取得敌人/伙伴瞄准线，防止夹具直顶生物。没有关闭/缩小生物碰撞、穿墙、传送、补血、降低伤害或增加原流程120秒限时。不是新增玩家自动寻路或改变尸体碰撞政策。
+
+失败快照的独立对照均实际执行：`Saved/RescueReturn-Baseline-Editor.log` 直走10秒仅移动0.2厘米、deadBlocker=1，明确发出CF_RESCUE_RETURN_BASELINE BLOCKED；`Saved/RescueReturn-Avoidance-Editor.log` 正常绕行587.5厘米并到达目标、avoided=1，CF_RESCUE_RETURN_REPLAY PASS。两进程均核对8A51A9FD输入不改写。对照不是完整冒险的替代品。
+
+随后原始坏输入6241718D的1920×1080 Editor D3D12全续行与独立最终读取在 `Saved/RescueAdventureQA/20261028-181320-3b2422df/` 通过，脚本退出0，三张实际PNG/独立帧检查通过且已逐张查看。伙伴47.2生命、实际行走4056.5厘米，玩家返家15生命，仍然承受真实危险；输入未改写，专用Editor原4AD07666档随后恢复。游戏模块SHA-256 `9341D3BB860C9B219C276523454C8940AE8A61B537B6AA171F5D27B1B175EAAF`。图中敌人仍可能遮挡伙伴或被选中，不能宣称任意取景延迟均安全或所有视觉问题解决。
+
+最新修正尚未重新打包，Windows坏样本复验、同包三尺寸及完整94进程仍待执行。下文此前失败记录保留，不把一次Editor通过扩大为全部平台验收。
+
 ## 缺口与方案
 
 自然救助实战中，活伙伴对象卡总是展示Y/F6，即使实际操作会因距离、战斗、冷却、体力/饱食或附近野生生物而拒绝。玩家需要在按键前理解当前状态，不能只依赖按键后的错误反馈。
