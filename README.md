@@ -1,5 +1,7 @@
 # 幻兽边境 · Creature Frontier
 
+当前限定验收包：`E:\CreatureFrontierBuilds\Windows-Storage-Chinese\CreatureFrontier.exe`，内部程序 SHA-256 为 `DFAA6F5142D0606A75544D8A847BE92A58119D1CBEF5C3134186CD2CDE2B648B`。格式29，包含归家窗口控制/销毁释放修复、F7水晶/脱险帮助及储物箱中文列对齐/小窗口显示。自己的98类/102进程完整回归、34真实旧档读取、三尺寸仓储图和独立副本三尺寸自然救助七进程/15图均已通过并检查，见[当前验收记录](Docs/STORAGE.md)。此前启动崩溃和文件占用中断仍保留，不算成功记录；原包、玩家存档均保留。仍是灰盒，双倒地、系统持续输入、正式美术/性能和可开关门等尚未完成。以下“当前”为历史交付。
+
 当前限定验收包：`E:\CreatureFrontierBuilds\Windows-Rescue-Pause\CreatureFrontier.exe`，内部EXE SHA-256 `17704D0850003170E81816F303191A4869775F1D59C2F840A7B23922F5E30812`。格式29支持真实脱险救助后的归家回忆、F7安静/庆祝回应及暂停治疗保护；同一程序完整97类/101进程、34真实旧档读取、三尺寸自然链七进程及15张逐图检查通过，详见[脱险归家验收](Docs/RESCUE_MEMORIES.md)。旧包和旧档保留；旧28程序不能读取29开发档，不覆盖原存档。仍为灰盒，帮助F7说明未补全、持续按键失焦、更多生命周期、双倒地与正式美术/性能等尚待。下文旧“当前”均为历史交付。
 
 此前限定验收包：`E:\CreatureFrontierBuilds\Windows-Care-Route\CreatureFrontier.exe`，内部EXE SHA-256为 `C01D79EC11F40F0134CC2E6EF1D0AFB0D4EA3249BD82BFF2ED43C69967EB8F8E`。陪伴提示与实际互动共用只读判据；该固定程序完整90类/94进程已正常结束，94日志均有成功标记且无失败/致命错误，哈希复核未变。另有34旧档读取、三尺寸新救助链和原坏输入复验，详见[陪伴提示验收](Docs/CARE_AVAILABILITY.md)。源码随后补齐的两条测试预览中文提示尚不在此包内。下文旧“当前”均为历史交付；双倒地、正式美术、系统输入及性能等缺口仍在。
