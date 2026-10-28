@@ -89,8 +89,12 @@ void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
                 UE_LOG(LogTemp,Display,TEXT("CF_DOOR_FARM_FOLLOW_AI state=%d immediate=%s"),AI?static_cast<int32>(AI->GetMoveStatus()):-1,AI?*AI->GetImmediateMoveDestination().ToString():TEXT("无"));
             }
             if(Elapsed<8)return;
+            const bool FacingProbe=FParse::Param(FCommandLine::Get(),TEXT("CFDoorFarmFacingProbe"));
+            const FVector Position=Pet->GetActorLocation();
+            const bool Inside=Position.X>-560 && Position.X<-240 && Position.Y>-1000 && Position.Y<-600;
+            UE_LOG(LogTemp,Display,TEXT("CF_DOOR_FARM_DOCK probe=%d inside=%d distance=%.1f"),FacingProbe,Inside,FVector::Dist2D(Position,Pet->GetFollowDestination()));
             End(Farm->StoredFood==0 && Farm->Crop->Seeds==1 && !Farm->Crop->bPlanted && Farm->Crop->GrowthWork==0 &&
-                !Pet->WorkSite && Pet->Activity==ECreatureActivity::Follow && Travel>300 && Pet->GetActorLocation().Y>-1000 &&
+                !Pet->WorkSite && Pet->Activity==ECreatureActivity::Follow && (FacingProbe?Travel>100:(Travel>300 && Inside)) &&
                 FVector::Dist2D(Pet->GetActorLocation(),Pet->GetFollowDestination())<65);return;
         }
         if(Phase==0 && Elapsed>=2)
@@ -137,7 +141,10 @@ void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
                 if(!FParse::Param(FCommandLine::Get(),TEXT("CFDoorFarmCancelOriginalAim")))
                 {
                     Hero->SetActorLocation(FVector(-440,-940,60));
-                    Hero->GetController()->SetControlRotation(FRotator(0,-160,0));Hero->FirstPersonCamera->SetWorldRotation(FRotator(0,-160,0));
+                    float Facing=-160;FParse::Value(FCommandLine::Get(),TEXT("CFDoorFarmFollowYaw="),Facing);
+                    if(!FMath::IsFinite(Facing) || Facing < -180 || Facing > 180){End(false);return;}
+                    Hero->GetController()->SetControlRotation(FRotator(0,Facing,0));Hero->FirstPersonCamera->SetWorldRotation(FRotator(0,Facing,0));
+                    UE_LOG(LogTemp,Display,TEXT("CF_DOOR_FARM_FACING yaw=%.1f"),Facing);
                 }
                 UE_LOG(LogTemp,Display,TEXT("CF_DOOR_FARM_CANCEL_FOLLOW goal=%s"),*Pet->GetFollowDestination().ToString());
             }
