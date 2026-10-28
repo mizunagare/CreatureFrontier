@@ -396,14 +396,21 @@ void RunHollowAdventure(UWorld* World,ACFPlayerCharacter* Hero,int Mode)
             auto* Movement=NewObject<UHomeMovementProbe>(Hero);Movement->RegisterComponent();
             UGameplayStatics::SetGamePaused(World,false);
             const double Started=FPlatformTime::Seconds();const FVector Start=Hero->GetActorLocation();
-            UE_LOG(LogTemp,Display,TEXT("CF_HOLLOW_DYNAMIC_BEGIN reconstructedFocus=1 deterministicReplay=0"));
-            FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([World,Hero,Pet,Enemy,Movement,Goal,Started,Start](float)
+            const bool WaitForPartner=FParse::Param(FCommandLine::Get(),TEXT("CFHollowInspectWait"));
+            UE_LOG(LogTemp,Display,TEXT("CF_HOLLOW_DYNAMIC_BEGIN reconstructedFocus=1 deterministicReplay=0 waitForPartner=%d"),WaitForPartner);
+            FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([World,Hero,Pet,Enemy,Movement,Goal,Started,Start,WaitForPartner](float)
             {
                 if(!IsValid(Hero) || !IsValid(Pet) || !IsValid(Enemy))
                 {UE_LOG(LogTemp,Error,TEXT("CF_HOLLOW_DYNAMIC FAIL actors"));FPlatformMisc::RequestExitWithStatus(false,1);return false;}
                 const FVector Now=Hero->GetActorLocation();
-                Movement->Direction=(Goal-Now).GetSafeNormal2D();
-                Hero->SetActorRotation(Movement->Direction.Rotation());Hero->GetController()->SetControlRotation(Movement->Direction.Rotation());
+                Movement->Direction=WaitForPartner || FVector::Dist2D(Now,Goal)<70?FVector::ZeroVector:(Goal-Now).GetSafeNormal2D();
+                if(WaitForPartner)
+                {
+                    const auto View=(Enemy->GetActorLocation()-Hero->FirstPersonCamera->GetComponentLocation()).Rotation();
+                    Hero->GetController()->SetControlRotation(View);Hero->FirstPersonCamera->SetWorldRotation(View);
+                }
+                else if(!Movement->Direction.IsNearlyZero())
+                {Hero->SetActorRotation(Movement->Direction.Rotation());Hero->GetController()->SetControlRotation(Movement->Direction.Rotation());}
                 FHitResult Block;FCollisionQueryParams Params(SCENE_QUERY_STAT(HollowDynamic),false,Hero);
                 const auto* Shape=Hero->GetCapsuleComponent();
                 World->SweepSingleByChannel(Block,Now,Now+Movement->Direction*100,FQuat::Identity,ECC_Pawn,
