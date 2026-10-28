@@ -32,22 +32,29 @@ bool ACFPlayerCharacter::PetCompanion(ACreatureCharacter* Pet)
 {return InteractCompanion(Pet,false);}
 bool ACFPlayerCharacter::PlayWithCompanion(ACreatureCharacter* Pet)
 {return InteractCompanion(Pet,true);}
-bool ACFPlayerCharacter::InteractCompanion(ACreatureCharacter* Pet,bool Playful)
+bool ACFPlayerCharacter::CanInteractCompanion(ACreatureCharacter* Pet,bool Playful,FString& OutReason) const
 {
+    OutReason.Reset();
     if(!HasAuthority() || Health<=0 || UGameplayStatics::IsGamePaused(this) || !IsValid(Pet) || Pet->IsActorBeingDestroyed() || Pet->GetWorld()!=GetWorld() || Pet->Health<=0 || Pet->Disposition!=ECreatureDisposition::Tamed || Pet->Tamer!=GetController() || GetDistanceTo(Pet)>250)
-    { Feedback=TEXT("请瞄准2.5米内自己存活的伙伴进行抚摸"); return false; }
+    { OutReason=TEXT("请瞄准2.5米内自己存活的伙伴进行抚摸"); return false; }
     if((Pet->Activity!=ECreatureActivity::Follow && Pet->Activity!=ECreatureActivity::Rest) || Pet->FocusTarget || Pet->SpecialWindupRemaining>0)
-    { Feedback=TEXT("伙伴正忙，请先让它跟随或休息"); return false; }
-    if(Pet->PettingCooldown>0) { Feedback=FString::Printf(TEXT("再等%.0f秒后才能抚摸这位伙伴"),FMath::CeilToFloat(Pet->PettingCooldown)); return false; }
+    { OutReason=TEXT("伙伴正忙，请先让它跟随或休息"); return false; }
+    if(Pet->PettingCooldown>0) { OutReason=FString::Printf(TEXT("再等%.0f秒后才能抚摸这位伙伴"),FMath::CeilToFloat(Pet->PettingCooldown)); return false; }
     const auto Style=Playful?ECompanionPreference::Playful:ECompanionPreference::Quiet;
     if(!Pet->Personality->CanRespond(Style))
-    {Feedback=TEXT("玩耍需要跟随中的伙伴、至少20体力和饱食，且不在休息待复工");return false;}
+    {OutReason=TEXT("玩耍需要跟随中的伙伴、至少20体力和饱食，且不在休息待复工");return false;}
     for(TActorIterator<ACreatureCharacter> It(GetWorld());It;++It)
         if(It->Disposition!=ECreatureDisposition::Tamed && It->Health>0 && It->Activity!=ECreatureActivity::ReturnHome && Pet->GetDistanceTo(*It)<600)
-        { Feedback=TEXT("野生生物离得太近，请先到安全地点"); return false; }
+        { OutReason=TEXT("野生生物离得太近，请先到安全地点"); return false; }
     FHitResult Hit; FCollisionQueryParams Params(SCENE_QUERY_STAT(PettingSight),false,this);
     if(GetWorld()->LineTraceSingleByChannel(Hit,GetPawnViewLocation(),Pet->GetActorLocation(),ECC_Visibility,Params) && Hit.GetActor()!=Pet)
-    { Feedback=TEXT("伙伴被障碍物遮挡"); return false; }
+    { OutReason=TEXT("伙伴被障碍物遮挡"); return false; }
+    return true;
+}
+bool ACFPlayerCharacter::InteractCompanion(ACreatureCharacter* Pet,bool Playful)
+{
+    FString Reason;if(!CanInteractCompanion(Pet,Playful,Reason)){Feedback=Reason;return false;}
+    const auto Style=Playful?ECompanionPreference::Playful:ECompanionPreference::Quiet;
     Feedback=Pet->Personality->Respond(Style);
     return true;
 }

@@ -56,6 +56,7 @@ public:
     bool PetCompanion(ACreatureCharacter* Pet);
     bool PlayWithCompanion(ACreatureCharacter* Pet);
     bool InteractCompanion(ACreatureCharacter* Pet,bool Playful);
+    bool CanInteractCompanion(ACreatureCharacter* Pet,bool Playful,FString& OutReason) const;
     void PlayAimedCompanion();
     void RecallAimedJourney();
     void PetAimedCompanion();

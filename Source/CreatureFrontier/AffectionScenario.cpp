@@ -29,11 +29,15 @@ void RunAffectionScenario(UWorld* World,ACFPlayerCharacter* Hero)
     const FTransform Transform(FRotator(0,180,0),FVector(-350,-1050,40));
     auto* Pet=World->SpawnActorDeferred<ACreatureCharacter>(ACreatureCharacter::StaticClass(),Transform); Pet->Definition=Definition; Pet->FinishSpawning(Transform); Pet->Tame(Hero->GetController()); Pet->SetActorTickEnabled(false); Pet->GetCharacterMovement()->DisableMovement();
     const float HP=Pet->Health,Stamina=Pet->Stamina; const int32 XP=Pet->Experience;
+    FString QueryReason;Hero->Feedback=TEXT("照料查询不改变反馈");
+    bool Query=true;for(int32 I=0;I<5;++I)Query &= Hero->CanInteractCompanion(Pet,false,QueryReason) && QueryReason.IsEmpty();
+    Query &= Hero->Feedback==TEXT("照料查询不改变反馈") && Pet->BondPoints==0 && Pet->PettingCooldown==0 && Pet->Health==HP && Pet->Stamina==Stamina && Pet->Experience==XP;
     bool Care=Hero->PetCompanion(Pet) && Pet->BondPoints==2 && Pet->PettingCooldown==30 && !Hero->PetCompanion(Pet);
     Pet->UpdateCreaturePresentation(.05f); Care &= Pet->GetVisualState()==TEXT("Affection") && Pet->Health==HP && Pet->Stamina==Stamina && Pet->Experience==XP && Hero->Inventory->Count(EFrontierItem::Food)==3;
     for(int32 Step=0;Step<30;++Step) Pet->UpdateCreaturePresentation(.1f); Care &= Pet->GetVisualState()==TEXT("Idle");
     Pet->Tick(10); Care &= FMath::IsNearlyEqual(Pet->PettingCooldown,20.f,.001f);
     Pet->PettingCooldown=0;
+    Pet->SetActivity(ECreatureActivity::Combat);Query &= !Hero->CanInteractCompanion(Pet,false,QueryReason) && !QueryReason.IsEmpty() && !Hero->PetCompanion(Pet) && Hero->Feedback==QueryReason;Pet->SetActivity(ECreatureActivity::Follow);
     Pet->SetActivity(ECreatureActivity::Work); bool Gates=!Hero->PetCompanion(Pet); Pet->SetActivity(ECreatureActivity::Combat); Gates &= !Hero->PetCompanion(Pet); Pet->SetActivity(ECreatureActivity::Follow);
     Pet->SetActorLocation(FVector(-100,-1050,40)); Gates &= !Hero->PetCompanion(Pet); Pet->SetActorLocation(Transform.GetLocation());
     auto* Wall=World->SpawnActor<AStaticMeshActor>(FVector(-440,-1050,70),FRotator::ZeroRotator); Wall->GetStaticMeshComponent()->SetMobility(EComponentMobility::Movable); Wall->GetStaticMeshComponent()->SetStaticMesh(LoadObject<UStaticMesh>(nullptr,TEXT("/Engine/BasicShapes/Cube.Cube"))); Wall->GetStaticMeshComponent()->SetCollisionProfileName(TEXT("BlockAll")); Wall->SetActorScale3D(FVector(.2,2,2));
@@ -77,7 +81,8 @@ void RunAffectionScenario(UWorld* World,ACFPlayerCharacter* Hero)
     if(Snapshot) { Snapshot->FormatVersion=15; Legacy=UGameplayStatics::SaveGameToSlot(Snapshot,TEXT("FrontierAffectionLegacy"),0) && Hero->LoadProgress(TEXT("FrontierAffectionLegacy")); Pet=FindPet(); Legacy &= Pet && Pet->BondPoints==0 && Pet->PettingCooldown==0; }
     bool Response=Pet && Hero->PetCompanion(Pet);
     if(Pet) { Pet->UpdateCreaturePresentation(.1f); Response &= Pet->GetVisualState()==TEXT("Affection") && Pet->BondPoints==2; }
-    const bool Passed=Care && Gates && PausedCare && Feed && Saved && Invalid && Legacy && Response;
+    const bool Passed=Query && Care && Gates && PausedCare && Feed && Saved && Invalid && Legacy && Response;
+    UE_LOG(LogTemp,Display,TEXT("CF_CARE_QUERY %s readonly=%d"),Query?TEXT("PASS"):TEXT("FAIL"),Query);
     UE_LOG(LogTemp,Display,TEXT("CF_AFFECTION %s care=%d gates=%d paused=%d feed=%d save=%d invalid=%d legacy=%d response=%d"),Passed?TEXT("PASS"):TEXT("FAIL"),Care,Gates,PausedCare,Feed,Saved,Invalid,Legacy,Response);
     if(Passed && FParse::Param(FCommandLine::Get(),TEXT("CFAffectionPreview")))
     {

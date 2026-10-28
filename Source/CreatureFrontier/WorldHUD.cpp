@@ -75,7 +75,10 @@ void ACFHUD::DrawWorldHUD(ACFPlayerCharacter* Player)
             const FString Activity=FrontierChinese::Activity(Creature->Activity);
             Rows.Add({FString::Printf(TEXT("%s | 体力 %.0f | 饱食 %.0f | 经验 %d/%d"),*Activity,Creature->Stamina,Creature->Nutrition,Creature->Experience,Creature->Level*100),Green,2});
             Rows.Add({FString::Printf(TEXT("%s | %s %.1f秒"),*Creature->GetSpecialName(),Creature->SpecialWindupRemaining>0?TEXT("蓄力"):TEXT("冷却"),Creature->SpecialWindupRemaining>0?Creature->SpecialWindupRemaining:Creature->SpecialCooldownRemaining),Yellow,2});
-            Rows.Add({TEXT("Y 安静陪伴 / F6 玩耍（安全距离2.5米）| J 喂食 | P 治疗"),Yellow,2});Rows.Add({TEXT("F4 命名 | F7 归家回忆 | F 跟随 | T 休息"),Yellow});
+            FString QuietReason,PlayReason;const bool Quiet=Player->CanInteractCompanion(Creature,false,QuietReason),Play=Player->CanInteractCompanion(Creature,true,PlayReason);
+            Rows.Add({Quiet?(Play?FString(TEXT("Y 安静陪伴 / F6 玩耍（安全距离2.5米）")):FString(TEXT("Y 安静陪伴 | F6 暂不可用："))+PlayReason):FString(TEXT("陪伴暂不可用："))+QuietReason,Yellow,2});
+            Rows.Add({TEXT("J 喂食 | P 治疗 | F 跟随 | T 休息"),Yellow});
+            Rows.Add({TEXT("F4 命名 / F7 归家回忆（安全空闲时）"),Yellow});
             const auto Job=Creature->GetGatheringStatus();if(!Job.IsEmpty())Rows.Add({Job,Yellow,2});
             if(Creature->FeedingSite.IsValid())Rows.Add({TEXT("寻找食物中，保留工作指派"),Yellow});
             else if(Creature->bResumeWorkAfterRest)Rows.Add({TEXT("自动休息：体力80 / 饱食20 / 生命80%后复工"),Yellow,2});
