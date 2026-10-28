@@ -1,0 +1,72 @@
+#include "HomeDoorScenario.h"
+#include "HomeModule.h"
+#include "CFPlayerCharacter.h"
+#include "CreatureCharacter.h"
+#include "CreatureDefinition.h"
+#include "WorkStation.h"
+#include "FarmCropComponent.h"
+#include "BaseBuildingComponent.h"
+#include "Camera/CameraComponent.h"
+#include "TimerManager.h"
+#include "NavigationSystem.h"
+#include "NavigationPath.h"
+
+void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero)
+{
+    // 固定房间只验证单伙伴工作，不替代自由放置、长期运输或自然冒险。
+    auto* Door=CFDoorNavigationQA::Room(World,Hero,0);
+    auto* Definition=LoadObject<UCreatureDefinition>(nullptr,TEXT("/Game/Creatures/DA_Mosskip.DA_Mosskip"));
+    auto Finish=[](bool Pass)
+    {UE_LOG(LogTemp,Display,TEXT("CF_DOOR_FARM %s"),Pass?TEXT("PASS"):TEXT("FAIL"));FPlatformMisc::RequestExitWithStatus(false,Pass?0:1);};
+    if(!Door || !Definition){Finish(false);return;}
+    const FTransform FarmTransform(FRotator::ZeroRotator,FVector(-400,-700,5),FVector(2,1,.7));
+    Hero->Building->Selected=EWorkSpecialty::Farming;
+    auto* Farm=Hero->Building->BuildAt(FarmTransform);
+    if(!Farm){UE_LOG(LogTemp,Display,TEXT("CF_DOOR_FARM_FIXTURE %s"),*Hero->Feedback);Finish(false);return;}
+    Farm->Crop->Seeds=1;
+    const auto Timer=MakeShared<FTimerHandle>();
+    World->GetTimerManager().SetTimer(*Timer,[World,Hero,Door,Farm,Definition,Timer,Finish,Phase=0,At=World->GetTimeSeconds(),Pet=static_cast<ACreatureCharacter*>(nullptr),Previous=FVector::ZeroVector,Travel=0.,Continuous=true]() mutable
+    {
+        auto End=[&](bool Pass)
+        {
+            UE_LOG(LogTemp,Display,TEXT("CF_DOOR_FARM_STATE phase=%d food=%d seeds=%d growth=%.2f travel=%.1f continuous=%d pet=%s"),Phase,Farm->StoredFood,Farm->Crop->Seeds,Farm->Crop->GrowthWork,Travel,Continuous,Pet?*Pet->GetActorLocation().ToString():TEXT("无"));
+            FTimerHandle Handle=*Timer;World->GetTimerManager().ClearTimer(Handle);Finish(Pass);
+        };
+        const double Elapsed=World->GetTimeSeconds()-At;
+        if(Pet){const auto Now=Pet->GetActorLocation();const double Step=FVector::Dist2D(Now,Previous);Travel+=Step;Previous=Now;Continuous &= Step<120;if(!Continuous || Pet->Health<=0 || Hero->Health<=0){End(false);return;}}
+        if(Phase==0 && Elapsed>=2)
+        {
+            Hero->SetActorLocation(FVector(-510,-730,60));
+            const FTransform Transform(FVector(-400,-1350,60));
+            Pet=World->SpawnActorDeferred<ACreatureCharacter>(ACreatureCharacter::StaticClass(),Transform,nullptr,nullptr,ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+            if(!Pet){End(false);return;}
+            Pet->Definition=Definition;Pet->FinishSpawning(Transform);Pet->Tame(Hero->GetController());Previous=Pet->GetActorLocation();
+            // 使用玩家现有工作命令；看向上方避免优先命中门或野外资源。
+            Hero->GetController()->SetControlRotation(FRotator(70,0,0));Hero->FirstPersonCamera->SetWorldRotation(FRotator(70,0,0));Hero->CommandWork();
+            if(Pet->WorkSite!=Farm || Pet->Activity!=ECreatureActivity::Work){End(false);return;}
+            Phase=1;At=World->GetTimeSeconds();return;
+        }
+        if(Phase==1)
+        {
+            const bool Unchanged=Farm->StoredFood==0 && Farm->Crop->Seeds==1 && !Farm->Crop->bPlanted && Farm->Crop->GrowthWork==0;
+            if(!Unchanged || Pet->GetActorLocation().Y>-1000){End(false);return;}
+            if(Elapsed<12)return;
+            UE_LOG(LogTemp,Display,TEXT("CF_DOOR_FARM_CLOSED PASS"));
+            Hero->SetActorLocation(FVector(-400,-720,60));
+            const auto Rotation=(FVector(-555,-1000,120)-Hero->FirstPersonCamera->GetComponentLocation()).Rotation();
+            Hero->GetController()->SetControlRotation(Rotation);Hero->FirstPersonCamera->SetWorldRotation(Rotation);
+            if(!Door->ToggleDoor(Hero) || Door->DoorState!=2){End(false);return;}
+            FNavLocation Goal;auto* Nav=FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
+            const bool Projected=Nav && Nav->ProjectPointToNavigation(Farm->GetActorLocation(),Goal,FVector(250,250,300));
+            auto* Path=Projected?UNavigationSystemV1::FindPathToLocationSynchronously(World,Pet->GetActorLocation(),Goal.Location,Pet):nullptr;
+            UE_LOG(LogTemp,Display,TEXT("CF_DOOR_FARM_PATH projected=%d goal=%s valid=%d partial=%d activity=%d stamina=%.1f nutrition=%.1f"),Projected,*Goal.Location.ToString(),Path && Path->IsValid(),Path && Path->IsPartial(),static_cast<int32>(Pet->Activity),Pet->Stamina,Pet->Nutrition);
+            Phase=2;At=World->GetTimeSeconds();return;
+        }
+        if(Phase==2)
+        {
+            if(Farm->StoredFood==0 && Elapsed<22)return;
+            End(Farm->StoredFood==1 && Farm->Crop->Seeds==0 && !Farm->Crop->bPlanted && Farm->Crop->GrowthWork==0 &&
+                Pet->WorkSite==Farm && Pet->Activity==ECreatureActivity::Work && Pet->GetActorLocation().Y>-1000 && Travel>300 && Continuous);
+        }
+    },.05f,true);
+}

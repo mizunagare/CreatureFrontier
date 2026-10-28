@@ -70,6 +70,8 @@ void ACFGameMode::BeginPlay()
 {
     Super::BeginPlay();
     SeedFrontierResources(GetWorld());
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFDoorFarmTest")))
+    {FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunHomeDoorFarmScenario(GetWorld(),Hero);},1.f,false);return;}
     if(FParse::Param(FCommandLine::Get(),TEXT("CFDoorPlayerTest")) || FParse::Param(FCommandLine::Get(),TEXT("CFDoorPlayerRotatedTest")))
     {const bool Rotated=FParse::Param(FCommandLine::Get(),TEXT("CFDoorPlayerRotatedTest"));FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this,Rotated](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunHomeDoorPlayerScenario(GetWorld(),Hero,Rotated);},1.f,false);return;}
     if(FParse::Param(FCommandLine::Get(),TEXT("CFDoorNavigationTest")) || FParse::Param(FCommandLine::Get(),TEXT("CFDoorNavigationRotatedTest")))
