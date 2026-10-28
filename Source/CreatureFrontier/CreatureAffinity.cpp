@@ -8,8 +8,8 @@ namespace CreatureAffinity
     }
     const TCHAR* FamilyName(const UCreatureDefinition* Definition)
     {
-        if(!Known(Definition)) return TEXT("Untyped");
-        return Definition->Form==ECreatureForm::Leaf?TEXT("Leaf"):Definition->Form==ECreatureForm::Ember?TEXT("Ember"):TEXT("Stone");
+        if(!Known(Definition)) return TEXT("无属性");
+        return Definition->Form==ECreatureForm::Leaf?TEXT("草叶"):Definition->Form==ECreatureForm::Ember?TEXT("余烬"):TEXT("岩石");
     }
     float Multiplier(const UCreatureDefinition* Attacker,const UCreatureDefinition* Defender)
     {
@@ -21,9 +21,9 @@ namespace CreatureAffinity
     }
     FString Describe(const UCreatureDefinition* Definition)
     {
-        if(!Known(Definition)) return TEXT("Untyped - normal damage");
-        const TCHAR* Strong=Definition->Form==ECreatureForm::Leaf?TEXT("Stone"):Definition->Form==ECreatureForm::Stone?TEXT("Ember"):TEXT("Leaf");
-        const TCHAR* Weak=Definition->Form==ECreatureForm::Leaf?TEXT("Ember"):Definition->Form==ECreatureForm::Stone?TEXT("Leaf"):TEXT("Stone");
-        return FString::Printf(TEXT("%s > %s x1.5 | vs %s x0.75"),FamilyName(Definition),Strong,Weak);
+        if(!Known(Definition)) return TEXT("无属性，伤害正常");
+        const TCHAR* Strong=Definition->Form==ECreatureForm::Leaf?TEXT("岩石"):Definition->Form==ECreatureForm::Stone?TEXT("余烬"):TEXT("草叶");
+        const TCHAR* Weak=Definition->Form==ECreatureForm::Leaf?TEXT("余烬"):Definition->Form==ECreatureForm::Stone?TEXT("草叶"):TEXT("岩石");
+        return FString::Printf(TEXT("%s 克制 %s ×1.5 | 对 %s ×0.75"),FamilyName(Definition),Strong,Weak);
     }
 }

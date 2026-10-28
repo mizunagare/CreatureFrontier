@@ -40,12 +40,12 @@ void ACFPlayerCharacter::SelectRosterCompanion()
 bool ACFPlayerCharacter::SelectCompanion(ACreatureCharacter* Pet)
 {
     if (!HasAuthority() || !GetController() || Health <= 0 || !IsValid(Pet) || Pet->Disposition != ECreatureDisposition::Tamed || Pet->Tamer != GetController() || Pet->Health <= 0 || GetDistanceTo(Pet) > 1200)
-    { Feedback = TEXT("Aim at your living companion within 12m to select it"); return false; }
+    { Feedback = TEXT("请瞄准12米内自己存活的伙伴进行选择"); return false; }
     FHitResult Hit; FCollisionQueryParams Params(SCENE_QUERY_STAT(CompanionSelection),false,this);
     if (GetWorld()->LineTraceSingleByChannel(Hit,FirstPersonCamera->GetComponentLocation(),Pet->GetActorLocation(),ECC_Visibility,Params) && Hit.GetActor() != Pet)
-    { Feedback = TEXT("Companion selection is blocked by cover"); return false; }
+    { Feedback = TEXT("障碍物阻挡了伙伴选择"); return false; }
     SelectedCompanion = Pet; bSingleCompanionMode = true;
-    Feedback = Pet->GetCreatureName()+TEXT(" selected. F/E/T/Q and G skill affect this companion; G aimed at a garden tends it; K returns to ALL");
+    Feedback = Pet->GetCreatureName()+TEXT("已选择。F/E/T/Q和G技能仅指挥它；瞄准农圃按G照料；K恢复全队指挥");
     return true;
 }
 
@@ -54,7 +54,7 @@ void ACFPlayerCharacter::SelectAimedCompanion() { SelectCompanion(TraceCreature(
 void ACFPlayerCharacter::ClearCompanionSelection()
 {
     SelectedCompanion.Reset(); bSingleCompanionMode = false;
-    Feedback = TEXT("Commands target ALL companions. L selects an aimed companion");
+    Feedback = TEXT("当前指挥全部伙伴，L 选择瞄准的单个伙伴");
 }
 
 bool ACFPlayerCharacter::IsCommandTarget(const ACreatureCharacter* Pet) const
@@ -65,9 +65,9 @@ bool ACFPlayerCharacter::IsCommandTarget(const ACreatureCharacter* Pet) const
 
 FString ACFPlayerCharacter::GetCommandScopeText() const
 {
-    if (!bSingleCompanionMode) return TEXT("ALL companions | L select aimed | K all");
+    if (!bSingleCompanionMode) return TEXT("全队指挥 | L 选择瞄准伙伴 | K 全队");
     const auto* Pet = SelectedCompanion.Get();
-    if (!Pet || Pet->Tamer != GetController()) return TEXT("Selection lost - commands blocked | L select | K all");
-    return Pet->Health > 0 ? TEXT("ONLY ")+Pet->GetCreatureName()+TEXT(" | L select | K all") :
-        TEXT("Selected companion downed - commands blocked | P treat | K all");
+    if (!Pet || Pet->Tamer != GetController()) return TEXT("选择已失效，命令暂停 | L 重选 | K 全队");
+    return Pet->Health > 0 ? TEXT("仅指挥 ")+Pet->GetCreatureName()+TEXT(" | L 选择 | K 全队") :
+        TEXT("所选伙伴已倒下，命令暂停 | P 治疗 | K 全队");
 }

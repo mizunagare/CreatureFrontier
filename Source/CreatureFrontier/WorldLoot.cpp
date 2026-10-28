@@ -33,6 +33,7 @@ AWorldLoot::AWorldLoot()
 void AWorldLoot::BeginPlay()
 {
     Super::BeginPlay();
+    Label->SetHiddenInGame(true);
     auto* Color = Marker->CreateDynamicMaterialInstance(0);
     if (Color) Color->SetVectorParameterValue(TEXT("Tint"), FLinearColor(1,.65f,.04f));
 }
@@ -48,8 +49,8 @@ bool AWorldLoot::Collect(ACFPlayerCharacter* Hero)
     };
     Transfer(EFrontierItem::Material, Materials);
     Transfer(EFrontierItem::Medicine, Medicine);
-    if (Picked > 0) Hero->Feedback = FString::Printf(TEXT("Collected loot: %d items%s"), Picked,
-        Materials + Medicine > 0 ? TEXT(" (remaining cache: inventory full)") : TEXT(""));
+    if (Picked > 0) Hero->Feedback = FString::Printf(TEXT("已收取掉落物：%d个物品%s"), Picked,
+        Materials + Medicine > 0 ? TEXT("（背包已满，剩余物资包已保留）") : TEXT(""));
     if (Materials <= 0 && Medicine <= 0) Destroy();
     return Picked > 0;
 }
@@ -57,7 +58,7 @@ bool AWorldLoot::Collect(ACFPlayerCharacter* Hero)
 void AWorldLoot::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
-    Label->SetText(FText::FromString(FString::Printf(TEXT("LOOT %d materials / %d medicine"), Materials, Medicine)));
+    Label->SetText(FText::FromString(FString::Printf(TEXT("掉落物：%d材料 / %d药品"), Materials, Medicine)));
     auto* Hero = Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerPawn(this, 0));
     if (Hero) { Label->SetWorldRotation((Hero->GetActorLocation() - Label->GetComponentLocation()).Rotation()); Collect(Hero); }
 }

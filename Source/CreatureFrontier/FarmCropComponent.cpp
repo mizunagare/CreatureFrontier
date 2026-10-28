@@ -11,8 +11,8 @@ int32 UFarmCropComponent::Stage() const
 { return !bPlanted?-1:GrowthWork>=RequiredWork?3:GrowthWork>=RequiredWork*2/3?2:GrowthWork>=RequiredWork/3?1:0; }
 FString UFarmCropComponent::Status() const
 {
-    const TCHAR* State=Stage()<0?TEXT("EMPTY"):Stage()==0?TEXT("SEEDLING"):Stage()==1?TEXT("GROWING"):Stage()==2?TEXT("FLOWERING"):TEXT("RIPE");
-    return FString::Printf(TEXT("%s %.1f/6 | SEEDS %d/30\nG sow/tend/harvest | F2 seed+ F3 seed-"),State,GrowthWork,Seeds);
+    const TCHAR* State=Stage()<0?TEXT("空地"):Stage()==0?TEXT("幼苗"):Stage()==1?TEXT("生长中"):Stage()==2?TEXT("开花中"):TEXT("已成熟");
+    return FString::Printf(TEXT("%s %.1f/6 | 种子 %d/30\nG 播种/照料/收获 | F2 存入种子 F3 取出种子"),State,GrowthWork,Seeds);
 }
 void UFarmCropComponent::Refresh()
 { if(auto* Site=Cast<AWorkStation>(GetOwner())) Site->RefreshFarm(); }
@@ -50,7 +50,7 @@ bool UFarmCropComponent::Interact(ACFPlayerCharacter* Hero,int32 Mode)
         { GrowthWork=FMath::Min(RequiredWork,GrowthWork+1); NextManualWork=GetWorld()->GetTimeSeconds()+1;Done=true; }
     }
     if(Done) Refresh();
-    Hero->Feedback=Done?Status():TEXT("Garden unchanged: seed / capacity / 1s tending cooldown; O withdraws harvested food");
+    Hero->Feedback=Done?Status():TEXT("农圃未改变：请检查种子、容量或1秒照料冷却；O 取出收获的食物");
     return Done;
 }
 bool UFarmCropComponent::Work(ACreatureCharacter* Pet,ACFPlayerCharacter* Hero,float Amount)

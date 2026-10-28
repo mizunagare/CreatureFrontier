@@ -47,9 +47,9 @@ bool UCompanionNamingComponent::RenameCompanion(ACreatureCharacter* Pet,const FS
 {
     auto* Hero=Cast<ACFPlayerCharacter>(GetOwner());const FString Name=Input.TrimStartAndEnd();
     if(!CanRename(Pet) || !IsValidName(Name) || (UGameplayStatics::IsGamePaused(this) && (!IsOpen() || Target.Get()!=Pet)))
-    {if(Hero) Hero->Feedback=TEXT("Name unchanged: own safe idle companion within 2.5m; one line, max 24 UTF-16 units");return false;}
+    {if(Hero) Hero->Feedback=TEXT("命名未改变：需在2.5米内瞄准自己的安全空闲伙伴；限单行、24个UTF-16单元");return false;}
     if(Pet->Nickname!=Name) {Pet->Nickname=Name;Pet->AcknowledgeName();}
-    Hero->Feedback=FString::Printf(TEXT("%s | %s | this individual keeps its identity; name grants no stats or bond"),*Pet->GetCreatureName(),*Pet->GetSpeciesName());
+    Hero->Feedback=FString::Printf(TEXT("%s | %s | 保留个体身份，命名不增加属性或亲密度"),*Pet->GetCreatureName(),*Pet->GetSpeciesName());
     return true;
 }
 bool UCompanionNamingComponent::Open(ACreatureCharacter* Pet)
@@ -58,21 +58,21 @@ bool UCompanionNamingComponent::Open(ACreatureCharacter* Pet)
     if(IsOpen() || !CanRename(Pet) || !PC || !GetWorld()->GetGameViewport() || !FSlateApplication::IsInitialized() ||
         UGameplayStatics::IsGamePaused(this) || Hero->Building->IsActive() || Hero->Storage->IsOpen() || Hero->IsBackpackOpen() || Hero->IsJournalOpen() || Hero->IsHelpVisible()) return false;
     if(!UGameplayStatics::SetGamePaused(this,true)) return false;
-    Hero->Feedback=TEXT("Enter confirms; Esc cancels. Blank restores the species name. Changes are saved with F5 after closing.");
+    Hero->Feedback=TEXT("Enter 确认，Esc 取消。留空恢复物种名。关闭后按 F5 保存。");
     if(Hero->IsRosterOpen()) Hero->ToggleRoster();
     Target=Pet;Hero->CancelMeleeAttack();Hero->GetCharacterMovement()->StopMovementImmediately();Hero->ConsumeMovementInputVector();Hero->StopJumping();
     auto CommitEntry=[this](){if(Entry.IsValid()) Commit(Entry->GetText().ToString());return FReply::Handled();};
     Dialog=SNew(SBorder).HAlign(HAlign_Center).VAlign(VAlign_Center).Padding(24)
     [SNew(SBox).WidthOverride(760)
         [SNew(SVerticalBox)
-            +SVerticalBox::Slot().AutoHeight().Padding(8)[SNew(STextBlock).Font(FCoreStyle::GetDefaultFontStyle("Regular",24)).Text(FText::FromString(TEXT("Name your companion | WORLD PAUSED")))]
-            +SVerticalBox::Slot().AutoHeight().Padding(8)[SNew(STextBlock).Font(FCoreStyle::GetDefaultFontStyle("Regular",18)).Text(FText::FromString(Pet->GetSpeciesName()+TEXT(" | blank restores the species name | 24 UTF-16 units")))]
+            +SVerticalBox::Slot().AutoHeight().Padding(8)[SNew(STextBlock).Font(FCoreStyle::GetDefaultFontStyle("Regular",24)).Text(FText::FromString(TEXT("给伙伴命名 | 世界已暂停")))]
+            +SVerticalBox::Slot().AutoHeight().Padding(8)[SNew(STextBlock).Font(FCoreStyle::GetDefaultFontStyle("Regular",18)).Text(FText::FromString(Pet->GetSpeciesName()+TEXT(" | 留空恢复物种名 | 限24个UTF-16单元")))]
             +SVerticalBox::Slot().AutoHeight().Padding(8)
             [SAssignNew(Entry,SEditableTextBox).Font(FCoreStyle::GetDefaultFontStyle("Regular",22)).Text(FText::FromString(Pet->Nickname)).SelectAllTextWhenFocused(true)
                 .OnTextCommitted_Lambda([this](const FText& Text,ETextCommit::Type Type){if(Type==ETextCommit::OnEnter) Commit(Text.ToString());})
                 .OnKeyDownHandler_Lambda([this](const FGeometry&,const FKeyEvent& Event){if(Event.GetKey()==EKeys::Escape){Close();return FReply::Handled();}return FReply::Unhandled();})]
-            +SVerticalBox::Slot().AutoHeight().Padding(8)[SNew(SButton).OnClicked_Lambda(CommitEntry)[SNew(STextBlock).Font(FCoreStyle::GetDefaultFontStyle("Regular",18)).Text(FText::FromString(TEXT("Confirm / Enter")))]]
-            +SVerticalBox::Slot().AutoHeight().Padding(8)[SNew(SButton).OnClicked_Lambda([this](){Close();return FReply::Handled();})[SNew(STextBlock).Font(FCoreStyle::GetDefaultFontStyle("Regular",18)).Text(FText::FromString(TEXT("Cancel / Esc")))]]
+            +SVerticalBox::Slot().AutoHeight().Padding(8)[SNew(SButton).OnClicked_Lambda(CommitEntry)[SNew(STextBlock).Font(FCoreStyle::GetDefaultFontStyle("Regular",18)).Text(FText::FromString(TEXT("确认 / Enter")))]]
+            +SVerticalBox::Slot().AutoHeight().Padding(8)[SNew(SButton).OnClicked_Lambda([this](){Close();return FReply::Handled();})[SNew(STextBlock).Font(FCoreStyle::GetDefaultFontStyle("Regular",18)).Text(FText::FromString(TEXT("取消 / Esc")))]]
             +SVerticalBox::Slot().AutoHeight().Padding(8)[SNew(STextBlock).Font(FCoreStyle::GetDefaultFontStyle("Regular",16)).Text_Lambda([Hero](){return FText::FromString(Hero->Feedback);}).WrapTextAt(740)]
         ]
     ];
@@ -84,7 +84,7 @@ void UCompanionNamingComponent::OpenAimed()
 {
     auto* Hero=Cast<ACFPlayerCharacter>(GetOwner());if(!Hero) return;
     auto* Pet=Hero->IsRosterOpen()?Hero->GetRosterHighlight():Hero->TraceCreature();
-    if(!Open(Pet)) Hero->Feedback=TEXT("F4: aim at your safe idle companion within 2.5m; close other panels first");
+    if(!Open(Pet)) Hero->Feedback=TEXT("F4：先关闭其他面板，再于2.5米内瞄准自己的安全空闲伙伴");
 }
 bool UCompanionNamingComponent::Commit(const FString& Input)
 {if(!IsOpen() || !RenameCompanion(Target.Get(),Input)) return false;Close();return true;}

@@ -15,7 +15,7 @@ FString ACFPlayerCharacter::GetQuickSaveSlot() const
 bool ACFPlayerCharacter::ClosePauseMenu()
 {
     if(!UGameplayStatics::SetGamePaused(this,false)) return false;
-    bPauseMenu=false; bPauseConfirmation=false; Feedback=TEXT("Resumed | F1 controls | Esc pause"); return true;
+    bPauseMenu=false; bPauseConfirmation=false; Feedback=TEXT("已继续 | F1 操作帮助 | Esc 暂停"); return true;
 }
 
 void ACFPlayerCharacter::TogglePauseMenu()
@@ -23,15 +23,15 @@ void ACFPlayerCharacter::TogglePauseMenu()
     if(!HasAuthority() || !GetController()) return;
     if(bPauseMenu)
     {
-        if(bPauseConfirmation) { bPauseConfirmation=false; Feedback=TEXT("Confirmation cancelled - world remains paused"); return; }
+        if(bPauseConfirmation) { bPauseConfirmation=false; Feedback=TEXT("已取消确认，世界保持暂停"); return; }
         ClosePauseMenu(); return;
     }
-    if(!UGameplayStatics::SetGamePaused(this,true)) { Feedback=TEXT("Pause is unavailable in this game mode"); return; }
+    if(!UGameplayStatics::SetGamePaused(this,true)) { Feedback=TEXT("当前游戏模式无法暂停"); return; }
     Storage->Close();
     CancelMeleeAttack(); Building->Cancel(); StopJumping(); GetCharacterMovement()->StopMovementImmediately(); ConsumeMovementInputVector();
     bRosterOpen=false; bJournalOpen=false; bHelpVisible=false; bBackpackOpen=false;
     bPauseMenu=true; bPauseConfirmation=false; PauseSelection=0;
-    Feedback=TEXT("Paused - world simulation stopped. Save before quitting");
+    Feedback=TEXT("已暂停，世界模拟停止。退出前请保存");
 }
 
 void ACFPlayerCharacter::PauseMenuNext() { if(bPauseMenu) { PauseSelection=(PauseSelection+1)%5; bPauseConfirmation=false; } else if(Storage->IsOpen()) Storage->Step(1); else StepBackpackRecipe(1); }
@@ -64,12 +64,12 @@ void ACFPlayerCharacter::ConfirmInterfaceAction()
         case 0: ClosePauseMenu(); break;
         case 1: QuickSave(); break;
         case 2:
-            if(!bPauseConfirmation) { bPauseConfirmation=true; Feedback=TEXT("Load replaces the current world. Enter or F9 confirms; Esc cancels"); }
+            if(!bPauseConfirmation) { bPauseConfirmation=true; Feedback=TEXT("读档会替换当前世界。Enter 或 F9 确认，Esc 取消"); }
             else { bPauseConfirmation=false; LoadProgress(GetQuickSaveSlot()); }
             break;
         case 3: if(RespawnAtBase()) ClosePauseMenu(); break;
         case 4:
-            if(!bPauseConfirmation) { bPauseConfirmation=true; Feedback=TEXT("Quit without saving? Enter confirms; Esc cancels. F5 saves instead"); }
+            if(!bPauseConfirmation) { bPauseConfirmation=true; Feedback=TEXT("不保存就退出？Enter 确认，Esc 取消，F5 保存"); }
             else QuitGame();
             break;
     }

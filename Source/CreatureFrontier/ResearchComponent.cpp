@@ -18,11 +18,11 @@ void UResearchComponent::RecordHarvest(const AResourceNode* Source)
 {
     auto* Hero=Cast<ACFPlayerCharacter>(GetOwner());
     if(!Hero || !Hero->HasAuthority() || Hero->Health<=0 || !Source || !Source->Definition || Source->Definition->Discovery!=EFrontierResearch::CrystalSample || Progress.bCrystalSample) return;
-    Progress.bCrystalSample=true; Hero->Feedback=TEXT("Crystal sample discovered! Return to base: C -> Study crystal");
+    Progress.bCrystalSample=true; Hero->Feedback=TEXT("发现水晶样本！回基地按C，选择研究水晶");
 }
 FString UResearchComponent::GetHint() const
 {
-    if(Progress.bCrystalStudy) return TEXT("CRYSTAL STUDIED | C: resonance device | B/8: crystal lantern | 0: capture mode");
-    if(Progress.bCrystalSample) return TEXT("CRYSTAL SAMPLE | Return to original base workbench; C -> Study crystal");
-    return TEXT("EXPEDITION | Crystal Rise NE: finite crystals guarded by alpha | M gather");
+    if(Progress.bCrystalStudy) return TEXT("已研究水晶 | C 共鸣捕捉器 | B/8 水晶灯 | 0 捕捉模式");
+    if(Progress.bCrystalSample) return TEXT("水晶样本 | 回初始基地工作台，按C研究水晶");
+    return TEXT("远征 | 东北水晶高地：首领守卫的有限水晶 | M 采集");
 }

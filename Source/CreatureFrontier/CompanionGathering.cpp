@@ -86,21 +86,21 @@ FString ACreatureCharacter::GetGatheringStatus() const
     if(auto* Field=FieldResource.Get())
     {
         const auto* Hero=Tamer?Cast<ACFPlayerCharacter>(Tamer->GetPawn()):nullptr;
-        if(Hero && Hero->Health<=0) return TEXT("FIELD JOB: owner down; paused without settling stock | F cancels");
-        if(Activity==ECreatureActivity::Rest) return TEXT("FIELD JOB: resting here; no field healing | feed/treat as needed | F cancels");
-        if(Field->Remaining<=0) return TEXT("FIELD JOB: waiting for stock | ")+Field->GetStatus()+TEXT(" | F cancels");
-        if(GatherRetry>0) return FString::Printf(TEXT("FIELD JOB: route timeout; retry in %.1fs | F cancels"),GatherRetry);
+        if(Hero && Hero->Health<=0) return TEXT("野外工作：主人倒下，暂停且不结算资源 | F 取消");
+        if(Activity==ECreatureActivity::Rest) return TEXT("野外工作：原地休息，不自动回血 | 可喂食/治疗 | F 取消");
+        if(Field->Remaining<=0) return TEXT("野外工作：等待资源 | ")+Field->GetStatus()+TEXT(" | F 取消");
+        if(GatherRetry>0) return FString::Printf(TEXT("野外工作：路径超时，%.1f秒后重试 | F 取消"),GatherRetry);
         if(Hero && Field->Definition && Hero->Inventory->Count(Field->Definition->OutputItem)>=999)
-            return TEXT("FIELD JOB: inventory full; stock and work retained | F cancels");
-        return (bGatheringActive?FString(TEXT("FIELD JOB: gathering | ")):FString(TEXT("FIELD JOB: travelling / blocked; 8s attempt | ")))+Field->GetStatus()+TEXT(" | F cancels");
+            return TEXT("野外工作：背包已满，保留资源与工作进度 | F 取消");
+        return (bGatheringActive?FString(TEXT("野外工作：采集中 | ")):FString(TEXT("野外工作：前往中/受阻，单次尝试8秒 | ")))+Field->GetStatus()+TEXT(" | F 取消");
     }
     if(Activity!=ECreatureActivity::Work || !WorkSite || WorkSite->RequiredSpecialty==EWorkSpecialty::Farming ||
         WorkSite->RequiredSpecialty==EWorkSpecialty::Transport || WorkSite->RequiredSpecialty==EWorkSpecialty::Feeding) return FString();
     if(auto* Node=GatherTarget.Get())
     {
         const auto* Hero=Tamer?Cast<ACFPlayerCharacter>(Tamer->GetPawn()):nullptr;
-        if(Hero && Node->Definition && Hero->Inventory->Count(Node->Definition->OutputItem)>=999) return TEXT("RESOURCE JOB: inventory full; stock and ready work retained");
-        return TEXT("RESOURCE JOB: ")+Node->GetStatus();
+        if(Hero && Node->Definition && Hero->Inventory->Count(Node->Definition->OutputItem)>=999) return TEXT("采集工作：背包已满，保留资源与已完成进度");
+        return TEXT("采集工作：")+Node->GetStatus();
     }
-    return TEXT("RESOURCE JOB: seeking stock within 8m of post; no stock = no output");
+    return TEXT("采集工作：在设施8米内寻找资源，无储量则不产出");
 }

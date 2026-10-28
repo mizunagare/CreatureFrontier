@@ -48,10 +48,10 @@ FString UCompanionMemoryComponent::GetSummary() const
 {
     switch(Memory)
     {
-    case ECrystalJourneyMemory::Pending:return TEXT("Crystal journey | home + F7 to share a memory");
-    case ECrystalJourneyMemory::QuietThanks:return TEXT("Crystal journey | a quiet thank-you at home");
-    case ECrystalJourneyMemory::Celebration:return TEXT("Crystal journey | celebrated together at home");
-    default:return TEXT("No shared journey yet");
+    case ECrystalJourneyMemory::Pending:return TEXT("水晶之旅 | 回家后按 F7 分享回忆");
+    case ECrystalJourneyMemory::QuietThanks:return TEXT("水晶之旅 | 归家后的轻声致谢");
+    case ECrystalJourneyMemory::Celebration:return TEXT("水晶之旅 | 归家后一起庆祝");
+    default:return TEXT("尚无共同旅程回忆");
     }
 }
 void UCompanionMemoryComponent::RecordHarvest(AResourceNode* Source,ACFPlayerCharacter* Hero,AActor* Harvester)
@@ -67,7 +67,7 @@ void UCompanionMemoryComponent::RecordHarvest(AResourceNode* Source,ACFPlayerCha
             (Pet->Activity!=ECreatureActivity::Follow && Pet->Activity!=ECreatureActivity::Combat && !(Pet==Harvester && Pet->Activity==ECreatureActivity::Work))) continue;
         Pet->Memory->Memory=ECrystalJourneyMemory::Pending;++Witnesses;
     }
-    if(Witnesses>0) Hero->Feedback=FString::Printf(TEXT("%d companions shared this crystal discovery. Return home together: aim + F7"),Witnesses);
+    if(Witnesses>0) Hero->Feedback=FString::Printf(TEXT("%d 位伙伴见证了水晶发现。一起回家后，瞄准伙伴按 F7"),Witnesses);
 }
 bool UCompanionMemoryComponent::CanRecall(ACFPlayerCharacter* Hero) const
 {
@@ -92,12 +92,12 @@ bool UCompanionMemoryComponent::Open(ACFPlayerCharacter* Hero)
     auto Choice=[this](int32 Reply){if(Reply==0)Close();else Commit(Reply==2);};
     auto Content=SNew(SBorder).HAlign(HAlign_Center).VAlign(VAlign_Center).Padding(24)
     [SNew(SBox).WidthOverride(760)[SNew(SVerticalBox)
-        +SVerticalBox::Slot().AutoHeight().Padding(8)[SNew(STextBlock).Font(FCoreStyle::GetDefaultFontStyle("Regular",24)).Text(FText::FromString(TEXT("Back from Crystal Rise | WORLD PAUSED")))]
-        +SVerticalBox::Slot().AutoHeight().Padding(8)[SNew(STextBlock).Font(FCoreStyle::GetDefaultFontStyle("Regular",20)).WrapTextAt(740).Text(FText::FromString(Pet->GetCreatureName()+TEXT(" watched the crystal come free beside you. Back at the workbench, you take a moment to remember the trip together.")))]
-        +SVerticalBox::Slot().AutoHeight().Padding(8)[SNew(SButton).OnClicked_Lambda([Choice](){Choice(1);return FReply::Handled();})[SNew(STextBlock).Font(FCoreStyle::GetDefaultFontStyle("Regular",20)).Text(FText::FromString(TEXT("1 - A quiet thank-you: glad we came home together")))]]
-        +SVerticalBox::Slot().AutoHeight().Padding(8)[SNew(SButton).OnClicked_Lambda([Choice](){Choice(2);return FReply::Handled();})[SNew(STextBlock).Font(FCoreStyle::GetDefaultFontStyle("Regular",20)).Text(FText::FromString(TEXT("2 - Celebrate: we made a discovery together!")))]]
-        +SVerticalBox::Slot().AutoHeight().Padding(8)[SNew(SButton).OnClicked_Lambda([Choice](){Choice(0);return FReply::Handled();})[SNew(STextBlock).Font(FCoreStyle::GetDefaultFontStyle("Regular",18)).Text(FText::FromString(TEXT("Later / Esc - keep this memory for another time")))]]
-        +SVerticalBox::Slot().AutoHeight().Padding(8)[SNew(STextBlock).Font(FCoreStyle::GetDefaultFontStyle("Regular",16)).WrapTextAt(740).Text(FText::FromString(TEXT("A shared memory, not a stat reward. 1 / 2 choose; Tab + Enter also works. F5 saves after closing.")))]
+        +SVerticalBox::Slot().AutoHeight().Padding(8)[SNew(STextBlock).Font(FCoreStyle::GetDefaultFontStyle("Regular",24)).Text(FText::FromString(TEXT("从水晶高地归来 | 世界已暂停")))]
+        +SVerticalBox::Slot().AutoHeight().Padding(8)[SNew(STextBlock).Font(FCoreStyle::GetDefaultFontStyle("Regular",20)).WrapTextAt(740).Text(FText::FromString(Pet->GetCreatureName()+TEXT("在你身旁见证了水晶的采出。回到工作台边，你们停下来，一起回味这段旅程。")))]
+        +SVerticalBox::Slot().AutoHeight().Padding(8)[SNew(SButton).OnClicked_Lambda([Choice](){Choice(1);return FReply::Handled();})[SNew(STextBlock).Font(FCoreStyle::GetDefaultFontStyle("Regular",20)).Text(FText::FromString(TEXT("1 · 轻声致谢：真高兴我们一起回到了家")))]]
+        +SVerticalBox::Slot().AutoHeight().Padding(8)[SNew(SButton).OnClicked_Lambda([Choice](){Choice(2);return FReply::Handled();})[SNew(STextBlock).Font(FCoreStyle::GetDefaultFontStyle("Regular",20)).Text(FText::FromString(TEXT("2 · 一起庆祝：这是属于我们的发现！")))]]
+        +SVerticalBox::Slot().AutoHeight().Padding(8)[SNew(SButton).OnClicked_Lambda([Choice](){Choice(0);return FReply::Handled();})[SNew(STextBlock).Font(FCoreStyle::GetDefaultFontStyle("Regular",18)).Text(FText::FromString(TEXT("以后再聊 / Esc · 暂时保留这段回忆")))]]
+        +SVerticalBox::Slot().AutoHeight().Padding(8)[SNew(STextBlock).Font(FCoreStyle::GetDefaultFontStyle("Regular",16)).WrapTextAt(740).Text(FText::FromString(TEXT("共同回忆不会带来数值奖励。按1/2选择，也可用Tab和Enter。关闭后按F5保存。")))]
     ]];
     Dialog=SNew(SJourneyMemoryPanel,Content,Choice);GetWorld()->GetGameViewport()->AddViewportWidgetContent(Dialog.ToSharedRef(),100);
     PC->bShowMouseCursor=true;FInputModeUIOnly Input;Input.SetWidgetToFocus(Dialog);PC->SetInputMode(Input);FSlateApplication::Get().SetKeyboardFocus(Dialog);return true;
@@ -107,7 +107,7 @@ bool UCompanionMemoryComponent::Commit(bool Celebrate)
     auto* Hero=Listener.Get();if(!IsOpen() || !CanRecall(Hero)) return false;
     Memory=Celebrate?ECrystalJourneyMemory::Celebration:ECrystalJourneyMemory::QuietThanks;
     auto* Pet=CastChecked<ACreatureCharacter>(GetOwner());Pet->RespondToMemory(Celebrate);
-    Hero->Feedback=Pet->GetCreatureName()+TEXT(" remembers: ")+GetSummary()+TEXT(" | no items, bond or combat stats awarded");Close();return true;
+    Hero->Feedback=Pet->GetCreatureName()+TEXT("记住了：")+GetSummary()+TEXT(" | 不增加物品、亲密度或战斗属性");Close();return true;
 }
 void UCompanionMemoryComponent::Close()
 {

@@ -25,6 +25,7 @@ public:
     FString GetStatus() const;
     void Refresh();
 private:
+    FString GetWorldLabel() const;
     UPROPERTY() TObjectPtr<UStaticMeshComponent> Visual;
     UPROPERTY() TObjectPtr<UTextRenderComponent> Label;
     UPROPERTY() TObjectPtr<class UMaterialInstanceDynamic> ResourceMaterial;

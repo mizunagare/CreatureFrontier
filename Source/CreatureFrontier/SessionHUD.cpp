@@ -2,21 +2,17 @@
 #include "CFPlayerCharacter.h"
 #include "PlayerEquipmentComponent.h"
 #include "Engine/Canvas.h"
+#include "Engine/Engine.h"
+#include "CanvasTypes.h"
 
 void ACFHUD::DrawWrappedText(const FString& Text,FLinearColor Color,float X,float Y,float Width,int32 MaxLines)
 {
-    TArray<FString> Words; Text.ParseIntoArrayWS(Words); FString Line; int32 Row=0;
-    for(const auto& Word:Words)
-    {
-        const FString Next=Line.IsEmpty()?Word:Line+TEXT(" ")+Word;
-        float W,H; GetTextSize(Next,W,H);
-        if(W>Width && !Line.IsEmpty())
-        {
-            DrawText(Line,Color,X,Y+Row*20); ++Row; if(Row>=MaxLines) return; Line=Word;
-        }
-        else Line=Next;
-    }
-    if(!Line.IsEmpty() && Row<MaxLines) DrawText(Line,Color,X,Y+Row*20);
+    // 使用引擎的字符断行，中文没有空格也能正确换行。
+    FTextSizingParameters Params(0,0,Width,0,GEngine->GetSmallFont());
+    TArray<FWrappedStringElement> Lines;
+    Canvas->WrapString(Params,0,FStringView(Text),Lines);
+    for(int32 Row=0;Row<FMath::Min(MaxLines,Lines.Num());++Row)
+        DrawText(Lines[Row].Value,Color,X,Y+Row*20);
 }
 
 void ACFHUD::DrawPauseMenu(ACFPlayerCharacter* Player)
@@ -25,52 +21,52 @@ void ACFHUD::DrawPauseMenu(ACFPlayerCharacter* Player)
     DrawRect(FLinearColor(.005f,.012f,.02f,.88f),0,0,Canvas->ClipX,Canvas->ClipY);
     DrawRect(FLinearColor(.025f,.055f,.08f,.98f),Left,Top,Width,460);
     DrawRect(FLinearColor(.08f,.26f,.32f,1),Left+14,Top+112+Player->GetPauseSelection()*40,Width-28,34);
-    DrawText(TEXT("PAUSED - CREATURE FRONTIER"),FLinearColor::White,Left+24,Top+24,nullptr,1.2f);
-    DrawText(TEXT("World simulation stopped"),FLinearColor::Green,Left+24,Top+54);
-    DrawText(TEXT("F5 save | F9 load confirmation"),FLinearColor::White,Left+24,Top+80);
-    const TCHAR* Options[]={TEXT("Resume"),TEXT("Save current progress"),TEXT("Load saved progress"),TEXT("Respawn at base (downed only)"),TEXT("Quit to desktop (no auto-save)")};
+    DrawText(TEXT("已暂停 · 幻兽边境"),FLinearColor::White,Left+24,Top+24,nullptr,1.2f);
+    DrawText(TEXT("世界模拟已暂停"),FLinearColor::Green,Left+24,Top+54);
+    DrawText(TEXT("F5 保存 | F9 确认读档"),FLinearColor::White,Left+24,Top+80);
+    const TCHAR* Options[]={TEXT("继续游戏"),TEXT("保存当前进度"),TEXT("读取存档进度"),TEXT("在基地复活（仅倒下时）"),TEXT("退出到桌面（不会自动保存）")};
     for(int32 Index=0;Index<5;++Index)
         DrawText(FString(Index==Player->GetPauseSelection()?TEXT(">> "):TEXT("   "))+Options[Index],Index==Player->GetPauseSelection()?FLinearColor::Yellow:FLinearColor::White,Left+24,Top+120+Index*40);
     DrawWrappedText(Player->Feedback,Player->IsPauseConfirmationPending()?FLinearColor::Yellow:FLinearColor::Green,Left+24,Top+332,Width-48,3);
-    DrawText(TEXT("Up / Down choose | Enter confirm | Esc resume / cancel"),FLinearColor::White,Left+24,Top+414);
-    DrawText(TEXT("Quitting does not save. F5 saves before you leave."),FLinearColor::White,Left+24,Top+436);
+    DrawText(TEXT("上下方向键选择 | Enter 确认 | Esc 继续/取消"),FLinearColor::White,Left+24,Top+414);
+    DrawText(TEXT("退出不会自动保存，离开前可按 F5 保存。"),FLinearColor::White,Left+24,Top+436);
 }
 
 void ACFHUD::DrawControlHelp(ACFPlayerCharacter* Player)
 {
     const TArray<FString> Lines={
-        TEXT("WASD move | mouse look | Space jump"),
-        TEXT("M gather resource (3m) | shared finite stock"),
-        TEXT("LMB melee | RMB capture / cancel spear windup"),
-        TEXT("0 normal / resonance capture | C study crystal"),
-        TEXT("Q focus enemy | G companion special"),
-        TEXT("L select one companion | K command all"),
-        TEXT("F follow/cancel | E aimed resource or nearby post (8m)"),
-        TEXT("E storage crate (3m) | arrows / Enter / Backspace"),
-        TEXT("V aim crate: delivery sink | V away clears future sink"),
-        TEXT("G garden sow/tend/harvest (3m) | F2/F3 seed +/-"),
-        TEXT("F4 name own idle companion (2.5m) | input pauses world"),
-        TEXT("F7 pending crystal journey: home + own idle companion (2.5m)"),
-        TEXT("T rest | P treat aimed companion"),
-        TEXT("J feed aimed companion | H heal yourself"),
-        TEXT("Y quiet care / F6 play (2.5m, safe; play: follow, 20 energy/food)"),
-        TEXT("B build | V cycle facility | X dismantle"),
-        TEXT("Build: 8 facility / home | 9 rotate home wall"),
-        TEXT("C backpack / recipes | 1 craft device (3)"),
-        TEXT("2 craft medicine (5) | 3 craft food (2)"),
-        FString::Printf(TEXT("4 spear (%d) | 5 vest (%d)"),Player->Equipment->GetSpearCost(),Player->Equipment->GetVestCost()),
-        TEXT("6 / 7 equip or remove spear / vest"),
-        TEXT("U store food | O take from garden / trough"),
-        TEXT("Z recover aimed companion cargo"),
-        TEXT("Tab team | [ / ] browse | Enter select"),
-        TEXT("I journal | PageUp / PageDown browse"),
-        TEXT("N claim completed journey reward"),
-        TEXT("R downed base respawn - world retained"),
-        TEXT("F5 save | F9 confirm load | Esc pause"),
-        TEXT("F1 closes help - this panel does NOT pause")};
+        TEXT("WASD 移动 | 鼠标转向 | 空格跳跃"),
+        TEXT("M 采集资源（3米）| 玩家与伙伴共享有限储量"),
+        TEXT("左键近战 | 右键捕捉/取消长矛蓄力"),
+        TEXT("0 切换普通/共鸣捕捉 | 对水晶按 C 研究"),
+        TEXT("Q 集火敌人 | G 伙伴技能"),
+        TEXT("L 选择单个伙伴 | K 指挥全队"),
+        TEXT("F 跟随/取消 | E 指派资源或附近设施（8米）"),
+        TEXT("E 打开箱子（3米）| 方向键/Enter/退格操作"),
+        TEXT("瞄准箱子按 V 设运输目标 | 对空按 V 清除"),
+        TEXT("G 播种/照料/收获（3米）| F2/F3 存取种子"),
+        TEXT("F4 给自己的空闲伙伴命名（2.5米，输入时暂停）"),
+        TEXT("F7 回应水晶之旅：在家瞄准空闲伙伴（2.5米）"),
+        TEXT("T 休息 | P 治疗瞄准的伙伴"),
+        TEXT("J 喂食瞄准的伙伴 | H 治疗自己"),
+        TEXT("Y 安静陪伴 / F6 玩耍（安全2.5米，玩耍耗体力/饱食20）"),
+        TEXT("B 建造 | V 切换设施 | X 拆除"),
+        TEXT("建造时：8 切换设施/房屋 | 9 旋转墙体"),
+        TEXT("C 背包/配方 | 1 制作捕捉器（3材料）"),
+        TEXT("2 制作药品（5材料）| 3 制作食物（2材料）"),
+        FString::Printf(TEXT("4 制作长矛（%d）| 5 制作护甲（%d）"),Player->Equipment->GetSpearCost(),Player->Equipment->GetVestCost()),
+        TEXT("6 / 7 装备或卸下长矛/护甲"),
+        TEXT("U 存入食物 | O 从农圃/食槽取出"),
+        TEXT("Z 取回瞄准伙伴携带的物品"),
+        TEXT("Tab 队伍 | [ / ] 翻页 | Enter 选择"),
+        TEXT("I 图鉴 | PageUp / PageDown 翻页"),
+        TEXT("N 领取已完成旅程的奖励"),
+        TEXT("倒下时按 R 回基地复活，保留世界"),
+        TEXT("F5 保存 | F9 确认读档 | Esc 暂停"),
+        TEXT("F1 关闭帮助，此面板不会暂停世界")};
     const float Left=Canvas->ClipX-488,Step=FMath::Clamp((Canvas->ClipY-130)/Lines.Num(),15.f,24.f);
     DrawRect(FLinearColor(.015f,.025f,.04f,.96f),Left,18,470,86+Step*Lines.Num());
-    DrawText(TEXT("CONTROLS | F1 close"),FLinearColor::White,Left+14,30);
-    DrawText(TEXT("LIVE WORLD - open Esc menu to pause"),FLinearColor::Yellow,Left+14,56);
+    DrawText(TEXT("操作帮助 | F1 关闭"),FLinearColor::White,Left+14,30);
+    DrawText(TEXT("世界仍在运行，按 Esc 打开暂停菜单"),FLinearColor::Yellow,Left+14,56);
     for(int32 Index=0;Index<Lines.Num();++Index) DrawText(Lines[Index],FLinearColor::White,Left+14,90+Index*Step);
 }

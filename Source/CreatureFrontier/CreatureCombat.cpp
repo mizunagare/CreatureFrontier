@@ -65,7 +65,7 @@ void ACreatureCharacter::HandlePlayerDowned(const ACFPlayerCharacter* Player)
 
 FString ACreatureCharacter::GetSpecialName() const
 {
-    return Definition && !Definition->SpecialName.IsEmpty() ? Definition->SpecialName.ToString() : TEXT("Charged Strike");
+    return Definition && !Definition->SpecialName.IsEmpty() ? Definition->SpecialName.ToString() : TEXT("蓄力打击");
 }
 
 bool ACreatureCharacter::TickSpecial(float DeltaSeconds)

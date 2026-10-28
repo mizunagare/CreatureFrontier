@@ -48,9 +48,9 @@ bool ACFPlayerCharacter::FindRespawnLocation(FVector& Location) const
 bool ACFPlayerCharacter::RespawnAtBase()
 {
     if(!HasAuthority() || !GetController()) return false;
-    if(Health>0) { Feedback=TEXT("R is available only while downed; it does not reset the world"); return false; }
+    if(Health>0) { Feedback=TEXT("只有倒下时才能按R复活，不会重置世界"); return false; }
     FVector Location;
-    if(!FindRespawnLocation(Location)) { Feedback=TEXT("Base is blocked or unsafe - F9 can restore an earlier save"); return false; }
+    if(!FindRespawnLocation(Location)) { Feedback=TEXT("基地被阻挡或不安全，可按F9读取此前存档"); return false; }
     // The live world is preserved. Cancel combat, not work assignments or health/cooldowns.
     for(TActorIterator<ACreatureCharacter> It(GetWorld());It;++It) It->HandlePlayerDowned(this);
     CancelMeleeAttack(); Building->Cancel(); bRosterOpen=false; bJournalOpen=false;
@@ -60,6 +60,6 @@ bool ACFPlayerCharacter::RespawnAtBase()
     Health=100; GetCharacterMovement()->SetMovementMode(MOVE_Walking);
     Equipment->RefreshVisual();
     RespawnProtectionUntil=GetWorld()->GetTimeSeconds()+3;
-    Feedback=TEXT("Respawned at base - world preserved, companions not healed. Shield 3s; attacks end it");
+    Feedback=TEXT("已在基地复活，保留世界但不治疗伙伴。保护3秒，攻击会结束保护");
     return true;
 }

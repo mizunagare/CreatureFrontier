@@ -8,7 +8,7 @@ const FFrontierRecipe* UCraftingCatalog::Find(FName Id) const
 FString UCraftingCatalog::ItemName(EFrontierItem Item)
 {
     if(auto* Catalog=Load()) for(const auto& Entry:Catalog->Items) if(Entry.Item==Item) return Entry.DisplayName.ToString();
-    return TEXT("Unavailable item");
+    return TEXT("物品不可用");
 }
 FString UCraftingCatalog::FormatItems(const TMap<EFrontierItem,int32>& Costs)
 {

@@ -13,7 +13,7 @@ void ACFPlayerCharacter::ToggleBackpack()
         CancelMeleeAttack(); Building->Cancel();
         bRosterOpen=false; bJournalOpen=false; bHelpVisible=false;
         BackpackRecipe=0;
-        Feedback=TEXT("Backpack | Up/Down recipe | Enter craft one | C close | WORLD LIVE");
+        Feedback=TEXT("背包 | 上下选择配方 | Enter 制作一个 | C 关闭 | 世界仍运行");
     }
 }
 
@@ -32,7 +32,7 @@ int32 ACFPlayerCharacter::GetBackpackRecipeCost(int32 Index) const
 FString ACFPlayerCharacter::GetBackpackRecipeStatus(int32 Index) const
 {
     const auto* Catalog=UCraftingCatalog::Load();
-    return Catalog && Catalog->Recipes.IsValidIndex(Index)?GetRecipeStatus(Catalog->Recipes[Index]):TEXT("Unknown recipe");
+    return Catalog && Catalog->Recipes.IsValidIndex(Index)?GetRecipeStatus(Catalog->Recipes[Index]):TEXT("未知配方");
 }
 
 void ACFPlayerCharacter::CraftBackpackRecipe()

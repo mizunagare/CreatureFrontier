@@ -17,12 +17,14 @@ AWildEncounter::AWildEncounter()
     Sign->SetRelativeRotation(FRotator(0,180,0));
     Sign->SetHorizontalAlignment(EHTA_Center);
     Sign->SetWorldSize(26);
-    Sign->SetText(FText::FromString(TEXT("Wild habitat")));
+    Sign->SetText(FText::FromString(TEXT("野生栖息地")));
 }
 
 void AWildEncounter::BeginPlay()
 {
     Super::BeginPlay();
+    if(auto* Sign=FindComponentByClass<UTextRenderComponent>())Sign->SetHiddenInGame(true);
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFHUDLayoutTest")) || FParse::Param(FCommandLine::Get(),TEXT("CFHUDPreview")))SetActorTickEnabled(false);
     for(const TCHAR* Flag:{TEXT("CFMemoryTest"),TEXT("CFMemoryWrite"),TEXT("CFMemoryRead"),TEXT("CFMemoryDoneRead"),TEXT("CFMemoryLegacyRead")})
         if(FParse::Param(FCommandLine::Get(),Flag))SetActorTickEnabled(false);
     for(const TCHAR* Flag:{TEXT("CFPersonalityTest"),TEXT("CFPersonalityWrite"),TEXT("CFPersonalityRead"),TEXT("CFPersonalityLegacyRead")})
@@ -43,7 +45,7 @@ void AWildEncounter::BeginPlay()
         if (FParse::Param(FCommandLine::Get(), Flag)) { SetActorTickEnabled(false); break; }
     if (auto* Sign = FindComponentByClass<UTextRenderComponent>())
     {
-        Sign->SetText(FText::FromString(RegionName + (bBoss ? TEXT(" - ALPHA Lv") : TEXT(" - Lv")) + FString::FromInt(CreatureLevel)));
+        Sign->SetText(FText::FromString(RegionName + (bBoss ? TEXT(" · 首领 等级") : TEXT(" · 等级")) + FString::FromInt(CreatureLevel)));
         const FVector Approach = FVector(-450,0,GetActorLocation().Z)-GetActorLocation();
         Sign->SetWorldRotation(Approach.Rotation());
     }
@@ -118,8 +120,8 @@ void AWildEncounter::RestorePopulation(float SavedRemaining)
 FString AWildEncounter::GetStatus() const
 {
     if (auto* Pet = GetResident())
-        return FString::Printf(TEXT("%s | %s Lv%d HP %.0f/%.0f"), *RegionName,
-            bBoss ? TEXT("ALPHA") : *Pet->GetCreatureName(), Pet->Level, Pet->Health, Pet->GetMaxHealth());
-    return FString::Printf(TEXT("%s | returns in %.0fs%s"), *RegionName, GetSavedRemaining(),
-        GetSavedRemaining() <= 0 ? TEXT(" (leave 10m)") : TEXT(""));
+        return FString::Printf(TEXT("%s | %s 等级%d 生命%.0f/%.0f"), *RegionName,
+            bBoss ? TEXT("首领") : *Pet->GetCreatureName(), Pet->Level, Pet->Health, Pet->GetMaxHealth());
+    return FString::Printf(TEXT("%s | %.0f秒后返回%s"), *RegionName, GetSavedRemaining(),
+        GetSavedRemaining() <= 0 ? TEXT("（需离开10米）") : TEXT(""));
 }

@@ -13,13 +13,13 @@ void ACFHUD::DrawBackpack(ACFPlayerCharacter* Player)
     const float Extra=FMath::Max(0,(Catalog->Items.Num()+1)/2-3)*27;
     DrawRect(FLinearColor(.015f,.025f,.04f,.97f),Left,18,470,630+Extra);
     DrawRect(FLinearColor(.08f,.26f,.32f,1),Left+10,232+Extra+(Player->GetBackpackRecipe()-Start)*56,450,52);
-    DrawText(TEXT("BACKPACK & CRAFTING | C close"),FLinearColor::White,Left+14,30);
-    DrawText(TEXT("LIVE WORLD - Esc opens pause menu"),FLinearColor::Yellow,Left+14,56);
+    DrawText(TEXT("背包与制作 | C 关闭"),FLinearColor::White,Left+14,30);
+    DrawText(TEXT("世界仍在运行 | Esc 打开暂停菜单"),FLinearColor::Yellow,Left+14,56);
     for(int32 Index=0;Index<Catalog->Items.Num();++Index)
         DrawText(FString::Printf(TEXT("%s: %d / 999"),*Catalog->Items[Index].DisplayName.ToString(),Player->Inventory->Count(Catalog->Items[Index].Item)),FLinearColor::White,Left+14+(Index%2)*220,88+(Index/2)*27);
     const auto& Gear=Player->Equipment->GetState();
-    DrawText(FString::Printf(TEXT("Spear: %s | Vest: %s"),Gear.bSpearEquipped?TEXT("equipped"):Gear.bOwnSpear?TEXT("stored"):TEXT("not owned"),Gear.bVestEquipped?TEXT("equipped"):Gear.bOwnVest?TEXT("stored"):TEXT("not owned")),FLinearColor::Green,Left+14,188+Extra);
-    DrawText(FString::Printf(TEXT("RECIPES %d-%d / %d | Up/Down | Enter craft"),Start+1,FMath::Min(Start+5,Catalog->Recipes.Num()),Catalog->Recipes.Num()),FLinearColor::White,Left+14,212+Extra);
+    DrawText(FString::Printf(TEXT("长矛：%s | 护甲：%s"),Gear.bSpearEquipped?TEXT("已装备"):Gear.bOwnSpear?TEXT("已收纳"):TEXT("未拥有"),Gear.bVestEquipped?TEXT("已装备"):Gear.bOwnVest?TEXT("已收纳"):TEXT("未拥有")),FLinearColor::Green,Left+14,188+Extra);
+    DrawText(FString::Printf(TEXT("配方 %d-%d / %d | 上下选择 | Enter 制作"),Start+1,FMath::Min(Start+5,Catalog->Recipes.Num()),Catalog->Recipes.Num()),FLinearColor::White,Left+14,212+Extra);
     for(int32 Index=Start;Index<FMath::Min(Start+5,Catalog->Recipes.Num());++Index)
     {
         const auto Color=Index==Player->GetBackpackRecipe()?FLinearColor::Yellow:FLinearColor::White;
@@ -27,6 +27,6 @@ void ACFHUD::DrawBackpack(ACFPlayerCharacter* Player)
         DrawWrappedText(Player->GetBackpackRecipeStatus(Index),Color,Left+22,260+Extra+(Index-Start)*56,430,1);
     }
     if(Catalog->Recipes.IsValidIndex(Player->GetBackpackRecipe())) DrawWrappedText(Catalog->Recipes[Player->GetBackpackRecipe()].Description.ToString(),FLinearColor::Green,Left+14,536+Extra,440,2);
-    DrawText(TEXT("1-5 also craft | 6 / 7 toggle owned gear"),FLinearColor::White,Left+14,586+Extra);
-    DrawText(TEXT("No auto-save. F5 saves items and equipment."),FLinearColor::White,Left+14,612+Extra);
+    DrawText(TEXT("1-5 快捷制作 | 6 / 7 切换已有装备"),FLinearColor::White,Left+14,586+Extra);
+    DrawText(TEXT("不会自动保存，按 F5 保存物品和装备。"),FLinearColor::White,Left+14,612+Extra);
 }

@@ -28,11 +28,12 @@ AResourceNode::AResourceNode()
     Visual->SetCollisionEnabled(ECollisionEnabled::QueryOnly); Visual->SetCollisionResponseToAllChannels(ECR_Ignore);
     Visual->SetCollisionResponseToChannel(ECC_Visibility,ECR_Block); Visual->SetCanEverAffectNavigation(false);
     Label=CreateDefaultSubobject<UTextRenderComponent>(TEXT("Label")); Label->SetupAttachment(RootComponent);
-    Label->SetRelativeLocation(FVector(0,0,65)); Label->SetWorldSize(17); Label->SetHorizontalAlignment(EHTA_Center);
+    Label->SetRelativeLocation(FVector(0,0,65)); Label->SetWorldSize(12); Label->SetCullDistance(600);Label->SetHorizontalAlignment(EHTA_Center);
 }
 void AResourceNode::BeginPlay()
 {
     Super::BeginPlay();
+    Label->SetHiddenInGame(true);
     if(!PersistentId.IsValid()) PersistentId=FGuid::NewGuid();
     Remaining=Definition && Definition->IsValidDefinition()?Definition->Capacity:0;
     Refresh();
@@ -47,7 +48,7 @@ void AResourceNode::Tick(float DeltaSeconds)
         const float PreviousSeconds=FMath::CeilToFloat(RegrowRemaining);
         RegrowRemaining=FMath::Max(0.f,RegrowRemaining-DeltaSeconds);
         if(RegrowRemaining==0) { Remaining=Definition->Capacity; Refresh(); }
-        else if(PreviousSeconds!=FMath::CeilToFloat(RegrowRemaining)) Label->SetText(FText::FromString(GetStatus()));
+        else if(PreviousSeconds!=FMath::CeilToFloat(RegrowRemaining)) Label->SetText(FText::FromString(GetWorldLabel()));
     }
     if(auto* Hero=UGameplayStatics::GetPlayerPawn(this,0))
         Label->SetWorldRotation((Hero->GetActorLocation()-Label->GetComponentLocation()).Rotation());
@@ -83,18 +84,20 @@ bool AResourceNode::TryHarvest(ACFPlayerCharacter* Recipient,AActor* Harvester)
 }
 FString AResourceNode::GetStatus() const
 {
-    if(!Definition) return TEXT("Unavailable resource");
-    if(Remaining==0) return FString::Printf(TEXT("%s | DEPLETED | %s"),*Definition->DisplayName.ToString(),
-        Definition->RegrowSeconds>0?*FString::Printf(TEXT("regrows in %.0fs"),FMath::CeilToFloat(RegrowRemaining)):TEXT("no regrowth"));
-    return FString::Printf(TEXT("%s | %d / %d | %s | M (3m)"),*Definition->DisplayName.ToString(),Remaining,Definition->Capacity,*UCraftingCatalog::ItemName(Definition->OutputItem));
+    if(!Definition) return TEXT("资源不可用");
+    if(Remaining==0) return FString::Printf(TEXT("%s | 已采空 | %s"),*Definition->DisplayName.ToString(),
+        Definition->RegrowSeconds>0?*FString::Printf(TEXT("%.0f秒后再生"),FMath::CeilToFloat(RegrowRemaining)):TEXT("不会再生"));
+    return FString::Printf(TEXT("%s | %d / %d | %s | M 采集（3米）"),*Definition->DisplayName.ToString(),Remaining,Definition->Capacity,*UCraftingCatalog::ItemName(Definition->OutputItem));
 }
 void AResourceNode::Refresh()
 {
-    Label->SetText(FText::FromString(GetStatus()));
+    Label->SetText(FText::FromString(GetWorldLabel()));
     Visual->SetRelativeScale3D(Remaining>0?FVector(.9f,.9f,.65f):FVector(.5f,.5f,.15f));
     if(!ResourceMaterial) ResourceMaterial=Visual->CreateDynamicMaterialInstance(0);
     if(Definition && ResourceMaterial) ResourceMaterial->SetVectorParameterValue(TEXT("Tint"),Remaining>0?Definition->Color:FLinearColor(.15f,.12f,.1f));
 }
+FString AResourceNode::GetWorldLabel() const
+{return Definition?Definition->DisplayName.ToString()+FString::Printf(TEXT(" (%d)"),Remaining):TEXT("资源不可用");}
 void SeedFrontierResources(UWorld* World)
 {
     if(!World) return;

@@ -1,4 +1,5 @@
 #include "BaseBuildingComponent.h"
+#include "FrontierChinese.h"
 #include "FarmCropComponent.h"
 #include "CFPlayerCharacter.h"
 #include "Camera/CameraComponent.h"
@@ -51,7 +52,7 @@ void UBaseBuildingComponent::Toggle()
         Mesh->SetMaterial(0, PreviewMaterial);
     }
     UpdatePlacement();
-    Hero->Feedback = TEXT("Build: 8 facility/home | V select | LMB place | RMB/B cancel | X dismantle");
+    Hero->Feedback = TEXT("建造：8 设施/房屋 | V 选择 | 左键放置 | 右键/B取消 | X 拆除");
 }
 
 void UBaseBuildingComponent::Cancel()
@@ -89,20 +90,20 @@ void UBaseBuildingComponent::RotateHome()
 bool UBaseBuildingComponent::ValidatePlacement(const FTransform& Transform, FString& Reason) const
 {
     auto* Hero = Cast<ACFPlayerCharacter>(GetOwner());
-    if (!Hero || !Hero->HasAuthority() || Hero->Health <= 0) { Reason = TEXT("Need a living player"); return false; }
-    if (!IsBuildTransformValid(Transform)) { Reason = TEXT("Use level ground within 12m of the original base"); return false; }
-    if (FVector::Dist(Hero->GetActorLocation(),Transform.GetLocation()) > 800) { Reason = TEXT("Too far (8m)"); return false; }
+    if (!Hero || !Hero->HasAuthority() || Hero->Health <= 0) { Reason = TEXT("需要存活的玩家"); return false; }
+    if (!IsBuildTransformValid(Transform)) { Reason = TEXT("请使用初始基地12米内的平地"); return false; }
+    if (FVector::Dist(Hero->GetActorLocation(),Transform.GetLocation()) > 800) { Reason = TEXT("距离过远（限8米）"); return false; }
     int32 Built = 0;
     for (TActorIterator<AWorkStation> It(GetWorld()); It; ++It) if (It->bPlayerBuilt) ++Built;
-    if (Built >= 20) { Reason = TEXT("Base limit: 20 placed facilities"); return false; }
+    if (Built >= 20) { Reason = TEXT("基地最多放置20个设施"); return false; }
     const int32 Cost = GetCost(Selected);
-    if (Cost == 0 || Hero->Inventory->Count(EFrontierItem::Material) < Cost) { Reason = TEXT("Not enough materials"); return false; }
+    if (Cost == 0 || Hero->Inventory->Count(EFrontierItem::Material) < Cost) { Reason = TEXT("材料不足"); return false; }
     FCollisionQueryParams Params(SCENE_QUERY_STAT(BuildPlacement), false);
     if (IsValid(Preview)) Params.AddIgnoredActor(Preview);
     // Query full solid volume, including pawns. Keep the supporting floor below the box.
     const FCollisionObjectQueryParams Objects(FCollisionObjectQueryParams::AllObjects);
     if (GetWorld()->OverlapAnyTestByObjectType(Transform.GetLocation()+FVector(0,0,1),Transform.GetRotation(),Objects,
-        FCollisionShape::MakeBox(FVector(112,62,34)),Params)) { Reason = TEXT("Space occupied - move away from creatures and buildings"); return false; }
+        FCollisionShape::MakeBox(FVector(112,62,34)),Params)) { Reason = TEXT("空间被占用，请避开生物与建筑"); return false; }
     // All four corners must have flat support: no bridging a ledge or stacking benches.
     for (float X : {-95.0f,95.0f}) for (float Y : {-45.0f,45.0f})
     {
@@ -112,9 +113,9 @@ bool UBaseBuildingComponent::ValidatePlacement(const FTransform& Transform, FStr
             Ground.ImpactNormal.Z < .98 || !((FMath::Abs(Ground.ImpactPoint.Z - BaseOrigin().Z) <= 2 && FMath::Abs(Transform.GetLocation().Z+15)<=2) ||
                 (FMath::IsNearlyEqual(Transform.GetLocation().Z,5.,.01) && FMath::IsNearlyEqual(Ground.ImpactPoint.Z,-30.,.01) &&
                  Cast<AHomeModule>(Ground.GetActor()) && CastChecked<AHomeModule>(Ground.GetActor())->GetKind()==EHomeModuleKind::Floor)))
-        { Reason = TEXT("Need flat support under every corner"); return false; }
+        { Reason = TEXT("每个角下方都需要平坦支撑"); return false; }
     }
-    Reason = TEXT("Ready to build");
+    Reason = TEXT("可以建造");
     return true;
 }
 
@@ -127,7 +128,7 @@ bool UBaseBuildingComponent::UpdatePlacement()
     if (IsValid(Preview)) Params.AddIgnoredActor(Preview);
     const FVector Start = Hero->FirstPersonCamera->GetComponentLocation();
     const bool Ground = GetWorld()->LineTraceSingleByChannel(Hit,Start,Start+Hero->FirstPersonCamera->GetForwardVector()*800,ECC_Visibility,Params);
-    if (!Ground) { Status = TEXT("Aim at the ground within 8m"); bValid = false; if (Preview) Preview->SetActorHiddenInGame(true); return false; }
+    if (!Ground) { Status = TEXT("请瞄准8米内的地面"); bValid = false; if (Preview) Preview->SetActorHiddenInGame(true); return false; }
     const FVector Position(FMath::GridSnap(Hit.ImpactPoint.X,100.0),FMath::GridSnap(Hit.ImpactPoint.Y,100.0),Hit.ImpactPoint.Z+35);
     Placement = FTransform(FRotator(0,FMath::GridSnap(static_cast<double>(Hero->GetControlRotation().Yaw),90.0),0),Position,FVector(2,1,.7));
     bValid = ValidatePlacement(Placement,Status);
@@ -157,7 +158,7 @@ AWorkStation* UBaseBuildingComponent::BuildAt(const FTransform& Transform)
     Site->RequiredSpecialty = Selected; Site->bPlayerBuilt = true; Site->PersistentId = FGuid::NewGuid();
     Site->FinishSpawning(Transform);
     if (!Hero->Inventory->Consume(EFrontierItem::Material,GetCost(Selected))) { Site->Destroy(); return nullptr; }
-    Hero->Feedback = TEXT("Facility built. E: assign companions | X: dismantle aimed facility");
+    Hero->Feedback = TEXT("设施已建造。E 指派伙伴 | X 拆除瞄准的设施");
     return Site;
 }
 
@@ -173,13 +174,13 @@ bool UBaseBuildingComponent::DismantleStation(AWorkStation* Station)
     auto* Hero = Cast<ACFPlayerCharacter>(GetOwner());
     if (!Hero || !Hero->HasAuthority() || Hero->Health <= 0 || !IsValid(Station) || !Station->bPlayerBuilt || Hero->GetDistanceTo(Station) > 600) return false;
     const int32 Refund = GetCost(Station->RequiredSpecialty)/2;
-    if (Station->StoredFood > 0) { Hero->Feedback = TEXT("Withdraw food with O before dismantling the facility"); return false; }
-    if(Station->Crop->IsOccupied()) {Hero->Feedback=TEXT("Harvest crop and withdraw reserved seeds with F3 before dismantling");return false;}
-    if (!Hero->Inventory->AddItem(EFrontierItem::Material,Refund)) { Hero->Feedback = TEXT("Make inventory space for dismantle refund"); return false; }
+    if (Station->StoredFood > 0) { Hero->Feedback = TEXT("拆除前请按O取出设施里的食物"); return false; }
+    if(Station->Crop->IsOccupied()) {Hero->Feedback=TEXT("拆除前请收获作物并按F3取出预留种子");return false;}
+    if (!Hero->Inventory->AddItem(EFrontierItem::Material,Refund)) { Hero->Feedback = TEXT("请为拆除返还物腾出背包空间"); return false; }
     for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It)
         if (It->WorkSite == Station) { It->WorkSite = nullptr; It->SetActivity(ECreatureActivity::Follow); }
     Station->Destroy();
-    Hero->Feedback = FString::Printf(TEXT("Dismantled: returned %d materials; workers now following"),Refund);
+    Hero->Feedback = FString::Printf(TEXT("已拆除，返还%d份材料；原工人改为跟随"),Refund);
     return true;
 }
 
@@ -195,13 +196,13 @@ void UBaseBuildingComponent::Dismantle()
     GetWorld()->LineTraceSingleByChannel(Hit,Start,Start+Hero->FirstPersonCamera->GetForwardVector()*600,ECC_Visibility,Params);
     auto* Site = Cast<AWorkStation>(Hit.GetActor());
     if(auto* Module=Cast<AHomeModule>(Hit.GetActor())) { Hero->HomeBuilding->Dismantle(Module); return; }
-    if (!Site || !Site->bPlayerBuilt) Hero->Feedback = TEXT("Aim at a player-built facility within 6m (original stations are protected)");
+    if (!Site || !Site->bPlayerBuilt) Hero->Feedback = TEXT("请瞄准6米内玩家建造的设施（初始设施受保护）");
     else DismantleStation(Site);
 }
 
 FString UBaseBuildingComponent::GetHint() const
 {
     if(bHomeMode) return CastChecked<ACFPlayerCharacter>(GetOwner())->HomeBuilding->GetHint();
-    return FString::Printf(TEXT("FACILITY %s (%d) | V select | 8 home\n%s"),
-        *UEnum::GetDisplayValueAsText(Selected).ToString(),GetCost(Selected),*Status);
+    return FString::Printf(TEXT("设施 %s（%d材料）| V 选择 | 8 房屋\n%s"),
+        *FrontierChinese::Specialty(Selected),GetCost(Selected),*Status);
 }

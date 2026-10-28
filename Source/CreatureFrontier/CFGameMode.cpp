@@ -10,6 +10,7 @@
 #include "NameScenario.h"
 #include "PersonalityScenario.h"
 #include "MemoryScenario.h"
+#include "HUDScenario.h"
 #include "HomeScenario.h"
 #include "ExpeditionScenario.h"
 #include "CFPlayerCharacter.h"
@@ -63,6 +64,8 @@ void ACFGameMode::BeginPlay()
 {
     Super::BeginPlay();
     SeedFrontierResources(GetWorld());
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFHUDLayoutTest")) || FParse::Param(FCommandLine::Get(),TEXT("CFHUDPreview")))
+    {const bool Preview=FParse::Param(FCommandLine::Get(),TEXT("CFHUDPreview"));FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this,Preview](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunHUDScenario(GetWorld(),Hero,Preview);},1.f,false);return;}
     const int32 MemoryMode=FParse::Param(FCommandLine::Get(),TEXT("CFMemoryWrite"))?1:FParse::Param(FCommandLine::Get(),TEXT("CFMemoryRead"))?2:FParse::Param(FCommandLine::Get(),TEXT("CFMemoryDoneRead"))?3:FParse::Param(FCommandLine::Get(),TEXT("CFMemoryLegacyRead"))?4:0;
     if(MemoryMode || FParse::Param(FCommandLine::Get(),TEXT("CFMemoryTest")))
     {FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this,MemoryMode](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0))) RunMemoryScenario(GetWorld(),Hero,MemoryMode);},1.f,false);return;}

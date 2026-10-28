@@ -70,7 +70,7 @@ bool UCompanionCargoComponent::TickDelivery(float DeltaSeconds,ACFPlayerCharacte
         TMap<EFrontierItem,int32> Items;
         for(const auto& Entry:Pet->CargoInventory->GetStacks()) if(Entry.Value>0) Items.Add(Entry.Key,Entry.Value);
         if(Pet->CargoInventory->TransferTo(Crate->StorageInventory,Items))
-        { bReturning=false; bFull=false; Hero->Feedback=TEXT("Companion delivered its carried batch to storage; no duplicate work XP"); }
+        { bReturning=false; bFull=false; Hero->Feedback=TEXT("伙伴已把携带批次送入箱子，不重复获得工作经验"); }
         else { bFull=true; Retry=2; }
         return true;
     }
@@ -92,16 +92,16 @@ bool UCompanionCargoComponent::Recover(ACFPlayerCharacter* Hero)
     TMap<EFrontierItem,int32> Items;
     for(const auto& Entry:Pet->CargoInventory->GetStacks()) if(Entry.Value>0) Items.Add(Entry.Key,Entry.Value);
     if(!Pet->CargoInventory->TransferTo(Hero->Inventory,Items)) return false;
-    bReturning=false; bFull=false; Expires=0; Retry=0; Hero->Feedback=TEXT("Recovered carried resource batch; no new items or XP generated"); return true;
+    bReturning=false; bFull=false; Expires=0; Retry=0; Hero->Feedback=TEXT("已取回携带资源，不额外生成物品或经验"); return true;
 }
 FString UCompanionCargoComponent::Status() const
 {
     const auto* Pet=Cast<ACreatureCharacter>(GetOwner()); if(!Pet || (!bOrdered && Count()==0)) return FString();
     const auto* Hero=Pet->Tamer?Cast<ACFPlayerCharacter>(Pet->Tamer->GetPawn()):nullptr;
-    const FString State=Pet->Health<=0?TEXT("downed; cargo retained"):Hero && Hero->Health<=0?TEXT("owner down; paused with cargo"):
-        !bOrdered?TEXT("retained; Z recover"):Pet->Activity==ECreatureActivity::Rest?TEXT("resting with cargo"):
-        bFull?TEXT("crate full; batch retained"):Retry>0?TEXT("route retry; batch retained"):bReturning?TEXT("carrying to storage"):TEXT("collecting batch");
-    return FString::Printf(TEXT("CARGO %d/%d | %s | %s"),Count(),Capacity,*State,*UCraftingCatalog::FormatItems(Pet->CargoInventory->GetStacks()));
+    const FString State=Pet->Health<=0?TEXT("已倒下，保留携带物"):Hero && Hero->Health<=0?TEXT("主人已倒下，携物暂停"):
+        !bOrdered?TEXT("已保留，Z 取回"):Pet->Activity==ECreatureActivity::Rest?TEXT("携物休息中"):
+        bFull?TEXT("箱子已满，保留当前批次"):Retry>0?TEXT("重试路径，保留当前批次"):bReturning?TEXT("正在运往储物箱"):TEXT("正在采集批次");
+    return FString::Printf(TEXT("携带 %d/%d | %s | %s"),Count(),Capacity,*State,*UCraftingCatalog::FormatItems(Pet->CargoInventory->GetStacks()));
 }
 void UCompanionCargoComponent::WriteSnapshot(FCreatureSaveRecord& Record) const
 {

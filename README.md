@@ -1,9 +1,13 @@
-# Creature Frontier
+# 幻兽边境 · Creature Frontier
 
 原创第一人称生物捕捉 RPG 原型。玩法重点是捕捉伙伴，并与伙伴共同生活、工作和战斗。
 
+已完成本轮中文显示改造：界面、帮助、任务、反馈、生物/技能/资源/配方和区域名称使用简体中文，后续开发文档与新增注释也使用中文。技术标识、路径、存档协议和玩家自定义昵称不改。实现、失败记录与验收边界见 [中文开发约定](Docs/CHINESE.md)；主界面已完成[信息分区与遮挡收敛](Docs/HUD_READABILITY.md)，场景名牌已修复中文缺字。
+
+中文可运行包：`E:\CreatureFrontierBuilds\Windows-Chinese-Verified\CreatureFrontier.exe`。同一最终构建连续70项本地回归、10份真实27旧档的22个独立读取进程通过；三种分辨率24张主界面图及1280×720的11张菜单图已逐张检查。本项目仍是灰盒，旧菜单极端尺寸排版、实体输入/IME、复杂场景性能与正式美术仍待完善。
+
 本轮加入“水晶之旅归家”：实际共同采样后回家，F7 选择安静致谢或一起庆祝，格式 27 保存个体回忆，不额外发资源、亲密度或战斗加成。详见 [共同经历与归家事件](Docs/COMPANION_MEMORIES.md)。原 Y / F6 的 [互动偏好](Docs/COMPANION_PREFERENCES.md) 保留。
-当前可运行包：`E:\CreatureFrontierBuilds\Windows-Memories-Final\CreatureFrontier.exe`；连续 69 项回归、9 份真实 26 旧档的 20 个独立进程读取检查、D3D12 回忆行为与两张新图检查通过。失败记录保留，不以编译或退出码单独判通过。仍为灰盒，HUD 遮挡、实体输入/IME、更多生活偏好/关系事件和正式角色/动画/UI 品质尚未全面完成。
+此前回忆版本：`E:\CreatureFrontierBuilds\Windows-Memories-Final\CreatureFrontier.exe`；连续69项回归、9份真实26旧档的20个独立进程读取检查、D3D12回忆行为与两张新图检查通过。该版本与失败记录保留，不以编译或退出码单独判通过；更多生活偏好/关系事件和正式角色/动画/UI品质尚未全面完成。
 此前 [个体命名](Docs/COMPANION_NAMES.md) 和 [照料暂停边界](Docs/CARE_PAUSE.md) 保留，G 仍按瞄准农圃交互/其他情况伙伴技能分派。
 此前有投入的播种—照料—收获及食物运输见 [农业说明](Docs/CROPS.md)。
 此前纤维、矿料、机械废件与基地加工见 [差异材料与加工](Docs/MATERIALS.md)。

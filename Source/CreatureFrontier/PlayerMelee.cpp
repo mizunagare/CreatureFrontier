@@ -26,7 +26,7 @@ void ACFPlayerCharacter::Attack()
     Equipment->PlayAttack();
     if(bPendingSpear)
     {
-        Feedback=TEXT("Spear windup - keep the target within 3.2m");
+        Feedback=TEXT("长矛蓄力中，请将目标保持在3.2米内");
         GetWorldTimerManager().SetTimer(MeleeTimer,this,&ACFPlayerCharacter::ResolveMeleeStrike,.12f,false);
     }
     else ResolveMeleeStrike();
@@ -40,14 +40,14 @@ void ACFPlayerCharacter::ResolveMeleeStrike()
     const FVector Start=FirstPersonCamera->GetComponentLocation(), End=Start+FirstPersonCamera->GetForwardVector()*PendingMeleeRange;
     FHitResult Hit; FCollisionQueryParams Params(SCENE_QUERY_STAT(PlayerMelee),false,this);
     if(!GetWorld()->SweepSingleByChannel(Hit,Start,End,FQuat::Identity,ECC_Visibility,FCollisionShape::MakeSphere(12),Params))
-    { Feedback=TEXT("Melee missed - move closer and aim at the creature"); return; }
+    { Feedback=TEXT("近战未命中，请靠近并瞄准生物"); return; }
     auto* Target=Cast<ACreatureCharacter>(Hit.GetActor());
-    if(!Target) { Feedback=TEXT("Melee blocked by cover"); return; }
+    if(!Target) { Feedback=TEXT("近战被障碍物阻挡"); return; }
     if(Target->Disposition==ECreatureDisposition::Tamed || Target->Health<=0)
-    { Feedback=TEXT("Melee stopped - companions and downed creatures are not targets"); return; }
+    { Feedback=TEXT("已停止近战，不攻击伙伴或倒下的生物"); return; }
     FHitResult Sight;
     if(GetWorld()->LineTraceSingleByChannel(Sight,Start,Hit.ImpactPoint,ECC_Visibility,Params) && Sight.GetActor()!=Target)
-    { Feedback=TEXT("Melee blocked by cover"); return; }
+    { Feedback=TEXT("近战被障碍物阻挡"); return; }
     const float Applied=UGameplayStatics::ApplyDamage(Target,PendingMeleeDamage,GetController(),this,UDamageType::StaticClass());
-    Feedback=Applied>0?TEXT("Melee hit! RMB captures; weaken the target without defeating it"):TEXT("Creature retreating - wait for it to return home");
+    Feedback=Applied>0?TEXT("近战命中！右键捕捉，削弱目标但不要击倒它"):TEXT("生物正在撤退，请等待它返回栖息地");
 }

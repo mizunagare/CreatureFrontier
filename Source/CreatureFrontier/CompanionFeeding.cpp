@@ -14,19 +14,19 @@ void ACFPlayerCharacter::CraftFood()
 bool ACFPlayerCharacter::FeedCompanion(ACreatureCharacter* Pet)
 {
     if (!HasAuthority() || Health <= 0 || UGameplayStatics::IsGamePaused(this) || !IsValid(Pet) || Pet->Tamer != GetController() || Pet->Health <= 0 || GetDistanceTo(Pet) > 600)
-    { Feedback = TEXT("Feed a living companion within 6m; use medicine to revive"); return false; }
-    if (GetWorld()->GetTimeSeconds() < NextFeedTime) { Feedback = TEXT("Wait before feeding again (3s)"); return false; }
-    if (Pet->Nutrition > 80) { Feedback = TEXT("Companion is not hungry (satiety must be 80 or below)"); return false; }
+    { Feedback = TEXT("请在6米内喂食存活的伙伴；倒下的伙伴需用药品救治"); return false; }
+    if (GetWorld()->GetTimeSeconds() < NextFeedTime) { Feedback = TEXT("请等待喂食冷却（3秒）"); return false; }
+    if (Pet->Nutrition > 80) { Feedback = TEXT("伙伴不饿（饱食需不高于80）"); return false; }
     FHitResult Hit;
     FCollisionQueryParams Params(SCENE_QUERY_STAT(FeedingSight),false,this);
     if (GetWorld()->LineTraceSingleByChannel(Hit,GetPawnViewLocation(),Pet->GetActorLocation(),ECC_Visibility,Params) && Hit.GetActor() != Pet)
-    { Feedback = TEXT("Companion is blocked by cover"); return false; }
-    if (!Inventory->Consume(EFrontierItem::Food,1)) { Feedback = TEXT("No food - farm or craft with 3 at base"); return false; }
+    { Feedback = TEXT("伙伴被障碍物遮挡"); return false; }
+    if (!Inventory->Consume(EFrontierItem::Food,1)) { Feedback = TEXT("没有食物，请种植或在基地按3制作"); return false; }
     Pet->Nutrition = FMath::Min(100.0f,Pet->Nutrition+35);
     Pet->Stamina = FMath::Min(100.0f,Pet->Stamina+15);
     Pet->AddBond(3);
     NextFeedTime = GetWorld()->GetTimeSeconds()+3;
-    Feedback = TEXT("Fed companion: +35 satiety, +15 stamina. E: resume work | F: follow");
+    Feedback = TEXT("已喂食伙伴：饱食+35，体力+15。E 继续工作 | F 跟随");
     return true;
 }
 
@@ -43,14 +43,14 @@ AWorkStation* ACFPlayerCharacter::TraceFacility() const
 void ACFPlayerCharacter::DepositTroughFood()
 {
     auto* Site = TraceFacility();
-    if (!Site || !Site->IsFoodStore()) Feedback = TEXT("Aim at a garden or feeding trough within 6m");
+    if (!Site || !Site->IsFoodStore()) Feedback = TEXT("请瞄准6米内的农圃或食槽");
     else Site->TransferFood(this,true);
 }
 
 void ACFPlayerCharacter::WithdrawTroughFood()
 {
     auto* Site = TraceFacility();
-    if (!Site || !Site->IsFoodStore()) Feedback = TEXT("Aim at a garden or feeding trough within 6m");
+    if (!Site || !Site->IsFoodStore()) Feedback = TEXT("请瞄准6米内的农圃或食槽");
     else Site->TransferFood(this,false);
 }
 
@@ -62,7 +62,7 @@ bool ACFPlayerCharacter::WithdrawCompanionCargo(ACreatureCharacter* Pet)
     if(Pet->Cargo->Count()>0) return Pet->Cargo->Recover(this);
     const int32 Amount=FMath::Min(Pet->CarriedFood,999-Inventory->Count(EFrontierItem::Food));
     if(Amount<=0 || !Inventory->AddItem(EFrontierItem::Food,Amount)) return false;
-    Pet->CarriedFood-=Amount; Feedback=FString::Printf(TEXT("Recovered %d carried food from companion"),Amount); return true;
+    Pet->CarriedFood-=Amount; Feedback=FString::Printf(TEXT("已从伙伴处取回%d份食物"),Amount); return true;
 }
 void ACFPlayerCharacter::WithdrawAimedCargo()
-{ if(!WithdrawCompanionCargo(TraceCreature())) Feedback=TEXT("Aim at your companion within 6m with cargo and inventory space"); }
+{ if(!WithdrawCompanionCargo(TraceCreature())) Feedback=TEXT("请瞄准6米内有携带物的自有伙伴，并确保背包有空间"); }

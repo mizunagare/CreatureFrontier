@@ -57,7 +57,7 @@ void RunAffectionScenario(UWorld* World,ACFPlayerCharacter* Hero)
     if(Opened) { PausedCare &= RejectPausedCare(); Hero->Naming->Close(); }
     PausedCare &= !UGameplayStatics::IsGamePaused(World) && !Hero->Naming->IsOpen();
     bool Feed=Hero->FeedCompanion(Pet) && Pet->BondPoints==5 && Hero->Inventory->Count(EFrontierItem::Food)==2;
-    Pet->BondPoints=99; Feed &= Hero->PetCompanion(Pet) && Pet->BondPoints==100; Pet->AddBond(3); Feed &= Pet->BondPoints==100 && Pet->GetBondLabel()==TEXT("Devoted");
+    Pet->BondPoints=99; Feed &= Hero->PetCompanion(Pet) && Pet->BondPoints==100; Pet->AddBond(3); Feed &= Pet->BondPoints==100 && Pet->GetBondLabel()==TEXT("亲密无间");
     auto FindPet=[World,Hero]() { for(TActorIterator<ACreatureCharacter> It(World);It;++It) if(It->Tamer==Hero->GetController()) return *It; return static_cast<ACreatureCharacter*>(nullptr); };
     bool Saved=Hero->SaveProgress(TEXT("FrontierAffectionAutomation")) && Hero->LoadProgress(TEXT("FrontierAffectionAutomation")); Pet=FindPet();
     Saved &= Pet && Pet->BondPoints==100 && Pet->PettingCooldown==30 && !Hero->PetCompanion(Pet);

@@ -49,7 +49,7 @@ void RunPersonalityScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
     if(Mode==3)
     {
         auto* Old=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("NameCross"),0));
-        bool Pass=Old && Old->FormatVersion<=26 && Old->Creatures.Num()==2;
+        bool Pass=Old && Old->FormatVersion<=27 && Old->Creatures.Num()==2;
         for(int32 Attempt=0;Attempt<2;++Attempt)
         {
             Pass &= Hero->LoadProgress(TEXT("NameCross"));
@@ -74,7 +74,7 @@ void RunPersonalityScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
             Pet->SetActorTickEnabled(false);Pet->GetCharacterMovement()->DisableMovement();return Pet;
         };
         auto* A=Make(QuietId,FVector(-350,-1050,40),TEXT("QuietLeaf"));auto* B=Make(PlayId,FVector(-350,-700,40),TEXT("PlayLeaf"));Aim(Hero,B);
-        Gates=!A->Personality->IsDiscovered() && !B->Personality->IsDiscovered() && A->Personality->GetSummary().Contains(TEXT("unknown"));
+        Gates=!A->Personality->IsDiscovered() && !B->Personality->IsDiscovered() && A->Personality->GetSummary().Contains(TEXT("尚未发现"));
         auto Reject=[Hero,B]()
         {
             const float Energy=B->Stamina,Food=B->Nutrition;const bool Known=B->Personality->IsDiscovered();const int32 Bond=B->BondPoints;

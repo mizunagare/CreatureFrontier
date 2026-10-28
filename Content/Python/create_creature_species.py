@@ -17,16 +17,16 @@ if not palette:
     assert editor_assets.save_loaded_asset(palette)
 
 specs = [
-    dict(asset='DA_Mosskip', name='Mosskip', form=unreal.CreatureForm.LEAF,
-         description='A springy leaf-eared grazer. Its patient paws excel at gathering.',
+    dict(asset='DA_Mosskip', name='苔跳兽', form=unreal.CreatureForm.LEAF,
+         description='长着柔韧叶耳的食草生物，耐心的双爪擅长采集，也能帮忙照料农圃。',
          health=90, attack=9, rate=0.45, speed=360.0, seconds=1.1,
          color=(0.12, 0.48, 0.22), accent=(0.42, 0.75, 0.08), job=unreal.WorkSpecialty.GATHERING, work=1.8),
-    dict(asset='DA_Cinderkit', name='Cinderkit', form=unreal.CreatureForm.EMBER,
-         description='A bright-backed frill creature that uses its warm tail to help craft tools.',
+    dict(asset='DA_Cinderkit', name='烬尾兽', form=unreal.CreatureForm.EMBER,
+         description='背鳍明亮的小生物，会用温暖的尾巴协助制作工具。',
          health=80, attack=13, rate=0.30, speed=340.0, seconds=0.85,
          color=(0.72, 0.16, 0.045), accent=(1.0, 0.56, 0.08), job=unreal.WorkSpecialty.CRAFTING, work=1.5),
-    dict(asset='DA_Craglet', name='Craglet', form=unreal.CreatureForm.STONE,
-         description='A sturdy crystal-horned burrower. Slow strides hide powerful mining strikes.',
+    dict(asset='DA_Craglet', name='岩角兽', form=unreal.CreatureForm.STONE,
+         description='长着水晶角的结实掘地生物，步伐缓慢，采矿时却能挥出有力的重击。',
          health=160, attack=18, rate=0.22, speed=220.0, seconds=1.8,
          color=(0.17, 0.24, 0.38), accent=(0.24, 0.64, 0.88), job=unreal.WorkSpecialty.MINING, work=2.0),
 ]
@@ -48,9 +48,9 @@ for spec in specs:
     for key, value in values.items():
         asset.set_editor_property(key, value)
     skill = {
-        'DA_Mosskip': ('Bramble Snare', 600.0, 2.0, 8.0),
-        'DA_Cinderkit': ('Cinder Burst', 700.0, 2.5, 7.0),
-        'DA_Craglet': ('Stone Guard', 400.0, 2.0, 10.0),
+        'DA_Mosskip': ('荆棘缠绕', 600.0, 2.0, 8.0),
+        'DA_Cinderkit': ('余烬爆发', 700.0, 2.5, 7.0),
+        'DA_Craglet': ('岩石守护', 400.0, 2.0, 10.0),
     }[spec['asset']]
     for key, value in zip(('special_name', 'special_range', 'special_damage_scale', 'special_cooldown_seconds'), skill):
         asset.set_editor_property(key, value)

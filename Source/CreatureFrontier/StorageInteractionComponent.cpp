@@ -20,9 +20,9 @@ bool UStorageInteractionComponent::CanAccess(const AHomeModule* Crate) const
 bool UStorageInteractionComponent::Open(AHomeModule* Crate)
 {
     auto* Hero=Cast<ACFPlayerCharacter>(GetOwner());
-    if(!CanAccess(Crate)) { if(Hero) Hero->Feedback=TEXT("Storage: close other panels, approach within 3m with clear sight"); return false; }
+    if(!CanAccess(Crate)) { if(Hero) Hero->Feedback=TEXT("仓储：请关闭其他面板，靠近3米内并保持视线畅通"); return false; }
     Hero->CancelMeleeAttack(); Target=Crate; Selection=0;
-    Hero->Feedback=TEXT("Storage LIVE | Up/Down item | Enter deposit 1 | Backspace withdraw 1 | Right/Left whole stack | E close"); return true;
+    Hero->Feedback=TEXT("仓储（世界运行中）| 上下选物品 | Enter 存1个 | 退格取1个 | 左右整组转移 | E 关闭"); return true;
 }
 bool UStorageInteractionComponent::TryOpenAimed()
 {
@@ -58,7 +58,7 @@ bool UStorageInteractionComponent::Transfer(EFrontierItem Item,int32 Amount,bool
     auto* Source=Deposit?Hero->Inventory.Get():Crate->StorageInventory.Get();
     auto* Destination=Deposit?Crate->StorageInventory.Get():Hero->Inventory.Get();
     const bool Done=Source->TransferTo(Destination,{{Item,Amount}});
-    Hero->Feedback=Done?FString::Printf(TEXT("Storage: %s %d items; both inventories committed"),Deposit?TEXT("deposited"):TEXT("withdrew"),Amount):TEXT("Storage unchanged: not enough stock or destination stack full");
+    Hero->Feedback=Done?FString::Printf(TEXT("仓储：%s%d个物品，双方库存已同步"),Deposit?TEXT("存入"):TEXT("取出"),Amount):TEXT("仓储未改变：库存不足或目标已满");
     return Done;
 }
 void UStorageInteractionComponent::DepositOne() { Transfer(static_cast<EFrontierItem>(Selection),1,true); }

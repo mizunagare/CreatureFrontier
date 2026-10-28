@@ -147,7 +147,7 @@ void RunFieldRecoveryScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
         if(Run->Phase==0)
         {
             Run->Pass &= Resource->Remaining==2 && Resource->HarvestCooldown==0 && Worker->Experience==0 && InventoryAndKnowledge(Hero,0);
-            Run->SawRetry |= Worker->GetGatheringStatus().Contains(TEXT("route timeout"));
+            Run->SawRetry |= Worker->GetGatheringStatus().Contains(TEXT("路径超时"));
             if(Elapsed>=2) Run->ClosedPath |= !PathOpen(World,Worker,Resource);
             if(Preview && Run->SawRetry && !Run->BlockedShot)
             { Hero->Feedback=Worker->GetGatheringStatus(); FScreenshotRequest::RequestScreenshot(ImageRoot/TEXT("Blocked.png"),false,false); Run->BlockedShot=true; }
@@ -177,7 +177,7 @@ void RunFieldRecoveryScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
             if(!Run->OwnerReleased)
             {
                 Run->Pass &= Resource->Remaining==2 && Worker->Experience==0 && InventoryAndKnowledge(Hero,0) &&
-                    Worker->GetFieldResource()==Resource && Worker->GetGatheringStatus().Contains(TEXT("owner down")) && FVector::Dist2D(Run->Start,Worker->GetActorLocation())<1;
+                    Worker->GetFieldResource()==Resource && Worker->GetGatheringStatus().Contains(TEXT("主人倒下")) && FVector::Dist2D(Run->Start,Worker->GetActorLocation())<1;
                 if(Elapsed<1.5f) return;
                 Hero->Health=100; Run->OwnerReleased=true; Advance(2); return;
             }

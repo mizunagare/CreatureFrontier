@@ -4,8 +4,8 @@ levels = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
 actors = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
 assert levels.load_level('/Game/Maps/L_Prototype')
 specs = [
-    ('MeadowGrove', 'Meadow Grove', 'DA_Mosskip', (-1500, 1400, -50), 2, 60.0, False),
-    ('CrystalRise', 'Crystal Rise', 'DA_Craglet', (1500, 1400, -50), 5, 180.0, True),
+    ('MeadowGrove', '草甸林地', 'DA_Mosskip', (-1500, 1400, -50), 2, 60.0, False),
+    ('CrystalRise', '水晶高地', 'DA_Craglet', (1500, 1400, -50), 5, 180.0, True),
 ]
 for key, name, asset, location, level, seconds, boss in specs:
     matches = [a for a in actors.get_all_level_actors() if isinstance(a, unreal.WildEncounter)

@@ -74,9 +74,9 @@ void RunAffinityScenario(UWorld* World,ACFPlayerCharacter* Hero)
     auto* TeamEmber=Spawn(Definitions[ECreatureForm::Ember],FVector(-800,-800,40),true);
     Spawn(Definitions[ECreatureForm::Stone],FVector(-600,-800,40),true);
     auto* Enemy=Spawn(Definitions[ECreatureForm::Stone],FVector(-350,-1050,40));
-    Hero->ClearCompanionSelection(); bool Scope=Hero->GetGroupMatchupText(Enemy).Contains(TEXT("1 strong / 1 resisted / 1 normal"));
-    Scope &= Hero->SelectCompanion(TeamLeaf) && Hero->GetGroupMatchupText(Enemy).Contains(TEXT("1 strong / 0 resisted / 0 normal")); Hero->ClearCompanionSelection();
-    TeamEmber->Health=0; Scope &= Hero->GetGroupMatchupText(Enemy).Contains(TEXT("1 strong / 0 resisted / 1 normal")); TeamEmber->Health=TeamEmber->GetMaxHealth();
+    Hero->ClearCompanionSelection(); bool Scope=Hero->GetGroupMatchupText(Enemy).Contains(TEXT("1克制 / 1被抵抗 / 1正常"));
+    Scope &= Hero->SelectCompanion(TeamLeaf) && Hero->GetGroupMatchupText(Enemy).Contains(TEXT("1克制 / 0被抵抗 / 0正常")); Hero->ClearCompanionSelection();
+    TeamEmber->Health=0; Scope &= Hero->GetGroupMatchupText(Enemy).Contains(TEXT("1克制 / 0被抵抗 / 1正常")); TeamEmber->Health=TeamEmber->GetMaxHealth();
     bool Saved=Hero->SaveProgress(TEXT("FrontierAffinityAutomation")) && Hero->LoadProgress(TEXT("FrontierAffinityAutomation"));
     Enemy=nullptr; TeamLeaf=nullptr;
     for(TActorIterator<ACreatureCharacter> It(World);It;++It)
@@ -85,7 +85,7 @@ void RunAffinityScenario(UWorld* World,ACFPlayerCharacter* Hero)
         if(It->Tamer!=Hero->GetController() && It->EncounterId.IsNone() && It->Definition==Definitions[ECreatureForm::Stone]) Enemy=*It;
         if(It->Tamer==Hero->GetController() && It->Definition==Definitions[ECreatureForm::Leaf]) TeamLeaf=*It;
     }
-    Saved &= Enemy && TeamLeaf && Hero->GetGroupMatchupText(Enemy).Contains(TEXT("1 strong / 1 resisted / 1 normal"));
+    Saved &= Enemy && TeamLeaf && Hero->GetGroupMatchupText(Enemy).Contains(TEXT("1克制 / 1被抵抗 / 1正常"));
     if(Enemy && TeamLeaf) { const float Before=Enemy->Health; Saved &= FMath::IsNearlyEqual(Damage(TeamLeaf,Enemy,20),30.f,.001f) && FMath::IsNearlyEqual(Before-Enemy->Health,30.f,.001f); }
     const bool Passed=Matrix && Guard && Neutral && Safety && Skills && Basic && Quake && Scope && Saved;
     UE_LOG(LogTemp,Display,TEXT("CF_AFFINITY %s matrix=%d guard=%d neutral=%d safety=%d skills=%d basic=%d quake=%d scope=%d save=%d"),Passed?TEXT("PASS"):TEXT("FAIL"),Matrix,Guard,Neutral,Safety,Skills,Basic,Quake,Scope,Saved);

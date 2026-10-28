@@ -149,7 +149,7 @@ FString ACreatureCharacter::GetCreatureName() const
 }
 FString ACreatureCharacter::GetSpeciesName() const
 {
-    return Definition && !Definition->DisplayName.IsEmpty() ? Definition->DisplayName.ToString() : TEXT("Wildling");
+    return Definition && !Definition->DisplayName.IsEmpty() ? Definition->DisplayName.ToString() : TEXT("野生生物");
 }
 
 float ACreatureCharacter::GetWorkEfficiency(const AWorkStation* Site) const
@@ -258,12 +258,12 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
         {
             bResumeWorkAfterRest = GetFieldResource() || (IsValid(WorkSite) && WorkSite->RequiredSpecialty != EWorkSpecialty::Feeding);
             SetActivity(ECreatureActivity::Rest); WorkProgress = 0;
-            OwnerPlayer->Feedback = TEXT("A companion is hungry. J: feed aimed companion | 3: craft food at base");
+            OwnerPlayer->Feedback = TEXT("伙伴饿了。J 喂食瞄准伙伴 | 3 在基地制作食物");
         }
         if (Activity == ECreatureActivity::Rest)
         {
             if (bResumeWorkAfterRest && !GetFieldResource() && (!IsValid(WorkSite) || WorkSite->RequiredSpecialty == EWorkSpecialty::Feeding))
-            { bResumeWorkAfterRest = false; WorkSite = nullptr; StopNavigation(); SetActivity(ECreatureActivity::Follow); OwnerPlayer->Feedback=TEXT("Assigned work target no longer available; companion following"); return; }
+            { bResumeWorkAfterRest = false; WorkSite = nullptr; StopNavigation(); SetActivity(ECreatureActivity::Follow); OwnerPlayer->Feedback=TEXT("指派的工作目标已失效，伙伴改为跟随"); return; }
             if (IsValid(WorkSite) && GetDistanceTo(WorkSite) > 220.0f)
             {
                 NavigateTo(WorkSite->GetActorLocation(), 35.0f);
@@ -275,12 +275,12 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
             if (bResumeWorkAfterRest && Stamina >= 80 && Nutrition >= 20 && Health >= GetMaxHealth()*.8f)
             {
                 SetActivity(ECreatureActivity::Work);
-                OwnerPlayer->Feedback = TEXT("Recovered companion resumed its assigned work");
+                OwnerPlayer->Feedback = TEXT("伙伴恢复后已继续原工作");
             }
             return;
         }
         if (Activity == ECreatureActivity::Work && GetFieldResource()) { if(!Cargo->TickDelivery(DeltaSeconds,OwnerPlayer)) TickGathering(DeltaSeconds,OwnerPlayer); return; }
-        if(Activity==ECreatureActivity::Work && !IsValid(WorkSite)) { StopNavigation(); SetActivity(ECreatureActivity::Follow); OwnerPlayer->Feedback=TEXT("Assigned work target no longer available; companion following"); return; }
+        if(Activity==ECreatureActivity::Work && !IsValid(WorkSite)) { StopNavigation(); SetActivity(ECreatureActivity::Follow); OwnerPlayer->Feedback=TEXT("指派的工作目标已失效，伙伴改为跟随"); return; }
         if (Activity == ECreatureActivity::Work && IsValid(WorkSite))
         {
             if (WorkSite->RequiredSpecialty == EWorkSpecialty::Feeding) { SetActivity(ECreatureActivity::Rest); return; }
@@ -298,7 +298,7 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
                     bResumeWorkAfterRest = true;
                     SetActivity(ECreatureActivity::Rest);
                     WorkProgress = 0.0f;
-                    OwnerPlayer->Feedback = TEXT("Companion resting; work resumes at 80 stamina, 20 satiety and 80% health");
+                    OwnerPlayer->Feedback = TEXT("伙伴休息中，体力80、饱食20、生命80%后复工");
                     return;
                 }
                 if(WorkSite->Crop->Work(this,OwnerPlayer,DeltaSeconds*GetWorkEfficiency(WorkSite)*(Nutrition<20?.5f:1.f)))
@@ -436,7 +436,7 @@ float ACreatureCharacter::TakeDamage(float DamageAmount, FDamageEvent const& Dam
         {
             auto* Observer=Attacker->Tamer?Cast<ACFPlayerCharacter>(Attacker->Tamer->GetPawn()):Tamer?Cast<ACFPlayerCharacter>(Tamer->GetPawn()):nullptr;
             if(Observer && Observer->Health>0)
-                Observer->Feedback=FString::Printf(TEXT("%s -> %s: %.1f damage | %s x%.2f"),*Attacker->GetCreatureName(),*GetCreatureName(),Applied,Affinity>1?TEXT("STRONG"):Affinity<1?TEXT("RESISTED"):TEXT("NORMAL"),Affinity);
+                Observer->Feedback=FString::Printf(TEXT("%s → %s：%.1f伤害 | %s ×%.2f"),*Attacker->GetCreatureName(),*GetCreatureName(),Applied,Affinity>1?TEXT("克制"):Affinity<1?TEXT("被抵抗"):TEXT("正常"),Affinity);
         }
         if (Disposition != ECreatureDisposition::Tamed && Health > 0)
         {
@@ -458,7 +458,7 @@ float ACreatureCharacter::TakeDamage(float DamageAmount, FDamageEvent const& Dam
                     Hero->RecordAlphaResolution(this);
                     auto* Loot = GetWorld()->SpawnActor<AWorldLoot>(GetActorLocation() + FVector(0,0,-55), FRotator::ZeroRotator);
                     if (Loot) { Loot->Materials = bAlpha ? 8 : 2; Loot->Medicine = bAlpha ? 1 : 0; }
-                    Hero->Feedback = TEXT("Loot dropped - approach the gold cache to collect");
+                    Hero->Feedback = TEXT("掉落物已生成，靠近金色物资包收取");
                 }
                 for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It)
                     if (It->Tamer == EventInstigator && It->GetDistanceTo(this) <= 1500.0f)

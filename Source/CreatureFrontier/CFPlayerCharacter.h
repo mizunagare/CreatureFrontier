@@ -41,7 +41,7 @@ public:
     UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Category="Research") TObjectPtr<class UResearchComponent> Research;
     UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Category="Inventory") TObjectPtr<class UStorageInteractionComponent> Storage;
     bool CraftRecipe(FName RecipeId);
-    FString GetRecipeStatus(const struct FFrontierRecipe& Recipe) const;
+    FString GetRecipeStatus(const struct FFrontierRecipe& Recipe,bool* bCanCraft=nullptr) const;
     void ToggleBuilding();
     void CycleBuilding();
     bool HasDeliverySelection() const { return bDeliverySelection; }

@@ -26,18 +26,18 @@ void RunBackpackScenario(UWorld* World,ACFPlayerCharacter* Hero)
     const int32 Costs[]={3,5,2,8,12};
     for(int32 Index=0;Index<5;++Index)
     {
-        Craft &= Hero->GetBackpackRecipe()==Index && Hero->GetBackpackRecipeCost(Index)==Costs[Index] && Hero->GetBackpackRecipeStatus(Index).StartsWith(TEXT("READY"));
+        Craft &= Hero->GetBackpackRecipe()==Index && Hero->GetBackpackRecipeCost(Index)==Costs[Index] && Hero->GetBackpackRecipeStatus(Index).StartsWith(TEXT("可以制作"));
         Hero->ConfirmInterfaceAction(); Hero->PauseMenuNext();
     }
     // The original five keep their order/prices; the two new research recipes are locked.
     for(int32 Index=5;Index<7;++Index)
     {
-        Craft &= Hero->GetBackpackRecipe()==Index && Hero->GetBackpackRecipeStatus(Index).StartsWith(TEXT("LOCKED"));
+        Craft &= Hero->GetBackpackRecipe()==Index && Hero->GetBackpackRecipeStatus(Index).StartsWith(TEXT("尚未解锁"));
         Hero->ConfirmInterfaceAction(); Hero->PauseMenuNext();
     }
     for(int32 Index=7;Index<11;++Index)
     {
-        Craft &= Hero->GetBackpackRecipe()==Index && !Hero->GetBackpackRecipeStatus(Index).StartsWith(TEXT("READY"));
+        Craft &= Hero->GetBackpackRecipe()==Index && !Hero->GetBackpackRecipeStatus(Index).StartsWith(TEXT("可以制作"));
         Hero->ConfirmInterfaceAction(); Hero->PauseMenuNext();
     }
     Craft &= Hero->GetBackpackRecipe()==0 && Hero->Inventory->Count(EFrontierItem::Material)==70;
@@ -45,16 +45,16 @@ void RunBackpackScenario(UWorld* World,ACFPlayerCharacter* Hero)
     Craft &= Hero->Equipment->GetState().bSpearEquipped && Hero->Equipment->GetState().bVestEquipped;
     for(int32 Index=0;Index<4;++Index) Hero->StepBackpackRecipe(1);
     Hero->ConfirmInterfaceAction(); Hero->StepBackpackRecipe(-1); Hero->ConfirmInterfaceAction();
-    bool Reject=Hero->Inventory->Count(EFrontierItem::Material)==70 && Hero->GetBackpackRecipeStatus(3).StartsWith(TEXT("OWNED"));
+    bool Reject=Hero->Inventory->Count(EFrontierItem::Material)==70 && Hero->GetBackpackRecipeStatus(3).StartsWith(TEXT("已拥有"));
     Hero->ToggleBackpack(); Hero->ToggleBackpack();
     Hero->Inventory->Restore({{EFrontierItem::Material,1}}); Hero->ConfirmInterfaceAction();
-    Reject &= Hero->Inventory->Count(EFrontierItem::Material)==1 && Hero->GetBackpackRecipeStatus(0).Contains(TEXT("2 more"));
+    Reject &= Hero->Inventory->Count(EFrontierItem::Material)==1 && Hero->GetBackpackRecipeStatus(0).Contains(TEXT("还需要2份"));
     Hero->Inventory->Restore({{EFrontierItem::Material,100},{EFrontierItem::CaptureDevice,999}}); Hero->ConfirmInterfaceAction();
-    Reject &= Hero->Inventory->Count(EFrontierItem::Material)==100 && Hero->Inventory->Count(EFrontierItem::CaptureDevice)==999 && Hero->GetBackpackRecipeStatus(0).StartsWith(TEXT("OUTPUT FULL"));
+    Reject &= Hero->Inventory->Count(EFrontierItem::Material)==100 && Hero->Inventory->Count(EFrontierItem::CaptureDevice)==999 && Hero->GetBackpackRecipeStatus(0).StartsWith(TEXT("产物已满"));
     Hero->Inventory->Restore({{EFrontierItem::Material,100}}); Hero->SetActorLocation(FVector(0,-3000,40));
     auto* Trough=World->SpawnActor<AWorkStation>(Hero->GetActorLocation()+FVector(200,0,0),FRotator::ZeroRotator); Trough->RequiredSpecialty=EWorkSpecialty::Feeding;
     Hero->ConfirmInterfaceAction();
-    Reject &= !Hero->IsNearWorkStation() && Hero->Inventory->Count(EFrontierItem::Material)==100 && Hero->GetBackpackRecipeStatus(0).Contains(TEXT("8m"));
+    Reject &= !Hero->IsNearWorkStation() && Hero->Inventory->Count(EFrontierItem::Material)==100 && Hero->GetBackpackRecipeStatus(0).Contains(TEXT("8米"));
     Trough->Destroy(); Hero->SetActorLocation(Base);
     Hero->TakeDamage(1000,FDamageEvent(),nullptr,nullptr); Hero->ConfirmInterfaceAction();
     Reject &= Hero->Health<=0 && !Hero->IsBackpackOpen() && Hero->Inventory->Count(EFrontierItem::Material)==100;

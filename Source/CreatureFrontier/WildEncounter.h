@@ -19,7 +19,7 @@ public:
     UPROPERTY(EditAnywhere, Category="Encounter") TObjectPtr<UCreatureDefinition> Definition;
     UPROPERTY(EditAnywhere, Category="Encounter", meta=(ClampMin="1", ClampMax="20")) int32 CreatureLevel = 2;
     UPROPERTY(EditAnywhere, Category="Encounter", meta=(ClampMin="1", ClampMax="600")) float RespawnSeconds = 60;
-    UPROPERTY(EditAnywhere, Category="Encounter") FString RegionName = TEXT("Wild habitat");
+    UPROPERTY(EditAnywhere, Category="Encounter") FString RegionName = TEXT("野生栖息地");
     UPROPERTY(EditAnywhere, Category="Encounter") bool bBoss = false;
     UPROPERTY(VisibleAnywhere, Category="Encounter") float Remaining = 0;
     ACreatureCharacter* GetResident() const;

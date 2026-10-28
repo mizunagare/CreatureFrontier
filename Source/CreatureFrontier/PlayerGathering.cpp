@@ -20,8 +20,8 @@ void ACFPlayerCharacter::GatherAimedResource()
     if(auto* Node=TraceResource())
     {
         const bool NewSample=Node->Definition && Node->Definition->Discovery==EFrontierResearch::CrystalSample && !Research->Has(EFrontierResearch::CrystalSample);
-        if(Node->TryHarvest(this,this)) Feedback=NewSample?Research->GetHint():TEXT("Gathered 1 ")+UCraftingCatalog::ItemName(Node->Definition->OutputItem)+TEXT(" from shared stock");
-        else Feedback=TEXT("Cannot gather: depleted, cooldown, blocked, too far, or inventory full");
+        if(Node->TryHarvest(this,this)) Feedback=NewSample?Research->GetHint():TEXT("采集了1份")+UCraftingCatalog::ItemName(Node->Definition->OutputItem)+TEXT("，来自共享储量");
+        else Feedback=TEXT("无法采集：已采空、冷却中、受阻、距离过远或背包已满");
     }
-    else Feedback=TEXT("Aim at a resource node within 3m, then press M");
+    else Feedback=TEXT("瞄准3米内的资源点，按M采集");
 }

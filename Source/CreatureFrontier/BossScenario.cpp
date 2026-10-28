@@ -98,7 +98,7 @@ void RunBossScenario(UWorld* World, ACFPlayerCharacter* Hero)
     Loot &= !Drop->Collect(Hero); // Full inventory leaves the remainder in the world.
     // This fixture manually converts a captured boss back to wild (no release
     // feature exists). Its retained companion-only preference must be rejected.
-    const bool RejectedFixture=Hero->SaveProgress(Slot) && !Hero->LoadProgress(Slot) && Hero->Feedback.Contains(TEXT("Invalid companion preference"));
+    const bool RejectedFixture=Hero->SaveProgress(Slot) && !Hero->LoadProgress(Slot) && Hero->Feedback.Contains(TEXT("伙伴偏好无效"));
     UE_LOG(LogTemp,Display,TEXT("CF_BOSS_FIXTURE rejectedRetainedPreference=%d"),RejectedFixture);
     Boss->Personality->RestoreSnapshot(ECompanionPreference::None,false);
     Saved &= RejectedFixture && Hero->SaveProgress(Slot) && Hero->LoadProgress(Slot);

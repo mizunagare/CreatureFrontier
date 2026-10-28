@@ -41,46 +41,46 @@ bool HomeLayout::IsCanonical(const FHomeModuleRecord& Record)
 }
 bool HomeLayout::Validate(const TArray<FHomeModuleRecord>& Records,FString& Reason)
 {
-    if(Records.Num()>128) { Reason=TEXT("Home limit: 128 modules"); return false; }
+    if(Records.Num()>128) { Reason=TEXT("房屋最多128个模块"); return false; }
     TSet<FGuid> Ids;
     for(int32 Index=0;Index<Records.Num();++Index)
     {
         const auto& Record=Records[Index];
-        if(!IsCanonical(Record) || Ids.Contains(Record.Id)) { Reason=TEXT("Invalid module transform, definition or duplicate ID"); return false; }
+        if(!IsCanonical(Record) || Ids.Contains(Record.Id)) { Reason=TEXT("模块变换或定义无效，或身份重复"); return false; }
         Ids.Add(Record.Id);
         for(int32 Other=0;Other<Index;++Other)
             if(Record.Transform.GetLocation().Equals(Records[Other].Transform.GetLocation(),.01) &&
                 Record.Transform.GetRotation().Equals(Records[Other].Transform.GetRotation(),.001))
-            { Reason=TEXT("Module socket already occupied"); return false; }
+            { Reason=TEXT("模块安装位已被占用"); return false; }
         const auto Kind=Record.Definition.Get()->Kind;
         if(Kind==EHomeModuleKind::Floor)
-        { if(Record.FloorId.IsValid()) { Reason=TEXT("Ground floors cannot have a parent floor"); return false; } continue; }
+        { if(Record.FloorId.IsValid()) { Reason=TEXT("地面地板不能依附父地板"); return false; } continue; }
         const FHomeModuleRecord* Floor=Records.FindByPredicate([&Record](const FHomeModuleRecord& Other){return Other.Id==Record.FloorId;});
         if(!Floor || !Floor->Definition.Get() || Floor->Definition.Get()->Kind!=EHomeModuleKind::Floor)
-        { Reason=TEXT("Module requires its supporting floor"); return false; }
+        { Reason=TEXT("模块需要支撑地板"); return false; }
         const FVector Center=Floor->Transform.GetLocation(); const FVector Position=Record.Transform.GetLocation();
         if(Kind==EHomeModuleKind::Roof)
         {
             if(!FVector(Position.X,Position.Y,-40).Equals(Center,.01) ||
                 !((WallAt(Records,FVector(Center.X,Center.Y-200,-30),0) && WallAt(Records,FVector(Center.X,Center.Y+200,-30),0)) ||
                   (WallAt(Records,FVector(Center.X-200,Center.Y,-30),90) && WallAt(Records,FVector(Center.X+200,Center.Y,-30),90))))
-            { Reason=TEXT("Roof requires two opposite walls on its floor"); return false; }
+            { Reason=TEXT("屋顶需要所在楼层两面相对的墙支撑"); return false; }
         }
         else if(Kind==EHomeModuleKind::Lantern || Kind==EHomeModuleKind::Storage)
         {
             const float Inset=Kind==EHomeModuleKind::Storage?145:170;
             if(FMath::Abs(Position.X-Center.X)>Inset || FMath::Abs(Position.Y-Center.Y)>Inset)
-            { Reason=TEXT("Furniture must fit inside its supporting floor"); return false; }
+            { Reason=TEXT("家具必须完全放在支撑地板内"); return false; }
         }
         else
         {
             const bool AlongX=FMath::IsNearlyZero(Record.Transform.Rotator().Yaw,.01);
             if(!(AlongX?FMath::IsNearlyEqual(Position.X,Center.X,.01) && FMath::IsNearlyEqual(FMath::Abs(Position.Y-Center.Y),200.,.01):
                 FMath::IsNearlyEqual(Position.Y,Center.Y,.01) && FMath::IsNearlyEqual(FMath::Abs(Position.X-Center.X),200.,.01)))
-            { Reason=TEXT("Walls snap to a supporting floor edge"); return false; }
+            { Reason=TEXT("墙需吸附到支撑地板边缘"); return false; }
         }
     }
-    Reason=TEXT("Structure supported"); return true;
+    Reason=TEXT("结构支撑有效"); return true;
 }
 FGuid HomeLayout::FindFloor(const FVector& Point,const TArray<FHomeModuleRecord>& Records)
 {
@@ -122,13 +122,13 @@ bool HomeLayout::ValidateTerrain(UWorld* World,const FHomeModuleRecord& Record,F
     for(const auto& Part:AHomeModule::Parts(Record.Definition.Get()->Kind))
         if(World->OverlapAnyTestByObjectType(Record.Transform.GetLocation()+Record.Transform.GetRotation().RotateVector(Part.Center),Record.Transform.GetRotation(),Objects,
             FCollisionShape::MakeBox(Part.Extent-FVector(1)),Params))
-        { Reason=TEXT("Module intersects authored world geometry"); return false; }
+        { Reason=TEXT("模块与场景几何体相交"); return false; }
     if(Record.Definition.Get()->Kind==EHomeModuleKind::Floor)
         for(double X:{-190.,190.}) for(double Y:{-190.,190.})
         {
             const FVector Corner=Record.Transform.GetLocation()+FVector(X,Y,0); FHitResult Hit;
             if(!World->LineTraceSingleByChannel(Hit,Corner+FVector(0,0,15),Corner-FVector(0,0,30),ECC_Visibility,Params) || Hit.ImpactNormal.Z<.98 || !FMath::IsNearlyEqual(Hit.ImpactPoint.Z,-50.,2.))
-            { Reason=TEXT("Floor needs flat ground under all four corners"); return false; }
+            { Reason=TEXT("地板四角下方均需平坦地面"); return false; }
         }
     return true;
 }

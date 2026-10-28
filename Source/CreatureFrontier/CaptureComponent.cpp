@@ -32,7 +32,7 @@ void UCaptureComponent::ToggleDevice()
 {
     auto* Hero=Cast<ACFPlayerCharacter>(GetOwner()); if(!Hero || !Hero->HasAuthority() || Hero->Health<=0 || UGameplayStatics::IsGamePaused(this)) return;
     bUseResonance=!bUseResonance;
-    Hero->Feedback=bUseResonance?TEXT("Resonance capture selected | consumes resonance device only | 0 normal"):TEXT("Normal capture selected | consumes normal device only | 0 resonance");
+    Hero->Feedback=bUseResonance?TEXT("已选共鸣捕捉，仅消耗共鸣器 | 0 普通捕捉"):TEXT("已选普通捕捉，仅消耗普通捕捉器 | 0 共鸣捕捉");
 }
 
 void UCaptureComponent::TryCapture_Implementation(ACreatureCharacter* Creature)
@@ -52,7 +52,7 @@ void UCaptureComponent::TryCapture_Implementation(ACreatureCharacter* Creature)
     if (!Hero || Hero->Health <= 0.0f) return;
     if (!Hero->Inventory->Consume(bUseResonance?EFrontierItem::ResonanceDevice:EFrontierItem::CaptureDevice, 1))
     {
-        Hero->Feedback = bUseResonance?TEXT("No resonance devices - craft after crystal study; no normal fallback"):TEXT("No normal devices - craft with 1 at work station");
+        Hero->Feedback = bUseResonance?TEXT("没有共鸣捕捉器，请完成水晶研究后制作；不会自动改用普通捕捉器"):TEXT("没有普通捕捉器，请在工作台按1制作");
         return;
     }
     const bool bSucceeded = Chance > 0.0f && FMath::FRand() <= Chance;

@@ -1,15 +1,15 @@
 import unreal
 
-# Idempotent content authoring; runtime player and AI both consume these definitions.
+# 幂等生成内容，玩家与伙伴运行时共享这些资源定义。
 tools = unreal.AssetToolsHelpers.get_asset_tools()
 specs = [
-    ('DA_Brush', 'Renewable brush', unreal.WorkSpecialty.GATHERING, 24, 180.0, (0.12, 0.5, 0.16)),
-    ('DA_Stone', 'Stone deposit', unreal.WorkSpecialty.MINING, 30, 0.0, (0.2, 0.38, 0.6)),
-    ('DA_Salvage', 'Salvage pile', unreal.WorkSpecialty.CRAFTING, 18, 0.0, (0.6, 0.28, 0.08)),
-    ('DA_Crystal', 'Crystal Rise deposit', unreal.WorkSpecialty.MINING, 8, 0.0, (0.55, 0.15, 0.8)),
-    ('DA_Fiber', 'Reedbank fibers', unreal.WorkSpecialty.GATHERING, 18, 240.0, (0.65, 0.72, 0.20)),
-    ('DA_Ore', 'Rust Ridge ore', unreal.WorkSpecialty.MINING, 16, 0.0, (0.72, 0.28, 0.12)),
-    ('DA_Scrap', 'Broken machinery', unreal.WorkSpecialty.CRAFTING, 12, 0.0, (0.25, 0.30, 0.34)),
+    ('DA_Brush', '再生灌木', unreal.WorkSpecialty.GATHERING, 24, 180.0, (0.12, 0.5, 0.16)),
+    ('DA_Stone', '石料矿床', unreal.WorkSpecialty.MINING, 30, 0.0, (0.2, 0.38, 0.6)),
+    ('DA_Salvage', '废料堆', unreal.WorkSpecialty.CRAFTING, 18, 0.0, (0.6, 0.28, 0.08)),
+    ('DA_Crystal', '高地水晶矿', unreal.WorkSpecialty.MINING, 8, 0.0, (0.55, 0.15, 0.8)),
+    ('DA_Fiber', '河岸纤维', unreal.WorkSpecialty.GATHERING, 18, 240.0, (0.65, 0.72, 0.20)),
+    ('DA_Ore', '锈岭矿料', unreal.WorkSpecialty.MINING, 16, 0.0, (0.72, 0.28, 0.12)),
+    ('DA_Scrap', '废弃机械', unreal.WorkSpecialty.CRAFTING, 12, 0.0, (0.25, 0.30, 0.34)),
 ]
 for name, label, specialty, capacity, regrow, color in specs:
     path = '/Game/Resources/' + name

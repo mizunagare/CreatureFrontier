@@ -9,13 +9,13 @@ bool AWorkStation::TransferFood(ACFPlayerCharacter* Hero, bool Deposit)
     FHitResult Hit;
     FCollisionQueryParams Params(SCENE_QUERY_STAT(TroughTransfer),false,Hero);
     if (GetWorld()->LineTraceSingleByChannel(Hit,Hero->GetPawnViewLocation(),GetActorLocation(),ECC_Visibility,Params) && Hit.GetActor() != this)
-    { Hero->Feedback = TEXT("Food store is blocked by cover"); return false; }
+    { Hero->Feedback = TEXT("食物设施被障碍物遮挡"); return false; }
     const int32 Amount = Deposit ? FMath::Min3(5,30-StoredFood,Hero->Inventory->Count(EFrontierItem::Food)) :
         FMath::Min3(5,StoredFood,UInventoryComponent::StackLimit-Hero->Inventory->Count(EFrontierItem::Food));
-    if (Amount <= 0) { Hero->Feedback = TEXT("No transferable food or destination is full"); return false; }
+    if (Amount <= 0) { Hero->Feedback = TEXT("没有可转移食物，或目标容量已满"); return false; }
     if (Deposit ? !Hero->Inventory->Consume(EFrontierItem::Food,Amount) : !Hero->Inventory->AddItem(EFrontierItem::Food,Amount)) return false;
     StoredFood += Deposit ? Amount : -Amount;
-    Hero->Feedback = FString::Printf(TEXT("Food store %d/30 | U deposit | O withdraw"),StoredFood);
+    Hero->Feedback = FString::Printf(TEXT("食物储量 %d/30 | U 存入 | O 取出"),StoredFood);
     RefreshLabel(); return true;
 }
 
@@ -35,6 +35,6 @@ bool AWorkStation::ServeFood(ACreatureCharacter* Pet)
     if (GetWorld()->LineTraceSingleByChannel(Hit,GetActorLocation(),Pet->GetActorLocation(),ECC_Visibility,Params) && Hit.GetActor() != Pet) return false;
     --StoredFood; Pet->Nutrition = FMath::Min(100.0f,Pet->Nutrition+35); Pet->Stamina = FMath::Min(100.0f,Pet->Stamina+15);
     Pet->AutoFeedCooldown = 3;
-    Hero->Feedback = Pet->GetCreatureName()+TEXT(" ate at the trough and will resume its assignment");
+    Hero->Feedback = Pet->GetCreatureName()+TEXT("已在食槽进食，即将继续原工作");
     RefreshLabel(); return true;
 }

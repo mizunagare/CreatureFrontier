@@ -193,7 +193,7 @@ struct FRun : TSharedFromThis<FRun>
         {
             if(Node->Remaining!=1 || Count!=3 || Stock!=999 || Pet->Experience!=3 || Hero->Inventory->Count(Item)!=999)
             { Finish(false,TEXT("blocked/full batch changed")); return; }
-            if(!Pet->Cargo->Status().Contains(TEXT("crate full"))) return;
+            if(!Pet->Cargo->Status().Contains(TEXT("箱子已满"))) return;
             if(Pet->GetDistanceTo(Crate)>220 || FVector::Dist2D(CarryStart,Pet->GetActorLocation())<400)
             { Finish(false,TEXT("no real delivery approach")); return; }
             UGameplayStatics::ApplyDamage(Hero,500,nullptr,Pet,nullptr); PausePosition=Pet->GetActorLocation(); Phase=2; PhaseAt=Now; return;

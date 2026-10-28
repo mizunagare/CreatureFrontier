@@ -67,15 +67,15 @@ void UPlayerEquipmentComponent::CraftVest() { Craft(false); }
 void UPlayerEquipmentComponent::ToggleSpear()
 {
     auto* Hero=Cast<ACFPlayerCharacter>(GetOwner()); if(!Hero || !Hero->HasAuthority() || Hero->Health<=0) return;
-    if(!State.bOwnSpear) { Hero->Feedback=TEXT("Craft a spear first: 4 near a work station"); return; }
+    if(!State.bOwnSpear) { Hero->Feedback=TEXT("请先在工作设施附近按4制作长矛"); return; }
     Hero->CancelMeleeAttack();
-    State.bSpearEquipped=!State.bSpearEquipped; SwingRemaining=0; RefreshVisual(); Hero->Feedback=State.bSpearEquipped?TEXT("Spear equipped"):TEXT("Spear unequipped");
+    State.bSpearEquipped=!State.bSpearEquipped; SwingRemaining=0; RefreshVisual(); Hero->Feedback=State.bSpearEquipped?TEXT("已装备长矛"):TEXT("已卸下长矛");
 }
 void UPlayerEquipmentComponent::ToggleVest()
 {
     auto* Hero=Cast<ACFPlayerCharacter>(GetOwner()); if(!Hero || !Hero->HasAuthority() || Hero->Health<=0) return;
-    if(!State.bOwnVest) { Hero->Feedback=TEXT("Craft a vest first: 5 near a work station"); return; }
-    State.bVestEquipped=!State.bVestEquipped; Hero->Feedback=State.bVestEquipped?TEXT("Vest equipped"):TEXT("Vest unequipped");
+    if(!State.bOwnVest) { Hero->Feedback=TEXT("请先在工作设施附近按5制作护甲"); return; }
+    State.bVestEquipped=!State.bVestEquipped; Hero->Feedback=State.bVestEquipped?TEXT("已装备护甲"):TEXT("已卸下护甲");
 }
 void UPlayerEquipmentComponent::PlayAttack() { if(State.bSpearEquipped) SwingRemaining=.22f; }
 bool UPlayerEquipmentComponent::IsWeaponVisible() const { return WeaponPivot && WeaponPivot->IsVisible(); }

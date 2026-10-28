@@ -24,8 +24,8 @@ void UCompanionPersonalityComponent::RestoreSnapshot(ECompanionPreference Prefer
 }
 FString UCompanionPersonalityComponent::GetSummary() const
 {
-    return !bDiscovered?TEXT("Preference unknown | try Y / F6"):Preferred==ECompanionPreference::Quiet?
-        TEXT("Prefers quiet care (Y)"):TEXT("Prefers lively play (F6)");
+    return !bDiscovered?TEXT("偏好尚未发现 | 试试 Y / F6"):Preferred==ECompanionPreference::Quiet?
+        TEXT("喜欢安静陪伴（Y）"):TEXT("喜欢活泼玩耍（F6）");
 }
 bool UCompanionPersonalityComponent::CanRespond(ECompanionPreference Style) const
 {
@@ -42,6 +42,6 @@ FString UCompanionPersonalityComponent::Respond(ECompanionPreference Style)
     if(Favorite) bDiscovered=true;
     if(Style==ECompanionPreference::Playful) Pet->Stamina-=5;
     Pet->RespondToPetting();Pet->SetSocialResponse(Style==ECompanionPreference::Playful,Favorite);
-    return FString::Printf(TEXT("%s %s%s | %s | bond %d/100 | shared 30s wait"),*Pet->GetCreatureName(),
-        Favorite?TEXT("lights up!"):TEXT("enjoys your company"),NewDiscovery?TEXT(" Preference discovered."):TEXT(""),*GetSummary(),Pet->BondPoints);
+    return FString::Printf(TEXT("%s %s%s | %s | 亲密 %d/100 | 共享冷却30秒"),*Pet->GetCreatureName(),
+        Favorite?TEXT("露出了欣喜的神情！"):TEXT("享受着你的陪伴"),NewDiscovery?TEXT(" 发现了新的偏好。"):TEXT(""),*GetSummary(),Pet->BondPoints);
 }

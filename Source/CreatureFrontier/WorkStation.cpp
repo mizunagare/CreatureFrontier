@@ -1,4 +1,5 @@
 #include "WorkStation.h"
+#include "FrontierChinese.h"
 #include "FarmCropComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/TextRenderComponent.h"
@@ -21,7 +22,7 @@ AWorkStation::AWorkStation()
     Label->SetupAttachment(Mesh);
     Label->SetAbsolute(false, false, true);
     Label->SetRelativeLocation(FVector(0,0,130));
-    Label->SetWorldSize(24);
+    Label->SetWorldSize(12);Label->SetCullDistance(900);
     Label->SetHorizontalAlignment(EHTA_Center);
     Label->SetTextRenderColor(FColor(235,240,220));
     static ConstructorHelpers::FObjectFinder<UStaticMesh> Cone(TEXT("/Engine/BasicShapes/Cone.Cone"));
@@ -53,6 +54,7 @@ void AWorkStation::OnConstruction(const FTransform& Transform)
 void AWorkStation::BeginPlay()
 {
     Super::BeginPlay();
+    Label->SetHiddenInGame(true);
     if (bPlayerBuilt)
         if (auto* Palette = LoadObject<UMaterialInterface>(nullptr,TEXT("/Game/Materials/M_CreaturePalette.M_CreaturePalette")))
         {
@@ -82,8 +84,6 @@ void AWorkStation::RefreshLabel()
                 Material->SetVectorParameterValue(TEXT("Tint"),Farm ? FLinearColor(.12f,.6f,.08f) : FLinearColor(.9f,.4f,.04f)); Plant->SetMaterial(0,Material);
             }
     }
-    const FString Name = UEnum::GetValueAsString(RequiredSpecialty).Replace(TEXT("EWorkSpecialty::"), TEXT(""));
-    Label->SetText(FText::FromString(Trough ? FString::Printf(TEXT("FEEDING TROUGH\nFOOD %d/30 | U+ O-"),StoredFood) :
-        Farm ? FString::Printf(TEXT("FOOD GARDEN | FOOD %d/30\n%s"),StoredFood,*Crop->Status()) : RequiredSpecialty==EWorkSpecialty::Transport ? TEXT("TRANSPORT POST\nFARM -> TROUGH | E assign") :
-        Name + (bPlayerBuilt ? TEXT("\nBUILT FACILITY") : TEXT("\nWORK STATION"))));
+    const FString Name = FrontierChinese::Specialty(RequiredSpecialty);
+    Label->SetText(FText::FromString(Trough?TEXT("食槽"):Farm?TEXT("食物农圃"):RequiredSpecialty==EWorkSpecialty::Transport?TEXT("运输站"):Name));
 }

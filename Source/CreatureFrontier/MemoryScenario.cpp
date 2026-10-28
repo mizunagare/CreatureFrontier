@@ -80,13 +80,13 @@ void RunMemoryScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
     using namespace CFMemoryQA;bool Sampling=true,Gates=true,Persistence=true;
     if(Mode==4)
     {
-        auto* Old=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("PersonalityCross"),0));bool Pass=Old && Old->FormatVersion==26 && Old->Creatures.Num()==2;
+        auto* Old=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("PersonalityCross"),0));bool Pass=Old && Old->FormatVersion>=26 && Old->FormatVersion<=27 && Old->Creatures.Num()==2;
         for(int32 Attempt=0;Attempt<2;++Attempt)
         {
             Pass &= Hero->LoadProgress(TEXT("PersonalityCross"));
             if(Old)for(const auto& R:Old->Creatures)
             {ACreatureCharacter* Live=nullptr;for(auto* P:Hero->GetCompanionRoster())if(P->PersistentId==R.Id)Live=P;
-             Pass &= Live && Live->Nickname==R.Nickname && Live->Personality->GetPreference()==R.Preference && Live->Personality->IsDiscovered()==R.bPreferenceDiscovered && Live->Memory->GetMemory()==ECrystalJourneyMemory::None && Live->BondPoints==R.BondPoints;}
+             Pass &= Live && Live->Nickname==R.Nickname && Live->Personality->GetPreference()==R.Preference && Live->Personality->IsDiscovered()==R.bPreferenceDiscovered && Live->Memory->GetMemory()==(Old->FormatVersion>=27?static_cast<ECrystalJourneyMemory>(R.CrystalJourney):ECrystalJourneyMemory::None) && Live->BondPoints==R.BondPoints;}
         }
         UE_LOG(LogTemp,Display,TEXT("CF_MEMORY_LEGACY_READ %s"),Pass?TEXT("PASS"):TEXT("FAIL"));FPlatformMisc::RequestExitWithStatus(false,Pass?0:1);return;
     }

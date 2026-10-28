@@ -34,6 +34,6 @@ bool ACreatureCharacter::TickAlphaAttack(float DeltaSeconds, APawn* Target)
     AlphaCooldown = 10;
     AttackCooldown = FMath::Max(AttackCooldown, AttackInterval);
     if (auto* Hero = Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerPawn(this, 0)))
-        Hero->Feedback = TEXT("ALPHA: Crystal Quake! Leave the orange circle or jump!");
+        Hero->Feedback = TEXT("首领：水晶震地！离开橙色圆圈或跳跃！");
     return true;
 }

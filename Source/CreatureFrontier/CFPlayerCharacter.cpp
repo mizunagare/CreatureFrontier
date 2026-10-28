@@ -1,4 +1,5 @@
 #include "CFPlayerCharacter.h"
+#include "FrontierChinese.h"
 #include "Camera/CameraComponent.h"
 #include "CaptureComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -53,9 +54,9 @@ void ACFPlayerCharacter::CycleBuilding()
     {
         DeliverySelection=Crate; bDeliverySelection=true; int32 Applied=0;
         for(TActorIterator<ACreatureCharacter> It(GetWorld());It;++It) if(IsCommandTarget(*It) && It->Cargo->Assign(Crate,this)) ++Applied;
-        Feedback=FString::Printf(TEXT("Storage destination selected; E resource orders will carry here | %d current jobs linked | V away from crate clears future selection"),Applied);
+        Feedback=FString::Printf(TEXT("已选运输目标；E 指派的资源将运到这里 | 已关联%d项工作 | 对空按V清除后续目标"),Applied);
     }
-    else { DeliverySelection.Reset(); bDeliverySelection=false; Feedback=TEXT("Future resource orders use player inventory again; F cancels existing delivery jobs"); }
+    else { DeliverySelection.Reset(); bDeliverySelection=false; Feedback=TEXT("后续采集直接放入背包；F 取消已有运输工作"); }
 }
 void ACFPlayerCharacter::DismantleBuilding() { Building->Dismantle(); }
 
@@ -83,10 +84,10 @@ void ACFPlayerCharacter::CraftMedicine()
 
 void ACFPlayerCharacter::UseMedicine()
 {
-    if (Health <= 0 || Health >= 100 || !HasAuthority()) { Feedback = TEXT("Medicine requires an injured, living player"); return; }
-    if (!Inventory->Consume(EFrontierItem::Medicine, 1)) { Feedback = TEXT("No medicine - craft at work station"); return; }
+    if (Health <= 0 || Health >= 100 || !HasAuthority()) { Feedback = TEXT("仅受伤且存活时可用药品"); return; }
+    if (!Inventory->Consume(EFrontierItem::Medicine, 1)) { Feedback = TEXT("没有药品，请在工作台制作"); return; }
     Health = FMath::Min(100.0f, Health + 40.0f);
-    Feedback = TEXT("Used medicine: restored up to 40 health");
+    Feedback = TEXT("已用药品，最多恢复40生命");
 }
 
 bool ACFPlayerCharacter::SaveProgress(const FString& Slot)
@@ -167,7 +168,7 @@ bool ACFPlayerCharacter::SaveProgress(const FString& Slot)
             Save->Facilities.Add(Record);
         }
     const bool bSaved = UGameplayStatics::SaveGameToSlot(Save, Slot, 0);
-    Feedback = bSaved ? TEXT("Saved - F9 to restore") : TEXT("Save failed");
+    Feedback = bSaved ? TEXT("保存成功，F9 读档") : TEXT("保存失败");
     return bSaved;
 }
 
@@ -180,7 +181,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
         !FMath::IsFinite(Save->Health) || Save->Health < 0 || Save->Health > 100 ||
         Save->Resources < 0 || Save->PlayerTransform.ContainsNaN() || Save->ViewRotation.ContainsNaN())
     {
-        Feedback = TEXT("No compatible save for this map");
+        Feedback = TEXT("没有适用于当前地图的存档");
         return false;
     }
     if (Save->FormatVersion == 1)
@@ -188,33 +189,33 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
         Save->InventoryStacks = {{EFrontierItem::Material, Save->Resources}, {EFrontierItem::CaptureDevice, 5}, {EFrontierItem::Medicine, 1}};
     }
     if(Save->FormatVersion<14) Save->Equipment=FPlayerEquipmentState();
-    if(!UPlayerEquipmentComponent::Validate(Save->Equipment)) { Feedback=TEXT("Invalid equipment in save"); return false; }
+    if(!UPlayerEquipmentComponent::Validate(Save->Equipment)) { Feedback=TEXT("存档中的装备数据无效"); return false; }
     if (Save->FormatVersion < 9) Save->InventoryStacks.FindOrAdd(EFrontierItem::Food) = 3;
     if(Save->FormatVersion<19)
     {
         Save->Research=FResearchProgress();
-        for(const auto& Entry:Save->InventoryStacks) if(Entry.Key>=EFrontierItem::Crystal && Entry.Value>0) { Feedback=TEXT("Unknown item in legacy save"); return false; }
+        for(const auto& Entry:Save->InventoryStacks) if(Entry.Key>=EFrontierItem::Crystal && Entry.Value>0) { Feedback=TEXT("旧存档含未知物品"); return false; }
     }
-    if(!UResearchComponent::Validate(Save->Research)) { Feedback=TEXT("Invalid research prerequisites in save"); return false; }
+    if(!UResearchComponent::Validate(Save->Research)) { Feedback=TEXT("存档中的研究前置条件无效"); return false; }
     if(Save->FormatVersion<23)
         for(const auto& Entry:Save->InventoryStacks) if(Entry.Key>=EFrontierItem::Fiber && Entry.Value>0)
-        { Feedback=TEXT("Unknown differentiated material in legacy save"); return false; }
+        { Feedback=TEXT("旧存档含未知分类材料"); return false; }
     if(Save->FormatVersion<24 && Save->InventoryStacks.FindRef(EFrontierItem::Seeds)>0)
-    {Feedback=TEXT("Unknown seed item in legacy inventory");return false;}
+    {Feedback=TEXT("旧存档背包含未知种子");return false;}
     if (!UInventoryComponent::Validate(Save->InventoryStacks))
     {
-        Feedback = TEXT("Invalid inventory in save");
+        Feedback = TEXT("存档中的背包数据无效");
         return false;
     }
     TArray<TObjectPtr<UCreatureDefinition>> LoadedJournalAssets;
     TSet<FSoftObjectPath> JournalPaths;
     if (Save->FormatVersion < 12) Save->Journal.Reset();
-    if (Save->Journal.Num()>128) { Feedback=TEXT("Invalid journal size in save"); return false; }
+    if (Save->Journal.Num()>128) { Feedback=TEXT("存档中的图鉴数量无效"); return false; }
     for (const auto& Entry : Save->Journal)
     {
         auto* Definition=Entry.Definition.LoadSynchronous();
         const auto Path=Entry.Definition.ToSoftObjectPath();
-        if (!Definition || JournalPaths.Contains(Path)) { Feedback=TEXT("Invalid journal entry in save"); return false; }
+        if (!Definition || JournalPaths.Contains(Path)) { Feedback=TEXT("存档中的图鉴条目无效"); return false; }
         JournalPaths.Add(Path); LoadedJournalAssets.Add(Definition);
     }
     if(Save->FormatVersion<13) Save->Objectives=FFrontierObjectiveProgress();
@@ -225,15 +226,15 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
     if(ObjectiveSave.Claimed<0 || ObjectiveSave.Claimed>5 || ObjectiveSave.WorkMaterials<0 || ObjectiveSave.WorkMaterials>3 || ObjectiveSave.FarmFood<0 || ObjectiveSave.FarmFood>2 ||
         (ObjectiveSave.Claimed>=1 && !SeenProof) || (ObjectiveSave.Claimed>=2 && !CaptureProof) ||
         (ObjectiveSave.Claimed>=3 && ObjectiveSave.WorkMaterials<3) || (ObjectiveSave.Claimed>=4 && ObjectiveSave.FarmFood<2) || (ObjectiveSave.Claimed>=5 && !ObjectiveSave.bAlphaResolved))
-    { Feedback=TEXT("Invalid journey progress in save"); return false; }
+    { Feedback=TEXT("存档中的旅程进度无效"); return false; }
     for (const auto& Entry : Save->EncounterTimers)
         if (Entry.Key.IsNone() || !FMath::IsFinite(Entry.Value) || Entry.Value < 0 || Entry.Value > 600)
-        { Feedback = TEXT("Invalid encounter timer in save"); return false; }
+        { Feedback = TEXT("存档中的遭遇计时无效"); return false; }
     for (const auto& Record : Save->Loot)
         if (Record.Transform.ContainsNaN() || Record.Materials < 0 || Record.Materials > 999 || Record.Medicine < 0 || Record.Medicine > 999)
-        { Feedback = TEXT("Invalid loot in save"); return false; }
+        { Feedback = TEXT("存档中的掉落物无效"); return false; }
     TSet<FGuid> FacilityIds;
-    if (Save->Facilities.Num() > 20) { Feedback = TEXT("Invalid facility count in save"); return false; }
+    if (Save->Facilities.Num() > 20) { Feedback = TEXT("存档中的设施数量无效"); return false; }
     for (auto& Record : Save->Facilities)
     {
         if(Save->FormatVersion<24) {Record.Seeds=0;Record.bPlanted=false;Record.GrowthWork=0;}
@@ -241,39 +242,39 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
             !UBaseBuildingComponent::IsBuildTransformValid(Record.Transform) || Record.StoredFood < 0 || Record.StoredFood > 30 ||
             (Record.Specialty != EWorkSpecialty::Feeding && Record.Specialty != EWorkSpecialty::Farming && Record.StoredFood != 0) ||
             (Save->FormatVersion<15 && ((Record.Specialty==EWorkSpecialty::Farming && Record.StoredFood!=0) || Record.Specialty==EWorkSpecialty::Transport)))
-        { Feedback = TEXT("Invalid facility in save"); return false; }
+        { Feedback = TEXT("存档中的设施无效"); return false; }
         FacilityIds.Add(Record.Id);
     }
     FResourceRestoreTransaction ResourceRestore(GetWorld());
-    if(!ResourceRestore.Stage(Save)) { Feedback=TEXT("Invalid or unavailable resource snapshot; world unchanged"); return false; }
+    if(!ResourceRestore.Stage(Save)) { Feedback=TEXT("资源快照无效或不可用，世界未改变"); return false; }
     TSet<FGuid> CreatureIds;
     for(auto& Record:Save->Creatures)
     {
         if(Save->FormatVersion<25) Record.Nickname.Empty();
         if(!UCompanionNamingComponent::IsValidName(Record.Nickname) || (!Record.Nickname.IsEmpty() && (!Record.bOwned || Record.Disposition!=ECreatureDisposition::Tamed)))
-        {Feedback=TEXT("Invalid companion name; world unchanged");return false;}
+        {Feedback=TEXT("伙伴昵称无效，世界未改变");return false;}
         if(Save->FormatVersion<22) { Record.Id=FGuid::NewGuid(); Record.CargoItems.Reset(); Record.DeliveryCrateId.Invalidate(); Record.bReturningCargo=false; }
-        if(!Record.Id.IsValid() || CreatureIds.Contains(Record.Id)) { Feedback=TEXT("Invalid or duplicate creature identity; world unchanged"); return false; }
+        if(!Record.Id.IsValid() || CreatureIds.Contains(Record.Id)) { Feedback=TEXT("生物身份无效或重复，世界未改变"); return false; }
         const bool OwnedTamed=Record.bOwned && Record.Disposition==ECreatureDisposition::Tamed;
         if(Save->FormatVersion<26)
         {Record.Preference=OwnedTamed?UCompanionPersonalityComponent::PreferenceForId(Record.Id):ECompanionPreference::None;Record.bPreferenceDiscovered=false;}
         if(!UCompanionPersonalityComponent::ValidateSnapshot(Record.Preference,Record.bPreferenceDiscovered,OwnedTamed))
-        {Feedback=TEXT("Invalid companion preference; world unchanged");return false;}
+        {Feedback=TEXT("伙伴偏好无效，世界未改变");return false;}
         if(Save->FormatVersion<27)Record.CrystalJourney=0;
         if(!UCompanionMemoryComponent::ValidateSnapshot(static_cast<ECrystalJourneyMemory>(Record.CrystalJourney),OwnedTamed,Save->Research.bCrystalSample))
-        {Feedback=TEXT("Invalid companion memory; world unchanged");return false;}
+        {Feedback=TEXT("伙伴回忆无效，世界未改变");return false;}
         CreatureIds.Add(Record.Id);
         if(Save->FormatVersion<20) Record.FieldResourceId.Invalidate();
         if(Record.FieldResourceId.IsValid() && (!ResourceRestore.Find(Record.FieldResourceId) || !Record.bOwned || Record.Disposition!=ECreatureDisposition::Tamed || Record.Health<=0 ||
             Record.WorkSiteId.IsValid() || !Record.WorkSiteName.IsNone() ||
             (Record.Activity!=ECreatureActivity::Work && !(Record.Activity==ECreatureActivity::Rest && Record.bResumeWorkAfterRest))))
-        { Feedback=TEXT("Invalid field work target; world unchanged"); return false; }
+        { Feedback=TEXT("野外工作目标无效，世界未改变"); return false; }
     }
     FHomeRestoreTransaction HomeRestore(GetWorld());
-    if(!HomeRestore.Stage(Save)) { Feedback=TEXT("Invalid home structure or indoor facility support; world unchanged"); return false; }
+    if(!HomeRestore.Stage(Save)) { Feedback=TEXT("房屋结构或室内设施支撑无效，世界未改变"); return false; }
     for(const auto& Record:Save->Creatures)
         if(!UCompanionCargoComponent::ValidateSnapshot(Record,HomeRestore.Find(Record.DeliveryCrateId)))
-        { Feedback=TEXT("Invalid carried resources or delivery intent; world unchanged"); return false; }
+        { Feedback=TEXT("携带资源或运输意图无效，世界未改变"); return false; }
     TArray<ACreatureCharacter*> OldCreatures;
     for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It) OldCreatures.Add(*It);
     TArray<ACreatureCharacter*> Restored;
@@ -299,7 +300,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
             !FMath::IsFinite(Record.LeashRadius) || Record.LeashRadius < 600 || Record.LeashRadius > 1500)
         {
             for (auto* Pet : Restored) Pet->Destroy();
-            Feedback = TEXT("Save references unavailable or invalid creature data");
+            Feedback = TEXT("存档引用的生物数据无效或不可用");
             return false;
         }
         auto* Pet = GetWorld()->SpawnActorDeferred<ACreatureCharacter>(CreatureClass, Record.Transform,
@@ -307,7 +308,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
         if (!Pet)
         {
             for (auto* Staged : Restored) Staged->Destroy();
-            Feedback = TEXT("Could not restore creatures");
+            Feedback = TEXT("无法恢复生物");
             return false;
         }
         Pet->PersistentId=Record.Id;
@@ -353,7 +354,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
         {
             for (auto* Staged : Restored) Staged->Destroy();
             for (auto* Staged : RestoredLoot) Staged->Destroy();
-            Feedback = TEXT("Could not restore loot");
+            Feedback = TEXT("无法恢复掉落物");
             return false;
         }
         Drop->Materials = Record.Materials;
@@ -371,7 +372,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
             for (auto* Staged : Restored) Staged->Destroy();
             for (auto* Staged : RestoredLoot) Staged->Destroy();
             for (auto* Staged : RestoredBuilt) Staged->Destroy();
-            Feedback = TEXT("Could not restore facilities"); return false;
+            Feedback = TEXT("无法恢复设施"); return false;
         }
         Site->bPlayerBuilt = true; Site->PersistentId = Record.Id; Site->RequiredSpecialty = Record.Specialty;
         Site->StoredFood = Record.StoredFood;
@@ -420,7 +421,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
     // Owned survivors in old snapshots prove capture; unseen wild snapshots do not prove discovery.
     for (auto* Pet : Restored)
         if (Pet->Tamer==GetController()) { RecordJournal(Pet->Definition,true); RecordAlphaResolution(Pet); }
-    Feedback = bSingleCompanionMode ? TEXT("Save restored - select again with L or use K for ALL; commands blocked until then") : TEXT("Save restored - commands target ALL; L selects one companion");
+    Feedback = bSingleCompanionMode ? TEXT("读档成功，请按L重选伙伴或按K指挥全队；此前不执行命令") : TEXT("读档成功，当前指挥全队；L 选择单个伙伴");
     return true;
 }
 
@@ -442,10 +443,10 @@ void ACFPlayerCharacter::BeginPlay()
 float ACFPlayerCharacter::TakeDamage(float Amount, const FDamageEvent& Event, AController* EventInstigator, AActor* Causer)
 {
     if (!HasAuthority() || Health <= 0.0f || !FMath::IsFinite(Amount) || Amount<=0) return 0.0f;
-    if(GetRespawnProtectionRemaining()>0) { Feedback=TEXT("Base respawn protection - attacking ends the shield"); return 0; }
+    if(GetRespawnProtectionRemaining()>0) { Feedback=TEXT("基地复活保护中，主动攻击会结束保护"); return 0; }
     const float Applied = FMath::Min(Health, Amount*(1-Equipment->GetDamageReduction()));
     Health -= Applied;
-    Feedback = Health <= 0.0f ? TEXT("Downed - R respawns at base without resetting the world | F9 load") : TEXT("Taking damage!");
+    Feedback = Health <= 0.0f ? TEXT("已倒下，R 回基地复活并保留世界 | F9 读档") : TEXT("受到伤害！");
     if (Health <= 0.0f)
     {
         UCompanionMemoryComponent::CloseAll(GetWorld());
@@ -469,7 +470,7 @@ void ACFPlayerCharacter::CaptureResolved(ACreatureCharacter* Creature, bool bSuc
         RecordJournal(Creature->Definition,bSucceeded && Creature->Disposition==ECreatureDisposition::Tamed && Creature->Tamer==GetController());
         if(bSucceeded) RecordAlphaResolution(Creature);
     }
-    Feedback = bSucceeded ? TEXT("Captured! F: follow | E: assign work") : TEXT("Capture failed - weaken it and retry");
+    Feedback = bSucceeded ? TEXT("捕捉成功！F 跟随 | E 指派工作") : TEXT("捕捉失败，削弱目标后再试");
 }
 
 void ACFPlayerCharacter::CommandFollow()
@@ -478,7 +479,7 @@ void ACFPlayerCharacter::CommandFollow()
     int32 Count = 0;
     for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It)
         if (IsCommandTarget(*It)) { It->ClearCombatOrders(); It->WorkSite = nullptr; It->SetActivity(ECreatureActivity::Follow); ++Count; }
-    Feedback = FString::Printf(TEXT("%d commanded companions following | %s"),Count,*GetCommandScopeText());
+    Feedback = FString::Printf(TEXT("%d 位受指挥伙伴正在跟随 | %s"),Count,*GetCommandScopeText());
 }
 
 void ACFPlayerCharacter::CommandFocus()
@@ -487,11 +488,11 @@ void ACFPlayerCharacter::CommandFocus()
     RespawnProtectionUntil=0;
     auto* Target = TraceCreature();
     if (!Target || Target->Health <= 0 || Target->Disposition == ECreatureDisposition::Tamed)
-    { Feedback = TEXT("Aim at a living wild creature to focus attacks"); return; }
+    { Feedback = TEXT("瞄准存活的野生生物以指挥集火"); return; }
     int32 Count = 0;
     for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It)
         if (IsCommandTarget(*It) && It->GetDistanceTo(this) <= 1800 && It->OrderAttack(Target)) ++Count;
-    Feedback = FString::Printf(TEXT("Focus %s: %d active companions"), *Target->GetCreatureName(), Count);
+    Feedback = FString::Printf(TEXT("集火%s：%d位可行动伙伴"), *Target->GetCreatureName(), Count);
 }
 
 void ACFPlayerCharacter::CommandSpecial()
@@ -510,8 +511,8 @@ void ACFPlayerCharacter::CommandSpecial()
         const float Distance = It->GetDistanceTo(Target);
         if (Distance < BestDistance) { BestDistance = Distance; BestPet = *It; BestTarget = Target; }
     }
-    if (BestPet && BestPet->RequestSpecial(BestTarget)) Feedback = BestPet->GetCreatureName() + TEXT(" moving into skill range");
-    else Feedback = TEXT("Need an active companion, target, 20 stamina and ready cooldown");
+    if (BestPet && BestPet->RequestSpecial(BestTarget)) Feedback = BestPet->GetCreatureName() + TEXT("正前往技能范围内");
+    else Feedback = TEXT("需要可行动伙伴、目标、20体力且技能冷却结束");
 }
 
 void ACFPlayerCharacter::CommandWork()
@@ -524,12 +525,12 @@ void ACFPlayerCharacter::CommandWork()
     if(auto* Node=Cast<AResourceNode>(Hit.GetActor()))
     {
         auto* Crate=DeliverySelection.Get();
-        if(bDeliverySelection && (!IsValid(Crate) || Crate->IsActorBeingDestroyed())) { Feedback=TEXT("Selected delivery crate lost; V clears selection or selects another crate"); return; }
+        if(bDeliverySelection && (!IsValid(Crate) || Crate->IsActorBeingDestroyed())) { Feedback=TEXT("所选运输箱已丢失，按V清除或选择其他箱子"); return; }
         int32 Assigned=0;
         for(TActorIterator<ACreatureCharacter> It(GetWorld());It;++It)
             if(IsCommandTarget(*It) && (!bDeliverySelection || It->CarriedFood==0) && It->AssignFieldResource(Node))
             { if(bDeliverySelection) It->Cargo->Assign(Crate,this); ++Assigned; }
-        Feedback=FString::Printf(TEXT("Field resource assigned to %d companions | %s | F cancels"),Assigned,bDeliverySelection?TEXT("carry to selected storage"):TEXT("direct player inventory"));
+        Feedback=FString::Printf(TEXT("已为%d位伙伴指派野外资源 | %s | F 取消"),Assigned,bDeliverySelection?TEXT("运到所选储物箱"):TEXT("直接放入玩家背包"));
         return;
     }
     AWorkStation* Site = nullptr;
@@ -540,13 +541,13 @@ void ACFPlayerCharacter::CommandWork()
         const float Distance = GetDistanceTo(*It);
         if (Distance < Best) { Best = Distance; Site = *It; }
     }
-    if (!Site) { Feedback = TEXT("Move within 8m of the work station"); return; }
+    if (!Site) { Feedback = TEXT("请靠近工作设施8米内"); return; }
     int32 Count = 0;
     for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It)
         if (IsCommandTarget(*It) && It->Health > 0.0f)
         { It->CancelFieldResource(); It->WorkSite = Site; It->SetActivity(ECreatureActivity::Work); ++Count; }
-    Feedback = FString::Printf(TEXT("Assigned %d: %s. Matching specialties work faster"),Count,
-        *UEnum::GetValueAsString(Site->RequiredSpecialty));
+    Feedback = FString::Printf(TEXT("已指派%d位伙伴：%s。专长匹配时工作更快"),Count,
+        *FrontierChinese::Specialty(Site->RequiredSpecialty));
 }
 
 void ACFPlayerCharacter::CommandRest()
@@ -556,23 +557,23 @@ void ACFPlayerCharacter::CommandRest()
     float Best = 800;
     for (TActorIterator<AWorkStation> It(GetWorld()); It; ++It)
         if (GetDistanceTo(*It) < Best) { Best = GetDistanceTo(*It); Site = *It; }
-    if (!Site) { Feedback = TEXT("Rest command requires a nearby base work station (8m)"); return; }
+    if (!Site) { Feedback = TEXT("休息命令需要靠近基地工作设施（8米）"); return; }
     int32 Count = 0;
     for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It)
         if (IsCommandTarget(*It) && It->Health > 0)
         { It->CancelFieldResource(); It->bResumeWorkAfterRest = false; It->WorkSite = Site; It->SetActivity(ECreatureActivity::Rest); ++Count; }
-    Feedback = FString::Printf(TEXT("%d companions returning to base to recover health and stamina"), Count);
+    Feedback = FString::Printf(TEXT("%d位伙伴正回基地恢复生命和体力"), Count);
 }
 
 void ACFPlayerCharacter::HealCompanion()
 {
     if (!HasAuthority() || Health <= 0) return;
     auto* Pet = TraceCreature();
-    if (!Pet || Pet->Tamer != GetController()) { Feedback = TEXT("Aim at your companion to use medicine"); return; }
-    if (Pet->Health >= Pet->GetMaxHealth()) { Feedback = TEXT("Companion is already healthy"); return; }
-    if (!Inventory->Consume(EFrontierItem::Medicine, 1)) { Feedback = TEXT("No medicine - craft with 2 at base"); return; }
+    if (!Pet || Pet->Tamer != GetController()) { Feedback = TEXT("瞄准自己的伙伴使用药品"); return; }
+    if (Pet->Health >= Pet->GetMaxHealth()) { Feedback = TEXT("伙伴生命已满"); return; }
+    if (!Inventory->Consume(EFrontierItem::Medicine, 1)) { Feedback = TEXT("没有药品，在基地按2制作"); return; }
     Pet->Health = FMath::Min(Pet->GetMaxHealth(), Pet->Health + 40.0f);
-    Feedback = TEXT("Companion treated (+40 health). T: rest at base, F: follow");
+    Feedback = TEXT("已治疗伙伴（恢复40生命）。T 基地休息，F 跟随");
 }
 
 ACFPlayerCharacter::ACFPlayerCharacter()
