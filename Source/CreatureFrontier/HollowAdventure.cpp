@@ -87,6 +87,7 @@ struct FAdventure
     double DownedShotAfter=0,RejoinedShotAfter=0;
     uint64 LastShotAuditFrame=MAX_uint64;
     bool WriteDownedCheckpoint=false,ResumedCheckpoint=false;
+    float ObservedHeroHP=-1,ObservedPetHP=-1,ObservedEnemyHP=-1;
     bool SameRecoveryBag() const
     {for(int32 I=0;I<static_cast<int32>(EFrontierItem::Count);++I)if(Hero->Inventory->Count(static_cast<EFrontierItem>(I))!=RecoveryBag.FindRef(static_cast<EFrontierItem>(I)))return false;return true;}
     void Shot(const TCHAR* Name)
@@ -106,6 +107,13 @@ struct FAdventure
     bool Tick()
     {
         const FVector Now=Hero->GetActorLocation(),PetNow=Pet->GetActorLocation();
+        // 只记录QA自然交战时序，不更改目标、生命、输入或恢复判据。
+        if(Mode==3 && RecoveryStage==0 && (Hero->Health!=ObservedHeroHP || Pet->Health!=ObservedPetHP || Enemy->Health!=ObservedEnemyHP))
+        {
+            UE_LOG(LogTemp,Display,TEXT("CF_HOLLOW_RECOVERY_HEALTH time=%.3f heroHP=%.2f petHP=%.2f enemyHP=%.2f heroDistance=%.2f petDistance=%.2f battle=%d attackSent=%d petFocus=%s petActivity=%d"),
+                World->GetTimeSeconds(),Hero->Health,Pet->Health,Enemy->Health,Enemy->GetDistanceTo(Hero),Enemy->GetDistanceTo(Pet),Battle,RecoveryAttackSent,*GetNameSafe(Pet->FocusTarget),static_cast<int32>(Pet->Activity));
+            ObservedHeroHP=Hero->Health;ObservedPetHP=Pet->Health;ObservedEnemyHP=Enemy->Health;
+        }
         const float Step=FVector::Dist(Now,Previous),PetStep=FVector::Dist(PetNow,PreviousPet);Travel+=FVector::Dist2D(Now,Previous);PetTravel+=FVector::Dist2D(PetNow,PreviousPet);Previous=Now;PreviousPet=PetNow;PetSouth=FMath::Min(PetSouth,PetNow.Y);
         Incoming |= Mode==3 && RecoveryStage==2?(Hero->Health<SecondHeroHP || Pet->Health<SecondPetHP):(Hero->Health<100 || Pet->Health<Pet->GetMaxHealth());Skill |= Pet->SpecialCooldownRemaining>0 && Pet->Stamina<=80;
         if(!Returning && Now.Y<-2200)Shot(TEXT("Entrance"));
@@ -117,6 +125,8 @@ struct FAdventure
             !Pet->IsActorTickEnabled() || !Enemy->IsActorTickEnabled() || !Camp->IsActorTickEnabled())return Fail(TEXT("continuous/alive/deadline"));
         if(Mode==3 && RecoveryStage==0 && Hero->Health<=0)
         {
+            UE_LOG(LogTemp,Display,TEXT("CF_HOLLOW_RECOVERY_DEATH_GATES south=%d near=%d enemyAlive=%d enemyHurt=%d petHurt=%d resident=%d noFocus=%d noWindup=%d noSlow=%d"),
+                Now.Y<-2700,Enemy->GetDistanceTo(Hero)<=300,Enemy->Health>0,Enemy->Health<Enemy->GetMaxHealth(),Pet->Health<Pet->GetMaxHealth(),Camp->GetResident()==Enemy,!Pet->FocusTarget,Pet->SpecialWindupRemaining<=0,!Hero->Pace->IsSlowWalking());
             // 受伤出发后必须由自然住民实际击倒；残血目标才能有效验证复活不补血。
             if(Now.Y>=-2700 || Enemy->GetDistanceTo(Hero)>300 || Enemy->Health<=0 || Enemy->Health>=Enemy->GetMaxHealth() || Pet->Health>=Pet->GetMaxHealth() || Camp->GetResident()!=Enemy || Pet->FocusTarget || Pet->SpecialWindupRemaining>0 || Hero->Pace->IsSlowWalking())return Fail(TEXT("natural-death-state"));
             Input->Direction=FVector::ZeroVector;
