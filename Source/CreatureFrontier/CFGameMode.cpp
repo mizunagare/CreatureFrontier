@@ -67,6 +67,8 @@ void ACFGameMode::BeginPlay()
 {
     Super::BeginPlay();
     SeedFrontierResources(GetWorld());
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFRescueNaturalWrite")))
+    {FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunNaturalRescueCheckpoint(GetWorld(),Hero);},1.f,false);return;}
     if(FParse::Param(FCommandLine::Get(),TEXT("CFRescueGatesTest")))
     {FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunRescueGateScenario(GetWorld(),Hero);},1.f,false);return;}
     const int32 CheckpointMode=FParse::Param(FCommandLine::Get(),TEXT("CFHollowDownedWrite"))?5:FParse::Param(FCommandLine::Get(),TEXT("CFHollowDownedResume"))?6:FParse::Param(FCommandLine::Get(),TEXT("CFHollowCheckpointRead"))?7:0;
