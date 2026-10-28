@@ -11,6 +11,11 @@
 #include "Kismet/GameplayStatics.h"
 #include "HAL/PlatformMisc.h"
 #include "TimerManager.h"
+#include "CompanionSkillTrail.h"
+#include "UnrealClient.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
+#include "Misc/Paths.h"
 
 void RunCompanionCombatScenario(UWorld* World, ACFPlayerCharacter* Hero)
 {
@@ -51,6 +56,16 @@ void RunCompanionCombatScenario(UWorld* World, ACFPlayerCharacter* Hero)
     auto* Ally = Spawn(FVector(-900,-1200,40), nullptr, true);
     if (!Ally) { FPlatformMisc::RequestExitWithStatus(true, 11); return; }
     Ally->SetActorTickEnabled(false);
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFSkillTrailPreview")))
+    {
+        FTimerHandle Shot;
+        World->GetTimerManager().SetTimer(Shot,[World]()
+        {
+            int32 Count=0;for(TActorIterator<ACompanionSkillTrail> It(World);It;++It)++Count;
+            UE_LOG(LogTemp,Display,TEXT("CF_SKILL_TRAIL_SHOT active=%d frame=%llu"),Count,static_cast<uint64>(GFrameCounter));
+            FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir()/TEXT("SkillTrailPreview.png"),true,false);
+        },.8f,false);
+    }
     FTimerHandle Check;
     World->GetTimerManager().SetTimer(Check, [World, Hero, Leaf, Ember, Stone, LeafEnemy, EmberEnemy, StoneEnemy, SplashEnemy, Ally, Spawn, bFocus, bAccepted]()
     {
@@ -87,6 +102,15 @@ void RunCompanionCombatScenario(UWorld* World, ACFPlayerCharacter* Hero)
         const bool bRetaliation = bInitiallyIdle && Provoked->Activity == ECreatureActivity::Combat && Provoked->Disposition == ECreatureDisposition::Hostile;
 
         const float SavedCooldown = Leaf->SpecialCooldownRemaining;
+        int32 TrailCount=0;bool TrailGeometry=true;
+        for(TActorIterator<ACompanionSkillTrail> It(World);It;++It)
+        {
+            ++TrailCount;TrailGeometry &= !It->GetActorEnableCollision();
+            TInlineComponentArray<UStaticMeshComponent*> Marks(*It);
+            TrailGeometry &= Marks.Num()==7;
+            for(auto* Mark:Marks)TrailGeometry &= Mark->GetStaticMesh()!=nullptr && Mark->GetCollisionEnabled()==ECollisionEnabled::NoCollision && !Mark->CanEverAffectNavigation() && !Mark->GetComponentLocation().ContainsNaN();
+        }
+        const bool bTrails=TrailCount==3 && TrailGeometry;
         UCreatureDefinition* LeafDefinition = Leaf->Definition;
         const FString Slot = TEXT("FrontierCombatAutomation");
         const bool bSaved = Hero->SaveProgress(Slot);
@@ -96,8 +120,14 @@ void RunCompanionCombatScenario(UWorld* World, ACFPlayerCharacter* Hero)
         for (TActorIterator<ACreatureCharacter> It(World); It; ++It)
             if (It->Tamer == Hero->GetController() && It->Definition == LeafDefinition)
                 bCooldown = SavedCooldown > 0 && FMath::IsNearlyEqual(It->SpecialCooldownRemaining, SavedCooldown) && It->SpecialWindupRemaining == 0;
-        const bool bPass = bFocus && bAccepted && bDamage && bSlow && bSplash && bGuard && bCost && bLowStamina && bRestBlocked && bCover && bRetaliation && bSaved && bLoaded && bCooldown;
+        const bool bPass = bTrails && bFocus && bAccepted && bDamage && bSlow && bSplash && bGuard && bCost && bLowStamina && bRestBlocked && bCover && bRetaliation && bSaved && bLoaded && bCooldown;
         UE_LOG(LogTemp, Display, TEXT("CF_COMBAT %s focus=%d accepted=%d damage=%d slow=%d splash=%d guard=%d cost=%d lowStamina=%d rest=%d cover=%d retaliation=%d cooldownSave=%d"), bPass ? TEXT("PASS") : TEXT("FAIL"), bFocus, bAccepted, bDamage, bSlow, bSplash, bGuard, bCost, bLowStamina, bRestBlocked, bCover, bRetaliation, bSaved && bLoaded && bCooldown);
-        FPlatformMisc::RequestExitWithStatus(false, bPass ? 0 : 11);
+        FTimerHandle Cleanup;
+        World->GetTimerManager().SetTimer(Cleanup,[World,bPass,bTrails]()
+        {
+            bool Cleared=true;for(TActorIterator<ACompanionSkillTrail> It(World);It;++It)Cleared=false;
+            UE_LOG(LogTemp,Display,TEXT("CF_SKILL_TRAIL %s geometry=%d cleanup=%d"),bPass && Cleared?TEXT("PASS"):TEXT("FAIL"),bTrails,Cleared);
+            FPlatformMisc::RequestExitWithStatus(false,bPass && Cleared?0:11);
+        },.65f,false);
     }, 0.9f, false);
 }

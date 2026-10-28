@@ -65,7 +65,7 @@ $cases = @(
     @{Flag='CFMemoryDoneRead'; Marker='CF_MEMORY_DONE_READ PASS'},
     @{Flag='CFCareTest'; Marker='CF_CARE PASS'},
     @{Flag='CFSpeciesTest'; Marker='CF_SPECIES PASS'},
-    @{Flag='CFCombatTest'; Marker='CF_COMBAT PASS'},
+    @{Flag='CFCombatTest'; Marker='CF_SKILL_TRAIL PASS'},
     @{Flag='CFEncounterTest'; Marker='CF_ENCOUNTER PASS'},
     @{Flag='CFBossTest'; Marker='CF_BOSS PASS'},
     @{Flag='CFBuildingTest'; Marker='CF_BUILD PASS'},

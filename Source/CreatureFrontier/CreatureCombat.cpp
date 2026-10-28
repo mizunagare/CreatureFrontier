@@ -3,6 +3,7 @@
 #include "CFPlayerCharacter.h"
 #include "Kismet/GameplayStatics.h"
 #include "EngineUtils.h"
+#include "CompanionSkillTrail.h"
 
 bool ACreatureCharacter::HasClearSight(const AActor* Target) const
 {
@@ -126,6 +127,9 @@ void ACreatureCharacter::ResolveSpecial()
         GetDistanceTo(Target) > Range || !HasClearSight(Target)) return;
     const float Damage = GetAttackDamage() * (Definition ? Definition->SpecialDamageScale : 2.0f);
     UGameplayStatics::ApplyDamage(Target, Damage, Tamer, this, UDamageType::StaticClass());
+    // 在已通过距离/视线检查的真实结算点生成，不把表现当作第二次攻击。
+    if(auto* Trail=GetWorld()->SpawnActor<ACompanionSkillTrail>())
+        Trail->Initialize(GetActorLocation()+FVector(0,0,15),Target->GetActorLocation()+FVector(0,0,15),Definition);
     SkillPulseRemaining = 0.3f;
     BeginStrikePose(Target);
     const ECreatureForm Form = Definition ? Definition->Form : ECreatureForm::Leaf;
