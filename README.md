@@ -1,5 +1,7 @@
 # 幻兽边境 · Creature Frontier
 
+当前限定验收包更新为 `E:\CreatureFrontierBuilds\Windows-Checkpoint-Shots\CreatureFrontier.exe`：[洞窟倒地冷启动恢复](Docs/HOLLOW_CHECKPOINT.md)完成同一EXE的86类/90进程回归、15份真实格式28旧档的32进程读取，以及三尺寸九进程恢复链/24张逐图检查。原倒地输入在每组恢复内未改写；旧包与玩家档保留。仍是灰盒，伙伴同时倒下、系统级输入与正式美术/性能尚未全面验收。下述恢复反馈包记录为历史交付，后续救助提示改动尚不包含在新验收包中。
+
 当前可玩包：`E:\CreatureFrontierBuilds\Windows-Recovery-Feedback\CreatureFrontier.exe`。[洞窟倒地与伙伴重聚](Docs/HOLLOW_RECOVERY.md)首版通过同一EXE的83类/87进程完整回归、14份真实28旧档的30进程读取与三尺寸24张恢复图检查。倒地交互提示已修正，旧包/玩家档保留，格式仍28。仍为灰盒，下一步补倒地中途退出重进后的恢复；伙伴同时倒下、正式美术/性能和系统级输入尚未全面验收。
 
 此前技能轨迹包：`E:\CreatureFrontierBuilds\Windows-SkillTrail-Framing\CreatureFrontier.exe`。[伙伴技能空间反馈](Docs/SKILL_SPATIAL_FEEDBACK.md)首版的81类/85进程回归、30个旧档读取进程及三尺寸21张图记录保留，不冒充新包证据。伙伴画外辨识、正式特效/美术与普通窗口持续按键仍需完善。
