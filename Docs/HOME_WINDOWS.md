@@ -1,5 +1,11 @@
 # 开放窗墙
 
+## Windows替换确认三尺寸图形
+
+95C185CB候选自身运行不写存档的确认预览，`Saved/HomeReplace-Preview-Windows-20261029.log`（1280）、`HomeReplace-Preview-Windows-960-20261029.log`、`HomeReplace-Preview-Windows-1920-20261029.log` 均输出必要预览PASS，无失败/致命/断言。实际PNG尺寸分别1280×720、960×540、1920×1080已核对，三张均逐张目视：成本10/返还3、5秒Insert确认/移开取消和右下待确认状态完整可读，无红色普通预览叠影或面板重叠。
+
+图片位于候选Saved/HomeReplacePreview下的 `5C30C865485569BE5CA1A193FF8E982B`（1280）、`2583BD2F47711B04EBDDBCA3130F5328`（960）、`55418F3249FFCAD15C445D923F4D1380`（1920）目录，各为Confirm.png。该预览停在首次确认，材料170未扣，不能作为实际确认执行、长额外成本、任意窗口或取消超时的图形证据。完整回归30814仍运行；不改稳定入口。
+
 ## 原位替换独立Windows候选
 
 `E:\CreatureFrontierBuilds\Windows-Home-Replacement` 独立Development打包成功（原进程64334退出0，BuildCookRun106.67秒），内部EXE SHA-256 `95C185CBB976576DBEB7F1BF3ED0063C5D6EFCBD15F24C346248B21C08B8EA6A`，格式32。保留旧包与全部玩家存档；磁盘检查允许新目录构建，无手动清理。编译仍有引擎废弃API与非首选编译器警告，Cook三条既有FText来源警告，未当作正式资源本地化完成。
