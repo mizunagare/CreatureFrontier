@@ -1,4 +1,4 @@
-param([switch]$Editor,[string]$BuildRoot='',[string]$EngineRoot='D:\Epic\UE_5.8')
+param([switch]$Editor,[string]$BuildRoot='',[string]$EngineRoot='D:\Epic\UE_5.8',[switch]$Navigation)
 $ErrorActionPreference='Stop'
 if(($Editor -and $BuildRoot) -or (!$Editor -and !$BuildRoot)){throw '请只指定Editor或BuildRoot之一'}
 $projectRoot=Split-Path $PSScriptRoot -Parent
@@ -14,6 +14,7 @@ $cases=@()
 foreach($yaw in @(0,90)){
     $cases+=@{Name="Structure-$yaw";Yaw=$yaw;Cap=30;Mode='Structure'}
     foreach($cap in @(30,60,120)){$cases+=@{Name="Cancel-$yaw-$cap";Yaw=$yaw;Cap=$cap;Mode='Cancel'}}
+    if($Navigation){$cases+=@{Name="Navigation-$yaw";Yaw=$yaw;Cap=30;Mode='Navigation'}}
 }
 $results=@()
 foreach($case in $cases){
@@ -21,7 +22,12 @@ foreach($case in $cases){
     # 此矩阵不传写档参数；冷启动及真实旧档由其他专项保护测试槽。
     $arguments=@('-game','-nullrhi','-nosound','-unattended','-nop4','-CFWindowTest','-CFHomeReplaceTest','-CFHomeReplaceInput',('-ExecCmds="t.MaxFPS '+$case.Cap+'"'),('-abslog="'+$log+'"'))
     if($case.Yaw -eq 90){$arguments+='-CFHomeReplaceRotated'}
-    if($case.Mode -eq 'Cancel'){$arguments+='-CFHomeReplaceCancel';$markers=@('CF_HOME_REPLACE_CANCEL PASS phase=2')}
+    if($case.Mode -eq 'Navigation'){
+        $arguments=@($arguments|Where-Object {$_ -notin @('-CFWindowTest','-CFHomeReplaceTest','-CFHomeReplaceInput','-CFHomeReplaceRotated')})
+        $arguments+=@('-CFHomeReplaceNavigation',$(if($case.Yaw -eq 90){'-CFDoorNavigationRotatedTest'}else{'-CFDoorNavigationTest'}))
+        $markers=@('CF_HOME_REPLACE_NAV_SEALED PASS',('CF_HOME_REPLACE_NAV PASS yaw='+$case.Yaw+' closed=1 entered=1 occupied=1 exited=1'))
+    }
+    elseif($case.Mode -eq 'Cancel'){$arguments+='-CFHomeReplaceCancel';$markers=@('CF_HOME_REPLACE_CANCEL PASS phase=2')}
     else{$arguments+=@('-CFHomeReplaceDoor','-CFHomeReplaceCapacity');$markers=@('CF_HOME_REPLACE_DOOR PASS transitions=4','CF_HOME_REPLACE_CAPACITY PASS paused=1 downed=1 far=1 overflow=1 net=1',('CF_HOME_REPLACE PASS support=1 yaw='+$case.Yaw))}
     if($Editor){$arguments=@((Join-Path $root 'CreatureFrontier.uproject'))+$arguments}
     if((Get-FrontierBuildFingerprint -LiteralPath $module) -ne $hash){throw '矩阵启动前程序指纹变化'}
@@ -37,4 +43,4 @@ foreach($case in $cases){
     if(!$pass){throw "矩阵失败：$log"}
     Write-Host "$($case.Name) 通过"
 }
-Write-Host '原位替换八进程矩阵通过；不代表冷启动、图形或自然通行全部完成'
+Write-Host "原位替换$($cases.Count)进程矩阵通过；不代表冷启动、图形或开放世界自然通行全部完成"
