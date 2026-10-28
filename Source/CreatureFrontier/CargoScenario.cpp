@@ -24,6 +24,7 @@
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
 #include "UnrealClient.h"
+#include "InputRoutingQA.h"
 
 namespace CFCargoQA
 {
@@ -149,9 +150,10 @@ struct FRun : TSharedFromThis<FRun>
 {
     UWorld* World=nullptr; ACFPlayerCharacter* Hero=nullptr; int32 Mode=0,Phase=0; double Started=0,PhaseAt=0;
     FVector CarryStart=FVector::ZeroVector,PausePosition=FVector::ZeroVector,PartialStart=FVector::ZeroVector; FTimerHandle Timer;
-    bool Loaded=true,Paused=false,Delivered=false; FGuid OwnedId;
+    bool Loaded=true,Paused=false,Delivered=false,Avoid=false,Switched=false; FGuid OwnedId;
     void Finish(bool Passed,const TCHAR* Reason)
     {
+        if(Avoid){Passed &= Switched && Phase==6;UE_LOG(LogTemp,Display,TEXT("CF_STANCE_CARGO %s switched=%d"),Passed?TEXT("PASS"):TEXT("FAIL"),Switched);}
         UE_LOG(LogTemp,Display,TEXT("CF_CARGO%s %s phase=%d loaded=%d paused=%d delivered=%d reason=%s"),Mode==1?TEXT("_WRITE"):Mode==2?TEXT("_READ"):Mode==3?TEXT("_CRYSTAL"):Mode==4?TEXT("_ORE"):TEXT(""),Passed?TEXT("PASS"):TEXT("FAIL"),Phase,Loaded,Paused,Delivered,Reason);
         if(!Passed || !FParse::Param(FCommandLine::Get(),TEXT("CFCargoPreview"))) FPlatformMisc::RequestExitWithStatus(false,Passed?0:1);
         else
@@ -174,17 +176,25 @@ struct FRun : TSharedFromThis<FRun>
         const double Now=World->GetTimeSeconds();
         if(!Pet || !Crate || !Node || Now-Started>45) { Finish(false,TEXT("missing actor or timeout")); return; }
         const int32 Stock=Crate->StorageInventory->Count(Item),Count=Pet->Cargo->Count();
+        if(Avoid && Switched && !Pet->bAvoidCombat){Finish(false,TEXT("avoid stance lost"));return;}
         if(Phase==0)
         {
             if(Node->Remaining+Count+Stock!=4 || Hero->Inventory->Count(Item)!=999 || Pet->Experience!=4-Node->Remaining)
             { Finish(false,TEXT("pickup conservation")); return; }
             if(Count<3 || !Pet->Cargo->IsReturning()) return;
+            if(Avoid && !Switched)
+            {
+                if(!CFInputQA::Press(Hero,EKeys::F8) || !Pet->bAvoidCombat || !Mid(World,Hero))
+                {Finish(false,TEXT("avoid switch changed cargo"));return;}
+                Switched=true;UE_LOG(LogTemp,Display,TEXT("CF_STANCE_CARGO_SWITCH PASS cargo=3 source=1 stock=0 xp=3"));
+            }
             CarryStart=Pet->GetActorLocation();
             OwnedId=Pet->PersistentId;
             Loaded &= Mid(World,Hero,Crystal,Ore) && Hero->SaveProgress(MidSlot);
             if(Mode==1) { Loaded &= Hero->SaveProgress(TEXT("CargoCross")); Finish(Loaded,TEXT("cross checkpoint")); return; }
             Loaded &= Hero->LoadProgress(MidSlot) && Mid(World,Hero,Crystal,Ore) && Hero->LoadProgress(MidSlot) && Mid(World,Hero,Crystal,Ore);
             Loaded &= Worker(World,Hero) && Worker(World,Hero)->PersistentId==OwnedId;
+            if(Avoid)Loaded &= Worker(World,Hero) && Worker(World,Hero)->bAvoidCombat;
             if(!Loaded) { Finish(false,TEXT("midtrip restore")); return; }
             Pet=Worker(World,Hero); Crate=Box(World); Shot(World,Hero,Pet,TEXT("Carrying"));
             Crate->StorageInventory->Restore({{Item,999}}); Phase=1; PhaseAt=Now; return;
@@ -243,6 +253,8 @@ void RunCargoScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
     UCreatureDefinition* Leaf=nullptr;
     for(TActorIterator<ACreatureCharacter> It(World);It;++It) { if(It->Definition && It->Definition->Form==(Mode>=3?ECreatureForm::Stone:ECreatureForm::Leaf)) Leaf=It->Definition; It->Destroy(); }
     auto Run=MakeShared<FRun>(); Run->World=World; Run->Hero=Hero; Run->Mode=Mode; Run->Started=World->GetTimeSeconds();
+    Run->Avoid=FParse::Param(FCommandLine::Get(),TEXT("CFStanceCargoTest"));
+    if(Run->Avoid && Mode!=0){Run->Finish(false,TEXT("avoid mode"));return;}
     Hero->GetCharacterMovement()->DisableMovement();
     if(Mode==2)
     {

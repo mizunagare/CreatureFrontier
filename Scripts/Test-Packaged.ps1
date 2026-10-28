@@ -77,6 +77,7 @@ $cases = @(
     @{Flag='CFStorageWrite'; Marker='CF_STORAGE_WRITE PASS'},
     @{Flag='CFStorageRead'; Marker='CF_STORAGE_READ PASS'},
     @{Flag='CFCargoTest'; Marker='CF_CARGO PASS'},
+    @{Flag='CFCargoTest'; Label='CFStanceCargo'; Arguments=@('-CFStanceCargoTest'); Marker='CF_STANCE_CARGO PASS switched=1'; RequiredMarkers=@('CF_STANCE_CARGO_SWITCH PASS cargo=3 source=1 stock=0 xp=3','CF_CARGO PASS phase=6 loaded=1 paused=1 delivered=1')},
     @{Flag='CFCargoWrite'; Marker='CF_CARGO_WRITE PASS'},
     @{Flag='CFCargoRead'; Marker='CF_CARGO_READ PASS'},
     @{Flag='CFCargoCrystalTest'; Marker='CF_CARGO_CRYSTAL PASS'},
