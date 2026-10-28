@@ -1,4 +1,4 @@
-param([switch]$Editor,[string]$BuildRoot='',[string]$EngineRoot='D:\Epic\UE_5.8',[switch]$Preview,[string]$Resolution='1280x720')
+param([switch]$Editor,[string]$BuildRoot='',[string]$EngineRoot='D:\Epic\UE_5.8',[switch]$Preview,[string]$Resolution='1280x720',[switch]$Interactions)
 $ErrorActionPreference='Stop'
 if(($Editor -and $BuildRoot) -or (!$Editor -and !$BuildRoot)){throw '请只指定Editor或BuildRoot之一'}
 if($Resolution -notmatch '^(960x540|1280x720|1920x1080)$'){throw '窗墙预览仅支持960x540、1280x720或1920x1080'}
@@ -24,9 +24,14 @@ try {
         $backups+=@{Path=$path;Existed=$exists;Backup=$backup;Hash=$before;Name=$name}
     }
     $inputHash=''
-    foreach($case in @(@{Name='Write';Flag='CFWindowTest';Marker='CF_WINDOW PASS built=1 hole=1 frame=1 pawn=1 support=1 legacy=1 save=1'},
+    $cases=@(@{Name='Write';Flag='CFWindowTest';Marker='CF_WINDOW PASS built=1 hole=1 frame=1 pawn=1 support=1 legacy=1 save=1'},
                        @{Name='Read1';Flag='CFWindowRead';Marker='CF_WINDOW_READ PASS windows=2 loads=2'},
-                       @{Name='Read2';Flag='CFWindowRead';Marker='CF_WINDOW_READ PASS windows=2 loads=2'})){
+                       @{Name='Read2';Flag='CFWindowRead';Marker='CF_WINDOW_READ PASS windows=2 loads=2'})
+    if($Interactions){$cases+=@(
+        @{Name='Input';Flag='CFWindowInputTest';Marker='CF_WINDOW_INPUT PASS phase=2 windows=2 materials=72'},
+        @{Name='Navigation';Flag='CFWindowNavigationTest';Marker='CF_WINDOW_NAV PASS phase=2 closed=1 continuous=1 windowBlocked=1'},
+        @{Name='Melee';Flag='CFWindowMeleeTest';Marker='CF_WINDOW_MELEE PASS sill=1 opening=2 upper=1 side=1'})}
+    foreach($case in $cases){
         $log=Join-Path $run ($case.Name+'.log')
         $arguments=@('-game','-nullrhi','-nosound','-unattended','-nop4','-CFHomeTest',('-'+$case.Flag),('-abslog="'+$log+'"'))
         if($Preview -and $case.Name -eq 'Write'){
@@ -55,7 +60,7 @@ try {
         }
         $current=(Get-FileHash -LiteralPath (Join-Path $saveRoot 'WindowGood.sav')).Hash
         if($case.Name -eq 'Write'){$inputHash=$current}elseif($current -ne $inputHash){throw '窗墙读取改写了输入文件'}
-        $results += [pscustomobject]@{Case=$case.Name;Pass=$true;Preview=[bool]$Preview;Resolution=$Resolution;BuildSHA256=$hash;InputSHA256=$inputHash;Log=$log}
+        $results += [pscustomobject]@{Case=$case.Name;Pass=$true;Preview=[bool]$Preview;Interactions=[bool]$Interactions;Resolution=$Resolution;BuildSHA256=$hash;InputSHA256=$inputHash;Log=$log}
         $results | Export-Csv -LiteralPath (Join-Path $run 'Results.csv') -NoTypeInformation
         Write-Host "$($case.Name) 通过"
     }
@@ -70,4 +75,4 @@ try {
         }
     } finally {$mutex.ReleaseMutex();$mutex.Dispose()}
 }
-Write-Host '窗墙一写两读通过，输入未改写，原专用槽已还原；图形与导航仍需另验'
+Write-Host '窗墙所选专项通过，输入未改写，原专用槽已还原；截图需目视，未选专项不计通过'

@@ -1,5 +1,15 @@
 # 开放窗墙
 
+## Windows组合专项
+
+新独立包 `E:\CreatureFrontierBuilds\Windows-Window-Interactions` 构建成功，内部EXE SHA-256 `202738D90134DF645985C52CC7AB33BC58F9AF01DE7E0D9797D1513FE48AE442`，格式32，旧包/玩家档不覆盖。
+
+自身预览及一写两读 `Saved/WindowPersistenceQA/20261029-054058-21662260/` 三进程通过，1280×720三张PNG实际尺寸核对通过，屋外/转角/屋内三图已逐张查看；中文说明可读，正视对面墙影响开口辨识和灰盒材质局限仍保留。该证据属于新Windows而非Editor。
+
+脚本新增可选 `-Interactions`：原一写两读后，串行运行输入、导航、近战三个独立进程；每进程固定程序哈希，要求对应成功标记且无FAIL/致命错误，并检查WindowGood输入未改写。实际执行 `Scripts/Test-HomeWindow.ps1 -BuildRoot E:/CreatureFrontierBuilds/Windows-Window-Interactions -Interactions` 的 `Saved/WindowPersistenceQA/20261029-054141-b862b488/` 六项全部正常结束通过，原专用槽恢复。组合输入哈希保持 `431BDA88DE58BA8BFFE1B71A7CCE4365A58F735DF2B07B41C4EA1A1C9D8C6D58`，脚本语法通过。
+
+这只补齐新包自身有限夹具的专项证据；自然窗边实战、伙伴技能/溅射、旋转和群体矩阵仍待。新包自己的完整本地回归已启动但未结束，不借旧8A9EB670的120进程结果，稳定包不升。
+
 ## 玩家长矛与窗框碰撞
 
 新增 `CFWindowMeleeTest`，正常支付地板8和窗墙10材料后，使用原Attack/长矛蓄力、球体扫掠与伤害结算，依次检查窗台阻挡、窗洞命中、上沿阻挡、侧柱阻挡、窗洞再次命中。三个阻挡步骤同时要求目标生命不减和原“障碍物阻挡”反馈，正向步骤要求按装备真实伤害扣血，防止仅以无伤害误判为阻挡。未修改正常近战规则、资源或存档格式。
