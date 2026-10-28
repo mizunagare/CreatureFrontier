@@ -1,5 +1,13 @@
 # 开放窗墙
 
+## 首个独立Windows候选
+
+`E:\CreatureFrontierBuilds\Windows-Open-Window` 已独立打包成功（格式32），内部EXE SHA-256为 `8A9EB670529FABFCC80FD84C29528EE3B5EF32ABF6E8CAC5434244E23273DAEE`。保留所有旧构建，未覆盖旧玩家存档。
+
+`Scripts/Test-HomeWindow.ps1 -BuildRoot E:/CreatureFrontierBuilds/Windows-Open-Window` 实际结束0，`Saved/WindowPersistenceQA/20261029-045711-2236a7ca/` 写入及两次独立读取均通过，三行CSV固定同一EXE；输入SHA-256保持 `0B4B872D46F746775DD65CBCE24C1D157F3F092D57187411F333125CD7B00E35`，原专用槽恢复。由此补齐脚本Windows正常入口，不等于图形/实际键鼠放置或伙伴导航验收。
+
+本候选自己的本地完整回归已启动，尚未结束；格式31旧候选的118个进程不能算作本包结果。真实旧档审计、图形和窗边战斗/导航仍待，原恢复卡路问题不因此消失，稳定指针不变。
+
 ## 跨进程增量
 
 5027BDAB Editor构建成功。新增 `CFWindowRead` 在创建夹具前读取WindowGood，检查格式32、五个房屋记录/两个窗墙、材料56；每个读取进程正常加载两次，核对全部记录身份、定义、父地板、位置朝向、支付物品和门状态、背包完整堆叠，以及两个朝向窗洞/窗台的实际射线。读取不重摆现场、不赠送材料、不写新档。
