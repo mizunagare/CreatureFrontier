@@ -46,12 +46,12 @@ void ACreatureCharacter::TickRoaming(float DeltaSeconds)
         if (!Found)
         {
             if(FParse::Param(FCommandLine::Get(),TEXT("CFRoamTrace")))
-                UE_LOG(LogTemp,Display,TEXT("CF_ROAM_SELECT failed time=%.3f location=%s"),GetWorld()->GetTimeSeconds(),*GetActorLocation().ToString());
+                UE_LOG(LogTemp,Display,TEXT("CF_ROAM_SELECT failed time=%.3f location=%s id=%s encounter=%s actor=%s"),GetWorld()->GetTimeSeconds(),*GetActorLocation().ToString(),*PersistentId.ToString(EGuidFormats::DigitsWithHyphens),*EncounterId.ToString(),*GetName());
             StopNavigation(); SetActivity(ECreatureActivity::Idle); RoamPause = 2; return;
         }
         RoamTarget = Point.Location; bHasRoamTarget = true;
         if(FParse::Param(FCommandLine::Get(),TEXT("CFRoamTrace")))
-            UE_LOG(LogTemp,Display,TEXT("CF_ROAM_SELECT time=%.3f distance=%.3f location=%s target=%s"),GetWorld()->GetTimeSeconds(),FVector::Dist2D(GetActorLocation(),RoamTarget),*GetActorLocation().ToString(),*RoamTarget.ToString());
+            UE_LOG(LogTemp,Display,TEXT("CF_ROAM_SELECT time=%.3f distance=%.3f location=%s target=%s id=%s encounter=%s actor=%s"),GetWorld()->GetTimeSeconds(),FVector::Dist2D(GetActorLocation(),RoamTarget),*GetActorLocation().ToString(),*RoamTarget.ToString(),*PersistentId.ToString(EGuidFormats::DigitsWithHyphens),*EncounterId.ToString(),*GetName());
         SetActivity(ECreatureActivity::Wander);
     }
     if (FVector::Dist2D(GetActorLocation(),RoamTarget) <= 85)
@@ -59,7 +59,7 @@ void ACreatureCharacter::TickRoaming(float DeltaSeconds)
         StopNavigation(); SetActivity(ECreatureActivity::Idle);
         RoamPause = FMath::FRandRange(2.0f,5.0f); bHasRoamTarget = false;
         if(FParse::Param(FCommandLine::Get(),TEXT("CFRoamTrace")))
-            UE_LOG(LogTemp,Display,TEXT("CF_ROAM_ARRIVE time=%.3f distance=%.3f homeDistance=%.3f pause=%.3f"),GetWorld()->GetTimeSeconds(),FVector::Dist2D(GetActorLocation(),RoamTarget),FVector::Dist2D(GetActorLocation(),HabitatHome),RoamPause);
+            UE_LOG(LogTemp,Display,TEXT("CF_ROAM_ARRIVE time=%.3f distance=%.3f homeDistance=%.3f pause=%.3f id=%s encounter=%s actor=%s"),GetWorld()->GetTimeSeconds(),FVector::Dist2D(GetActorLocation(),RoamTarget),FVector::Dist2D(GetActorLocation(),HabitatHome),RoamPause,*PersistentId.ToString(EGuidFormats::DigitsWithHyphens),*EncounterId.ToString(),*GetName());
     }
     else NavigateTo(RoamTarget,55);
 }

@@ -1,5 +1,13 @@
 # 洞窟倒地与伙伴重聚（首版限定验收）
 
+## 巡游诊断归属补齐
+
+旧5DF05F08失败只有初始健康行与最终超时，没有当时Battle/Focus/阻挡/巡游目标证据；不能从初始battle=0推断最终状态。当前CF_ROAM_SELECT/ARRIVE原日志也没有身份字段，多生物交错时不便把洞窟住民的选点、到达与恢复状态关联。
+
+仅在既有 `-CFRoamTrace` 日志尾部追加PersistentId、EncounterId与运行Actor名，保留原协议前缀/时间/距离/位置/目标/停顿字段，不改变随机选点、导航、战斗或存档。Editor模块 `4A3095C999B87044EFD048EC990F6B344332F940AB74E19738F91CB2028521C2` 构建成功。实际世界专项 `Saved/RoamIdentityQA/20261029-072438-8202198a/World.log` 固定1549种子、60上限，CF_WORLD PASS、无失败/致命/断言，退出0；原FrontierWorldAutomation槽已按备份哈希恢复，生成样本保留。
+
+实际MeadowGrove两段巡游的SELECT/ARRIVE具有同一非空GUID；正常存读档后Actor名由CreatureCharacter_3变为_5，而GUID保持，证明应以持久身份关联而非运行名。这不是洞窟卡路复现或确定性重放；CFRoamSeed仅此世界专项明确解析，不能假定恢复场景也接受该参数。新字段尚未进入正在运行的A0973D7B Windows程序，原恢复卡路与补30/120测试未结束状态保留。
+
 ## 两个60样本结束，补充其他上限中
 
 A0973D7B隔离副本 `Saved/HollowRecoveryMatrix/20261029-071547-f989e54b/` 两样本均结束，32704退出0；两行CSV及全部准备/姿态/自然倒地九门槛/重生/返家重聚/二次战斗/最终恢复/实际60上限标记重审通过，无FAIL/致命/断言，EXE指纹不变。原QA恢复槽起初不存在，结束后实际核对恢复为不存在，生成样本保留于证据目录。
