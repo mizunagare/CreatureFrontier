@@ -1,5 +1,13 @@
 # 开放窗墙
 
+## 替换为开启门后的冷启动
+
+新增 `HomeReplaceDoorGood` 专用槽：原替换输入/门类链中，门框替换为默认关闭门并经过正常ToggleDoor打开后保存；后续窗墙/实墙转换不覆盖此输入。读取明确选择门模式，先读磁盘、两次正常Load核对四模块GUID/地板/朝向/支付/门状态及完整背包，要求恰有一个开启门、无窗墙并保留屋顶；每次加载实际射线验证中央通道畅通，不能只信DoorState。
+
+脚本新增显式 `-ReplacementDoor`，必须同用Replacement、可选ReplacementRotated，保护并恢复自己的门槽，不写HomeReplaceGood/玩家常规档。语法和缺少主模式中文拒绝路径通过。Editor构建成功，实际 `Test-HomeWindow.ps1 -Editor -Replacement -ReplacementDoor -ReplacementRotated`，`Saved/WindowPersistenceQA/20261029-070304-e9f52798/` 一写两读三进程结束通过，模块 `137BB188C33A5C21B30B50C69986749495827A9E27F9C522B0B281582BE8608D`，输入SHA-256 `D3630E5FB2A038BBC95A0E2A0E49401689968B436628A926F2B7828798E472A4` 不变、原门槽恢复。
+
+只证明90度开启门替换快照，不把原门普通冷启动证据冒充替换为关闭门/Windows新QA证据。关闭状态、更多朝向、跨档伙伴通行与Windows仍待；不改存档格式或生产规则，稳定入口不升。
+
 ## 改建后的伙伴真实通行与安全封回
 
 复用门导航场景，新增显式 `-CFHomeReplaceNavigation`（同用CFDoorNavigationTest或CFDoorNavigationRotatedTest）。付费围合房间先将门替换实墙，伙伴在外跟随且无完整入室路径；把实墙原位换门框后，由真实Actor Tick/导航/碰撞进入。伙伴中心经过开口时尝试封墙必须拒绝且材料不变，随后正常入室，再调整玩家目的地让伙伴真实离开，最终门框换实墙。成功替换核对身份/地板/变换及成本返还，封回后等待1秒再验证室内目标无完整路径。

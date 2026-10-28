@@ -1,7 +1,8 @@
-param([switch]$Editor,[string]$BuildRoot='',[string]$EngineRoot='D:\Epic\UE_5.8',[switch]$Preview,[string]$Resolution='1280x720',[switch]$Interactions,[switch]$Skills,[switch]$RotatedNavigation,[switch]$Replacement,[switch]$ReplacementRotated)
+param([switch]$Editor,[string]$BuildRoot='',[string]$EngineRoot='D:\Epic\UE_5.8',[switch]$Preview,[string]$Resolution='1280x720',[switch]$Interactions,[switch]$Skills,[switch]$RotatedNavigation,[switch]$Replacement,[switch]$ReplacementRotated,[switch]$ReplacementDoor)
 $ErrorActionPreference='Stop'
 if(($Editor -and $BuildRoot) -or (!$Editor -and !$BuildRoot)){throw '请只指定Editor或BuildRoot之一'}
 if($ReplacementRotated -and !$Replacement){throw '旋转替换必须显式选择Replacement冷启动模式'}
+if($ReplacementDoor -and !$Replacement){throw '替换门状态必须显式选择Replacement冷启动模式'}
 if($Replacement -and ($Preview -or $Interactions -or $Skills -or $RotatedNavigation)){throw '原位替换冷启动模式不能与其他专项开关组合'}
 if($Resolution -notmatch '^(960x540|1280x720|1920x1080)$'){throw '窗墙预览仅支持960x540、1280x720或1920x1080'}
 $projectRoot=Split-Path $PSScriptRoot -Parent
@@ -17,9 +18,9 @@ Write-Host "窗墙跨进程证据：$run"
 $mutex=[Threading.Mutex]::new($false,'Local\CreatureFrontierWindowQA')
 if(!$mutex.WaitOne(0)){$mutex.Dispose();throw '窗墙测试槽正在使用'}
 $backups=@();$results=@()
-$slot=if($Replacement){'HomeReplaceGood'}else{'WindowGood'}
+$slot=if($ReplacementDoor){'HomeReplaceDoorGood'}elseif($Replacement){'HomeReplaceGood'}else{'WindowGood'}
 try {
-    $slots=if($Replacement){@('HomeReplaceGood')}else{@('WindowGood','WindowLegacy31')}
+    $slots=if($Replacement){@($slot)}else{@('WindowGood','WindowLegacy31')}
     foreach($name in $slots){
         $path=Join-Path $saveRoot ($name+'.sav');$exists=Test-Path -LiteralPath $path
         $backup=Join-Path $run ($name+'-before.sav')
@@ -42,6 +43,11 @@ try {
         @{Name='Read1';Flag='CFWindowTest';Arguments=@('-CFHomeReplaceRead');Marker='CF_HOME_REPLACE_READ PASS loads=2 windows=1 roofs=1'},
         @{Name='Read2';Flag='CFWindowTest';Arguments=@('-CFHomeReplaceRead');Marker='CF_HOME_REPLACE_READ PASS loads=2 windows=1 roofs=1'})
         if($ReplacementRotated){$cases[0].Arguments+=@('-CFHomeReplaceRotated');$cases[0].Marker='CF_HOME_REPLACE PASS support=1 yaw=90'}
+        if($ReplacementDoor){
+            $cases[0].Arguments=@($cases[0].Arguments|Where-Object {$_ -ne '-CFHomeReplaceWrite'})+@('-CFHomeReplaceDoor','-CFHomeReplaceDoorWrite')
+            $cases[0].RequiredMarkers=@('CF_HOME_REPLACE_DOOR_WRITE PASS','CF_HOME_REPLACE_DOOR PASS transitions=4')
+            foreach($read in @($cases[1],$cases[2])){$read.Arguments+=@('-CFHomeReplaceDoorRead');$read.Marker='CF_HOME_REPLACE_DOOR_READ PASS loads=2 doors=1 open=1'}
+        }
     }
     foreach($case in $cases){
         $log=Join-Path $run ($case.Name+'.log')
@@ -75,6 +81,7 @@ try {
         $current=(Get-FileHash -LiteralPath (Join-Path $saveRoot ($slot+'.sav'))).Hash
         if($case.Name -eq 'Write'){$inputHash=$current}elseif($current -ne $inputHash){throw '窗墙读取改写了输入文件'}
         $results += [pscustomobject]@{Case=$case.Name;Pass=$true;Replacement=[bool]$Replacement;ReplacementRotated=[bool]$ReplacementRotated;Preview=[bool]$Preview;Interactions=[bool]$Interactions;Skills=[bool]$Skills;RotatedNavigation=[bool]$RotatedNavigation;Resolution=$Resolution;BuildSHA256=$hash;InputSHA256=$inputHash;Log=$log}
+        $results[-1] | Add-Member -NotePropertyName ReplacementDoor -NotePropertyValue ([bool]$ReplacementDoor)
         $results | Export-Csv -LiteralPath (Join-Path $run 'Results.csv') -NoTypeInformation
         Write-Host "$($case.Name) 通过"
     }

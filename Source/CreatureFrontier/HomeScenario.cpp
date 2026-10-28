@@ -125,15 +125,18 @@ void RunHomeWindowScenario(UWorld* World,ACFPlayerCharacter* Hero)
 {
     if(FParse::Param(FCommandLine::Get(),TEXT("CFHomeReplaceRead")))
     {
-        const auto* Input=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("HomeReplaceGood"),0));
+        const bool DoorMode=FParse::Param(FCommandLine::Get(),TEXT("CFHomeReplaceDoorRead"));
+        const FString Slot=DoorMode?TEXT("HomeReplaceDoorGood"):TEXT("HomeReplaceGood");
+        const auto* Input=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot,0));
         bool Pass=Input && Input->FormatVersion==FrontierCurrentSaveVersion && Input->HomeModules.Num()==4;
-        int32 Windows=0,Roofs=0;
+        int32 Windows=0,Roofs=0,Doors=0;
         if(Input)for(const auto& Record:Input->HomeModules)if(auto* D=Record.Definition.LoadSynchronous())
-        {if(D->Kind==EHomeModuleKind::Window){++Windows;Pass &= Record.PaidMaterials==D->MaterialCost && Record.FloorId.IsValid();}if(D->Kind==EHomeModuleKind::Roof)++Roofs;}
-        Pass &= Windows==1 && Roofs==1;
+        {if(D->Kind==EHomeModuleKind::Window){++Windows;Pass &= Record.PaidMaterials==D->MaterialCost && Record.FloorId.IsValid();}if(D->Kind==EHomeModuleKind::Roof)++Roofs;
+            if(D->Kind==EHomeModuleKind::Door){++Doors;Pass &= Record.DoorState==2 && Record.PaidMaterials==D->MaterialCost && Record.FloorId.IsValid();}}
+        Pass &= Roofs==1 && (DoorMode?(Windows==0 && Doors==1):(Windows==1 && Doors==0));
         for(int32 Attempt=0;Pass && Attempt<2;++Attempt)
         {
-            Pass &= Hero->LoadProgress(TEXT("HomeReplaceGood"));
+            Pass &= Hero->LoadProgress(Slot);
             const auto Live=HomeLayout::Collect(World);Pass &= Live.Num()==Input->HomeModules.Num() && Hero->Inventory->GetStacks().OrderIndependentCompareEqual(Input->InventoryStacks);
             for(const auto& Expected:Input->HomeModules)
             {
@@ -141,7 +144,13 @@ void RunHomeWindowScenario(UWorld* World,ACFPlayerCharacter* Hero)
                 Pass &= Actual && Actual->Definition==Expected.Definition && Actual->FloorId==Expected.FloorId && Actual->Transform.Equals(Expected.Transform,.01) &&
                     Actual->PaidMaterials==Expected.PaidMaterials && Actual->PaidExtraItems.OrderIndependentCompareEqual(Expected.PaidExtraItems) && Actual->DoorState==Expected.DoorState;
             }
+            if(DoorMode)for(TActorIterator<AHomeModule> It(World);It;++It)if(!It->bPreview && It->GetKind()==EHomeModuleKind::Door)
+            {
+                FHitResult Hit;FCollisionQueryParams Params(SCENE_QUERY_STAT(HomeReplaceDoorRead),false,Hero);const auto T=It->GetActorTransform();
+                Pass &= It->DoorState==2 && !World->LineTraceSingleByChannel(Hit,T.TransformPosition(FVector(0,-150,170)),T.TransformPosition(FVector(0,150,170)),ECC_Visibility,Params);
+            }
         }
+        if(DoorMode)UE_LOG(LogTemp,Display,TEXT("CF_HOME_REPLACE_DOOR_READ %s loads=2 doors=%d open=1"),Pass?TEXT("PASS"):TEXT("FAIL"),Doors);
         UE_LOG(LogTemp,Display,TEXT("CF_HOME_REPLACE_READ %s loads=2 windows=%d roofs=%d"),Pass?TEXT("PASS"):TEXT("FAIL"),Windows,Roofs);
         FPlatformMisc::RequestExitWithStatus(false,Pass?0:1);return;
     }
@@ -280,6 +289,11 @@ void RunHomeWindowScenario(UWorld* World,ACFPlayerCharacter* Hero)
                             const auto View=(Current->GetActorTransform().TransformPosition(FVector(0,0,125))-Hero->FirstPersonCamera->GetComponentLocation()).Rotation();
                             Hero->GetController()->SetControlRotation(View);Hero->FirstPersonCamera->SetWorldRotation(View);
                             Pass &= Current->ToggleDoor(Hero) && Current->DoorState==2 && CenterHit()==nullptr;
+                            if(FParse::Param(FCommandLine::Get(),TEXT("CFHomeReplaceDoorWrite")))
+                            {
+                                Pass &= Hero->SaveProgress(TEXT("HomeReplaceDoorGood"));
+                                UE_LOG(LogTemp,Display,TEXT("CF_HOME_REPLACE_DOOR_WRITE %s"),Pass?TEXT("PASS"):TEXT("FAIL"));
+                            }
                         }
                         else Pass &= Current->DoorState==0 && (Kind==EHomeModuleKind::Wall?CenterHit()==Current:CenterHit()==nullptr);
                         Pass &= HomeLayout::Validate(HomeLayout::Collect(World),Reason);
