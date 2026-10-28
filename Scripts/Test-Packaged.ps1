@@ -26,6 +26,8 @@ $cases = @(
     @{Flag='CFDoorTest'; Marker='CF_DOOR PASS'},
     @{Flag='CFDoorOpenRead'; Marker='CF_DOOR_OPEN_READ PASS'},
     @{Flag='CFDoorClosedRead'; Marker='CF_DOOR_CLOSED_READ PASS'},
+    @{Flag='CFDoorNavigationTest'; Marker='CF_DOOR_NAV PASS yaw=0'; RequiredMarkers=@('CF_DOOR_NAV_CLOSED PASS')},
+    @{Flag='CFDoorNavigationRotatedTest'; Marker='CF_DOOR_NAV PASS yaw=90'; RequiredMarkers=@('CF_DOOR_NAV_CLOSED PASS')},
     @{Flag='CFRescueMemoryTest'; Marker='CF_RESCUE_MEMORY PASS mode=0'; RequiredMarkers=@('CF_RESCUE_PAUSED_HEAL PASS')},
     @{Flag='CFRescueMemoryWrite'; Marker='CF_RESCUE_MEMORY PASS mode=1'},
     @{Flag='CFRescueMemoryRescueRead'; Marker='CF_RESCUE_MEMORY PASS mode=2'},

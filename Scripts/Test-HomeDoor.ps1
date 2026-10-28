@@ -29,7 +29,7 @@ try{
             $backups+=@{Path=$path;Backup=$backup;Hash=(Get-FileHash -LiteralPath $path).Hash}
         }
     }
-    foreach($case in @(@('CFDoorTest','CF_DOOR PASS'),@('CFDoorOpenRead','CF_DOOR_OPEN_READ PASS'),@('CFDoorClosedRead','CF_DOOR_CLOSED_READ PASS'))){
+    foreach($case in @(@('CFDoorTest','CF_DOOR PASS'),@('CFDoorOpenRead','CF_DOOR_OPEN_READ PASS'),@('CFDoorClosedRead','CF_DOOR_CLOSED_READ PASS'),@('CFDoorNavigationTest','CF_DOOR_NAV PASS yaw=0'),@('CFDoorNavigationRotatedTest','CF_DOOR_NAV PASS yaw=90'))){
     $log=Join-Path $run ($case[0]+'.log')
     $arguments=@('-game',('-'+$case[0]),'-nullrhi','-nosound','-unattended','-nop4',('-abslog="'+$log+'"'))
     $openInput=Join-Path $saveRoot 'DoorOpen.sav';$closedInput=Join-Path $saveRoot 'DoorGood.sav'
@@ -38,6 +38,7 @@ try{
     $process=Start-Process -FilePath $exe -ArgumentList $arguments -WindowStyle Hidden -PassThru
     if(!$process.WaitForExit(60000)){$process.Kill();$process.WaitForExit();throw '实体门专项超时'}
     if($process.ExitCode -ne 0 -or !(Select-String -LiteralPath $log -SimpleMatch $case[1] -Quiet) -or (Select-String -LiteralPath $log -Pattern 'CF_\w+ FAIL|Fatal error|Assertion failed' -Quiet)){throw "实体门专项未通过：$log"}
+    if($case[0] -like 'CFDoorNavigation*' -and !(Select-String -LiteralPath $log -SimpleMatch 'CF_DOOR_NAV_CLOSED PASS' -Quiet)){throw '缺少真实闭门等待成功标记'}
     if($inputHashes.Count -and ((Get-FileHash -LiteralPath $openInput).Hash -ne $inputHashes[0] -or (Get-FileHash -LiteralPath $closedInput).Hash -ne $inputHashes[1])){throw '跨进程读取改写了实体门输入存档'}
     if((Get-FrontierBuildFingerprint -LiteralPath $module) -ne $hash){throw '专项期间程序模块发生变化'}
     $results+=[pscustomobject]@{Case=$case[0];Pass=$true;BuildSHA256=$hash;Log=$log}
@@ -48,7 +49,7 @@ try{
         $path=Join-Path $saveRoot ($slot+'.sav')
         if(Test-Path -LiteralPath $path){Copy-Item -LiteralPath $path -Destination (Join-Path $run ($slot+'.sav'))}
     }
-    Write-Host '实体门三进程专项通过；导航与图形验收另行执行'
+    Write-Host '实体门五进程专项通过；图形与扩展导航样本另行验收'
 }finally{
     try{foreach($entry in $backups){Copy-Item -LiteralPath $entry.Backup -Destination $entry.Path;if((Get-FileHash -LiteralPath $entry.Path).Hash -ne $entry.Hash){throw '原实体门测试槽恢复校验失败'}}}
     finally{$mutex.ReleaseMutex();$mutex.Dispose()}
