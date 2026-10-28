@@ -82,22 +82,23 @@ bool UCompanionMemoryComponent::CanShareAtHome(ACFPlayerCharacter* Hero) const
     return !GetWorld()->LineTraceSingleByChannel(Hit,Hero->GetPawnViewLocation(),Pet->GetActorLocation(),ECC_Visibility,Params) || Hit.GetActor()==Pet;
 }
 bool UCompanionMemoryComponent::CanRecall(ACFPlayerCharacter* Hero) const
-{return Memory==ECrystalJourneyMemory::Pending && CanShareAtHome(Hero);}
+{return (Memory==ECrystalJourneyMemory::Pending || RescueMemory==ERescueJourneyMemory::Pending) && CanShareAtHome(Hero);}
 bool UCompanionMemoryComponent::Open(ACFPlayerCharacter* Hero)
 {
     auto* PC=IsValid(Hero)?Cast<APlayerController>(Hero->GetController()):nullptr;
     if(IsOpen() || !CanRecall(Hero) || !PC || UGameplayStatics::IsGamePaused(this) || !GetWorld()->GetGameViewport() || !FSlateApplication::IsInitialized() ||
         Hero->Building->IsActive() || Hero->Storage->IsOpen() || Hero->IsBackpackOpen() || Hero->IsHelpVisible() || Hero->IsJournalOpen() || Hero->Naming->IsOpen()) return false;
     if(!UGameplayStatics::SetGamePaused(this,true)) return false;
+    bRecallingRescue=Memory!=ECrystalJourneyMemory::Pending;
     Listener=Hero;if(Hero->IsRosterOpen())Hero->ToggleRoster();Hero->CancelMeleeAttack();Hero->GetCharacterMovement()->StopMovementImmediately();Hero->StopJumping();Hero->ConsumeMovementInputVector();
     const auto* Pet=CastChecked<ACreatureCharacter>(GetOwner());
     auto Choice=[this](int32 Reply){if(Reply==0)Close();else Commit(Reply==2);};
-    auto Content=SNew(SBorder).HAlign(HAlign_Center).VAlign(VAlign_Center).Padding(24)
+    auto Content=SNew(SBorder).BorderImage(FCoreStyle::Get().GetBrush("WhiteBrush")).BorderBackgroundColor(FLinearColor(.015f,.025f,.04f,.97f)).ForegroundColor(FLinearColor::White).HAlign(HAlign_Center).VAlign(VAlign_Center).Padding(24)
     [SNew(SBox).WidthOverride(760)[SNew(SVerticalBox)
-        +SVerticalBox::Slot().AutoHeight().Padding(8)[SNew(STextBlock).Font(FCoreStyle::GetDefaultFontStyle("Regular",24)).Text(FText::FromString(TEXT("从水晶高地归来 | 世界已暂停")))]
-        +SVerticalBox::Slot().AutoHeight().Padding(8)[SNew(STextBlock).Font(FCoreStyle::GetDefaultFontStyle("Regular",20)).WrapTextAt(740).Text(FText::FromString(Pet->GetCreatureName()+TEXT("在你身旁见证了水晶的采出。回到工作台边，你们停下来，一起回味这段旅程。")))]
-        +SVerticalBox::Slot().AutoHeight().Padding(8)[SNew(SButton).OnClicked_Lambda([Choice](){Choice(1);return FReply::Handled();})[SNew(STextBlock).Font(FCoreStyle::GetDefaultFontStyle("Regular",20)).Text(FText::FromString(TEXT("1 · 轻声致谢：真高兴我们一起回到了家")))]]
-        +SVerticalBox::Slot().AutoHeight().Padding(8)[SNew(SButton).OnClicked_Lambda([Choice](){Choice(2);return FReply::Handled();})[SNew(STextBlock).Font(FCoreStyle::GetDefaultFontStyle("Regular",20)).Text(FText::FromString(TEXT("2 · 一起庆祝：这是属于我们的发现！")))]]
+        +SVerticalBox::Slot().AutoHeight().Padding(8)[SNew(STextBlock).Font(FCoreStyle::GetDefaultFontStyle("Regular",24)).Text(FText::FromString(bRecallingRescue?TEXT("一起平安归来 | 世界已暂停"):TEXT("从水晶高地归来 | 世界已暂停")))]
+        +SVerticalBox::Slot().AutoHeight().Padding(8)[SNew(STextBlock).Font(FCoreStyle::GetDefaultFontStyle("Regular",20)).WrapTextAt(740).Text(FText::FromString(Pet->GetCreatureName()+(bRecallingRescue?TEXT("曾在冒险中倒下，你用药救起了它。如今一起回到了家，你们在工作台边停下来，确认彼此都还在身旁。"):TEXT("在你身旁见证了水晶的采出。回到工作台边，你们停下来，一起回味这段旅程。"))))]
+        +SVerticalBox::Slot().AutoHeight().Padding(8)[SNew(SButton).OnClicked_Lambda([Choice](){Choice(1);return FReply::Handled();})[SNew(STextBlock).Font(FCoreStyle::GetDefaultFontStyle("Regular",20)).Text(FText::FromString(bRecallingRescue?TEXT("1 · 安静陪伴：别怕，我们已经回家了"):TEXT("1 · 轻声致谢：真高兴我们一起回到了家")))]]
+        +SVerticalBox::Slot().AutoHeight().Padding(8)[SNew(SButton).OnClicked_Lambda([Choice](){Choice(2);return FReply::Handled();})[SNew(STextBlock).Font(FCoreStyle::GetDefaultFontStyle("Regular",20)).Text(FText::FromString(bRecallingRescue?TEXT("2 · 庆祝归来：以后也要一起平安回来！"):TEXT("2 · 一起庆祝：这是属于我们的发现！")))]]
         +SVerticalBox::Slot().AutoHeight().Padding(8)[SNew(SButton).OnClicked_Lambda([Choice](){Choice(0);return FReply::Handled();})[SNew(STextBlock).Font(FCoreStyle::GetDefaultFontStyle("Regular",18)).Text(FText::FromString(TEXT("以后再聊 / Esc · 暂时保留这段回忆")))]]
         +SVerticalBox::Slot().AutoHeight().Padding(8)[SNew(STextBlock).Font(FCoreStyle::GetDefaultFontStyle("Regular",16)).WrapTextAt(740).Text(FText::FromString(TEXT("共同回忆不会带来数值奖励。按1/2选择，也可用Tab和Enter。关闭后按F5保存。")))]
     ]];
@@ -106,17 +107,19 @@ bool UCompanionMemoryComponent::Open(ACFPlayerCharacter* Hero)
 }
 bool UCompanionMemoryComponent::Commit(bool Celebrate)
 {
-    auto* Hero=Listener.Get();if(!IsOpen() || !CanRecall(Hero)) return false;
-    Memory=Celebrate?ECrystalJourneyMemory::Celebration:ECrystalJourneyMemory::QuietThanks;
+    auto* Hero=Listener.Get();if(!IsOpen() || !CanShareAtHome(Hero) ||
+        (bRecallingRescue?RescueMemory!=ERescueJourneyMemory::Pending:Memory!=ECrystalJourneyMemory::Pending)) return false;
+    if(bRecallingRescue)RescueMemory=Celebrate?ERescueJourneyMemory::Celebration:ERescueJourneyMemory::QuietThanks;
+    else Memory=Celebrate?ECrystalJourneyMemory::Celebration:ECrystalJourneyMemory::QuietThanks;
     auto* Pet=CastChecked<ACreatureCharacter>(GetOwner());Pet->RespondToMemory(Celebrate);
-    Hero->Feedback=Pet->GetCreatureName()+TEXT("记住了：")+GetSummary()+TEXT(" | 不增加物品、亲密度或战斗属性");Close();return true;
+    Hero->Feedback=Pet->GetCreatureName()+TEXT("记住了：")+(bRecallingRescue?GetRescueSummary():GetSummary())+TEXT(" | 不增加物品、亲密度或战斗属性");Close();return true;
 }
 void UCompanionMemoryComponent::Close()
 {
     if(!Dialog.IsValid())return;
     if(GetWorld() && GetWorld()->GetGameViewport())GetWorld()->GetGameViewport()->RemoveViewportWidgetContent(Dialog.ToSharedRef());Dialog.Reset();
     if(auto* Hero=Listener.Get())if(auto* PC=Cast<APlayerController>(Hero->GetController())){PC->bShowMouseCursor=false;PC->SetInputMode(FInputModeGameOnly());}
-    Listener.Reset();UGameplayStatics::SetGamePaused(this,false);
+    Listener.Reset();bRecallingRescue=false;UGameplayStatics::SetGamePaused(this,false);
 }
 void UCompanionMemoryComponent::CloseAll(UWorld* World)
 {if(World)for(TActorIterator<ACreatureCharacter> It(World);It;++It)It->Memory->Close();}

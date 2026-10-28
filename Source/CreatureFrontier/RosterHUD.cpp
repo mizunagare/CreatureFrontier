@@ -10,12 +10,13 @@
 void ACFHUD::DrawRosterPanel(ACFPlayerCharacter* Player)
 {
     const auto Pets=Player->GetCompanionRoster();const int32 Highlight=Pets.IndexOfByKey(Player->GetRosterHighlight());
-    const float U=Layout.Unit,RowHeight=110*U,Header=100*U;
+    const bool HasRescue=Pets.ContainsByPredicate([](const ACreatureCharacter* Pet){return !Pet->Memory->GetRescueSummary().IsEmpty();});
+    const float U=Layout.Unit,RowHeight=(HasRescue?130:110)*U,Header=100*U;
     const int32 Rows=FMath::Clamp(FMath::FloorToInt((Canvas->ClipY-160*U)/RowHeight),1,8),Start=Highlight==INDEX_NONE?0:(Highlight/Rows)*Rows;
     const float Width=FMath::Min(470*U,Canvas->ClipX-2*Layout.Margin),Left=Canvas->ClipX-Width-Layout.Margin,Top=Layout.Margin;
     const auto Panel=FFrontierHUDLayout::Box(Left,Top,Width,Header+Rows*RowHeight);TrackPanel(Panel);
     DrawRect(FLinearColor(.015f,.025f,.04f,.97f),Left,Top,Width,Panel.GetSize().Y);
-    if(Highlight!=INDEX_NONE)DrawRect(FLinearColor(.08f,.22f,.28f,.95f),Left+6*U,Top+85*U+(Highlight-Start)*RowHeight,Width-12*U,106*U);
+    if(Highlight!=INDEX_NONE)DrawRect(FLinearColor(.08f,.22f,.28f,.95f),Left+6*U,Top+85*U+(Highlight-Start)*RowHeight,Width-12*U,RowHeight-4*U);
     auto Line=[this,Left,Width,U](const FString& Text,FLinearColor Color,float Y)
     {DrawHUDText(Text,Color,FFrontierHUDLayout::Box(Left+12*U,Y,Width-24*U,Layout.Line),1);};
     Line(FString::Printf(TEXT("队伍：%d 位伙伴 | %d-%d"),Pets.Num(),Pets.IsEmpty()?0:Start+1,FMath::Min(Start+Rows,Pets.Num())),FLinearColor::White,Top+12*U);
@@ -34,5 +35,6 @@ void ACFHUD::DrawRosterPanel(ACFPlayerCharacter* Player)
         if(Pet->WorkSite)Status+=TEXT(" | ")+FrontierChinese::Specialty(Pet->WorkSite->RequiredSpecialty);
         if(Pet->GetFieldResource())Status+=TEXT(" | 野外采集");if(Pet->CarriedFood>0)Status+=FString::Printf(TEXT(" | 携带食物 %d"),Pet->CarriedFood);
         Line(Status,FLinearColor::Green,Y+40*U);Line(Pet->Personality->GetSummary(),FLinearColor(.7f,.9f,1),Y+60*U);Line(Pet->Memory->GetSummary(),FLinearColor(.7f,.85f,1),Y+80*U);
+        if(HasRescue)Line(Pet->Memory->GetRescueSummary(),FLinearColor(.7f,.85f,1),Y+100*U);
     }
 }

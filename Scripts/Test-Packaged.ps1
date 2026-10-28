@@ -26,6 +26,8 @@ $cases = @(
     @{Flag='CFRescueMemoryRescueRead'; Marker='CF_RESCUE_MEMORY PASS mode=2'},
     @{Flag='CFRescueMemoryHomeRead'; Marker='CF_RESCUE_MEMORY PASS mode=3'},
     @{Flag='CFRescueMemoryFinalRead'; Marker='CF_RESCUE_MEMORY PASS mode=4'},
+    @{Flag='CFRescueRecallTest'; Marker='CF_RESCUE_RECALL PASS'},
+    @{Flag='CFRescueRecallRead'; Marker='CF_RESCUE_RECALL_READ PASS'},
     @{Flag='CFSmokeTest'; Marker='CF_SMOKE PASS'},
     @{Flag='CFPaceTest'; Marker='CF_PACE PASS'},
     @{Flag='CFWildSightTest'; Marker='CF_WILD_SIGHT PASS'},

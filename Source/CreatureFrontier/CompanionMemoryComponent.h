@@ -25,6 +25,7 @@ public:
     static bool ValidateSnapshot(ECrystalJourneyMemory State,bool OwnedTamed,bool Sampled);
     void RestoreSnapshot(ECrystalJourneyMemory State);
     FString GetSummary() const;
+    FString GetRescueSummary() const;
     bool Open(ACFPlayerCharacter* Hero);
     bool Commit(bool Celebrate);
     void Close();
@@ -45,4 +46,6 @@ private:
     UPROPERTY(VisibleAnywhere,BlueprintReadOnly,meta=(AllowPrivateAccess="true")) ECrystalJourneyMemory Memory=ECrystalJourneyMemory::None;
     TWeakObjectPtr<ACFPlayerCharacter> Listener;
     TSharedPtr<SWidget> Dialog;
+    // 打开时锁定经历，防止确认时误写另一个待分享事件。
+    bool bRecallingRescue=false;
 };

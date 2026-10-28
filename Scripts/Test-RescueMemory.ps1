@@ -16,7 +16,9 @@ $hash=(Get-FileHash -LiteralPath $fingerprint).Hash
 $evidence=Join-Path $projectRoot ('Saved\RescueMemoryQA\'+(Get-Date -Format 'yyyyMMdd-HHmmss')+'-'+[Guid]::NewGuid().ToString('N').Substring(0,8))
 New-Item -ItemType Directory -Path $evidence | Out-Null
 Write-Host "脱险经历证据：$evidence"
-$slots=@('RescueMemoryDowned','RescueMemoryRescued','RescueMemoryHome','RescueMemoryBad','RescueMemoryLegacy28')
+$qaMutex=[System.Threading.Mutex]::new($false,'Local\CreatureFrontierRescueMemoryQA')
+if(!$qaMutex.WaitOne(0)){$qaMutex.Dispose();throw '脱险经历专项正在使用相同测试槽，请串行运行'}
+$slots=@('RescueMemoryDowned','RescueMemoryRescued','RescueMemoryHome','RescueMemoryBad','RescueMemoryLegacy28','RescueRecallDone')
 $backups=@()
 $results=@()
 try{
@@ -28,14 +30,14 @@ try{
             $backups+=@{Path=$path;Backup=$backup;Hash=(Get-FileHash -LiteralPath $path).Hash}
         }
     }
-    $flags=@('CFRescueMemoryTest','CFRescueMemoryWrite','CFRescueMemoryRescueRead','CFRescueMemoryHomeRead','CFRescueMemoryFinalRead')
+    $flags=@('CFRescueMemoryTest','CFRescueMemoryWrite','CFRescueMemoryRescueRead','CFRescueMemoryHomeRead','CFRescueMemoryFinalRead','CFRescueRecallTest','CFRescueRecallRead')
     for($index=0;$index -lt $flags.Count;$index++){
         $flag=$flags[$index];$log=Join-Path $evidence ($flag+'.log')
         $testArgs=@('-game',('-'+$flag),'-nullrhi','-nosound','-unattended','-nop4',('-abslog="'+$log+'"'))
         if($Editor){$testArgs=@((Join-Path $projectRoot 'CreatureFrontier.uproject'))+$testArgs}
         $process=Start-Process -FilePath $exe -ArgumentList $testArgs -WindowStyle Hidden -PassThru
         if(!$process.WaitForExit(60000)){$process.Kill();$process.WaitForExit();throw "测试超时：$log"}
-        $marker='CF_RESCUE_MEMORY PASS mode='+$index
+        $marker=if($index -lt 5){'CF_RESCUE_MEMORY PASS mode='+$index}elseif($index -eq 5){'CF_RESCUE_RECALL PASS'}else{'CF_RESCUE_RECALL_READ PASS'}
         if($process.ExitCode -ne 0 -or !(Select-String -LiteralPath $log -SimpleMatch $marker -Quiet) -or (Select-String -LiteralPath $log -Pattern 'CF_\w+ FAIL|Fatal error|Assertion failed' -Quiet)){throw "测试未通过：$log"}
         if((Get-FileHash -LiteralPath $fingerprint).Hash -ne $hash){throw '测试期间模块发生变化'}
         $results += [pscustomobject]@{Case=$flag;Pass=$true;BuildSHA256=$hash;Log=$log}
@@ -44,5 +46,6 @@ try{
     }
     foreach($slot in $slots){$path=Join-Path $saveRoot ($slot+'.sav');if(Test-Path -LiteralPath $path){Copy-Item -LiteralPath $path -Destination (Join-Path $evidence ($slot+'.sav'))}}
 }finally{
-    foreach($entry in $backups){Copy-Item -LiteralPath $entry.Backup -Destination $entry.Path;if((Get-FileHash -LiteralPath $entry.Path).Hash -ne $entry.Hash){throw '原测试槽恢复校验失败'}}
+    try{foreach($entry in $backups){Copy-Item -LiteralPath $entry.Backup -Destination $entry.Path;if((Get-FileHash -LiteralPath $entry.Path).Hash -ne $entry.Hash){throw '原测试槽恢复校验失败'}}}
+    finally{$qaMutex.ReleaseMutex();$qaMutex.Dispose()}
 }

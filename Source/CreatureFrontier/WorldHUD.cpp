@@ -85,6 +85,7 @@ void ACFHUD::DrawWorldHUD(ACFPlayerCharacter* Player)
             if(Creature->CarriedFood>0 || Creature->Cargo->Count()>0)Rows.Add({FString::Printf(TEXT("携带食物 %d | 资源 %d | Z 取回（6米）"),Creature->CarriedFood,Creature->Cargo->Count()),Yellow});
             Rows.Add({FString::Printf(TEXT("亲密 %d/100 | 照料冷却 %.0f秒"),Creature->BondPoints,FMath::CeilToFloat(Creature->PettingCooldown)),Green});
             Rows.Add({Creature->Personality->GetSummary(),Blue});Rows.Add({Creature->Memory->GetSummary(),Blue,2});
+            const auto RescueSummary=Creature->Memory->GetRescueSummary();if(!RescueSummary.IsEmpty())Rows.Add({RescueSummary,Blue,2});
         }
         else
         {

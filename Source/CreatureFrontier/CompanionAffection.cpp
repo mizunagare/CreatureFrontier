@@ -63,5 +63,5 @@ void ACFPlayerCharacter::PlayAimedCompanion() { PlayWithCompanion(TraceCreature(
 void ACFPlayerCharacter::RecallAimedJourney()
 {
     auto* Pet=TraceCreature();
-    if(!Pet || !Pet->Memory->Open(this))Feedback=TEXT("F7：在初始基地瞄准2.5米内自己的安全空闲伙伴，分享待回应的水晶之旅");
+    if(!Pet || !Pet->Memory->Open(this))Feedback=TEXT("F7：在初始基地瞄准2.5米内自己的安全空闲伙伴，分享待回应的共同经历");
 }

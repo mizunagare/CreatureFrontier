@@ -27,6 +27,18 @@ UCompanionMemoryComponent::UCompanionMemoryComponent()
     PrimaryComponentTick.bCanEverTick=true;
     PrimaryComponentTick.TickInterval=.25f;
 }
+FString UCompanionMemoryComponent::GetRescueSummary() const
+{
+    switch(RescueMemory)
+    {
+    case ERescueJourneyMemory::Downed:return TEXT("脱险之旅 | 等待救助");
+    case ERescueJourneyMemory::Rescued:return TEXT("脱险之旅 | 一起平安回家吧");
+    case ERescueJourneyMemory::Pending:return Memory==ECrystalJourneyMemory::Pending?TEXT("脱险归来 | F7先分享水晶，再聊这段经历"):TEXT("脱险归来 | 安全归家后按F7聊聊");
+    case ERescueJourneyMemory::QuietThanks:return TEXT("脱险归来 | 记住了归家后的安静陪伴");
+    case ERescueJourneyMemory::Celebration:return TEXT("脱险归来 | 记住了一起庆祝平安归来");
+    default:return FString();
+    }
+}
 bool UCompanionMemoryComponent::ValidateRescueSnapshot(UWorld* World,uint8 State,FName Source,bool OwnedTamed)
 {
     if(State==0)return Source.IsNone();
