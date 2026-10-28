@@ -18,6 +18,9 @@
 #include "PlayerPaceComponent.h"
 #include "Containers/Ticker.h"
 #include "GameFramework/Controller.h"
+#include "WorldLoot.h"
+#include "BaseBuildingComponent.h"
+#include "Algo/Reverse.h"
 
 void RunRescueGateScenario(UWorld* World, ACFPlayerCharacter* Hero)
 {
@@ -90,5 +93,64 @@ void RunNaturalRescueCheckpoint(UWorld* World, ACFPlayerCharacter* Hero)
         if(Index<Points.Num())
         {if(FVector::Dist2D(Now,Points[Index])<70){++Index;Input->Direction=FVector::ZeroVector;}else{Input->Direction=(Points[Index]-Now).GetSafeNormal2D();Hero->GetController()->SetControlRotation(Input->Direction.Rotation());}}
         return true;
+    }),.1f);
+}
+
+void RunNaturalRescueResume(UWorld* World, ACFPlayerCharacter* Hero, bool ReadFinal)
+{
+    const auto* Source=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("RescueNaturalDowned"),0));
+    const auto* Record=Source?Source->Creatures.FindByPredicate([](const auto& R){return R.bOwned && R.Health==0;}):nullptr;
+    if(!Record || !Hero->LoadProgress(ReadFinal?TEXT("RescueNaturalFinal"):TEXT("RescueNaturalDowned")))
+    {UE_LOG(LogTemp,Error,TEXT("CF_RESCUE_NATURAL_LOAD FAIL source"));FPlatformMisc::RequestExitWithStatus(false,1);return;}
+    ACreatureCharacter* Pet=nullptr;AWildEncounter* Camp=nullptr;
+    for(TActorIterator<ACreatureCharacter> It(World);It;++It)if(It->PersistentId==Record->Id)Pet=*It;
+    for(TActorIterator<AWildEncounter> It(World);It;++It)if(It->EncounterId==TEXT("EmberHollow"))Camp=*It;
+    auto Snapshot=[World,Hero,Pet,Camp]()
+    {
+        int32 Materials=Hero->Inventory->Count(EFrontierItem::Material);for(TActorIterator<AWorldLoot> It(World);It;++It)Materials+=It->Materials;
+        AResourceNode* Cache=nullptr;for(TActorIterator<AResourceNode> It(World);It;++It)if(It->PersistentId==FGuid(0xCF170000,0,0,11))Cache=*It;
+        return Pet && Pet->Health>0 && Pet->Tamer==Hero->GetController() && Pet->GetDistanceTo(Hero)<300 && Hero->Health>0 &&
+            FVector::Dist2D(Hero->GetActorLocation(),UBaseBuildingComponent::BaseOrigin())<800 && Camp && !Camp->GetResident() && Cache && Cache->Remaining==6 &&
+            Materials==9 && Hero->Inventory->Count(EFrontierItem::Medicine)==0 && Hero->Inventory->Count(EFrontierItem::Food)==9;
+    };
+    if(ReadFinal){const bool Pass=Snapshot();UE_LOG(LogTemp,Display,TEXT("CF_RESCUE_NATURAL_READ %s"),Pass?TEXT("PASS"):TEXT("FAIL"));FPlatformMisc::RequestExitWithStatus(false,Pass?0:1);return;}
+    auto* Enemy=Camp?Camp->GetResident():nullptr;const auto* EnemyRecord=Enemy?Source->Creatures.FindByPredicate([Enemy](const auto& R){return R.Id==Enemy->PersistentId;}):nullptr;
+    bool Match=Pet && EnemyRecord && Pet->Health==0 && Pet->GetActorLocation().Equals(Record->Transform.GetLocation(),.1f) && Pet->Stamina==Record->Stamina && Pet->Nutrition==Record->Nutrition &&
+        Enemy->Health==EnemyRecord->Health && Enemy->GetActorLocation().Equals(EnemyRecord->Transform.GetLocation(),.1f) && Hero->Health==Source->Health && Hero->GetActorLocation().Equals(Source->PlayerTransform.GetLocation(),.1f);
+    for(int32 I=0;I<static_cast<int32>(EFrontierItem::Count);++I)Match &= Hero->Inventory->Count(static_cast<EFrontierItem>(I))==Source->InventoryStacks.FindRef(static_cast<EFrontierItem>(I));
+    UE_LOG(LogTemp,Display,TEXT("CF_RESCUE_NATURAL_LOAD %s"),Match?TEXT("PASS"):TEXT("FAIL"));
+    if(!Match){FPlatformMisc::RequestExitWithStatus(false,1);return;}
+    auto* Input=NewObject<UHomeMovementProbe>(Hero);Input->RegisterComponent();auto Points=MakeHollowRoutePoints();Algo::Reverse(Points);Points.Add(FVector(-250,-400,40));
+    // 先到最近的原路线点，后沿原折返通道返家，不把伙伴移回基地。
+    int32 Nearest=0;for(int32 I=1;I<Points.Num();++I)if(FVector::Dist2D(Hero->GetActorLocation(),Points[I])<FVector::Dist2D(Hero->GetActorLocation(),Points[Nearest]))Nearest=I;
+    const double Deadline=FPlatformTime::Seconds()+120;CFInputQA::Press(Hero,EKeys::LeftShift);
+    FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([World,Hero,Pet,Enemy,Camp,Input,Points,Snapshot,Deadline,Index=Nearest,Stage=0,Skill=false,Travel=0.f,Previous=Pet->GetActorLocation()](float) mutable
+    {
+        const float Step=FVector::Dist(Pet->GetActorLocation(),Previous);Travel+=Step;Previous=Pet->GetActorLocation();
+        if(FPlatformTime::Seconds()>Deadline || Hero->Health<=0 || (Stage>0 && Pet->Health<=0) || Step>160)
+        {UE_LOG(LogTemp,Error,TEXT("CF_RESCUE_NATURAL_RESUME FAIL stage=%d index=%d heroHP=%.1f petHP=%.1f travel=%.1f"),Stage,Index,Hero->Health,Pet->Health,Travel);FPlatformMisc::RequestExitWithStatus(false,1);return false;}
+        auto Aim=[Hero](AActor* Actor){const auto View=(Actor->GetActorLocation()-Hero->FirstPersonCamera->GetComponentLocation()).Rotation();Hero->GetController()->SetControlRotation(View);Hero->FirstPersonCamera->SetWorldRotation(View);};
+        if(Stage==0)
+        {
+            // 先用真实侧移取得对敌人的视线，避免救起后仍被伙伴胶囊挡住指令射线。
+            Aim(Enemy);if(Hero->TraceCreature()!=Enemy){const FVector Toward=(Enemy->GetActorLocation()-Hero->GetActorLocation()).GetSafeNormal2D();Input->Direction=FVector(-Toward.Y,Toward.X,0);return true;}
+            Aim(Pet);if(Hero->TraceCreature()!=Pet){Input->Direction=(Pet->GetActorLocation()-Hero->GetActorLocation()).GetSafeNormal2D();return true;}
+            Input->Direction=FVector::ZeroVector;const FVector Position=Pet->GetActorLocation();
+            const bool Pass=CFInputQA::Press(Hero,EKeys::P) && Pet->Health==40 && Pet->GetActorLocation().Equals(Position) && Hero->Inventory->Count(EFrontierItem::Medicine)==0;
+            UE_LOG(LogTemp,Display,TEXT("CF_RESCUE_NATURAL_TREAT %s"),Pass?TEXT("PASS"):TEXT("FAIL"));if(!Pass){FPlatformMisc::RequestExitWithStatus(false,1);return false;}
+            // 救助不会自动取消休息，按现有提示F恢复行动后才能接受Q/G。
+            if(!CFInputQA::Press(Hero,EKeys::F) || Pet->Activity!=ECreatureActivity::Follow){FPlatformMisc::RequestExitWithStatus(false,1);return false;}Stage=1;
+        }
+        if(Stage==1)
+        {
+            Input->Direction=FVector::ZeroVector;Skill |= Pet->SpecialCooldownRemaining>0;
+            if(Enemy->Health>0){Aim(Enemy);if(Hero->TraceCreature()==Enemy){CFInputQA::Press(Hero,EKeys::Q);if(!Skill)CFInputQA::Press(Hero,EKeys::G);}return true;}
+            Stage=2;CFInputQA::Press(Hero,EKeys::F);
+        }
+        if(Index<Points.Num())
+        {if(FVector::Dist2D(Hero->GetActorLocation(),Points[Index])<70){++Index;Input->Direction=FVector::ZeroVector;}else{Input->Direction=(Points[Index]-Hero->GetActorLocation()).GetSafeNormal2D();Hero->GetController()->SetControlRotation(Input->Direction.Rotation());}return true;}
+        Input->Direction=FVector::ZeroVector;if(Pet->GetDistanceTo(Hero)>300)return true;
+        CFInputQA::Release(Hero,EKeys::LeftShift);const bool Pass=Skill && Travel>2000 && Snapshot() && Hero->SaveProgress(TEXT("RescueNaturalFinal"));
+        UE_LOG(LogTemp,Display,TEXT("CF_RESCUE_NATURAL_RESUME %s petHP=%.1f travel=%.1f skill=%d"),Pass?TEXT("PASS"):TEXT("FAIL"),Pet->Health,Travel,Skill);FPlatformMisc::RequestExitWithStatus(false,Pass?0:1);return false;
     }),.1f);
 }
