@@ -62,7 +62,7 @@ bool UFarmCropComponent::Work(ACreatureCharacter* Pet,ACFPlayerCharacter* Hero,f
         UGameplayStatics::IsGamePaused(this)) return false;
     FHitResult Hit; FCollisionQueryParams Params(SCENE_QUERY_STAT(CropWork),false,Pet);
     if(GetWorld()->LineTraceSingleByChannel(Hit,Pet->GetActorLocation(),Site->GetActorLocation()+FVector(0,0,30),ECC_Visibility,Params) && Hit.GetActor()!=Site) return false;
-    if(Amount==0) return Harvest(); // A previously ripe crop can settle after capacity is freed; never grows/sows here.
+    if(Amount==0) return Harvest(); // 已成熟作物可在容量释放后结算；此处绝不生长或播种。
     if(!bPlanted && !Sow()) return false;
     const int32 Before=Stage(); GrowthWork=FMath::Min(RequiredWork,GrowthWork+Amount);
     if(Stage()!=Before) Refresh();
