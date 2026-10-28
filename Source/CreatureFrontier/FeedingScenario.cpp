@@ -27,7 +27,7 @@ void RunFeedingScenario(UWorld* World, ACFPlayerCharacter* Hero)
     Builder->Selected = EWorkSpecialty::Feeding; auto* Trough = Builder->BuildAt(At(0));
     Builder->Selected = EWorkSpecialty::Farming; auto* Garden = Builder->BuildAt(At(-700));
     if (!Trough || !Garden) { UE_LOG(LogTemp,Error,TEXT("CF_FEED FAIL build")); FPlatformMisc::RequestExitWithStatus(false,1); return; }
-    Garden->Crop->Seeds=3; // The return-to-work assertion includes seeded production after eating.
+    Garden->Crop->Seeds=3; // 返回工作断言包含进食后消耗种子的实际生产。
     const FGuid Id = Trough->PersistentId, GardenId = Garden->PersistentId;
     Hero->FirstPersonCamera->SetWorldRotation((Trough->GetActorLocation()-Hero->FirstPersonCamera->GetComponentLocation()).Rotation());
     Hero->DepositTroughFood(); Hero->DepositTroughFood();
@@ -65,7 +65,7 @@ void RunFeedingScenario(UWorld* World, ACFPlayerCharacter* Hero)
             First->Activity == ECreatureActivity::Work && FVector::Dist2D(First->GetActorLocation(),First->WorkSite->GetActorLocation()) <= 220 && First->WorkSite->StoredFood>0;
         if (!Trough) { FPlatformMisc::RequestExitWithStatus(false,1); return; }
         First->FeedingSite = Trough; First->Nutrition = 30; First->AutoFeedCooldown = 0; First->Tick(0);
-        const bool Timeout = !First->FeedingSite.IsValid() && First->AutoFeedCooldown == 5; // Expired transient target falls back to its job.
+        const bool Timeout = !First->FeedingSite.IsValid() && First->AutoFeedCooldown == 5; // 临时进食目标超时后回到原工作。
         First->Nutrition = 65; First->AutoFeedCooldown = 2.5f;
         const FString Slot = TEXT("FrontierFeedingAutomation");
         bool Saved = Hero->SaveProgress(Slot) && Hero->LoadProgress(Slot);

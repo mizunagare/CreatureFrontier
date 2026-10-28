@@ -48,7 +48,7 @@ void RunEcologyScenario(UWorld* World, ACFPlayerCharacter* Hero)
     bool Routes = true;
     for (FVector End : {FVector(-1500,1400,40),FVector(1500,1400,40)})
     {
-        // Start at the playable base entrance, not inside the original gathering bench.
+        // 从可游玩的基地入口出发，不从原有采集工作台内部出发。
         auto* Path = UNavigationSystemV1::FindPathToLocationSynchronously(World,FVector(0,0,40),End,Hero);
         Routes &= Path && Path->IsValid() && !Path->IsPartial();
         UE_LOG(LogTemp,Display,TEXT("CF_WORLD_ROUTE %s valid=%d partial=%d points=%d"),*End.ToString(),Path && Path->IsValid(),Path && Path->IsPartial(),Path ? Path->PathPoints.Num() : 0);
@@ -82,9 +82,9 @@ void RunEcologyScenario(UWorld* World, ACFPlayerCharacter* Hero)
                 AI?static_cast<int32>(AI->GetMoveStatus()):-1,*Resident->GetActorLocation().ToString(),
                 AI?*AI->GetImmediateMoveDestination().ToString():TEXT("none"));
         }
-        // Net displacement alone rejects valid short out-and-back patrols.
-        // Keep the original 35cm gate, or require TWO observed moving->idle
-        // legs with >=35cm continuous travel. An immobile Wander cannot pass.
+        // 只检查净位移会误拒绝合法的短程往返巡游。
+        // 保留原有35厘米门槛，或要求观察到两段从移动转为停留、
+        // 且连续行程至少35厘米的路线；静止的巡游状态不能通过。
         const bool Movement=MaxTravel>=35 || (CompletedLegs>=2 && PathTravel>=35);
         if (!Movement && Now-Started < 8) return;
         const bool Roam = Movement && Within && Continuous && SawWander;
@@ -132,7 +132,7 @@ void RunEcologyScenario(UWorld* World, ACFPlayerCharacter* Hero)
                 Pass ? TEXT("PASS") : TEXT("FAIL"),Scene,Roam,Persisted,Immune,Reset,Tamed);
             FPlatformMisc::RequestExitWithStatus(false,Pass ? 0 : 1);
         },7.0f,false);
-        // Last capture access: clearing a repeating timer destroys its running delegate.
+        // 最后一次访问捕获变量：清除循环定时器会销毁正在执行的委托。
         World->GetTimerManager().ClearTimer(*Poll);
     },.05f,true);
 }

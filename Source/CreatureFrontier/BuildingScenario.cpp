@@ -31,8 +31,8 @@ void RunBuildingScenario(UWorld* World, ACFPlayerCharacter* Hero)
     Builder->Toggle();
     const bool Preview = Builder->IsActive();
     Builder->Cycle(); Builder->Cycle(); Builder->Cycle(); Builder->Cycle(); Builder->Cycle(); Builder->Cycle();
-    Hero->Attack(); // Real LMB route must place rather than fire.
-    Hero->CaptureTarget(); // Real RMB route cancels without consuming a capture device.
+    Hero->Attack(); // 真实鼠标左键入口必须放置建筑，而非开火。
+    Hero->CaptureTarget(); // 真实鼠标右键入口取消建造，不消耗捕捉器。
     AWorkStation* Gather = nullptr;
     for (TActorIterator<AWorkStation> It(World); It; ++It) if (It->bPlayerBuilt) Gather = *It;
     const bool Input = Preview && !Builder->IsActive() && Builder->Selected == EWorkSpecialty::Gathering &&
@@ -83,7 +83,7 @@ void RunBuildingScenario(UWorld* World, ACFPlayerCharacter* Hero)
         Reject &= !Hero->LoadProgress(BadSlot);
     }
     else Reject = false;
-    // Let real runtime nav tiles rebuild after placement and two snapshot replacements.
+    // 放置建筑及两次快照替换后，等待真实运行时导航网格重建。
     FTimerHandle CheckNav;
     World->GetTimerManager().SetTimer(CheckNav,[World,Hero,MineId,GatherId,Slot,Input,Reject,Costs,Work,Saved]()
     {

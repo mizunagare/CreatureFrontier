@@ -45,8 +45,8 @@ void AWildEncounter::BeginPlay()
         if(FParse::Param(FCommandLine::Get(),Flag)) SetActorTickEnabled(false);
     for(const TCHAR* Flag:{TEXT("CFFieldRecoveryTest"),TEXT("CFFieldRecoveryWrite"),TEXT("CFFieldRecoveryRead"),TEXT("CFStorageTest"),TEXT("CFStorageWrite"),TEXT("CFStorageRead"),TEXT("CFCargoTest"),TEXT("CFCargoWrite"),TEXT("CFCargoRead"),TEXT("CFCargoCrystalTest")})
         if(FParse::Param(FCommandLine::Get(),Flag)) SetActorTickEnabled(false);
-    // Existing fixture scenarios own their entire population. The encounter scenario
-    // explicitly ticks its own slot, keeping all regression worlds isolated.
+    // 现有夹具场景自行管理全部生物；遭遇场景显式更新自己的位置，
+    // 保持各个回归世界相互隔离。
     for (const TCHAR* Flag : {TEXT("CFFieldTest"), TEXT("CFFieldWrite"), TEXT("CFFieldRead"), TEXT("CFExpeditionTest"), TEXT("CFExpeditionWrite"), TEXT("CFExpeditionRead"), TEXT("CFHomeTest"), TEXT("CFHomeWrite"), TEXT("CFHomeRead"), TEXT("CFResourceTest"), TEXT("CFFormationTest"), TEXT("CFAffectionTest"), TEXT("CFAffinityTest"), TEXT("CFAnimationTest"), TEXT("CFBackpackTest"), TEXT("CFSessionTest"),
         TEXT("CFSmokeTest"), TEXT("CFInventoryTest"), TEXT("CFCareTest"),
         TEXT("CFSpeciesTest"), TEXT("CFCombatTest"), TEXT("CFSaveWrite"), TEXT("CFSaveRead"), TEXT("CFNavTest"), TEXT("CFEncounterTest"), TEXT("CFBossTest"), TEXT("CFBuildingTest"), TEXT("CFWorldTest"), TEXT("CFWorldPreview"), TEXT("CFFarmingTest"), TEXT("CFFarmPreview"), TEXT("CFFeedingTest"), TEXT("CFWorkCycleTest"), TEXT("CFSquadTest"), TEXT("CFJournalTest"), TEXT("CFObjectiveTest"), TEXT("CFRespawnTest"), TEXT("CFEquipmentTest"), TEXT("CFMeleeTest"), TEXT("CFLogisticsTest")})
@@ -67,7 +67,7 @@ ACreatureCharacter* AWildEncounter::GetResident() const
 
 bool AWildEncounter::IsSpawnAreaClear() const
 {
-    // Never pop an enemy into the player's view or on top of another creature.
+    // 不得让敌人突然出现在玩家视野内或其他生物身上。
     for (TActorIterator<APawn> It(GetWorld()); It; ++It)
     {
         if (auto* Creature = Cast<ACreatureCharacter>(*It); Creature && Creature->Health <= 0) continue;

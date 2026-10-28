@@ -39,8 +39,8 @@ struct FCreatureSaveRecord
     UPROPERTY() FString Nickname;
     UPROPERTY() ECompanionPreference Preference=ECompanionPreference::None;
     UPROPERTY() bool bPreferenceDiscovered=false;
-    // Store the raw byte: enum-name deserialization may turn unknown names into
-    // the valid None default before our snapshot validator can reject them.
+    // 保存原始字节：按枚举名称反序列化可能在快照校验前，将未知名称
+    // 转成合法的 None 默认值，导致校验无法拒绝异常数据。
     UPROPERTY() uint8 CrystalJourney=0;
     UPROPERTY() uint8 RescueJourney=0;
     UPROPERTY() FName RescueSource;
@@ -103,9 +103,9 @@ class CREATUREFRONTIER_API UFrontierSaveGame : public USaveGame
 {
     GENERATED_BODY()
 public:
-    // Legacy saves may omit this property when it equals the class default.
-    // Freeze the pre-cargo fallback; writers explicitly set the current version
-    // so future default changes cannot reinterpret an untagged legacy save.
+    // 旧存档可能在属性等于类默认值时省略该属性。
+    // 固定引入携带物前的回退版本；写档时显式设置当前版本，
+    // 防止未来默认值变化导致无版本标记的旧档被错误解释。
     UPROPERTY() int32 FormatVersion = 21;
     UPROPERTY() FResearchProgress Research;
     UPROPERTY() TArray<FHomeModuleRecord> HomeModules;

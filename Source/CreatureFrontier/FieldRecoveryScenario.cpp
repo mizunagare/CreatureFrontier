@@ -85,7 +85,7 @@ void RunFieldRecoveryScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
     auto* Node=FindCrystal(World);
     if(!Leaf || !Node) { ExitCase(false,Mode); return; }
     const FVector Center=Node->GetActorLocation();
-    // The same fixed terrain fixture is rebuilt in each process; it is NOT a saved player building.
+    // 每个进程重建相同的固定地形夹具，它不是玩家存档中的建筑。
     Wall(World,Center+FVector(350,0,150),FVector(20,350,200));
     Wall(World,Center+FVector(-235,-350,150),FVector(115,20,200));
     Wall(World,Center+FVector(235,-350,150),FVector(115,20,200));
@@ -169,7 +169,7 @@ void RunFieldRecoveryScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
             if(!Run->Pass) { Fail(); return; }
             Run->Start=Worker->GetActorLocation(); Run->Gate->SetActorEnableCollision(false); Run->Gate->Destroy();
             if(auto* Nav=FNavigationSystem::GetCurrent<UNavigationSystemV1>(World)) Nav->Build();
-            Hero->Health=0; // Component-level ownership/liveness gate; full death/respawn has its own regression.
+            Hero->Health=0; // 检查组件级归属与存活门槛；完整死亡/复活另有回归。
             Advance(2); return;
         }
         if(Run->Phase==2)

@@ -80,7 +80,7 @@ void RunBossScenario(UWorld* World, ACFPlayerCharacter* Hero)
     Saved &= Boss && Boss->AlphaWindup == 0 && FMath::IsNearlyEqual(Boss->AlphaCooldown,10);
     if (!Boss) { UE_LOG(LogTemp, Error, TEXT("CF_BOSS FAIL restore")); FPlatformMisc::RequestExitWithStatus(false,1); return; }
     Boss->SetActorTickEnabled(false);
-    // Capture cancels a hostile charge, and never creates a kill reward.
+    // 捕捉会取消敌对蓄力，但绝不生成击杀奖励。
     Boss->AlphaWindup = 1; Boss->Tame(Hero->GetController()); Boss->Tick(0);
     const bool Capture = Boss->AlphaWindup == 0;
     Boss->Disposition = ECreatureDisposition::Wild; Boss->Tamer = nullptr;
@@ -92,12 +92,12 @@ void RunBossScenario(UWorld* World, ACFPlayerCharacter* Hero)
     bool Loot = Drops == 1 && Drop && Drop->Materials == 8 && Drop->Medicine == 1;
     if (!Drop) { UE_LOG(LogTemp, Error, TEXT("CF_BOSS FAIL loot")); FPlatformMisc::RequestExitWithStatus(false,1); return; }
     Hero->Inventory->Restore({{EFrontierItem::Material,998},{EFrontierItem::Medicine,999}});
-    Loot &= !Drop->Collect(Hero); // Too far.
+    Loot &= !Drop->Collect(Hero); // 距离过远。
     Hero->SetActorLocation(Drop->GetActorLocation()+FVector(100,0,55));
     Loot &= Drop->Collect(Hero) && Drop->Materials == 7 && Drop->Medicine == 1 && Hero->Inventory->Count(EFrontierItem::Material) == 999;
-    Loot &= !Drop->Collect(Hero); // Full inventory leaves the remainder in the world.
-    // This fixture manually converts a captured boss back to wild (no release
-    // feature exists). Its retained companion-only preference must be rejected.
+    Loot &= !Drop->Collect(Hero); // 背包已满时，剩余掉落物保留在世界中。
+    // 此夹具将已捕捉的首领手动改回野生状态（目前没有放生功能）。
+    // 必须拒绝它残留的伙伴专用偏好数据。
     const bool RejectedFixture=Hero->SaveProgress(Slot) && !Hero->LoadProgress(Slot) && Hero->Feedback.Contains(TEXT("伙伴偏好无效"));
     UE_LOG(LogTemp,Display,TEXT("CF_BOSS_FIXTURE rejectedRetainedPreference=%d"),RejectedFixture);
     Boss->Personality->RestoreSnapshot(ECompanionPreference::None,false);

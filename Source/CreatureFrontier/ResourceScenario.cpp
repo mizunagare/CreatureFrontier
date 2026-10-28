@@ -129,7 +129,7 @@ void RunResourceScenario(UWorld* World,ACFPlayerCharacter* Hero)
     bool Migration=Hero->LoadProgress(TEXT("FrontierResourceLegacy")) && CountNodes()==11 && Hero->Inventory->Count(EFrontierItem::Material)==7;
     for(TActorIterator<AResourceNode> It(World);It;++It) Migration &= It->Remaining==It->Definition->Capacity;
     for(TActorIterator<ACreatureCharacter> It(World);It;++It) It->Destroy();
-    // Real navigation around the existing wall, then conserved harvest and depleted waiting.
+    // 通过真实导航绕过现有墙壁，再验证守恒采集与耗尽后等待。
     Brush=nullptr;
     for(TActorIterator<AResourceNode> It(World);It;++It)
     { if(It->PersistentId==FGuid(0xCF170000,0,0,1)) Brush=*It; else It->Destroy(); }
@@ -156,7 +156,7 @@ void RunResourceScenario(UWorld* World,ACFPlayerCharacter* Hero)
         FTimerHandle ActivePoll=*Poll;
         if(Preview && Pass)
         {
-            // Loading restores walking; freeze this camera fixture before aiming from its new height.
+            // 读档会恢复行走；从新高度瞄准前先冻结相机夹具。
             Hero->GetCharacterMovement()->DisableMovement();
             Hero->SetActorLocation(FVector(1300,500,90));
             const FRotator View=(Brush->GetActorLocation()-Hero->FirstPersonCamera->GetComponentLocation()).Rotation();

@@ -71,9 +71,9 @@ void RunFieldWorkScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
     Hero->Inventory->Restore({{EFrontierItem::Crystal,0}});
     Pet->Tick(.1f); Baseline &= Node->Remaining==Stock-1 && Pet->Experience==1 && Hero->Inventory->Count(EFrontierItem::Crystal)==1;
     Node->Tick(1);
-    // Leaf has no Mining specialty: 5.8s is 2.9/3 work. Keeping it across reassignment would incorrectly settle after .3s.
+    // Leaf 没有采矿专长：5.8秒相当于2.9/3工作进度；重新分配后若保留，会在0.3秒后错误结算。
     Pet->Tick(5.8f); Pet->AssignFieldResource(Node); Pet->Tick(.3f);
-    Baseline &= Node->Remaining==Stock-1; // Same-activity reassignment resets partial work.
+    Baseline &= Node->Remaining==Stock-1; // 重新分配相同工作也会重置未完成进度。
     Pet->Stamina=0; Pet->Tick(.1f);
     Baseline &= Pet->Activity==ECreatureActivity::Rest && Pet->bResumeWorkAfterRest && Pet->GetFieldResource()==Node;
     Baseline &= Hero->SaveProgress(TEXT("FieldLocal")) && Hero->LoadProgress(TEXT("FieldLocal"));

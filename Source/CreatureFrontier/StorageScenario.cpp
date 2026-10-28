@@ -95,7 +95,7 @@ void RunStorageScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
     Interface &= Snapshot(World,Hero);
     Hero->Storage->WithdrawOne(); Hero->Storage->DepositOne();
     Interface &= Snapshot(World,Hero);
-    Hero->Storage->WithdrawStack(); Hero->Storage->DepositStack(); // all-or-nothing full stack round trip, then restore exact distribution.
+    Hero->Storage->WithdrawStack(); Hero->Storage->DepositStack(); // 整组事务全成或全不成，往返后精确恢复原分布。
     bool UIStacks=Crate->StorageInventory->Count(EFrontierItem::Material)==86 && Hero->Inventory->Count(EFrontierItem::Material)==0;
     Interface &= UIStacks && Hero->Storage->Transfer(EFrontierItem::Material,85,false) && Snapshot(World,Hero);
     const auto BeforePack=Hero->Inventory->GetStacks(); const auto BeforeStock=Crate->StorageInventory->GetStacks();
@@ -149,7 +149,7 @@ void RunStorageScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
     auto LegacyPack=BeforePack;
     for(auto Item:{EFrontierItem::Fiber,EFrontierItem::Ore,EFrontierItem::Scrap,EFrontierItem::Seeds}) {Legacy->InventoryStacks.Remove(Item); LegacyPack.Remove(Item);}
     Legacy->HomeModules.RemoveAll([](const FHomeModuleRecord& R){return R.Definition.LoadSynchronous()->Kind==EHomeModuleKind::Storage;});
-    Legacy->HomeModules[0].StoredItems.Add(EFrontierItem::Crystal,999); // Future field ignored for actual old-format structure.
+    Legacy->HomeModules[0].StoredItems.Add(EFrontierItem::Crystal,999); // 真实旧格式结构忽略后来新增的字段。
     bool Migration=UGameplayStatics::SaveGameToSlot(Legacy,TEXT("StorageLegacy20"),0) && Hero->LoadProgress(TEXT("StorageLegacy20")) &&
         !Find(World,EHomeModuleKind::Storage) && Hero->Inventory->GetStacks().OrderIndependentCompareEqual(LegacyPack) &&
         Hero->LoadProgress(TEXT("StorageLegacy20")) && !Find(World,EHomeModuleKind::Storage) && Hero->Inventory->GetStacks().OrderIndependentCompareEqual(LegacyPack);

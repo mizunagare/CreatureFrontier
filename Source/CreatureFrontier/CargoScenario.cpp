@@ -118,7 +118,7 @@ bool Faults(UWorld* World,ACFPlayerCharacter* Hero)
     Pass &= !Box(World) && Pet && Pet->Cargo->Count()==3 && !Pet->Cargo->HasOrder() && !Pet->GetFieldResource() && Pet->Activity==ECreatureActivity::Follow && Hero->Inventory->Count(EFrontierItem::Material)==999;
     if(!Check(TEXT("crate_removed"))) return false;
     Pass &= Hero->LoadProgress(Slot) && Mid(World,Hero);
-    auto* Node=Source(World); Node->Destroy(); // External fault injection: its remaining one unit is not counted as harvested.
+    auto* Node=Source(World); Node->Destroy(); // 外部故障注入：残留的一份资源不能计为已采集。
     Pass &= Hero->SaveProgress(TEXT("CargoSourceGone")) && Hero->LoadProgress(TEXT("CargoSourceGone")); Pet=Worker(World,Hero);
     Pass &= !Source(World) && Pet && Pet->Cargo->Count()==3 && !Pet->Cargo->HasOrder() && !Pet->GetFieldResource();
     if(!Check(TEXT("source_removed"))) return false;
@@ -128,7 +128,7 @@ bool Faults(UWorld* World,ACFPlayerCharacter* Hero)
     if(!Grove) return false;
     Grove->Tick(0); auto* Resident=Grove->GetResident();
     if(!Resident) return false;
-    Resident->Tame(Hero->GetController()); Resident->CargoInventory->Restore({{EFrontierItem::Material,1}}); // Isolated retention fixture, not harvested yield.
+    Resident->Tame(Hero->GetController()); Resident->CargoInventory->Restore({{EFrontierItem::Material,1}}); // 独立的货物保留夹具，不是采集产出。
     const FGuid ResidentId=Resident->PersistentId;
     UGameplayStatics::ApplyDamage(Resident,1000,nullptr,Hero,nullptr); Grove->Tick(60);
     Pass &= IsValid(Resident) && !Resident->IsActorBeingDestroyed() && Resident->Disposition==ECreatureDisposition::Tamed && Resident->Health==0 && Resident->Cargo->Count()==1 && Grove->GetResident()!=Resident && Grove->GetResident()!=nullptr;
@@ -215,9 +215,9 @@ struct FRun : TSharedFromThis<FRun>
         }
         if(Phase==4)
         {
-            if(Now-PhaseAt<.3) return; // Flush the distinct delivered frame before snapshot rewind fault cases.
+            if(Now-PhaseAt<.3) return; // 快照回退故障检查前，先输出独立的交付完成帧。
             if(Mode==2 || Mode==3 || Mode==4) { Finish(Loaded && Paused && Delivered,TEXT("restored batch checks")); return; }
-            Phase=5; return; // The normal case must actually return and harvest the last partial batch.
+            Phase=5; return; // 正常情况必须实际返程并采集最后不足一批的资源。
         }
         if(Phase==5)
         {

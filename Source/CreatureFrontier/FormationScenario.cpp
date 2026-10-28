@@ -32,8 +32,8 @@ void RunFormationScenario(UWorld* World,ACFPlayerCharacter* Hero)
     {
         const FTransform Transform(FVector(300,100+Index*120,40));
         FActorSpawnParameters Spawn; Spawn.bDeferConstruction=true; Spawn.SpawnCollisionHandlingOverride=ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-        // Keep construction/tick order Leaf, Ember, Stone. Permute roster roles through names,
-        // matching the cooked build's reverse-generated names rather than swapping definitions.
+        // 保持 Leaf、Ember、Stone 的构造和更新顺序，通过名称置换队伍角色，
+        // 对应烘焙构建反向生成的名称，不交换物种定义。
         const int32 Rank=(Reverse?(Lead-Index%3+3):(Index%3-Lead+3))%3;
         if(ExplicitLead) Spawn.Name=FName(*FString::Printf(TEXT("FormationFixture_%02d"),(Index/3)*3+Rank));
         auto* Pet=World->SpawnActor<ACreatureCharacter>(ACreatureCharacter::StaticClass(),Transform,Spawn);
@@ -77,8 +77,8 @@ void RunFormationScenario(UWorld* World,ACFPlayerCharacter* Hero)
     auto Trial=MakeShared<FTrial>(); Trial->Started=World->GetTimeSeconds(); auto Poll=MakeShared<FTimerHandle>();
     World->GetTimerManager().SetTimer(*Poll,[World,Hero,Pets,Center,Layout,PathValid,Materials,Trial,Poll]()
     {
-        // Clearing this delegate destroys its captures. Keep the handle on the stack,
-        // and never access captures after the final ClearTimer call.
+        // 清除委托会销毁其捕获变量，因此在栈上保留句柄，
+        // 最后调用 ClearTimer 后不再访问捕获变量。
         FTimerHandle ActivePoll=*Poll;
         if(Center && Trial->Phase==0) Trial->Detour=FMath::Max(Trial->Detour,FMath::Abs(static_cast<float>(Center->GetActorLocation().Y)-500));
         bool Arrived=true;

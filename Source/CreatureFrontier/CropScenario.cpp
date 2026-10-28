@@ -115,7 +115,7 @@ void RunCropScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
         Site->AdjustFoodStock(-1);Pet->Tick(.1f);Pass &= Site->StoredFood==30 && !Site->Crop->bPlanted && Pet->Experience==3;
         Pass &= Hero->LoadProgress(TEXT("CropCross"));Site=Garden(World);
         UE_LOG(LogTemp,Display,TEXT("CF_CROP_STAGE ripe pass=%d"),Pass);
-        Hero->SetActorLocation(Site->GetActorLocation()+FVector(-250,0,55)); // Clear the farmer's body; keep the real visibility gate.
+        Hero->SetActorLocation(Site->GetActorLocation()+FVector(-250,0,55)); // 避开耕作伙伴身体，保留真实视线门槛。
         Hero->FirstPersonCamera->SetWorldRotation((Site->GetActorLocation()-Hero->FirstPersonCamera->GetComponentLocation()).Rotation());
         Hero->Inventory->Restore({{EFrontierItem::Seeds,999}});Hero->WithdrawGardenSeed();Pass &= Site->Crop->Seeds==1;
         Hero->Inventory->Consume(EFrontierItem::Seeds,1);Hero->WithdrawGardenSeed();Pass &= Site->Crop->Seeds==0 && Hero->Inventory->Count(EFrontierItem::Seeds)==999;

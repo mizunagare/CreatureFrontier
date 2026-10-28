@@ -48,12 +48,12 @@ void RunFarmingScenario(UWorld* World, ACFPlayerCharacter* Hero)
     int32 Plants = 0;
     for (auto* Piece : Pieces) if (Piece->GetName().StartsWith(TEXT("FarmPlant")) && Piece->IsVisible()) ++Plants;
     Build &= Plants == 0 && !Garden->Crop->bPlanted && Garden->Crop->Seeds==0;
-    Garden->Crop->Seeds=12; // Explicit seed fixture; production must consume these.
+    Garden->Crop->Seeds=12; // 显式种子夹具；生产必须消耗这些种子。
     const FTransform Transform(FRotator::ZeroRotator,FVector(0,-900,40));
     auto* Pet = World->SpawnActorDeferred<ACreatureCharacter>(ACreatureCharacter::StaticClass(),Transform,nullptr,nullptr,ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
     Pet->Definition = Definition; Pet->FinishSpawning(Transform); Pet->Tame(Hero->GetController());
     Pet->GetCharacterMovement()->DisableMovement(); Pet->SetActorTickEnabled(false);
-    bool Reject = !Hero->FeedCompanion(Pet); // Full satiety.
+    bool Reject = !Hero->FeedCompanion(Pet); // 饱食度已满。
     Pet->Nutrition = 30; Pet->SetActorLocation(FVector(-1500,-1000,40));
     Reject &= !Hero->FeedCompanion(Pet); Pet->SetActorLocation(Transform.GetLocation());
     auto* Wall = World->SpawnActor<AStaticMeshActor>(FVector(-170,-975,75),FRotator::ZeroRotator);
@@ -71,7 +71,7 @@ void RunFarmingScenario(UWorld* World, ACFPlayerCharacter* Hero)
     Pet->Tick(3.4f); const bool Slower = Garden->StoredFood==1;
     Pet->Tick(3.4f);
     const bool Hungry = Slower && Garden->StoredFood==2 && Hero->Inventory->Count(EFrontierItem::Food)==2;
-    // Switching jobs cannot turn accumulated garden progress into gathered materials.
+    // 切换工作不得把已累积的农圃进度转换成采集材料。
     auto* Other = World->SpawnActor<AWorkStation>(FVector(0,-1050,-15),FRotator::ZeroRotator);
     Pet->Nutrition = 100; Pet->Stamina = 100;
     Pet->Tick(1);

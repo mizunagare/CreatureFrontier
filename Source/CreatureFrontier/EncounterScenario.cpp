@@ -28,7 +28,7 @@ void RunEncounterScenario(UWorld* World, ACFPlayerCharacter* Hero)
     Site->Tick(20);
     const bool Safe = !Site->GetResident() && IsValid(First);
     Hero->SetActorLocation(FVector(-1500,-1500,40));
-    // The captured companion also has to leave the spawn capsule.
+    // 被捕捉的伙伴也必须离开出生点胶囊体。
     First->SetActorLocation(FVector(-1300,-1500,40));
     Site->Tick(0);
     auto* Second = Site->GetResident();

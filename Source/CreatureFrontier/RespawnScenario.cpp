@@ -68,7 +68,7 @@ void RunRespawnScenario(UWorld* World,ACFPlayerCharacter* Hero)
     bool Respawn=Hero->RespawnAtBase() && Hero->Health==100 && Hero->GetCharacterMovement()->MovementMode==MOVE_Walking && FVector::Dist2D(Hero->GetActorLocation(),Enemy->GetActorLocation())>=800 && FVector::Dist2D(Hero->GetActorLocation(),UBaseBuildingComponent::BaseOrigin())<=1201;
     bool Preserved=SameBag() && Hero->GetObjectives().Claimed==Claimed && Hero->GetJournal().Num()==JournalCount && Worker->Health==60 && Worker->Stamina==40 && Worker->Nutrition==60 && Worker->Activity==ECreatureActivity::Work && Worker->WorkSite==Gather && Resting->bResumeWorkAfterRest && Resting->WorkSite==Mine && Resting->Activity==ECreatureActivity::Rest && Fighter->Health==50 && Fighter->Stamina==80 && Downed->Health==0 && Trough->StoredFood==7 && Loot->Materials==7 && Enemy->Health==90;
     CenterBlock->Destroy(); Enemy->SetActorLocation(FVector(1100,0,40)); Enemy->Tick(0);
-    Preserved &= Enemy->GetDistanceTo(Hero)>650 && Enemy->GetDistanceTo(Hero)<2000 && Enemy->Activity==ECreatureActivity::Idle; // Retaliation must not pull a far enemy back to the base.
+    Preserved &= Enemy->GetDistanceTo(Hero)>650 && Enemy->GetDistanceTo(Hero)<2000 && Enemy->Activity==ECreatureActivity::Idle; // 反击不得将远处敌人拉回基地。
     bool Shield=Hero->GetRespawnProtectionRemaining()>0 && UGameplayStatics::ApplyDamage(Hero,10,nullptr,Enemy,nullptr)==0 && Hero->Health==100;
     const FVector SafePosition=Hero->GetActorLocation(); Shield &= !Hero->RespawnAtBase() && Hero->GetActorLocation().Equals(SafePosition);
     if(FParse::Param(FCommandLine::Get(),TEXT("CFRespawnPreview")))

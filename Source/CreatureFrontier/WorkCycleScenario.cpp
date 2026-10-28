@@ -24,7 +24,7 @@ void RunWorkCycleScenario(UWorld* World, ACFPlayerCharacter* Hero)
     auto At = [](float X) { return FTransform(FRotator::ZeroRotator,FVector(X,-700,-15),FVector(2,1,.7)); };
     Hero->Building->Selected = EWorkSpecialty::Farming;
     auto* Garden = Hero->Building->BuildAt(At(0));
-    if(Garden) Garden->Crop->Seeds=10; // Recovery resumes existing seeded agriculture, not free production.
+    if(Garden) Garden->Crop->Seeds=10; // 恢复已有种子的农业工作，而非免费生产。
     if (!Garden) { FPlatformMisc::RequestExitWithStatus(false,1); return; }
     const FGuid Id = Garden->PersistentId;
     const FTransform Transform(FRotator::ZeroRotator,FVector(0,-900,40));
@@ -64,7 +64,7 @@ void RunWorkCycleScenario(UWorld* World, ACFPlayerCharacter* Hero)
     for (TActorIterator<ACreatureCharacter> It(World); It; ++It) if (It->Tamer == Hero->GetController()) Pet = *It;
     Saved &= Pet && Pet->bResumeWorkAfterRest && Pet->WorkSite && Pet->WorkSite->PersistentId == Id && Pet->Activity == ECreatureActivity::Rest;
     if (!Pet) { FPlatformMisc::RequestExitWithStatus(false,1); return; }
-    // Actual game ticking must recover, resume, and produce after loading a paused job.
+    // 读回暂停的工作后，必须通过真实游戏更新完成恢复、续工与生产。
     Pet->GetCharacterMovement()->DisableMovement();
     FTimerHandle Complete;
     World->GetTimerManager().SetTimer(Complete,[World,Hero,Pet,Slot,Hunger,Manual,Downed,Removed,Exhausted,Saved]()

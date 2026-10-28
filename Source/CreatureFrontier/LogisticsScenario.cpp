@@ -108,7 +108,7 @@ void RunLogisticsScenario(UWorld* World,ACFPlayerCharacter* Hero)
     auto Build=[&](EWorkSpecialty Kind,int32 X,int32 Y) { Hero->Building->Selected=Kind; return Hero->Building->BuildAt(FTransform(FRotator::ZeroRotator,FVector(X,Y,-15),FVector(2,1,.7))); };
     auto* Garden=Build(EWorkSpecialty::Farming,0,-700); auto* Trough=Build(EWorkSpecialty::Feeding,0,-1100); auto* Post=Build(EWorkSpecialty::Transport,-300,-700);
     if(!Garden || !Trough || !Post) { UE_LOG(LogTemp,Error,TEXT("CF_LOGISTICS FAIL building %s"),*Hero->Feedback); FPlatformMisc::RequestExitWithStatus(false,1); return; }
-    Garden->Crop->Seeds=3; // Exactly three input seeds for the production/transport fixture.
+    Garden->Crop->Seeds=3; // 生产与运输夹具只投入三颗种子。
     auto Make=[&](FVector Position)
     {
         const FTransform Transform(Position); auto* Pet=World->SpawnActorDeferred<ACreatureCharacter>(ACreatureCharacter::StaticClass(),Transform,nullptr,nullptr,ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
@@ -131,7 +131,7 @@ void RunLogisticsScenario(UWorld* World,ACFPlayerCharacter* Hero)
         {
             UE_LOG(LogTemp,Display,TEXT("CF_LOGISTICS_ROUTE farmer=%s courier=%s farm=%d trough=%d cargo=%d satiety=%.1f"),*Farmer->GetActorLocation().ToString(),*Courier->GetActorLocation().ToString(),Garden->StoredFood,Trough->StoredFood,Courier->CarriedFood,Farmer->Nutrition);
             FinishLogisticsChecks(World,Hero,Garden,Trough,Post,Courier,Farmer,Production,*Trip,Ate);
-            // Last capture access: clearing a repeating timer destroys its running delegate.
+            // 最后一次访问捕获变量：清除循环定时器会销毁正在执行的委托。
             World->GetTimerManager().ClearTimer(*Poll);
         }
     },.2f,true);

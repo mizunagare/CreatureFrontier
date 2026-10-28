@@ -91,7 +91,7 @@ FGuid HomeLayout::FindFloor(const FVector& Point,const TArray<FHomeModuleRecord>
 }
 bool HomeLayout::SupportsFacility(const FTransform& Facility,const TArray<FHomeModuleRecord>& Records)
 {
-    if(FMath::Abs(Facility.GetLocation().Z+15)<=2) return true; // Preserve the original facility transform tolerance.
+    if(FMath::Abs(Facility.GetLocation().Z+15)<=2) return true; // 保留原有设施变换容差。
     if(!FMath::IsNearlyEqual(Facility.GetLocation().Z,5.,.01)) return false;
     for(double X:{-95.,95.}) for(double Y:{-45.,45.})
         if(!FindFloor(Facility.GetLocation()+Facility.GetRotation().RotateVector(FVector(X,Y,0)),Records).IsValid()) return false;

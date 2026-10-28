@@ -85,7 +85,7 @@ bool CheckSnapshot(UWorld* World,ACFPlayerCharacter* Hero,const FString& Slot)
 bool FinishProgress(UWorld* World,ACFPlayerCharacter* Hero,FGuid FloorId)
 {
     bool Pass=Hero->Research->Has(EFrontierResearch::CrystalSample) && !Hero->Research->Has(EFrontierResearch::CrystalStudy);
-    // The trip back was physically driven above; use a nearby clear bench position for transactions.
+    // 上文已经实际行走返程；事务检查使用附近无遮挡的工作台位置。
     Hero->SetActorLocation(FVector(-450,0,40)); Hero->GetCharacterMovement()->DisableMovement();
     auto Before=Hero->Inventory->GetStacks();
     Pass &= Hero->CraftRecipe(TEXT("StudyCrystal")) && Hero->Research->Has(EFrontierResearch::CrystalStudy) &&
@@ -197,7 +197,7 @@ void RunExpeditionScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
                 UE_LOG(LogTemp,Display,TEXT("CF_EXPEDITION_WRITE %s"),Written?TEXT("PASS"):TEXT("FAIL")); FTimerHandle Active=*Poll;
                 FPlatformMisc::RequestExitWithStatus(false,Written?0:1); World->GetTimerManager().ClearTimer(Active); return;
             }
-            // Snapshot loading replaces creatures; never retain old actor pointers beyond this point.
+            // 读取快照会替换生物；此后绝不能继续持有旧实体指针。
             Hero->GetCharacterMovement()->DisableMovement(); Hero->SetActorLocation(FVector(-450,-250,40));
             for(TActorIterator<ACreatureCharacter> It(World);It;++It) if(It->Tamer==Hero->GetController()) { It->SetActivity(ECreatureActivity::Rest); Target=*It; break; }
             Hero->CaptureComponent->ToggleDevice(); Hero->CaptureComponent->TryCapture(Target);

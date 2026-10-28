@@ -412,7 +412,7 @@ void ACFGameMode::BeginPlay()
                     UE_LOG(LogTemp, Display, TEXT("CF_NAV_WORK %s materials=%d"), bWorked ? TEXT("PASS") : TEXT("FAIL"), Hero->Inventory->Count(EFrontierItem::Material));
                     FPlatformMisc::RequestExitWithStatus(false, bWorked ? 0 : 8);
                 }, 12.0f, false);
-                // Clear only after the final capture access: clearing destroys this delegate.
+                // 最后一次访问捕获变量后才能清除，因为清除会销毁当前委托。
                 GetWorldTimerManager().ClearTimer(*Poll);
             }, 0.1f, true);
             return;

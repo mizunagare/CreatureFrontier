@@ -40,7 +40,7 @@ void RunMaterialsScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
     {
         for(TActorIterator<ACreatureCharacter> It(World);It;++It) It->Destroy();
         Hero->GetCharacterMovement()->DisableMovement();
-        Hero->Inventory->Restore({{EFrontierItem::Material,2}}); // Known processing-cost fixture, not resource yield.
+        Hero->Inventory->Restore({{EFrontierItem::Material,2}}); // 明确的加工成本夹具，不是资源产出。
         auto* Catalog=UCraftingCatalog::Load(); Pass=Catalog && Catalog->Validate() && Catalog->Items.Num()==10 && Catalog->Recipes.Num()==11;
         for(uint32 Id=8;Id<=10;++Id)
         {

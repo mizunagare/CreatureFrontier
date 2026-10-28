@@ -18,8 +18,8 @@ bool UInventoryComponent::TransferTo(UInventoryComponent* Destination,const TMap
         SourceAfter.FindOrAdd(Entry.Key)-=Entry.Value;
         DestinationAfter.FindOrAdd(Entry.Key)+=Entry.Value;
     }
-    // Both copies are validated before either live container changes. No callbacks
-    // or fallible operation between commits on the authoritative game thread.
+    // 修改任一实际容器前先校验两个副本；在权威游戏线程上连续提交，
+    // 两次提交之间不调用回调，也不执行可能失败的操作。
     Stacks=MoveTemp(SourceAfter); Destination->Stacks=MoveTemp(DestinationAfter); return true;
 }
 

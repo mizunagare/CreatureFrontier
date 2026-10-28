@@ -95,7 +95,7 @@ void RunMeleeScenario(UWorld* World,ACFPlayerCharacter* Hero)
                 const bool Pass=Trial->Timing && Trial->Range && Trial->Cover && Trial->Friendly && Trial->Tracking && Trial->Cancel && Trial->Snapshot && Trial->Death && Trial->Bare && Target->Health==340;
                 UE_LOG(LogTemp,Display,TEXT("CF_MELEE %s timing=%d range=%d cover=%d friendly=%d tracking=%d cancel=%d snapshot=%d death=%d bare=%d"),Pass?TEXT("PASS"):TEXT("FAIL"),Trial->Timing,Trial->Range,Trial->Cover,Trial->Friendly,Trial->Tracking,Trial->Cancel,Trial->Snapshot,Trial->Death,Trial->Bare);
                 FPlatformMisc::RequestExitWithStatus(false,Pass?0:1);
-                // Clearing a repeating timer destroys its captures: no capture access after this line.
+                // 清除循环定时器会销毁捕获变量：此行之后不再访问。
                 World->GetTimerManager().ClearTimer(*Timer); break;
             }
         }
