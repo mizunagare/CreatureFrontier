@@ -1,6 +1,7 @@
-param([switch]$Editor,[string]$BuildRoot='',[string]$EngineRoot='D:\Epic\UE_5.8',[switch]$Preview,[string]$Resolution='1280x720',[switch]$Interactions,[switch]$Skills,[switch]$RotatedNavigation,[switch]$Replacement)
+param([switch]$Editor,[string]$BuildRoot='',[string]$EngineRoot='D:\Epic\UE_5.8',[switch]$Preview,[string]$Resolution='1280x720',[switch]$Interactions,[switch]$Skills,[switch]$RotatedNavigation,[switch]$Replacement,[switch]$ReplacementRotated)
 $ErrorActionPreference='Stop'
 if(($Editor -and $BuildRoot) -or (!$Editor -and !$BuildRoot)){throw '请只指定Editor或BuildRoot之一'}
+if($ReplacementRotated -and !$Replacement){throw '旋转替换必须显式选择Replacement冷启动模式'}
 if($Replacement -and ($Preview -or $Interactions -or $Skills -or $RotatedNavigation)){throw '原位替换冷启动模式不能与其他专项开关组合'}
 if($Resolution -notmatch '^(960x540|1280x720|1920x1080)$'){throw '窗墙预览仅支持960x540、1280x720或1920x1080'}
 $projectRoot=Split-Path $PSScriptRoot -Parent
@@ -39,7 +40,9 @@ try {
     if($Replacement){$cases=@(
         @{Name='Write';Flag='CFWindowTest';Arguments=@('-CFHomeReplaceTest','-CFHomeReplaceInput','-CFHomeReplaceWrite');Marker='CF_HOME_REPLACE PASS support=1';RequiredMarkers=@('CF_HOME_REPLACE_WRITE PASS')},
         @{Name='Read1';Flag='CFWindowTest';Arguments=@('-CFHomeReplaceRead');Marker='CF_HOME_REPLACE_READ PASS loads=2 windows=1 roofs=1'},
-        @{Name='Read2';Flag='CFWindowTest';Arguments=@('-CFHomeReplaceRead');Marker='CF_HOME_REPLACE_READ PASS loads=2 windows=1 roofs=1'})}
+        @{Name='Read2';Flag='CFWindowTest';Arguments=@('-CFHomeReplaceRead');Marker='CF_HOME_REPLACE_READ PASS loads=2 windows=1 roofs=1'})
+        if($ReplacementRotated){$cases[0].Arguments+=@('-CFHomeReplaceRotated');$cases[0].Marker='CF_HOME_REPLACE PASS support=1 yaw=90'}
+    }
     foreach($case in $cases){
         $log=Join-Path $run ($case.Name+'.log')
         $arguments=@('-game','-nullrhi','-nosound','-unattended','-nop4','-CFHomeTest',('-'+$case.Flag),('-abslog="'+$log+'"'))
@@ -71,7 +74,7 @@ try {
         }
         $current=(Get-FileHash -LiteralPath (Join-Path $saveRoot ($slot+'.sav'))).Hash
         if($case.Name -eq 'Write'){$inputHash=$current}elseif($current -ne $inputHash){throw '窗墙读取改写了输入文件'}
-        $results += [pscustomobject]@{Case=$case.Name;Pass=$true;Replacement=[bool]$Replacement;Preview=[bool]$Preview;Interactions=[bool]$Interactions;Skills=[bool]$Skills;RotatedNavigation=[bool]$RotatedNavigation;Resolution=$Resolution;BuildSHA256=$hash;InputSHA256=$inputHash;Log=$log}
+        $results += [pscustomobject]@{Case=$case.Name;Pass=$true;Replacement=[bool]$Replacement;ReplacementRotated=[bool]$ReplacementRotated;Preview=[bool]$Preview;Interactions=[bool]$Interactions;Skills=[bool]$Skills;RotatedNavigation=[bool]$RotatedNavigation;Resolution=$Resolution;BuildSHA256=$hash;InputSHA256=$inputHash;Log=$log}
         $results | Export-Csv -LiteralPath (Join-Path $run 'Results.csv') -NoTypeInformation
         Write-Host "$($case.Name) 通过"
     }
