@@ -1,5 +1,5 @@
 param([Parameter(Mandatory=$true)][string]$BuildRoot,
-      [string[]]$Resolutions=@('960x540','1280x720','1920x1080'))
+      [string[]]$Resolutions=@('960x540','1280x720','1920x1080'),[switch]$Rescue)
 $ErrorActionPreference='Stop'
 $projectRoot=Split-Path $PSScriptRoot -Parent
 $exe=Join-Path $BuildRoot 'CreatureFrontier\Binaries\Win64\CreatureFrontier.exe'
@@ -9,6 +9,7 @@ $evidence=Join-Path $projectRoot ('Saved\HUDRenderQA\'+(Get-Date -Format 'yyyyMM
 New-Item -ItemType Directory -Path $evidence | Out-Null
 Write-Host "HUD evidence: $evidence"
 $scenes=@('Companion','Roster','RosterDanger','HelpDanger','Resource','Garden','Building','Downed')
+if($Rescue){$scenes+=@('CompanionDownedNoMedicine','CompanionDownedMedicine')}
 $results=@()
 foreach($resolution in $Resolutions){
     if($resolution -notmatch '^(\d{3,4})x(\d{3,4})$'){throw 'Use WIDTHxHEIGHT resolution values'}
@@ -16,10 +17,11 @@ foreach($resolution in $Resolutions){
     if($width -lt 640 -or $width -gt 4096 -or $height -lt 360 -or $height -gt 2160){throw 'Resolution outside test safety bounds'}
     $log=Join-Path $evidence ($resolution+'.log')
     $previewArguments=@('-CFHUDPreview','-RenderOffscreen','-ForceRes',('-ResX='+$width),('-ResY='+$height),'-nosound','-unattended','-nop4','-norhithread','-forcerhibypass','-ExecCmds="t.MaxFPS 60,r.MotionBlurQuality 0,r.DefaultFeature.MotionBlur 0,r.AntiAliasingMethod 1"',('-abslog="'+$log+'"'))
+    if($Rescue){$previewArguments+='-CFHUDRescuePreview'}
     $process=Start-Process -FilePath $exe -WorkingDirectory $BuildRoot -ArgumentList $previewArguments -WindowStyle Hidden -PassThru
     if(!$process.WaitForExit(60000)){$process.Kill();$process.WaitForExit();throw "HUD preview timeout: $log"}
     $contents=Get-Content -LiteralPath $log -Raw
-    if($process.ExitCode -ne 0 -or $contents -notmatch 'CF_HUD_PREVIEW PASS scenes=8' -or $contents -match 'CF_HUD.*FAIL|Fatal error|Assertion failed'){throw "HUD behavior failed: $log"}
+    if($process.ExitCode -ne 0 -or $contents -notmatch ('CF_HUD_PREVIEW PASS scenes='+$scenes.Count+'\b') -or $contents -match 'CF_HUD.*FAIL|Fatal error|Assertion failed'){throw "HUD behavior failed: $log"}
     foreach($scene in $scenes){if($contents -notmatch ('CF_HUD_FRAME PASS scene='+$scene+' viewport='+$resolution+' ')){throw "Missing actual $resolution frame: $scene"}}
     $rootMatch=[regex]::Match($contents,'CF_HUD_PREVIEW_ROOT [^\r\n]*[/\\]([A-F0-9]{32})')
     if(!$rootMatch.Success){throw 'Fresh screenshot directory not recorded'}
@@ -36,8 +38,8 @@ foreach($resolution in $Resolutions){
         Copy-Item -LiteralPath $source -Destination (Join-Path $evidence ($resolution+'-'+$scene+'.png'))
     }
     if((Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash -ne $buildHash){throw 'Executable changed during HUD checks'}
-    $results += [pscustomobject]@{Resolution=$resolution;Scenes=8;Pass=$true;BuildSHA256=$buildHash;Log=$log}
+    $results += [pscustomobject]@{Resolution=$resolution;Scenes=$scenes.Count;Pass=$true;BuildSHA256=$buildHash;Log=$log}
     $results | Export-Csv -LiteralPath (Join-Path $evidence 'Results.csv') -NoTypeInformation
-    Write-Host "$resolution : eight rendered scenes PASS; PNG sizes verified"
+    Write-Host "$resolution : $($scenes.Count)个渲染场景通过，PNG尺寸已验证"
 }
 Write-Host "HUD run completed. Inspect every screenshot: $evidence"

@@ -60,6 +60,16 @@ void ACFHUD::DrawWorldHUD(ACFPlayerCharacter* Player)
         const FString Identity=Creature->Nickname.IsEmpty()?Creature->GetCreatureName():Creature->GetCreatureName()+TEXT(" / ")+Creature->GetSpeciesName();
         Rows.Add({Identity,Blue,2});Rows.Add({FString::Printf(TEXT("%s 等级%d | 生命 %.0f/%.0f"),Tamed?TEXT("伙伴"):TEXT("野生"),Creature->Level,Creature->Health,Creature->GetMaxHealth())});
         if(Player->Health<=0)Rows.Add({TEXT("倒下时无法交互，请先复活或读档"),Yellow,2});
+        else if(Tamed && Creature->Health<=0)
+        {
+            Rows.Add({TEXT("伙伴已倒下，无法自行返家或执行指令"),Yellow,2});
+            Rows.Add({Player->Inventory->Count(EFrontierItem::Medicine)>0?
+                TEXT("P 使用1份药品救助，恢复40生命"):
+                TEXT("缺少药品：回基地按2制作，再返回救助"),Yellow,2});
+            Rows.Add({TEXT("救起后可按F跟随；R复活不会治疗伙伴"),Blue,2});
+            if(Creature->CarriedFood>0 || Creature->Cargo->Count()>0)
+                Rows.Add({FString::Printf(TEXT("携带食物 %d | 资源 %d | Z 取回（6米）"),Creature->CarriedFood,Creature->Cargo->Count()),Yellow});
+        }
         else if(Tamed)
         {
             const FString Activity=FrontierChinese::Activity(Creature->Activity);

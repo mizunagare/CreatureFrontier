@@ -49,7 +49,8 @@ struct FPreview
 {
     UWorld* World=nullptr;ACFPlayerCharacter* Hero=nullptr;ACFHUD* HUD=nullptr;ACreatureCharacter* Pet=nullptr;ACreatureCharacter* Boss=nullptr;AResourceNode* Resource=nullptr;AWorkStation* Garden=nullptr;
     FString Root;int32 Step=0;bool AwaitShot=false;double Next=0,Deadline=0;uint64 LastFrame=0;TMap<EFrontierItem,int32> Bag;
-    const TCHAR* Name() const {const TCHAR* Names[]={TEXT("Companion"),TEXT("Roster"),TEXT("RosterDanger"),TEXT("HelpDanger"),TEXT("Resource"),TEXT("Garden"),TEXT("Building"),TEXT("Downed")};return Names[Step];}
+    bool Rescue=false;
+    const TCHAR* Name() const {const TCHAR* Names[]={TEXT("Companion"),TEXT("Roster"),TEXT("RosterDanger"),TEXT("HelpDanger"),TEXT("Resource"),TEXT("Garden"),TEXT("Building"),TEXT("Downed"),TEXT("CompanionDownedNoMedicine"),TEXT("CompanionDownedMedicine")};return Names[Step];}
     void Setup()
     {
         if(Hero->IsRosterOpen())Hero->ToggleRoster();if(Hero->IsHelpVisible())Hero->ToggleHelp();if(Hero->Building->IsActive())Hero->ToggleBuilding();Hero->Health=100;
@@ -60,6 +61,8 @@ struct FPreview
         if(Step==5)AimHUD(Hero,Garden,FVector(0,-230,55));
         if(Step==6){Hero->SetActorLocation(FVector(-450,-1000,40));Hero->ToggleBuilding();}
         if(Step==7){AimHUD(Hero,Pet,FVector(0,-200,0));Hero->Health=0;}
+        // 两个新增画面只验证救助信息，不冒充自然战斗或实际用药验收。
+        if(Step>=8){AimHUD(Hero,Pet,FVector(0,-200,0));Pet->Health=0;Hero->Inventory->Restore({{EFrontierItem::Material,100},{EFrontierItem::Food,3},{EFrontierItem::Medicine,Step==9?1:0}});Bag=Hero->Inventory->GetStacks();}
         Next=FPlatformTime::Seconds()+.5;AwaitShot=false;
     }
     bool Tick()
@@ -69,11 +72,11 @@ struct FPreview
         if(AwaitShot)
         {
             if(IFileManager::Get().FileSize(*(Root/(FString(Name())+TEXT(".png"))))<1000)return true;
-            if(++Step==8){UE_LOG(LogTemp,Display,TEXT("CF_HUD_PREVIEW PASS scenes=8"));FPlatformMisc::RequestExitWithStatus(false,0);return false;}
+            if(++Step==(Rescue?10:8)){UE_LOG(LogTemp,Display,TEXT("CF_HUD_PREVIEW PASS scenes=%d"),Rescue?10:8);FPlatformMisc::RequestExitWithStatus(false,0);return false;}
             LastFrame=HUD->GetLayoutAudit().Frame;Setup();return true;
         }
         const auto& A=HUD->GetLayoutAudit();if(A.Frame<=LastFrame)return true;
-        const EFrontierHUDContext Expected=Step==0 || Step==7?EFrontierHUDContext::Companion:Step<=3?EFrontierHUDContext::None:Step==4?EFrontierHUDContext::Resource:Step==5?EFrontierHUDContext::Garden:EFrontierHUDContext::Building;
+        const EFrontierHUDContext Expected=Step==0 || Step>=7?EFrontierHUDContext::Companion:Step<=3?EFrontierHUDContext::None:Step==4?EFrontierHUDContext::Resource:Step==5?EFrontierHUDContext::Garden:EFrontierHUDContext::Building;
         bool SameBag=true;for(int32 Item=0;Item<static_cast<int32>(EFrontierItem::Count);++Item)SameBag &= Hero->Inventory->Count(static_cast<EFrontierItem>(Item))==Bag.FindRef(static_cast<EFrontierItem>(Item));
         const bool RosterValid=(Step==1 || Step==2)?A.RosterRows>0 && A.RosterRows<8:A.RosterRows==0;
         const bool Pass=A.bFits && A.bNoOverlap && A.bCenterClear && A.Context==Expected && A.bInterface==(Step>=1 && Step<=3) && A.bAlert==(Step==2 || Step==3 || Step==7) && A.TextLines>0 && RosterValid && SameBag && Pet->BondPoints==0 && Pet->Experience==0 && Pet->Stamina==35 && Pet->Nutrition==40 && Pet->Memory->GetMemory()==ECrystalJourneyMemory::QuietThanks;
@@ -90,6 +93,7 @@ void RunHUDScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Preview)
     auto* PC=Cast<APlayerController>(Hero->GetController());auto* HUD=PC?Cast<ACFHUD>(PC->GetHUD()):nullptr;UCreatureDefinition* Leaf=nullptr;UCreatureDefinition* Stone=nullptr;
     for(TActorIterator<ACreatureCharacter> It(World);It;++It){if(It->Definition && It->Definition->Form==ECreatureForm::Leaf)Leaf=It->Definition;if(It->Definition && It->Definition->Form==ECreatureForm::Stone)Stone=It->Definition;It->Destroy();}
     auto State=MakeShared<CFHUDQA::FPreview>();State->World=World;State->Hero=Hero;State->HUD=HUD;
+    State->Rescue=FParse::Param(FCommandLine::Get(),TEXT("CFHUDRescuePreview"));
     for(TActorIterator<AResourceNode> It(World);It;++It)if(It->PersistentId==FGuid(0xCF170000,0,0,1))State->Resource=*It;
     if(!HUD || !Leaf || !Stone || !State->Resource){UE_LOG(LogTemp,Error,TEXT("CF_HUD_PREVIEW FAIL fixture"));FPlatformMisc::RequestExitWithStatus(false,1);return;}
     Hero->GetCharacterMovement()->DisableMovement();Hero->SetActorLocation(FVector(-450,0,90));Hero->Inventory->Restore({{EFrontierItem::Material,100},{EFrontierItem::Food,3}});
