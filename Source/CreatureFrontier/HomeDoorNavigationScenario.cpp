@@ -34,9 +34,8 @@ bool Toggle(ACFPlayerCharacter* Hero,AHomeModule* Door,float Yaw)
 void Facing(ACFPlayerCharacter* Hero,float Yaw)
 {Hero->GetController()->SetControlRotation(FRotator(0,Yaw,0));Hero->FirstPersonCamera->SetWorldRotation(FRotator(0,Yaw,0));}
 }
-void RunHomeDoorNavigationScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Rotated)
+AHomeModule* CFDoorNavigationQA::Room(UWorld* World,ACFPlayerCharacter* Hero,float Orientation)
 {
-    const float Orientation=Rotated?90.f:0.f;
     // 隔离门与导航，不把固定房间夹具宣称为自然冒险或群体导航验收。
     for(TActorIterator<AWildEncounter> It(World);It;++It)It->SetActorTickEnabled(false);
     for(TActorIterator<ACreatureCharacter> It(World);It;++It){It->SetActorTickEnabled(false);It->GetCharacterMovement()->DisableMovement();}
@@ -50,8 +49,14 @@ void RunHomeDoorNavigationScenario(UWorld* World,ACFPlayerCharacter* Hero,bool R
         Build(EHomeModuleKind::Wall,FVector(-200,-800,-30),Floor->PersistentId,90) &&
         Build(EHomeModuleKind::Wall,FVector(-400,-600,-30),Floor->PersistentId) &&
         Build(EHomeModuleKind::Roof,FVector(-400,-800,280),Floor->PersistentId);
+    return Room?Door:nullptr;
+}
+void RunHomeDoorNavigationScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Rotated)
+{
+    const float Orientation=Rotated?90.f:0.f;
+    auto* Door=CFDoorNavigationQA::Room(World,Hero,Orientation);
     auto* Definition=LoadObject<UCreatureDefinition>(nullptr,TEXT("/Game/Creatures/DA_Mosskip.DA_Mosskip"));
-    if(!Room || !Definition){UE_LOG(LogTemp,Error,TEXT("CF_DOOR_NAV FAIL fixture %s"),*Hero->Feedback);FPlatformMisc::RequestExitWithStatus(false,1);return;}
+    if(!Door || !Definition){UE_LOG(LogTemp,Error,TEXT("CF_DOOR_NAV FAIL fixture %s"),*Hero->Feedback);FPlatformMisc::RequestExitWithStatus(false,1);return;}
     const auto Poll=MakeShared<FTimerHandle>();
     World->GetTimerManager().SetTimer(*Poll,[World,Hero,Door,Definition,Poll,Orientation,Phase=0,At=World->GetTimeSeconds(),Pet=static_cast<ACreatureCharacter*>(nullptr),
         Previous=FVector::ZeroVector,Travel=0.,ClosedMaxY=-DBL_MAX,Closed=false,Opened=false,Entered=false,Occupied=false,Exited=false,Continuous=true]() mutable

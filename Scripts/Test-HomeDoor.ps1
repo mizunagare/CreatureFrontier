@@ -29,7 +29,7 @@ try{
             $backups+=@{Path=$path;Backup=$backup;Hash=(Get-FileHash -LiteralPath $path).Hash}
         }
     }
-    foreach($case in @(@('CFDoorTest','CF_DOOR PASS'),@('CFDoorOpenRead','CF_DOOR_OPEN_READ PASS'),@('CFDoorClosedRead','CF_DOOR_CLOSED_READ PASS'),@('CFDoorNavigationTest','CF_DOOR_NAV PASS yaw=0'),@('CFDoorNavigationRotatedTest','CF_DOOR_NAV PASS yaw=90'))){
+    foreach($case in @(@('CFDoorTest','CF_DOOR PASS'),@('CFDoorOpenRead','CF_DOOR_OPEN_READ PASS'),@('CFDoorClosedRead','CF_DOOR_CLOSED_READ PASS'),@('CFDoorNavigationTest','CF_DOOR_NAV PASS yaw=0'),@('CFDoorNavigationRotatedTest','CF_DOOR_NAV PASS yaw=90'),@('CFDoorPlayerTest','CF_DOOR_PLAYER PASS yaw=0'),@('CFDoorPlayerRotatedTest','CF_DOOR_PLAYER PASS yaw=90'))){
     $log=Join-Path $run ($case[0]+'.log')
     $arguments=@('-game',('-'+$case[0]),'-nullrhi','-nosound','-unattended','-nop4',('-abslog="'+$log+'"'))
     $openInput=Join-Path $saveRoot 'DoorOpen.sav';$closedInput=Join-Path $saveRoot 'DoorGood.sav'
@@ -49,7 +49,7 @@ try{
         $path=Join-Path $saveRoot ($slot+'.sav')
         if(Test-Path -LiteralPath $path){Copy-Item -LiteralPath $path -Destination (Join-Path $run ($slot+'.sav'))}
     }
-    Write-Host '实体门五进程专项通过；图形与扩展导航样本另行验收'
+    Write-Host '实体门七进程专项通过；图形与扩展导航样本另行验收'
 }finally{
     try{foreach($entry in $backups){Copy-Item -LiteralPath $entry.Backup -Destination $entry.Path;if((Get-FileHash -LiteralPath $entry.Path).Hash -ne $entry.Hash){throw '原实体门测试槽恢复校验失败'}}}
     finally{$mutex.ReleaseMutex();$mutex.Dispose()}
