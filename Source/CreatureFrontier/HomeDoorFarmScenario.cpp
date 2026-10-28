@@ -10,15 +10,22 @@
 #include "TimerManager.h"
 #include "NavigationSystem.h"
 #include "NavigationPath.h"
+#include "EngineUtils.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 
 void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero)
 {
     // 固定房间只验证单伙伴工作，不替代自由放置、长期运输或自然冒险。
     auto* Door=CFDoorNavigationQA::Room(World,Hero,0);
+    const bool NoRoof=FParse::Param(FCommandLine::Get(),TEXT("CFDoorFarmNoRoof"));
+    int32 RemovedRoofs=0;
+    if(NoRoof)for(TActorIterator<AHomeModule> It(World);It;++It)if(It->GetKind()==EHomeModuleKind::Roof){It->Destroy();++RemovedRoofs;}
+    UE_LOG(LogTemp,Display,TEXT("CF_DOOR_FARM_FIXTURE roof=%d removed=%d"),!NoRoof,RemovedRoofs);
     auto* Definition=LoadObject<UCreatureDefinition>(nullptr,TEXT("/Game/Creatures/DA_Mosskip.DA_Mosskip"));
     auto Finish=[](bool Pass)
     {UE_LOG(LogTemp,Display,TEXT("CF_DOOR_FARM %s"),Pass?TEXT("PASS"):TEXT("FAIL"));FPlatformMisc::RequestExitWithStatus(false,Pass?0:1);};
-    if(!Door || !Definition){Finish(false);return;}
+    if(!Door || !Definition || (NoRoof && RemovedRoofs!=1)){Finish(false);return;}
     const FTransform FarmTransform(FRotator::ZeroRotator,FVector(-400,-700,5),FVector(2,1,.7));
     Hero->Building->Selected=EWorkSpecialty::Farming;
     auto* Farm=Hero->Building->BuildAt(FarmTransform);
