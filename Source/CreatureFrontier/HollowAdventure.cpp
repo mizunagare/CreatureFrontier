@@ -88,6 +88,7 @@ struct FAdventure
     uint64 LastShotAuditFrame=MAX_uint64;
     bool WriteDownedCheckpoint=false,ResumedCheckpoint=false;
     float ObservedHeroHP=-1,ObservedPetHP=-1,ObservedEnemyHP=-1;
+    double NextRouteLog=0;
     bool SameRecoveryBag() const
     {for(int32 I=0;I<static_cast<int32>(EFrontierItem::Count);++I)if(Hero->Inventory->Count(static_cast<EFrontierItem>(I))!=RecoveryBag.FindRef(static_cast<EFrontierItem>(I)))return false;return true;}
     void Shot(const TCHAR* Name)
@@ -115,6 +116,18 @@ struct FAdventure
             ObservedHeroHP=Hero->Health;ObservedPetHP=Pet->Health;ObservedEnemyHP=Enemy->Health;
         }
         const float Step=FVector::Dist(Now,Previous),PetStep=FVector::Dist(PetNow,PreviousPet);Travel+=FVector::Dist2D(Now,Previous);PetTravel+=FVector::Dist2D(PetNow,PreviousPet);Previous=Now;PreviousPet=PetNow;PetSouth=FMath::Min(PetSouth,PetNow.Y);
+        // 卡路时记录真实胶囊前方的阻挡物，先区分洞壁与伙伴碰撞，不改变路线或碰撞规则。
+        if(Mode==3 && RecoveryStage==0 && Step<1 && !Input->Direction.IsNearlyZero() && FPlatformTime::Seconds()>NextRouteLog)
+        {
+            NextRouteLog=FPlatformTime::Seconds()+5;
+            FHitResult Hit;FCollisionQueryParams Query(SCENE_QUERY_STAT(HollowRouteObstacle),false,Hero);
+            const auto* Capsule=Hero->GetCapsuleComponent();
+            const bool Blocked=World->SweepSingleByChannel(Hit,Now,Now+Input->Direction.GetSafeNormal()*100,FQuat::Identity,ECC_Pawn,
+                FCollisionShape::MakeCapsule(Capsule->GetScaledCapsuleRadius(),Capsule->GetScaledCapsuleHalfHeight()),Query);
+            UE_LOG(LogTemp,Display,TEXT("CF_HOLLOW_ROUTE_STALL index=%d hero=%s goal=%s input=%s velocity=%s blocked=%d actor=%s component=%s impact=%s"),
+                Index,*Now.ToString(),Points.IsValidIndex(Index)?*Points[Index].ToString():TEXT("none"),*Input->Direction.ToString(),
+                *Hero->GetVelocity().ToString(),Blocked,*GetNameSafe(Hit.GetActor()),*GetNameSafe(Hit.GetComponent()),*Hit.ImpactPoint.ToString());
+        }
         Incoming |= Mode==3 && RecoveryStage==2?(Hero->Health<SecondHeroHP || Pet->Health<SecondPetHP):(Hero->Health<100 || Pet->Health<Pet->GetMaxHealth());Skill |= Pet->SpecialCooldownRemaining>0 && Pet->Stamina<=80;
         if(!Returning && Now.Y<-2200)Shot(TEXT("Entrance"));
         if(Pet->SpecialWindupRemaining>0)Shot(TEXT("Skill"));
