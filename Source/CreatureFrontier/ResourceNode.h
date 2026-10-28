@@ -31,7 +31,7 @@ private:
     UPROPERTY() TObjectPtr<class UMaterialInstanceDynamic> ResourceMaterial;
 };
 
-// Used only for a new world or migrating snapshots that predate resource history.
+// 仅用于新世界，或迁移尚未记录资源历史的旧快照。
 void SeedFrontierResources(UWorld* World);
 bool SpawnStarterResources(UWorld* World,TArray<AResourceNode*>& OutNodes);
 bool MakeStarterResourceRecords(TArray<struct FResourceSaveRecord>& OutRecords);

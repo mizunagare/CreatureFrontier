@@ -112,7 +112,7 @@ bool HomeLayout::ValidateTerrain(UWorld* World,const FHomeModuleRecord& Record,F
 {
     if(!IsCanonical(Record)) return false;
     FCollisionQueryParams Params(SCENE_QUERY_STAT(HomeTerrain),false);
-    // Snapshot actors can change positions on load; the authored world cannot.
+    // 快照实体可以在读档时改变位置，预设世界则不能改变。
     for(TActorIterator<AActor> It(World);It;++It)
     {
         const auto* Station=Cast<AWorkStation>(*It);

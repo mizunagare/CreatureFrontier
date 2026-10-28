@@ -75,7 +75,7 @@ void ACreatureCharacter::HandlePlayerDowned(const ACFPlayerCharacter* Player)
         if(Health>0 && Activity==ECreatureActivity::Combat) { WorkSite=nullptr; SetActivity(ECreatureActivity::Follow); }
         return;
     }
-    // This prototype has one player: discard retaliation, never heal or relocate wild creatures.
+    // 当前原型只有一名玩家：清除反击意图，但不治疗或移动野生生物。
     RetaliationTarget.Reset(); RetaliationRemaining=0; AlphaWindup=0; ClearCombatOrders(); StopNavigation();
     if(Activity==ECreatureActivity::Combat) { Disposition=ECreatureDisposition::Wild; SetActivity(ECreatureActivity::Idle); }
 }

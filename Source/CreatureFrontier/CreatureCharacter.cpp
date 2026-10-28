@@ -96,7 +96,7 @@ ACreatureCharacter::ACreatureCharacter()
     AlphaWarning = Part(TEXT("AlphaWarning"), CylinderMesh.Object, FVector(0,0,-84), FVector(7.6,7.6,.02));
     AlphaWarning->SetVisibility(false);
     AlphaWarning->SetHiddenInGame(true);
-    // Ground telegraphs must not follow breathing, crouching or strike poses.
+    // 地面预警不得跟随呼吸、下蹲或攻击姿态移动。
     SkillIndicator->SetupAttachment(GetRootComponent());
     AlphaWarning->SetupAttachment(GetRootComponent());
     for(const auto& Piece:Feet) NeutralFeet.Add(Piece->GetRelativeTransform());
@@ -188,7 +188,7 @@ void ACreatureCharacter::NavigateTo(const FVector& Destination, float Acceptance
         const APawn* FollowOwner=Activity==ECreatureActivity::Follow && Tamer?Tamer->GetPawn():nullptr;
         if(!FollowOwner || !Nav->ProjectPointToNavigation(FollowOwner->GetActorLocation(),Projected,FVector(250,250,300)))
         { StopNavigation(); return; }
-        Acceptance=160.f; // Preserve personal space when falling back to the owner's location.
+        Acceptance=160.f; // 退回主人位置时保留个人空间。
     }
     const auto Result=AI->MoveToLocation(Projected.Location, Acceptance, false, true, false, false, nullptr, false);
     if(Result==EPathFollowingRequestResult::Failed && Activity==ECreatureActivity::Follow && Tamer && Tamer->GetPawn())
@@ -328,7 +328,7 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
         if(GetCharacterMovement()->bUseRVOAvoidance!=(Enemy==nullptr)) GetCharacterMovement()->SetAvoidanceEnabled(Enemy==nullptr);
         const FVector Destination = Enemy ? Enemy->GetActorLocation() : GetFollowDestination();
         // A nav path may bend back through a companion even when the final-goal ray is clear.
-        // Bypass self-steering only if BOTH desired and actual path directions have a clear local corridor.
+        // 只有期望方向与实际路径方向的局部通道均畅通时，才绕过自身转向处理。
         const auto* FollowAI=Cast<AAIController>(GetController());
         const bool ClearSegment=!FollowAI || FollowAI->GetMoveStatus()!=EPathFollowingStatus::Moving ||
             HasClearFollowApproach(FollowAI->GetImmediateMoveDestination());

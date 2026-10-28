@@ -4,7 +4,7 @@
 
 ECompanionPreference UCompanionPersonalityComponent::PreferenceForId(const FGuid& Id)
 {
-    // Explicit, version-independent mapping for first assignment / legacy migration.
+    // 首次分配及旧档迁移使用显式映射，不依赖版本变化。
     return ((Id.A^Id.B^Id.C^Id.D)&1u)?ECompanionPreference::Playful:ECompanionPreference::Quiet;
 }
 bool UCompanionPersonalityComponent::ValidateSnapshot(ECompanionPreference Preference,bool Discovered,bool OwnedTamed)

@@ -26,8 +26,8 @@ bool UCompanionCargoComponent::Assign(AHomeModule* Crate,ACFPlayerCharacter* Her
         (Pet->Activity!=ECreatureActivity::Work && !(Pet->Activity==ECreatureActivity::Rest && Pet->bResumeWorkAfterRest)) ||
         !IsValid(Crate) || Crate->IsActorBeingDestroyed() || Crate->GetWorld()!=GetWorld() || Crate->bPreview || Crate->bStaged ||
         Crate->GetKind()!=EHomeModuleKind::Storage || !Crate->PersistentId.IsValid()) return false;
-    // Player selection is made with the 8m visibility trace; the subsequent
-    // resource order may be issued far away from this explicitly selected sink.
+    // 玩家通过八米可见性射线选择目标；之后可以远离这个明确选定的
+    // 接收设施，再下达资源任务。
     Pet->ResetGathering(); Pet->StopNavigation();
     Destination=Crate; bOrdered=true; bReturning=Count()>0; Expires=0; Retry=0; bFull=false; return true;
 }
@@ -111,7 +111,7 @@ void UCompanionCargoComponent::WriteSnapshot(FCreatureSaveRecord& Record) const
     const auto* Target=GetTarget(); const auto* Source=Pet->GetFieldResource();
     if(!Target || !IsValid(Source) || Source->IsActorBeingDestroyed())
     {
-        // Snapshot orphaned intent canonically even if deletion precedes this frame's AI tick.
+        // 即使目标在本帧 AI 更新前被删除，快照也要规范记录失去目标的任务意图。
         Record.FieldResourceId.Invalidate(); Record.bResumeWorkAfterRest=false;
         Record.Activity=Record.Health>0?ECreatureActivity::Follow:ECreatureActivity::Rest; return;
     }

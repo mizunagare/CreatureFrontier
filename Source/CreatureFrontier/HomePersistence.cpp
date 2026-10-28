@@ -39,8 +39,8 @@ bool FHomeRestoreTransaction::Stage(UFrontierSaveGame* Save)
     for(const auto& Record:Save->HomeModules) if(!HomeLayout::ValidateTerrain(World,Record,Reason)) return false;
     for(const auto& Facility:Save->Facilities)
         if(!HomeLayout::SupportsFacility(Facility.Transform,Save->HomeModules)) return false;
-    // Validate saved containers against the SAVED facilities, not the old live
-    // world which this transaction will replace. Floor contact is allowed.
+    // 使用存档中的设施校验存档容器，而非即将被本事务替换的旧世界。
+    // 允许容器与地板接触。
     for(const auto& Record:Save->HomeModules) if(Record.Definition.Get()->Kind==EHomeModuleKind::Storage)
         for(const auto& Facility:Save->Facilities)
         {

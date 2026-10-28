@@ -65,7 +65,7 @@ void ACreatureCharacter::UpdateCreaturePresentation(float DeltaSeconds)
             Pose.SetRotation((FRotator(0,FMath::Sin(Time*3+Index)*3,0).Quaternion()*Pose.GetRotation()).GetNormalized());
         AccentParts[Index]->SetRelativeTransform(Pose);
     }
-    // Squash both eye whites and pupils together: no detached pupils while blinking.
+    // 眼白与瞳孔同步压缩，避免眨眼时瞳孔脱离眼睛。
     const float BlinkPhase=FMath::Fmod(Time,4.3f);
     const float EyeOpen=Dead?1.f:(RestPoseBlend>.7f || AffectionPoseRemaining>0)?.12f:BlinkPhase<.14f?.08f:1.f;
     for(int32 Index=0;Index<EyeParts.Num() && Index<NeutralEyes.Num();++Index)

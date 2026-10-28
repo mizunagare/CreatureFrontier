@@ -20,7 +20,7 @@ float UCaptureComponent::CalculateCaptureChance(const ACreatureCharacter* Creatu
         return 0.0f;
     }
 
-    // Injured creatures are easier to capture. Chance is always capped to keep tension.
+    // 受伤生物更容易捕捉，但成功率始终设有上限，以保留不确定性。
     const float InjuryBonus = 1.0f + (1.0f - Creature->GetHealthRatio()) * 1.5f;
     const float BaseRate = Creature->Definition ? Creature->Definition->BaseCaptureRate : 0.35f;
     float Multiplier=0;

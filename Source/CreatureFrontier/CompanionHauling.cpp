@@ -5,7 +5,7 @@
 
 bool ACreatureCharacter::TickHauling(float DeltaSeconds)
 {
-    // Legacy food hauling cannot silently overwrite/mix retained resource cargo.
+    // 旧式食物搬运不得悄然覆盖或混合已保留的资源货物。
     if(Cargo->Count()>0) { StopNavigation(); return true; }
     auto Park=[this]()
     {

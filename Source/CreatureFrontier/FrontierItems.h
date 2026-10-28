@@ -2,7 +2,7 @@
 #include "CoreMinimal.h"
 #include "FrontierItems.generated.h"
 
-// Serialized numeric values 0-3 remain unchanged for old snapshots.
+// 为兼容旧快照，序列化数值 0–3 保持不变。
 UENUM(BlueprintType)
 enum class EFrontierItem : uint8 { Material, CaptureDevice, Medicine, Food, Crystal, ResonanceDevice, Fiber, Ore, Scrap, Seeds, Count UMETA(Hidden) };
 

@@ -72,7 +72,7 @@ bool AResourceNode::TryHarvest(ACFPlayerCharacter* Recipient,AActor* Harvester)
             Pet->WorkSite->RequiredSpecialty!=Definition->Specialty || GetDistanceTo(Pet->WorkSite)>800)) return false;
     }
     else if(!CanReach(Recipient,300)) return false;
-    // The single shared transaction: failed capacity/range/ownership checks spend nothing.
+    // 唯一的共用事务：容量、距离或归属检查失败时不消耗任何资源。
     const auto* Pet=Cast<ACreatureCharacter>(Harvester);
     const bool Added=Pet && Pet->Cargo->HasOrder()?Pet->Cargo->Receive(Definition->OutputItem):Recipient->Inventory->AddItem(Definition->OutputItem,1);
     if(!Added) return false;

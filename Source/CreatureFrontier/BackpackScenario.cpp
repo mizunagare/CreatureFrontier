@@ -29,7 +29,7 @@ void RunBackpackScenario(UWorld* World,ACFPlayerCharacter* Hero)
         Craft &= Hero->GetBackpackRecipe()==Index && Hero->GetBackpackRecipeCost(Index)==Costs[Index] && Hero->GetBackpackRecipeStatus(Index).StartsWith(TEXT("可以制作"));
         Hero->ConfirmInterfaceAction(); Hero->PauseMenuNext();
     }
-    // The original five keep their order/prices; the two new research recipes are locked.
+    // 原有五项保留顺序与价格；两项新增研究配方尚未解锁。
     for(int32 Index=5;Index<7;++Index)
     {
         Craft &= Hero->GetBackpackRecipe()==Index && Hero->GetBackpackRecipeStatus(Index).StartsWith(TEXT("尚未解锁"));

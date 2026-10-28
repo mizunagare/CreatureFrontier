@@ -35,7 +35,7 @@ bool ACFPlayerCharacter::CraftRecipe(FName RecipeId)
     TMap<EFrontierItem,int32> Outputs;
     if(Recipe->Reward==ERecipeReward::Item) Outputs.Add(Recipe->Output,Recipe->OutputAmount);
     if(!Inventory->Transact(Recipe->Inputs,Outputs)) { Feedback=TEXT("制作事务失败，未消耗物品"); return false; }
-    // Preflight above guarantees these single-threaded unique state changes cannot fail.
+    // 上面的预检查保证这些单线程唯一状态变更不会失败。
     if(Recipe->Reward==ERecipeReward::Spear) Equipment->GrantCrafted(true);
     if(Recipe->Reward==ERecipeReward::Vest) Equipment->GrantCrafted(false);
     if(Recipe->Reward==ERecipeReward::CrystalStudy) Research->CompleteCrystalStudy();

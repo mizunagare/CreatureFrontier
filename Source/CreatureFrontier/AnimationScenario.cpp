@@ -60,11 +60,11 @@ void RunAnimationScenario(UWorld* World,ACFPlayerCharacter* Hero)
         TArray<UStaticMeshComponent*> Pieces; Pet->GetComponents(Pieces);
         for(auto* Piece:Pieces) Isolation &= Piece->GetCollisionEnabled()==ECollisionEnabled::NoCollision && !Piece->CanEverAffectNavigation();
     }
-    // Drive a real AI melee decision, not a synthetic animation trigger.
+    // 通过真实的 AI 近战决策触发动作，不直接伪造动画触发。
     auto* Attacker=Pets[0]; auto* Target=World->SpawnActor<ACreatureCharacter>(Attacker->GetActorLocation()+FVector(120,0,0),FRotator::ZeroRotator);
     Target->SetActorTickEnabled(false); Target->GetCharacterMovement()->DisableMovement(); Attacker->FocusTarget=Target; Attacker->SetActivity(ECreatureActivity::Combat);
     const float Before=Target->Health; Attacker->Tick(.016f);
-    // First presentation sample is the neutral start of the strike; then advance into its lunge.
+    // 首次表现采样为攻击的中性起始姿态，随后推进到突进阶段。
     Attacker->UpdateCreaturePresentation(.07f); Attacker->UpdateCreaturePresentation(.07f);
     const bool Strike=Target->Health<Before && Attacker->GetVisualState()==TEXT("Striking") && Attacker->CreatureVisual->GetAttachParent()->GetComponentLocation().X>Attacker->GetActorLocation().X;
     UE_LOG(LogTemp,Display,TEXT("CF_ANIMATION melee hp=%.2f before=%.2f state=%s activity=%d root=%s pivot=%s target=%s"),Target->Health,Before,*Attacker->GetVisualState().ToString(),static_cast<int32>(Attacker->Activity),*Attacker->GetActorLocation().ToString(),*Attacker->CreatureVisual->GetAttachParent()->GetComponentLocation().ToString(),*Target->GetActorLocation().ToString());
@@ -89,7 +89,7 @@ void RunAnimationScenario(UWorld* World,ACFPlayerCharacter* Hero)
             if(Pet->Definition->Form==ECreatureForm::Ember) Pet->SetActivity(ECreatureActivity::Rest);
             if(Pet->Definition->Form==ECreatureForm::Stone) Pet->SpecialWindupRemaining=.6f;
             for(int32 Step=0;Step<20;++Step) Pet->UpdateCreaturePresentation(.05f);
-            Pet->Tick(0.f); // Refresh cargo and skill effects without advancing simulation.
+            Pet->Tick(0.f); // 刷新携带物与技能效果，不推进模拟时间。
         }
         const FString Root=FPaths::ProjectSavedDir()/TEXT("AnimationPreview"); IFileManager::Get().MakeDirectory(*Root,true);
         FTimerHandle Shot,Done; World->GetTimerManager().SetTimer(Shot,[Root](){FScreenshotRequest::RequestScreenshot(Root/TEXT("poses.png"),false,false);},3.f,false);

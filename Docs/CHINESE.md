@@ -1,5 +1,11 @@
 # 中文开发与显示约定
 
+## 历史注释清理（2026-10-28，持续进行）
+
+继续翻译导航编队、资源事务、建造、搬运、动画、捕捉、读档与复活等模块的英文注释，并将中文提交说明及测试解释约定写入根目录开发规范。本批仅改注释，不更改标识符、数值、资源路径或存档协议；现有未提交的回忆窗口生命周期修复单独验证，不混同为翻译成果。
+
+本批修改后已实际执行 Editor Development 构建并成功。尚有历史英文注释待清理；英文注释搜索仅用于定位，不能证明所有展示文案均已覆盖。本批未重新打包，不替换既有 Windows 验收包；既有图形证据不作为本批新验收。
+
 ## 后续文案补漏（2026-10-28）
 
 补齐FieldRecoveryScenario和FormationScenario两条英文预览反馈，不改玩法、协议或存档。Editor再次编译成功；`Saved/Chinese-Formation-Editor.log` 与 `Saved/Chinese-FieldRecovery-Short-Editor.log` 实际预览进程退出0且各自成功标记存在。1280×720两张新图已查看：编队反馈主体中文可读，末尾预览说明按原预算省略；野外反馈首轮长句被省略造成否定含义不清，已缩为“路线恢复：实际抵达采集，获得水晶×1、经验×1”，重新取图全文可见。最终图为 `Saved/FormationPreview/followers.png`、`Saved/FieldRecovery/Recovered.png`。仅证明所列Editor尺寸，不将Windows-Care-Route的94进程借用为这次后续文案的打包验收；没有重打包，也未声称所有窗口/Unicode输入均验收。

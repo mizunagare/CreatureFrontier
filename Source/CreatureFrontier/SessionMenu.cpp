@@ -8,7 +8,7 @@
 
 FString ACFPlayerCharacter::GetQuickSaveSlot() const
 {
-    // The menu automation must never write the player's normal save slot.
+    // 菜单自动化测试绝不能写入玩家的常规存档槽。
     return FParse::Param(FCommandLine::Get(),TEXT("CFSessionTest"))?TEXT("FrontierSessionAutomation"):TEXT("FrontierSlot");
 }
 

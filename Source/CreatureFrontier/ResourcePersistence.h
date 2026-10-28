@@ -3,7 +3,7 @@
 class AResourceNode;
 class UFrontierSaveGame;
 
-// Failure at ANY later load step must leave the live resource ledger intact.
+// 后续任意读档步骤失败，都必须完整保留当前资源账本。
 class FResourceRestoreTransaction
 {
 public:

@@ -284,7 +284,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
     TArray<ACreatureCharacter*> OldCreatures;
     for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It) OldCreatures.Add(*It);
     TArray<ACreatureCharacter*> Restored;
-    // Stage every actor before replacing the live world; a missing asset leaves it intact.
+    // 替换当前世界前先准备全部实体；资源缺失时保留原世界不变。
     for (const auto& Record : Save->Creatures)
     {
         UClass* CreatureClass = Record.CreatureClass.LoadSynchronous();
@@ -425,7 +425,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
     RosterHighlight.Reset(); bBackpackOpen=false; BackpackRecipe=0; Storage->Close(); DeliverySelection.Reset(); bDeliverySelection=false;
     Journal=Save->Journal; JournalAssets=LoadedJournalAssets; JournalPage=0;
     Objectives=Save->Objectives;
-    // Owned survivors in old snapshots prove capture; unseen wild snapshots do not prove discovery.
+    // 旧快照中的自有存活伙伴可证明已捕捉；未见过的野生快照不能证明已发现。
     for (auto* Pet : Restored)
         if (Pet->Tamer==GetController()) { RecordJournal(Pet->Definition,true); RecordAlphaResolution(Pet); }
     Feedback = bSingleCompanionMode ? TEXT("读档成功，请按L重选伙伴或按K指挥全队；此前不执行命令") : TEXT("读档成功，当前指挥全队；L 选择单个伙伴");
@@ -440,7 +440,7 @@ void ACFPlayerCharacter::RestartLevel()
 void ACFPlayerCharacter::BeginPlay()
 {
     Super::BeginPlay();
-    // Starter supplies belong to a new player, never to a generic container.
+    // 初始补给仅属于新玩家，不属于通用容器。
     Inventory->Restore({{EFrontierItem::Material,6},{EFrontierItem::CaptureDevice,5},{EFrontierItem::Medicine,1},{EFrontierItem::Food,3}});
     InitializeRespawnAnchor();
     CaptureComponent->OnCaptureResolved.AddDynamic(this, &ACFPlayerCharacter::CaptureResolved);

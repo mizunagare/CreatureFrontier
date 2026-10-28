@@ -66,8 +66,8 @@ bool ACreatureCharacter::FindFollowPathDetour(const FVector& Destination,const A
 
 bool ACreatureCharacter::HasClearFollowApproach(const FVector& Destination) const
 {
-    // Local steering needs a clear LOOKAHEAD corridor, not proximity to the final goal.
-    // Otherwise expanded RVO radii can deadlock a physically clear approach outside docking range.
+    // 局部转向需要前方通道畅通，不能只检查是否接近最终目标。
+    // 否则扩大的 RVO 半径可能让停靠范围外本可通行的接近路线陷入僵局。
     const FVector LookAhead=GetActorLocation()+(Destination-GetActorLocation()).GetClampedToMaxSize2D(220.f);
     return !FindFollowPathBlocker(LookAhead);
 }
@@ -89,8 +89,8 @@ FVector ACreatureCharacter::FindFollowApproach(const FVector& Destination) const
             FVector Alternate=Position+Away*(Radius+60); Alternate.Z=Destination.Z; return Alternate;
         }
     }
-    // Segment blockers are resolved from the REAL nav path in NavigateTo. A perpendicular
-    // raw ray waypoint here can lie inside static geometry and project onto our current poly.
+    // NavigateTo 根据真实导航路径处理分段障碍；此处垂直射线生成的临时点
+    // 可能落入静态几何体内部，并投影回当前导航多边形。
     return Destination;
 }
 
@@ -108,8 +108,8 @@ FVector ACreatureCharacter::GetFollowDestination() const
     const FRotator Facing(0,Hero->GetController()?Hero->GetController()->GetControlRotation().Yaw:Hero->GetActorRotation().Yaw,0);
     float Side=Column==0?0.f:Column==1?-130.f:130.f;
     const FVector Center=Hero->GetActorLocation()+Facing.RotateVector(FVector(-170.f-Row*150.f,0,0));
-    // Keep the center approach corridor open. Side followers wait farther out
-    // until their row's center has arrived, then dock inward without crossing it.
+    // 保持中央接近通道畅通；两侧伙伴在远处等待本排中央伙伴抵达，
+    // 随后向内停靠，避免横穿中央通道。
     if(Column!=0 && FVector::Dist2D(Followers[Row*3]->GetActorLocation(),Center)>65.f)
         Side+=Column==1?-150.f:150.f;
     const FVector Local(-170.f-Row*150.f,Side,0);

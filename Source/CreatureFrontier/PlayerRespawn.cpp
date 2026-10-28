@@ -52,7 +52,7 @@ bool ACFPlayerCharacter::RespawnAtBase()
     if(Health>0) { Feedback=TEXT("只有倒下时才能按R复活，不会重置世界"); return false; }
     FVector Location;
     if(!FindRespawnLocation(Location)) { Feedback=TEXT("基地被阻挡或不安全，可按F9读取此前存档"); return false; }
-    // The live world is preserved. Cancel combat, not work assignments or health/cooldowns.
+    // 保留当前世界；仅取消战斗，不清除工作分配、生命或冷却状态。
     for(TActorIterator<ACreatureCharacter> It(GetWorld());It;++It) It->HandlePlayerDowned(this);
     Pace->StopSlowWalk(); CancelMeleeAttack(); Building->Cancel(); bRosterOpen=false; bJournalOpen=false;
     GetCharacterMovement()->StopMovementImmediately(); StopJumping();

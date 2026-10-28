@@ -100,11 +100,11 @@ bool UBaseBuildingComponent::ValidatePlacement(const FTransform& Transform, FStr
     if (Cost == 0 || Hero->Inventory->Count(EFrontierItem::Material) < Cost) { Reason = TEXT("材料不足"); return false; }
     FCollisionQueryParams Params(SCENE_QUERY_STAT(BuildPlacement), false);
     if (IsValid(Preview)) Params.AddIgnoredActor(Preview);
-    // Query full solid volume, including pawns. Keep the supporting floor below the box.
+    // 检查包括角色在内的完整实体体积，让支撑地面位于检测盒下方。
     const FCollisionObjectQueryParams Objects(FCollisionObjectQueryParams::AllObjects);
     if (GetWorld()->OverlapAnyTestByObjectType(Transform.GetLocation()+FVector(0,0,1),Transform.GetRotation(),Objects,
         FCollisionShape::MakeBox(FVector(112,62,34)),Params)) { Reason = TEXT("空间被占用，请避开生物与建筑"); return false; }
-    // All four corners must have flat support: no bridging a ledge or stacking benches.
+    // 四角都必须有平坦支撑，不允许跨越悬边或叠放工作台。
     for (float X : {-95.0f,95.0f}) for (float Y : {-45.0f,45.0f})
     {
         const FVector Corner = Transform.GetLocation() + Transform.GetRotation().RotateVector(FVector(X,Y,0));

@@ -32,7 +32,7 @@ bool ACreatureCharacter::TickAutoFeeding()
     { StopNavigation(); FeedingSite.Reset(); return true; }
     FVector Direction = GetActorLocation()-Site->GetActorLocation(); Direction.Z = 0;
     if (!Direction.Normalize()) Direction = FVector(1,0,0);
-    // Leave room for path acceptance and the vertical offset to the bench's root.
+    // 为路径抵达判定及工作台根节点的垂直偏移留出余量。
     FVector Approach = Site->GetActorLocation()+Direction*150; Approach.Z = GetActorLocation().Z;
     NavigateTo(Approach,35);
     return true;

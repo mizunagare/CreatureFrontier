@@ -45,8 +45,8 @@ bool UHomeBuildingComponent::ValidatePlacement(const FTransform& Transform,FGuid
     auto Layout=HomeLayout::Collect(GetWorld()); const auto Proposed=Candidate(Definition,Transform,FloorId); Layout.Add(Proposed);
     if(!HomeLayout::Validate(Layout,Reason)) return false;
     FCollisionQueryParams Params(SCENE_QUERY_STAT(HomePlacement),false);
-    // Canonical sockets permit floor/wall contact and perpendicular corner joints.
-    // Other collisions, especially pawns, facilities and authored cover, remain real.
+    // 规范吸附点允许地板与墙接触，以及垂直转角连接。
+    // 其他碰撞仍然生效，尤其是角色、设施及预设掩体。
     for(TActorIterator<AHomeModule> It(GetWorld());It;++It) Params.AddIgnoredActor(*It);
     const auto Objects=FCollisionObjectQueryParams(FCollisionObjectQueryParams::AllObjects);
     for(const auto& Part:AHomeModule::Parts(Selected))

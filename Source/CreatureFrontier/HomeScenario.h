@@ -5,7 +5,7 @@
 class UWorld;
 class ACFPlayerCharacter;
 
-// Held movement input for the packaged physics test, independent of frame rate.
+// 打包物理测试使用持续移动输入，不依赖帧率。
 UCLASS()
 class UHomeMovementProbe : public UActorComponent
 {

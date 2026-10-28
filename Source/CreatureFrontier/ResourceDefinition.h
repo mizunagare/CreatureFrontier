@@ -5,7 +5,7 @@
 #include "FrontierItems.h"
 #include "ResourceDefinition.generated.h"
 
-// Resource budgets and work costs are content, not duplicated player/AI rules.
+// 资源预算与工作成本属于内容数据，不在玩家和 AI 规则中重复定义。
 UCLASS(BlueprintType)
 class CREATUREFRONTIER_API UResourceDefinition : public UPrimaryDataAsset
 {
@@ -16,7 +16,7 @@ public:
     UPROPERTY(EditAnywhere,BlueprintReadOnly) int32 Capacity=12;
     UPROPERTY(EditAnywhere,BlueprintReadOnly) float WorkSeconds=3;
     UPROPERTY(EditAnywhere,BlueprintReadOnly) float HarvestInterval=.8f;
-    // Zero means permanently depleted in this world snapshot. No offline growth.
+    // 零表示当前世界快照中永久耗尽，不进行离线再生。
     UPROPERTY(EditAnywhere,BlueprintReadOnly) float RegrowSeconds=0;
     UPROPERTY(EditAnywhere,BlueprintReadOnly) FLinearColor Color=FLinearColor::Green;
     UPROPERTY(EditAnywhere,BlueprintReadOnly) EFrontierItem OutputItem=EFrontierItem::Material;
