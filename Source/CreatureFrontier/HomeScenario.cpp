@@ -29,8 +29,49 @@
 #include "InputRoutingQA.h"
 #include "InputKeyEventArgs.h"
 #include "GenericPlatform/GenericPlatformInputDeviceMapper.h"
+#include "PlayerEquipmentComponent.h"
 
 UHomeMovementProbe::UHomeMovementProbe() { PrimaryComponentTick.bCanEverTick=true; }
+
+void RunHomeWindowMeleeScenario(UWorld* World,ACFPlayerCharacter* Hero)
+{
+    Hero->SetActorLocation(FVector(-400,-1140,40));Hero->GetCharacterMovement()->DisableMovement();Hero->Inventory->Restore({{EFrontierItem::Material,100}});
+    Hero->HomeBuilding->Selected=EHomeModuleKind::Floor;
+    auto* Floor=Hero->HomeBuilding->BuildAt(FTransform(FVector(-400,-800,-40)));
+    Hero->HomeBuilding->Selected=EHomeModuleKind::Window;
+    auto* Window=Floor?Hero->HomeBuilding->BuildAt(FTransform(FVector(-400,-1000,-30)),Floor->PersistentId):nullptr;
+    if(!Window){UE_LOG(LogTemp,Error,TEXT("CF_WINDOW_MELEE FAIL fixture"));FPlatformMisc::RequestExitWithStatus(false,1);return;}
+    FPlayerEquipmentState Gear;Gear.bOwnSpear=true;Gear.bSpearEquipped=true;Hero->Equipment->Restore(Gear);
+    auto* Target=World->SpawnActor<ACreatureCharacter>(FVector(-400,-880,60),FRotator::ZeroRotator);
+    if(!Target){UE_LOG(LogTemp,Error,TEXT("CF_WINDOW_MELEE FAIL target"));FPlatformMisc::RequestExitWithStatus(false,1);return;}
+    // 固定靶位隔离窗台/窗洞/上沿/侧柱；高处靶位不是自然战斗或飞行生物证据。
+    Target->SetActorTickEnabled(false);Target->GetCharacterMovement()->DisableMovement();
+    auto Strike=[Hero,Target](FVector Player,FVector Victim)
+    {
+        Hero->SetActorLocation(Player);Target->SetActorLocation(Victim);
+        const auto View=(Victim-Hero->FirstPersonCamera->GetComponentLocation()).Rotation();Hero->GetController()->SetControlRotation(View);Hero->FirstPersonCamera->SetWorldRotation(View);Hero->Attack();
+    };
+    const auto Timer=MakeShared<FTimerHandle>();const float Initial=Target->Health;const float Damage=Hero->GetPlayerAttackDamage();
+    Strike(FVector(-400,-1140,40),FVector(-400,-880,60));
+    World->GetTimerManager().SetTimer(*Timer,[World,Hero,Target,Strike,Timer,Initial,Damage,Step=0,Pass=true]() mutable
+    {
+        const float Expected=(Step==0?Initial:Step<4?Initial-Damage:Initial-2*Damage);
+        Pass &= FMath::IsNearlyEqual(Target->Health,Expected,.01) && !Hero->IsMeleePending();
+        if(Step==0 || Step==2 || Step==3)Pass &= Hero->Feedback.Contains(TEXT("障碍物阻挡"));
+        if(Step==0)Strike(FVector(-400,-1140,40),FVector(-400,-880,170));
+        else if(Step==1)Strike(FVector(-400,-1140,40),FVector(-400,-880,300));
+        else if(Step==2)Strike(FVector(-550,-1140,40),FVector(-550,-880,170));
+        else if(Step==3)Strike(FVector(-400,-1140,40),FVector(-400,-880,170));
+        else
+        {
+            Pass &= Hero->Inventory->Count(EFrontierItem::Material)==82;
+            const bool Result=Pass;const float Health=Target->Health;FTimerHandle Handle=*Timer;World->GetTimerManager().ClearTimer(Handle);
+            UE_LOG(LogTemp,Display,TEXT("CF_WINDOW_MELEE %s sill=1 opening=2 upper=1 side=1 health=%.1f"),Result?TEXT("PASS"):TEXT("FAIL"),Health);
+            FPlatformMisc::RequestExitWithStatus(false,Result?0:1);return;
+        }
+        ++Step;
+    },.65f,true);
+}
 
 void RunHomeWindowInputScenario(UWorld* World,ACFPlayerCharacter* Hero)
 {
@@ -82,6 +123,7 @@ void RunHomeWindowInputScenario(UWorld* World,ACFPlayerCharacter* Hero)
 
 void RunHomeWindowScenario(UWorld* World,ACFPlayerCharacter* Hero)
 {
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFWindowMeleeTest"))){RunHomeWindowMeleeScenario(World,Hero);return;}
     if(FParse::Param(FCommandLine::Get(),TEXT("CFWindowInputTest"))){RunHomeWindowInputScenario(World,Hero);return;}
     if(FParse::Param(FCommandLine::Get(),TEXT("CFWindowRead")))
     {

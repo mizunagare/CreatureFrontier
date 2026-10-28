@@ -30,6 +30,7 @@ $cases = @(
     @{Flag='CFWindowTest'; Arguments=@('-CFHomeTest'); Marker='CF_WINDOW PASS built=1 hole=1 frame=1 pawn=1 support=1 legacy=1 save=1'},
     @{Flag='CFWindowInputTest'; Arguments=@('-CFHomeTest'); Marker='CF_WINDOW_INPUT PASS phase=2 windows=2 materials=72'},
     @{Flag='CFWindowNavigationTest'; Marker='CF_WINDOW_NAV PASS phase=2 closed=1 continuous=1 windowBlocked=1'},
+    @{Flag='CFWindowMeleeTest'; Arguments=@('-CFHomeTest'); Marker='CF_WINDOW_MELEE PASS sill=1 opening=2 upper=1 side=1'},
     @{Flag='CFWindowRead'; Arguments=@('-CFHomeTest'); Marker='CF_WINDOW_READ PASS windows=2 loads=2'; PreserveSlot='WindowGood'},
     @{Flag='CFStanceTest'; Arguments=@('-CFDefenseTest'); Marker='CF_STANCE PASS defaults=1 passive=1 explicit=1 cancel=1 invalid=1 persist=1 legacy=1'; RequiredMarkers=@('CF_STANCE_BOUNDARIES PASS scope=1 guard=1 bounds=1 work=1','CF_STANCE_SKILL PASS explicit=1 cancel=1')},
     @{Flag='CFStanceRead'; Arguments=@('-CFDefenseTest'); Marker='CF_STANCE_READ PASS avoid=2 guard=2'; PreserveSlot='StanceGood'},

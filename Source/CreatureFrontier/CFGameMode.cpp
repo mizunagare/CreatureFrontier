@@ -179,7 +179,7 @@ void ACFGameMode::BeginPlay()
         FTimerHandle ExpeditionStart; GetWorldTimerManager().SetTimer(ExpeditionStart,[this,ExpeditionMode](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0))) RunExpeditionScenario(GetWorld(),Hero,ExpeditionMode);},1.f,false); return;
     }
     const int32 HomeMode=FParse::Param(FCommandLine::Get(),TEXT("CFHomeWrite"))?1:FParse::Param(FCommandLine::Get(),TEXT("CFHomeRead"))?2:0;
-    const bool WindowMode=FParse::Param(FCommandLine::Get(),TEXT("CFWindowTest")) || FParse::Param(FCommandLine::Get(),TEXT("CFWindowRead")) || FParse::Param(FCommandLine::Get(),TEXT("CFWindowInputTest"));
+    const bool WindowMode=FParse::Param(FCommandLine::Get(),TEXT("CFWindowTest")) || FParse::Param(FCommandLine::Get(),TEXT("CFWindowRead")) || FParse::Param(FCommandLine::Get(),TEXT("CFWindowInputTest")) || FParse::Param(FCommandLine::Get(),TEXT("CFWindowMeleeTest"));
     if(HomeMode || FParse::Param(FCommandLine::Get(),TEXT("CFHomeTest")) || WindowMode)
     {
         FTimerHandle HomeStart;
