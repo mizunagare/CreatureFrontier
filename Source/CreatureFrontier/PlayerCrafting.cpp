@@ -23,7 +23,7 @@ FString ACFPlayerCharacter::GetRecipeStatus(const FFrontierRecipe& Recipe,bool* 
         if(Missing>0) return FString::Printf(TEXT("还需要%d份%s"),Missing,*Item.DisplayName.ToString());
     }
     if(bCanCraft)*bCanCraft=true;
-    return TEXT("可以制作，按Enter制作一个");
+    return TEXT("可以制作，按回车制作一个");
 }
 bool ACFPlayerCharacter::CraftRecipe(FName RecipeId)
 {

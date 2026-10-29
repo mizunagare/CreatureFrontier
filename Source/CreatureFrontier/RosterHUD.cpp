@@ -20,7 +20,7 @@ void ACFHUD::DrawRosterPanel(ACFPlayerCharacter* Player)
     auto Line=[this,Left,Width,U](const FString& Text,FLinearColor Color,float Y)
     {DrawHUDText(Text,Color,FFrontierHUDLayout::Box(Left+12*U,Y,Width-24*U,Layout.Line),1);};
     Line(FString::Printf(TEXT("队伍：%d 位伙伴 | %d-%d"),Pets.Num(),Pets.IsEmpty()?0:Start+1,FMath::Min(Start+Rows,Pets.Num())),FLinearColor::White,Top+12*U);
-    Line(TEXT("[ / ] 翻页 | Enter 选择 | F4 命名 | Tab 关闭"),FLinearColor::Yellow,Top+34*U);
+    Line(TEXT("[ / ] 翻页 | 回车选择 | F4 命名 | Tab 关闭"),FLinearColor::Yellow,Top+34*U);
     Line(TEXT("世界仍在运行 | 选择距离12米，需可见"),FLinearColor::White,Top+56*U);
     if(Pets.IsEmpty())Line(TEXT("还没有伙伴，试着捕捉野生生物吧"),FLinearColor::Green,Top+92*U);
     for(int32 Index=Start;Index<FMath::Min(Start+Rows,Pets.Num());++Index)

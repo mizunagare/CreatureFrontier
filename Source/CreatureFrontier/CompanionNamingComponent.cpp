@@ -62,7 +62,10 @@ bool UCompanionNamingComponent::Open(ACreatureCharacter* Pet)
     if(Hero->IsRosterOpen()) Hero->ToggleRoster();
     Target=Pet;Hero->CancelMeleeAttack();Hero->GetCharacterMovement()->StopMovementImmediately();Hero->ConsumeMovementInputVector();Hero->StopJumping();
     auto CommitEntry=[this](){if(Entry.IsValid()) Commit(Entry->GetText().ToString());return FReply::Handled();};
-    Dialog=SNew(SBorder).HAlign(HAlign_Center).VAlign(VAlign_Center).Padding(24)
+    // 显式绘制深色背景，避免中文标题在明亮场景上失去对比。
+    Dialog=SNew(SBorder).BorderImage(FCoreStyle::Get().GetBrush("WhiteBrush"))
+        .BorderBackgroundColor(FLinearColor(.015f,.025f,.04f,.97f)).ForegroundColor(FLinearColor::White)
+        .HAlign(HAlign_Center).VAlign(VAlign_Center).Padding(24)
     [SNew(SBox).WidthOverride(760)
         [SNew(SVerticalBox)
             +SVerticalBox::Slot().AutoHeight().Padding(8)[SNew(STextBlock).Font(FCoreStyle::GetDefaultFontStyle("Regular",24)).Text(FText::FromString(TEXT("给伙伴命名 | 世界已暂停")))]

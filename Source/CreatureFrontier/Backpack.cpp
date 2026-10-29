@@ -13,7 +13,7 @@ void ACFPlayerCharacter::ToggleBackpack()
         CancelMeleeAttack(); Building->Cancel();
         bRosterOpen=false; bJournalOpen=false; bHelpVisible=false;
         BackpackRecipe=0;
-        Feedback=TEXT("背包 | 上下选择配方 | Enter 制作一个 | C 关闭 | 世界仍运行");
+        Feedback=TEXT("背包 | 上下选择配方 | 回车制作一个 | C 关闭 | 世界仍运行");
     }
 }
 

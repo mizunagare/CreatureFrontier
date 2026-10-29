@@ -28,7 +28,7 @@ void ACFHUD::DrawPauseMenu(ACFPlayerCharacter* Player)
     for(int32 Index=0;Index<5;++Index)
         DrawText(FString(Index==Player->GetPauseSelection()?TEXT(">> "):TEXT("   "))+Options[Index],Index==Player->GetPauseSelection()?FLinearColor::Yellow:FLinearColor::White,Left+24,Top+120+Index*40);
     DrawWrappedText(Player->Feedback,Player->IsPauseConfirmationPending()?FLinearColor::Yellow:FLinearColor::Green,Left+24,Top+332,Width-48,3);
-    DrawText(TEXT("上下方向键选择 | Enter 确认 | Esc 继续/取消"),FLinearColor::White,Left+24,Top+414);
+    DrawText(TEXT("上下方向键选择 | 回车确认 | 退出键继续/取消"),FLinearColor::White,Left+24,Top+414);
     DrawText(TEXT("退出不会自动保存，离开前可按 F5 保存。"),FLinearColor::White,Left+24,Top+436);
 }
 
@@ -58,15 +58,15 @@ void ACFHUD::DrawControlHelp(ACFPlayerCharacter* Player)
         TEXT("6 / 7 装备或卸下长矛/护甲"),
         TEXT("U 存入食物 | O 从农圃/食槽取出"),
         TEXT("Z 取回瞄准伙伴携带的物品"),
-        TEXT("Tab 队伍 | [ / ] 翻页 | Enter 选择"),
-        TEXT("I 图鉴 | PageUp / PageDown 翻页"),
+        TEXT("Tab 队伍 | [ / ] 翻页 | 回车选择"),
+        TEXT("I 图鉴 | 上翻页键 / 下翻页键"),
         TEXT("N 领取已完成旅程的奖励"),
         TEXT("倒下时按 R 回基地复活，保留世界"),
-        TEXT("F5 保存 | F9 确认读档 | Esc 暂停"),
+        TEXT("F5 保存 | F9 确认读档 | 退出键暂停"),
         TEXT("F1 关闭帮助，此面板不会暂停世界")};
     const float Left=Canvas->ClipX-488,Step=FMath::Clamp((Canvas->ClipY-130)/Lines.Num(),15.f,24.f);
     DrawRect(FLinearColor(.015f,.025f,.04f,.96f),Left,18,470,86+Step*Lines.Num());
     DrawText(TEXT("操作帮助 | F1 关闭"),FLinearColor::White,Left+14,30);
-    DrawText(TEXT("世界仍在运行，按 Esc 打开暂停菜单"),FLinearColor::Yellow,Left+14,56);
+    DrawText(TEXT("世界仍在运行，按退出键打开暂停菜单"),FLinearColor::Yellow,Left+14,56);
     for(int32 Index=0;Index<Lines.Num();++Index) DrawText(Lines[Index],FLinearColor::White,Left+14,90+Index*Step);
 }

@@ -22,7 +22,7 @@ bool UStorageInteractionComponent::Open(AHomeModule* Crate)
     auto* Hero=Cast<ACFPlayerCharacter>(GetOwner());
     if(!CanAccess(Crate)) { if(Hero) Hero->Feedback=TEXT("仓储：请关闭其他面板，靠近3米内并保持视线畅通"); return false; }
     Hero->CancelMeleeAttack(); Target=Crate; Selection=0;
-    Hero->Feedback=TEXT("仓储（世界运行中）| 上下选物品 | Enter 存1个 | 退格取1个 | 左右整组转移 | E 关闭"); return true;
+    Hero->Feedback=TEXT("仓储（世界运行中）| 上下选物品 | 回车存1个 | 退格取1个 | 左右整组转移 | E 关闭"); return true;
 }
 bool UStorageInteractionComponent::TryOpenAimed()
 {

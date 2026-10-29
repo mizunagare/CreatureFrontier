@@ -16,7 +16,7 @@ FString ACFPlayerCharacter::GetQuickSaveSlot() const
 bool ACFPlayerCharacter::ClosePauseMenu()
 {
     if(!UGameplayStatics::SetGamePaused(this,false)) return false;
-    bPauseMenu=false; bPauseConfirmation=false; Feedback=TEXT("已继续 | F1 操作帮助 | Esc 暂停"); return true;
+    bPauseMenu=false; bPauseConfirmation=false; Feedback=TEXT("已继续 | F1 操作帮助 | 退出键暂停"); return true;
 }
 
 void ACFPlayerCharacter::TogglePauseMenu()
@@ -66,12 +66,12 @@ void ACFPlayerCharacter::ConfirmInterfaceAction()
         case 0: ClosePauseMenu(); break;
         case 1: QuickSave(); break;
         case 2:
-            if(!bPauseConfirmation) { bPauseConfirmation=true; Feedback=TEXT("读档会替换当前世界。Enter 或 F9 确认，Esc 取消"); }
+            if(!bPauseConfirmation) { bPauseConfirmation=true; Feedback=TEXT("读档会替换当前世界。回车或 F9 确认，退出键取消"); }
             else { bPauseConfirmation=false; LoadProgress(GetQuickSaveSlot()); }
             break;
         case 3: if(RespawnAtBase()) ClosePauseMenu(); break;
         case 4:
-            if(!bPauseConfirmation) { bPauseConfirmation=true; Feedback=TEXT("不保存就退出？Enter 确认，Esc 取消，F5 保存"); }
+            if(!bPauseConfirmation) { bPauseConfirmation=true; Feedback=TEXT("不保存就退出？回车确认，退出键取消，F5 保存"); }
             else QuitGame();
             break;
     }

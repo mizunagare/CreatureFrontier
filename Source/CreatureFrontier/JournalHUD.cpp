@@ -11,7 +11,7 @@ void ACFHUD::DrawJournalPanel(ACFPlayerCharacter* Player)
     const float Left=Canvas->ClipX-488;
     DrawRect(FLinearColor(.015f,.025f,.04f,.96f),Left,18,470,440);
     DrawText(FString::Printf(TEXT("野外图鉴 | 已发现%d种 | 已结交%d种"),Entries.Num(),Captured),FLinearColor::Green,Left+14,30);
-    DrawText(TEXT("I 关闭 | PageUp / PageDown 翻页 | 不暂停"),FLinearColor::Yellow,Left+14,54);
+    DrawText(TEXT("I 关闭 | 上翻页键 / 下翻页键 | 不暂停"),FLinearColor::Yellow,Left+14,54);
     if(Entries.IsEmpty()){DrawText(TEXT("瞄准12米内的活体生物即可发现"),FLinearColor::White,Left+14,104);return;}
     const int32 Index=Player->GetJournalPage()%Entries.Num();const auto& Entry=Entries[Index];const auto* Definition=Entry.Definition.Get();if(!Definition)return;
     DrawText(FString::Printf(TEXT("%d / %d  %s"),Index+1,Entries.Num(),*Definition->DisplayName.ToString()),FLinearColor::White,Left+14,100);

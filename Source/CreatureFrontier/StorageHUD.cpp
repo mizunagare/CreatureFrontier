@@ -28,7 +28,7 @@ void ACFHUD::DrawStorage(ACFPlayerCharacter* Player)
         DrawText(FString::FromInt(Player->Inventory->Count(Item)),FLinearColor::Yellow,BackpackX,104+Index*RowHeight);
         DrawText(FString::FromInt(Crate->StorageInventory->Count(Item)),FLinearColor::Yellow,CrateX,104+Index*RowHeight);
     }
-    DrawText(TEXT("上下选择 | Enter 存入1个"),FLinearColor::White,Left+14,FooterY);
+    DrawText(TEXT("上下选择 | 回车存入1个"),FLinearColor::White,Left+14,FooterY);
     DrawText(TEXT("退格键 取出1个"),FLinearColor::White,Left+14,FooterY+26);
     DrawText(TEXT("右方向键整组存入 | 左方向键整组取出"),FLinearColor::White,Left+14,FooterY+52);
     DrawText(TEXT("整组转移仅在容量足够时进行。F5 保存。"),FLinearColor::Green,Left+14,FooterY+78);

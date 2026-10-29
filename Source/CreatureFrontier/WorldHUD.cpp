@@ -33,7 +33,7 @@ void ACFHUD::DrawWorldHUD(ACFPlayerCharacter* Player)
         {(Player->Pace->IsSlowWalking()?FString(TEXT("慢行 | ")):FString())+Player->GetCommandScopeText(),Green,2},
         {FString::Printf(TEXT("%s | 攻击 %.0f | 距离 %.1f米 | 护甲 %.0f%%"),Player->Equipment->GetState().bSpearEquipped?TEXT("长矛"):TEXT("徒手"),Player->GetPlayerAttackDamage(),Player->GetPlayerMeleeRange()/100,Player->Equipment->GetDamageReduction()*100)},
         {Player->Health<=0?FString(TEXT("已倒下：R 基地复活 | F9 读档")):FString::Printf(TEXT("右键 %s | 共鸣器 %d | 0 切换"),Player->CaptureComponent->UsesResonance()?TEXT("共鸣捕捉"):TEXT("普通捕捉"),Player->Inventory->Count(EFrontierItem::ResonanceDevice)),Yellow},
-        {TEXT("F1 帮助 | C 背包 | Tab 队伍 | I 图鉴 | Esc 暂停")}});
+        {TEXT("F1 帮助 | C 背包 | Tab 队伍 | I 图鉴 | 退出键暂停")}});
     TArray<FFrontierHUDRow> Feedback={{Player->Feedback,Yellow,Player->HasDeliverySelection()?2:3}};
     if(Player->HasDeliverySelection())Feedback.Add({TEXT("已选运输箱 | E 指派资源 | 对空按 V 清除"),Green,1});
     DrawHUDPanel(Layout.Feedback,Feedback);
