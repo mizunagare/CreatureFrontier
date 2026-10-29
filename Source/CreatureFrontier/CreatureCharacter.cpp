@@ -201,6 +201,8 @@ void ACreatureCharacter::NavigateTo(const FVector& Destination, float Acceptance
         Acceptance=160.f; // 退回主人位置时保留个人空间。
     }
     const auto Result=AI->MoveToLocation(Projected.Location, Acceptance, false, true, false, false, nullptr, false);
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFHollowDetourTrace")))
+        UE_LOG(LogTemp,Display,TEXT("CF_DETOUR_MOVE active=%d goal=%s projected=%s result=%d"),bHasFollowPathDetour,*NavigationGoal.ToString(),*Projected.Location.ToString(),static_cast<int32>(Result));
     if(Result==EPathFollowingRequestResult::Failed && Activity==ECreatureActivity::Follow && Tamer && Tamer->GetPawn())
         AI->MoveToActor(Tamer->GetPawn(),160,false,true,false,nullptr,false);
 }

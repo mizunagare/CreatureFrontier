@@ -29,13 +29,30 @@ const ACharacter* Blocker(const ACreatureCharacter* Self,FVector Start,FVector E
 bool ClearPath(const ACreatureCharacter* Self,const UNavigationPath* Path)
 {
     if(!Path || !Path->IsValid() || Path->IsPartial() || Path->PathPoints.Num()<2) return false;
+    const auto* Capsule=Self->GetCapsuleComponent();
+    const float HeightOffset=Self->GetActorLocation().Z-Path->PathPoints[0].Z;
+    FCollisionQueryParams Query(SCENE_QUERY_STAT(CompanionDetourClearance),false,Self);
+    if(Self->Activity==ECreatureActivity::Combat && Self->FocusTarget)Query.AddIgnoredActor(Self->FocusTarget);
     for(int32 Index=1;Index<Path->PathPoints.Num();++Index)
+    {
+        FVector Start=Path->PathPoints[Index-1]+FVector(0,0,HeightOffset);
+        const FVector End=Path->PathPoints[Index]+FVector(0,0,HeightOffset);
+        if(Index==1 && FVector::Dist2D(Start,Self->GetActorLocation())<40)Start=Self->GetActorLocation();
+        FHitResult VolumeHit;
+        if(FParse::Param(FCommandLine::Get(),TEXT("CFHollowDetourTrace")) && Self->GetWorld()->SweepSingleByChannel(VolumeHit,Start,End,FQuat::Identity,ECC_Pawn,
+            FCollisionShape::MakeCapsule(Capsule->GetScaledCapsuleRadius(),Capsule->GetScaledCapsuleHalfHeight()),Query))
+        {
+            if(FParse::Param(FCommandLine::Get(),TEXT("CFHollowDetourTrace")))
+                UE_LOG(LogTemp,Display,TEXT("CF_DETOUR_VOLUME_REJECT actor=%s from=%s to=%s"),*GetNameSafe(VolumeHit.GetActor()),*Start.ToString(),*End.ToString());
+            return false;
+        }
         if(const auto* Hit=Blocker(Self,Path->PathPoints[Index-1],Path->PathPoints[Index]))
         {
             if(FParse::Param(FCommandLine::Get(),TEXT("CFHollowDetourTrace")))
                 UE_LOG(LogTemp,Display,TEXT("CF_DETOUR_REJECT actor=%s segment=%d from=%s to=%s"),*GetNameSafe(Hit),Index,*Path->PathPoints[Index-1].ToString(),*Path->PathPoints[Index].ToString());
             return false;
         }
+    }
     return true;
 }
 }
