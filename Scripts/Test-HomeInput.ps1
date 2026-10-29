@@ -1,5 +1,6 @@
-param([string]$BuildRoot='',[string]$EngineRoot='D:\Epic\UE_5.8',[switch]$Room)
+param([string]$BuildRoot='',[string]$EngineRoot='D:\Epic\UE_5.8',[switch]$Room,[switch]$Work)
 $ErrorActionPreference='Stop'
+if($Work){$Room=$true}
 . (Join-Path $PSScriptRoot 'BuildFingerprint.ps1')
 $projectRoot=Split-Path $PSScriptRoot -Parent
 $module=if($BuildRoot){Join-Path $BuildRoot 'CreatureFrontier\Binaries\Win64\CreatureFrontier.exe'}else{Join-Path $projectRoot 'Binaries\Win64\UnrealEditor-CreatureFrontier.dll'}
@@ -22,6 +23,7 @@ foreach($name in @('FrontierHomeAutomation','FrontierHomeInvalid','FrontierHomeL
 }
 $arguments=@('-CFHomeTest','-CFHomeInputOnly','-nullrhi','-nosound','-unattended','-nop4',('-abslog="'+$log+'"'))
 if($Room){$arguments+='-CFHomeRoomInput'}
+if($Work){$arguments+=@('-CFHomeRoomWork','-CFFurnishedFarm')}
 $exe=$module
 if(!$BuildRoot){$exe=Join-Path $EngineRoot 'Engine\Binaries\Win64\UnrealEditor-Cmd.exe';$arguments=@((Join-Path $projectRoot 'CreatureFrontier.uproject'),'-game')+$arguments}
 $process=Start-Process -FilePath $exe -ArgumentList $arguments -WindowStyle Hidden -PassThru
@@ -31,9 +33,11 @@ $body=Get-Content -LiteralPath $log -Raw
 $completion=if($Room){'CF_HOME_ROOM_INPUT PASS modules=11 material=112 noSave=1'}else{'CF_HOME_INPUT_ONLY PASS noSave=1'}
 if($body -match '\bFAIL\b|Fatal error|Assertion failed' -or !$body.Contains('CF_HOME_INPUT_BINDINGS PASS floor=1 rotated=1 cancelled=1 material=192') -or !$body.Contains($completion)){throw "房屋输入绑定专项未通过或构建不支持：$log"}
 if($Room -and ([regex]::Matches($body,'CF_HOME_ROOM_INPUT_PART PASS')).Count -ne 10){throw '整屋输入缺少十次新增模块的实际成功记录'}
+if($Work){foreach($marker in @('CF_HOME_ROOM_WORK PASS noRebuild=1','CF_DOOR_FARM_CLOSED PASS','CF_FURNISHED_FARM PASS','CF_DOOR_FARM PASS')){if(!$body.Contains($marker)){throw "建房后伙伴工作链缺少必要标记：$marker"}}}
 if((Get-FrontierBuildFingerprint -LiteralPath $module) -ne $hash){throw '房屋输入测试期间模块发生变化'}
-[pscustomobject]@{Pass=$true;BuildSHA256=$hash;Log=$log} | Export-Csv -LiteralPath (Join-Path $run 'Results.csv') -NoTypeInformation
-if($Room){Write-Host '双格门窗房屋及储物箱共11模块预览输入通过；不是系统鼠标或自然移动建房验收'}
+[pscustomobject]@{Room=[bool]$Room;Work=[bool]$Work;Pass=$true;BuildSHA256=$hash;Log=$log} | Export-Csv -LiteralPath (Join-Path $run 'Results.csv') -NoTypeInformation
+if($Work){Write-Host '输入建房与原房伙伴闭门等待、开门工作及物资核对通过；未验收系统鼠标或自然移动建房'}
+elseif($Room){Write-Host '双格门窗房屋及储物箱共11模块预览输入通过；不是系统鼠标或自然移动建房验收'}
 else{Write-Host '地板预览放置、墙预览旋转与取消绑定通过；不是系统鼠标或整屋人工建造验收'}
 } finally {
     try {foreach($entry in $protected){

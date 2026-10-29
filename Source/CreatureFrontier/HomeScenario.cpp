@@ -27,6 +27,7 @@
 #include "UnrealClient.h"
 #include "Components/BoxComponent.h"
 #include "InputRoutingQA.h"
+#include "HomeDoorScenario.h"
 #include "InputKeyEventArgs.h"
 #include "GenericPlatform/GenericPlatformInputDeviceMapper.h"
 #include "PlayerEquipmentComponent.h"
@@ -552,6 +553,7 @@ void RunHomeScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
         FString Reason;const auto Layout=HomeLayout::Collect(World);
         Room &= Layout.Num()==11 && HomeLayout::Validate(Layout,Reason) && Hero->Inventory->Count(EFrontierItem::Material)==112;
         UE_LOG(LogTemp,Display,TEXT("CF_HOME_ROOM_INPUT %s modules=%d material=%d noSave=1"),Room?TEXT("PASS"):TEXT("FAIL"),Layout.Num(),Hero->Inventory->Count(EFrontierItem::Material));
+        if(Room && FParse::Param(FCommandLine::Get(),TEXT("CFHomeRoomWork"))){RunHomeDoorFarmScenario(World,Hero,0,true);return;}
         FPlatformMisc::RequestExitWithStatus(false,Room?0:1);return;
     }
     if(FParse::Param(FCommandLine::Get(),TEXT("CFHomeInputOnly")))

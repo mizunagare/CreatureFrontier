@@ -9,7 +9,7 @@ void RunHomeDoorNavigationScenario(UWorld* World,ACFPlayerCharacter* Hero,bool R
 void RunHomeWindowNavigationScenario(UWorld* World,ACFPlayerCharacter* Hero);
 void RunHomeWindowSkillScenario(UWorld* World,ACFPlayerCharacter* Hero);
 void RunHomeDoorPlayerScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Rotated=false);
-void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode=0);
+void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode=0,bool UseExistingRoom=false);
 namespace CFDoorNavigationQA
 {
     FVector Point(FVector Position,float Yaw);
