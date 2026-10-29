@@ -21,7 +21,7 @@ void RunConstructionHomeScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Rea
 {
     auto End=[Hero](bool Passed,const TCHAR* Reason){UE_LOG(LogTemp,Display,TEXT("CF_CONSTRUCTION_HOME %s reason=%s feedback=%s"),Passed?TEXT("PASS"):TEXT("FAIL"),Reason,*Hero->Feedback);FPlatformMisc::RequestExitWithStatus(false,Passed?0:1);return false;};
     const auto* Source=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("ConstructionInput"),0));
-    if(!Source || Source->FormatVersion!=(Read?35:34) || Source->HomeModules.Num()!=19 || Source->Facilities.Num()!=2 || !Hero->LoadProgress(TEXT("ConstructionInput")) ||
+    if(!Source || (Read?(Source->FormatVersion<35 || Source->FormatVersion>FrontierCurrentSaveVersion):Source->FormatVersion!=34) || Source->HomeModules.Num()!=19 || Source->Facilities.Num()!=2 || !Hero->LoadProgress(TEXT("ConstructionInput")) ||
         Hero->Inventory->Count(EFrontierItem::Material)!=(Read?0:2) || Hero->Inventory->Count(EFrontierItem::Food)!=1 || Hero->Inventory->Count(EFrontierItem::Seeds)!=1){End(false,TEXT("source"));return;}
     ACreatureCharacter* Pet=nullptr;AHomeModule* Crate=nullptr;AHomeModule* Fence=nullptr;AHomeModule* Door=nullptr;
     for(TActorIterator<ACreatureCharacter> It(World);It;++It)if(It->Tamer==Hero->GetController())Pet=*It;
@@ -46,7 +46,7 @@ void RunConstructionHomeScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Rea
         UE_LOG(LogTemp,Display,TEXT("CF_CONSTRUCTION_HOME_ORIGIN PASS version=34 modules=19 refund=2 originalMaterial=2 stock=4 pet=%s"),*Pet->PersistentId.ToString());
     }
     else if(!Fence->bUnderConstruction || Pet->Construction->GetSite()!=Fence || Pet->Cargo->Count()!=3 || Crate->StorageInventory->Count(EFrontierItem::Material)!=1){End(false,TEXT("resume"));return;}
-    if(Read){UE_LOG(LogTemp,Display,TEXT("CF_CONSTRUCTION_HOME_RESTORE PASS version=35 carried=3 stock=1 identity=1"));}
+    if(Read){UE_LOG(LogTemp,Display,TEXT("CF_CONSTRUCTION_HOME_RESTORE PASS version=%d carried=3 stock=1 identity=1"),Source->FormatVersion);}
     for(TActorIterator<AWildEncounter> It(World);It;++It)It->SetActorTickEnabled(false);
     for(TActorIterator<ACreatureCharacter> It(World);It;++It)if(*It!=Pet){It->SetActorTickEnabled(false);It->GetCharacterMovement()->DisableMovement();}
     const auto PetId=Pet->PersistentId,SiteId=Fence->PersistentId,BoxId=Crate->PersistentId;
@@ -59,12 +59,12 @@ void RunConstructionHomeScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Rea
         const double Step=FVector::Dist(Pet->GetActorLocation(),*Previous);*Previous=Pet->GetActorLocation();*Travel+=Step;
         if(Step>120 || !Pet->IsActorTickEnabled() || !Pet->GetActorEnableCollision() || Pet->Health<=0 || Hero->Health<=0 ||
             Crate->StorageInventory->Count(EFrontierItem::Material)+Fence->StorageInventory->Count(EFrontierItem::Material)+Pet->Cargo->Count()+(Fence->bUnderConstruction?0:Fence->PaidMaterials)!=4)return End(false,TEXT("conservation"));
-        if(!*SavedMid && Pet->Cargo->Count()==3){if(!Hero->SaveProgress(TEXT("ConstructionHomeMid")))return End(false,TEXT("mid"));*SavedMid=true;UE_LOG(LogTemp,Display,TEXT("CF_CONSTRUCTION_HOME_MID PASS version=35 carried=3 identity=1"));}
+        if(!*SavedMid && Pet->Cargo->Count()==3){if(!Hero->SaveProgress(TEXT("ConstructionHomeMid")))return End(false,TEXT("mid"));*SavedMid=true;UE_LOG(LogTemp,Display,TEXT("CF_CONSTRUCTION_HOME_MID PASS version=36 carried=3 identity=1"));}
         if(Fence->bUnderConstruction)return true;
         if(!*SavedMid || *Travel<600 || Fence->PersistentId!=SiteId || Pet->Experience!=8 || Pet->BondPoints!=6 || Pet->Cargo->Count()!=0 || Pet->Construction->GetSite() ||
             !Bag.OrderIndependentCompareEqual(Hero->Inventory->GetStacks()) || !Hero->SaveProgress(TEXT("ConstructionHomeDone")) || !Hero->LoadProgress(TEXT("ConstructionHomeDone")))return End(false,TEXT("done"));
         const auto* Done=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("ConstructionHomeDone"),0));
-        if(!Done || Done->FormatVersion!=35 || Done->HomeModules.Num()!=19 || Done->Facilities.Num()!=2)return End(false,TEXT("done-save"));
+        if(!Done || Done->FormatVersion!=FrontierCurrentSaveVersion || Done->HomeModules.Num()!=19 || Done->Facilities.Num()!=2)return End(false,TEXT("done-save"));
         for(const auto& Old:SourceHouse)
         {
             if(Old.Transform.GetLocation().Equals(FVector(0,-600,-30),.01))continue;
@@ -75,6 +75,6 @@ void RunConstructionHomeScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Rea
         const auto* Built=Done->HomeModules.FindByPredicate([&](const FHomeModuleRecord& R){return R.Id==SiteId;});
         const auto* Box=Done->HomeModules.FindByPredicate([&](const FHomeModuleRecord& R){return R.Id==BoxId;});
         if(!Worker || Worker->Experience!=8 || Worker->BondPoints!=6 || Worker->ConstructionModuleId.IsValid() || Worker->Activity!=ECreatureActivity::Follow || !Built || Built->bUnderConstruction || Built->PaidMaterials!=4 || !Box || Box->StoredItems.FindRef(EFrontierItem::Material)!=0)return End(false,TEXT("identity-done"));
-        UE_LOG(LogTemp,Display,TEXT("CF_CONSTRUCTION_HOME_DONE PASS version=35 modules=19 retained=18 material=0 food=1 seeds=1 cost=4 travel=%.1f pet=%s site=%s"),*Travel,*PetId.ToString(),*SiteId.ToString());return End(true,TEXT("complete"));
+        UE_LOG(LogTemp,Display,TEXT("CF_CONSTRUCTION_HOME_DONE PASS version=36 modules=19 retained=18 material=0 food=1 seeds=1 cost=4 travel=%.1f pet=%s site=%s"),*Travel,*PetId.ToString(),*SiteId.ToString());return End(true,TEXT("complete"));
     }));
 }

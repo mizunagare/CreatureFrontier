@@ -44,6 +44,8 @@ bool FHomeRestoreTransaction::Stage(UFrontierSaveGame* Save)
     for(auto& Record:Save->HomeModules) if(!Record.Definition.LoadSynchronous()) return false;
     for(auto& Record:Save->HomeModules)
     {
+        if(!Record.ConstructionOriginalDefinition.IsNull() && (Save->FormatVersion<36 || !Record.ConstructionOriginalDefinition.LoadSynchronous()))return false;
+        if(auto* Original=Record.ConstructionOriginalDefinition.Get();Original && !UResearchComponent::Meets(Save->Research,Original->RequiredResearch))return false;
         if(Save->FormatVersion<35 && (Record.bUnderConstruction || Record.ConstructionCrateId.IsValid() || Record.ConstructionWork!=0))return false;
         if(Record.ConstructionCrateId.IsValid() && !Save->HomeModules.ContainsByPredicate([&](const FHomeModuleRecord& Source){return Source.Id==Record.ConstructionCrateId && Source.Definition.Get() && Source.Definition.Get()->Kind==EHomeModuleKind::Storage && !Source.bUnderConstruction;}))return false;
         const auto Kind=Record.Definition.Get()->Kind;
@@ -103,6 +105,7 @@ bool FHomeRestoreTransaction::Stage(UFrontierSaveGame* Save)
         Module->PaidMaterials=Record.PaidMaterials;
         Module->PaidExtraItems=Record.PaidExtraItems;
         Module->bUnderConstruction=Record.bUnderConstruction;Module->ConstructionCrateId=Record.ConstructionCrateId;Module->ConstructionWork=Record.ConstructionWork;
+        Module->ConstructionOriginalDefinition=Record.ConstructionOriginalDefinition.Get();
         Module->DoorState=Record.DoorState;
         Module->bStaged=true; Module->SetActorEnableCollision(false); Module->FinishSpawning(Record.Transform); Staged.Add(Module);
         if(!Module->StorageInventory->Restore(Record.StoredItems)) return false;

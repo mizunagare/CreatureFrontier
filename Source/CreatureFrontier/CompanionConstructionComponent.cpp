@@ -73,7 +73,7 @@ bool UCompanionConstructionComponent::TickWork(float DeltaSeconds,ACFPlayerChara
         const int32 Amount=FMath::Min3(Missing,UCompanionCargoComponent::Capacity,Crate->StorageInventory->Count(EFrontierItem::Material));
         Crate->StorageInventory->TransferTo(Pet->CargoInventory,{{EFrontierItem::Material,Amount}});return true;
     }
-    if(!Reach(Site)){Approach(Site);return true;}Pet->StopNavigation();bWorking=true;Site->ConstructionWork=FMath::Min(6.f,Site->ConstructionWork+DeltaSeconds*(Pet->Nutrition<20?.5f:1.f));
+    if(!Reach(Site) || !Site->ClearsCompletedPawn(Pet,Pet->GetActorLocation())){Approach(Site);return true;}Pet->StopNavigation();bWorking=true;Site->ConstructionWork=FMath::Min(6.f,Site->ConstructionWork+DeltaSeconds*(Pet->Nutrition<20?.5f:1.f));
     if(Site->ConstructionWork>=6 && Hero->HomeBuilding->CompleteConstruction(Site)){Cancel();Pet->bResumeWorkAfterRest=false;Pet->SetActivity(ECreatureActivity::Follow);}
     return true;
 }

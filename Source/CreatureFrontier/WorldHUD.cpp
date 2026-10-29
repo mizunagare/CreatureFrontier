@@ -52,7 +52,7 @@ void ACFHUD::DrawWorldHUD(ACFPlayerCharacter* Player)
     for(TActorIterator<AWildEncounter> It(GetWorld());It;++It)if(Player->GetDistanceTo(*It)<Distance){Distance=Player->GetDistanceTo(*It);Nearest=*It;}
     if(Nearest)Research.Add({Nearest->GetStatus(),Nearest->bBoss?Yellow:Green,2});DrawHUDPanel(Layout.Research,Research);
     TArray<FFrontierHUDRow> Rows;
-    if(Player->Building->IsActive()){Audit.Context=EFrontierHUDContext::Building;Rows.Add({TEXT("建造模式"),Yellow});Rows.Add({Player->Building->GetHint(),Yellow,7});}
+    if(Player->Building->IsActive()){Audit.Context=EFrontierHUDContext::Building;Rows.Add({TEXT("建造模式"),Yellow});Rows.Add({Player->Building->GetHint(),Yellow,9});}
     else if(Player->Health<=0 && !Creature)Rows.Add({TEXT("倒下时无法交互，请先复活或读档"),Yellow,2});
     else if(Creature)
     {

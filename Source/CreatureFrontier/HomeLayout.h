@@ -16,6 +16,7 @@ struct FHomeModuleRecord
     UPROPERTY() bool bUnderConstruction=false;
     UPROPERTY() FGuid ConstructionCrateId;
     UPROPERTY() float ConstructionWork=0;
+    UPROPERTY() TSoftObjectPtr<UHomeModuleDefinition> ConstructionOriginalDefinition;
     UPROPERTY() TSoftObjectPtr<UHomeModuleDefinition> Definition;
     UPROPERTY() FTransform Transform;
 };

@@ -30,8 +30,11 @@ public:
     UPROPERTY() bool bUnderConstruction=false;
     UPROPERTY() FGuid ConstructionCrateId;
     UPROPERTY() float ConstructionWork=0;
+    // 原位改建保留原墙定义和历史支付成本；完工或取消前不撤销旧墙承重。
+    UPROPERTY() TObjectPtr<UHomeModuleDefinition> ConstructionOriginalDefinition;
     static AHomeModule* TraceConstruction(class ACFPlayerCharacter* Hero);
     FString ConstructionStatus() const;
+    bool ClearsCompletedPawn(const class ACharacter* Pawn,const FVector& Center) const;
     EHomeModuleKind GetKind() const { return Definition?Definition->Kind:EHomeModuleKind::Floor; }
     static TArray<FHomePart> Parts(EHomeModuleKind Kind);
     static TArray<FHomePart> PlacementParts(EHomeModuleKind Kind);

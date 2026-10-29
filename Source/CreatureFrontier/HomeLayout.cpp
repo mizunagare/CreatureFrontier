@@ -13,12 +13,19 @@ namespace
 {
 bool Grid(double Value,double Step) { return FMath::IsNearlyEqual(Value,FMath::GridSnap(Value,Step),.01); }
 bool IsWall(EHomeModuleKind Kind) { return Kind==EHomeModuleKind::Wall || Kind==EHomeModuleKind::Doorway || Kind==EHomeModuleKind::Door || Kind==EHomeModuleKind::Window; }
+bool Renovatable(EHomeModuleKind Kind) { return Kind==EHomeModuleKind::Wall || Kind==EHomeModuleKind::Doorway || Kind==EHomeModuleKind::Window; }
+TArray<FHomePart> RecordParts(const FHomeModuleRecord& Record)
+{
+    auto Result=AHomeModule::Parts(Record.Definition.Get()->Kind);
+    if(const auto* Original=Record.ConstructionOriginalDefinition.Get())Result.Append(AHomeModule::Parts(Original->Kind));
+    return Result;
+}
 bool At(const FHomeModuleRecord& Record,const FVector& Position,double Yaw)
 { return Record.Transform.GetLocation().Equals(Position,.01) && FMath::IsNearlyEqual(Record.Transform.Rotator().Yaw,Yaw,.01); }
 bool WallAt(const TArray<FHomeModuleRecord>& Records,const FVector& Position,double Yaw)
 {
     for(const auto& Other:Records)
-        if(auto* Definition=Other.Definition.Get();Definition && !Other.bUnderConstruction && IsWall(Definition->Kind) && At(Other,Position,Yaw)) return true;
+        if(auto* Definition=Other.Definition.Get();Definition && (!Other.bUnderConstruction || Other.ConstructionOriginalDefinition.Get()) && IsWall(Definition->Kind) && At(Other,Position,Yaw)) return true;
     return false;
 }
 bool OppositeWalls(const TArray<FHomeModuleRecord>& Records,FVector Floor)
@@ -32,7 +39,9 @@ bool HomeLayout::IsFloorHeight(double Z)
 bool HomeLayout::IsCanonical(const FHomeModuleRecord& Record)
 {
     const auto* Definition=Record.Definition.Get();
-    if(!Record.Id.IsValid() || !Definition || !Definition->IsValidDefinition() || (Record.bUnderConstruction?Record.PaidMaterials!=0:Record.PaidMaterials<2) || Record.PaidMaterials>100 || Record.Transform.ContainsNaN() ||
+    const auto* Original=Record.ConstructionOriginalDefinition.Get();
+    if(!Record.ConstructionOriginalDefinition.IsNull() && (!Original || !Record.bUnderConstruction || !Original->IsValidDefinition() || !Renovatable(Original->Kind) || !Definition || !Renovatable(Definition->Kind) || Original==Definition || !Original->ExtraCosts.IsEmpty()))return false;
+    if(!Record.Id.IsValid() || !Definition || !Definition->IsValidDefinition() || (Record.bUnderConstruction && !Original?Record.PaidMaterials!=0:Record.PaidMaterials<2) || Record.PaidMaterials>100 || Record.Transform.ContainsNaN() ||
         !Record.Transform.GetRotation().IsNormalized() || !Record.Transform.GetScale3D().Equals(FVector::OneVector,.001)) return false;
     const FVector Position=Record.Transform.GetLocation(); const auto Rotation=Record.Transform.Rotator();
     for(const auto& Cost:Record.PaidExtraItems) if(Cost.Key==EFrontierItem::Material || Cost.Key>=EFrontierItem::Count || Cost.Value<=0 || Cost.Value>999) return false;
@@ -106,7 +115,7 @@ bool HomeLayout::Validate(const TArray<FHomeModuleRecord>& Records,FString& Reas
     for(const auto& Stair:Records)if(Stair.Definition.Get()->Kind==EHomeModuleKind::Stairs)
         for(const auto& Other:Records)if(Other.Id!=Stair.Id)
             for(const auto& Reserved:AHomeModule::PlacementParts(EHomeModuleKind::Stairs))
-                for(const auto& Part:AHomeModule::Parts(Other.Definition.Get()->Kind))
+                for(const auto& Part:RecordParts(Other))
                 {
                     const auto Space=FBox(Reserved.Center-Reserved.Extent+FVector(1),Reserved.Center+Reserved.Extent-FVector(1)).TransformBy(Stair.Transform.ToMatrixWithScale());
                     const auto Solid=FBox(Part.Center-Part.Extent+FVector(1),Part.Center+Part.Extent-FVector(1)).TransformBy(Other.Transform.ToMatrixWithScale());
@@ -118,7 +127,7 @@ bool HomeLayout::Validate(const TArray<FHomeModuleRecord>& Records,FString& Reas
             const auto Reserved=AHomeModule::DoorReservation(Door.Transform);
             if(Other.Definition.Get()->Kind==EHomeModuleKind::Door && Reserved.Intersect(AHomeModule::DoorReservation(Other.Transform)))
             {Reason=TEXT("两扇门的活动空间重叠");return false;}
-            for(const auto& Part:AHomeModule::Parts(Other.Definition.Get()->Kind))
+            for(const auto& Part:RecordParts(Other))
                 if(Reserved.Intersect(FBox(Part.Center-Part.Extent+FVector(1),Part.Center+Part.Extent-FVector(1)).TransformBy(Other.Transform.ToMatrixWithScale())))
                 {Reason=TEXT("门扇活动空间被其他房屋模块占用");return false;}
         }
@@ -152,6 +161,7 @@ TArray<FHomeModuleRecord> HomeLayout::Collect(UWorld* World)
         Result.Last().bUnderConstruction=It->bUnderConstruction;
         Result.Last().ConstructionCrateId=It->ConstructionCrateId;
         Result.Last().ConstructionWork=It->ConstructionWork;
+        Result.Last().ConstructionOriginalDefinition=It->ConstructionOriginalDefinition.Get();
     }
     return Result;
 }
@@ -166,7 +176,9 @@ bool HomeLayout::ValidateTerrain(UWorld* World,const FHomeModuleRecord& Record,F
         if(It->IsA<AHomeModule>() || (Station && Station->bPlayerBuilt) || It->IsA<AResourceNode>() || It->IsA<AWorldLoot>() || It->IsA<ACreatureCharacter>() || It->IsA<ACFPlayerCharacter>()) Params.AddIgnoredActor(*It);
     }
     const auto Objects=FCollisionObjectQueryParams(ECC_WorldStatic);
-    for(const auto& Part:AHomeModule::PlacementParts(Record.Definition.Get()->Kind))
+    auto Geometry=AHomeModule::PlacementParts(Record.Definition.Get()->Kind);
+    if(const auto* Original=Record.ConstructionOriginalDefinition.Get())Geometry.Append(AHomeModule::Parts(Original->Kind));
+    for(const auto& Part:Geometry)
         if(World->OverlapAnyTestByObjectType(Record.Transform.GetLocation()+Record.Transform.GetRotation().RotateVector(Part.Center),Record.Transform.GetRotation(),Objects,
             FCollisionShape::MakeBox(Part.Extent-FVector(1)),Params))
         { Reason=TEXT("模块与场景几何体相交"); return false; }

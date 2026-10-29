@@ -22,6 +22,7 @@ public:
     bool CompleteConstruction(AHomeModule* Module);
     bool Dismantle(AHomeModule* Module);
     AHomeModule* ReplaceWall(AHomeModule* Module);
+    AHomeModule* QueueWallReplacement(AHomeModule* Module);
     void ConfirmAimedReplacement();
     bool ValidatePlacement(const FTransform& Transform,FGuid FloorId,FString& Reason,bool Plan=false,const AHomeModule* Completing=nullptr) const;
     EHomeModuleKind Selected=EHomeModuleKind::Floor;
@@ -37,5 +38,6 @@ private:
     FString Status;
     TWeakObjectPtr<AHomeModule> PendingReplacement;
     EHomeModuleKind PendingKind=EHomeModuleKind::Floor;
+    bool bPendingConstruction=false;
     double ReplacementDeadline=0;
 };
