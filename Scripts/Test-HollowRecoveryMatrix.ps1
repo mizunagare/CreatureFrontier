@@ -3,8 +3,8 @@ param([switch]$Editor,[string]$BuildRoot='',[string]$EngineRoot='D:\Epic\UE_5.8'
 $ErrorActionPreference='Stop'
 if(!$FrameCaps.Count -or @($FrameCaps | Select-Object -Unique).Count -ne $FrameCaps.Count){throw '帧率轴不能为空或重复'}
 foreach($cap in $FrameCaps){if($cap -lt 15 -or $cap -gt 240){throw '帧率上限须为15到240'}}
-if($Editor -and $BuildRoot){throw 'Editor和BuildRoot不能同时指定'}
-if(!$Editor -and !$BuildRoot){throw '请指定Editor或BuildRoot'}
+if($Editor -and $BuildRoot){throw '不能同时指定编辑器模式和打包目录'}
+if(!$Editor -and !$BuildRoot){throw '请指定编辑器模式（-Editor）或打包目录（-BuildRoot）'}
 $projectRoot=Split-Path $PSScriptRoot -Parent
 . (Join-Path $PSScriptRoot 'BuildFingerprint.ps1')
 $root=if($Editor){$projectRoot}else{(Resolve-Path -LiteralPath $BuildRoot).Path}

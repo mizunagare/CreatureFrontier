@@ -3,7 +3,7 @@ param([string]$BuildRoot='', [switch]$Editor, [switch]$ReuseInput, [switch]$Prev
       [string]$EngineRoot='D:\Epic\UE_5.8')
 $ErrorActionPreference='Stop'
 $projectRoot=Split-Path $PSScriptRoot -Parent
-if($Celebrate -and !$Journey){throw 'Celebrate需要Journey模式'}
+if($Celebrate -and !$Journey){throw '归家庆祝需要同时启用旅程模式（-Journey）'}
 if($Width -lt 640 -or $Width -gt 4096 -or $Height -lt 360 -or $Height -gt 2160){throw '预览尺寸超出安全范围'}
 if($Editor){
     $exe=Join-Path $EngineRoot 'Engine\Binaries\Win64\UnrealEditor.exe'
@@ -11,7 +11,7 @@ if($Editor){
     $prefix=@((Join-Path $projectRoot 'CreatureFrontier.uproject'),'/Game/Maps/L_Prototype','-game')
     $saveRoot=Join-Path $projectRoot 'Saved\SaveGames'
 }else{
-    if(!$BuildRoot){throw '打包模式必须指定BuildRoot'}
+    if(!$BuildRoot){throw '打包模式必须指定程序目录（-BuildRoot）'}
     $exe=Join-Path $BuildRoot 'CreatureFrontier\Binaries\Win64\CreatureFrontier.exe'
     $working=$BuildRoot;$prefix=@();$saveRoot=Join-Path $BuildRoot 'CreatureFrontier\Saved\SaveGames'
 }
@@ -90,7 +90,7 @@ foreach($case in $cases){
         if(@($frames | Sort-Object -Unique).Count -ne $expectedFrames){throw '取景布局帧重复'}
     }
     if((Get-FileHash -LiteralPath $exe).Hash -ne $buildHash){throw '测试程序发生变化'}
-    if($module -and (Get-FileHash -LiteralPath $module).Hash -ne $moduleHash){throw 'Editor游戏模块发生变化'}
+    if($module -and (Get-FileHash -LiteralPath $module).Hash -ne $moduleHash){throw '编辑器游戏模块发生变化'}
     $results+=[pscustomobject]@{Flag=$case.Flag;Pass=$true;Editor=[bool]$Editor;Preview=[bool]$Preview;Journey=[bool]$Journey;Celebrate=[bool]$Celebrate;Resolution=($Width.ToString()+'x'+$Height);InputSHA256=$inputHash;BuildSHA256=$buildHash;ModuleSHA256=$moduleHash;Log=$log}
     $results | Export-Csv -LiteralPath (Join-Path $run 'Results.csv') -NoTypeInformation
     Write-Host "$($case.Flag)：通过，输入文件未改写"

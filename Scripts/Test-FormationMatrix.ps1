@@ -12,7 +12,7 @@ param(
 $ErrorActionPreference='Stop'
 if(!$FrameCaps.Count -or !$LeaderForms.Count -or !$SideOrders.Count) { throw '矩阵轴不能为空' }
 foreach($cap in $FrameCaps) { if($cap -ne 0 -and ($cap -lt 15 -or $cap -gt 240)) { throw '帧率上限须为0（不限）或15到240' } }
-foreach($leader in $LeaderForms) { if($leader -lt 0 -or $leader -gt 2) { throw '领队形态须为0（草叶）、1（炎火）或2（岩石）' } }
+foreach($leader in $LeaderForms) { if($leader -lt 0 -or $leader -gt 2) { throw '领队形态须为0（草叶）、1（余烬）或2（岩石）' } }
 foreach($order in $SideOrders) { if($order -ne 0 -and $order -ne 1) { throw '队列顺序须为0（循环）或1（逆序）' } }
 if(@($FrameCaps | Select-Object -Unique).Count -ne $FrameCaps.Count -or
     @($LeaderForms | Select-Object -Unique).Count -ne $LeaderForms.Count -or
@@ -20,12 +20,12 @@ if(@($FrameCaps | Select-Object -Unique).Count -ne $FrameCaps.Count -or
 $projectRoot=Split-Path $PSScriptRoot -Parent
 . (Join-Path $PSScriptRoot 'BuildFingerprint.ps1')
 if($Editor){
-    if($BuildRoot){throw 'Editor与BuildRoot不能同时指定'}
+    if($BuildRoot){throw '不能同时指定编辑器模式和打包目录'}
     $resolvedRoot=$projectRoot
     $exe=Join-Path $EngineRoot 'Engine\Binaries\Win64\UnrealEditor-Cmd.exe'
     $module=Join-Path $projectRoot 'Binaries\Win64\UnrealEditor-CreatureFrontier.dll'
 }else{
-    if(!$BuildRoot){throw '请指定Editor或BuildRoot'}
+    if(!$BuildRoot){throw '请指定编辑器模式（-Editor）或打包目录（-BuildRoot）'}
     $resolvedRoot=(Resolve-Path -LiteralPath $BuildRoot).Path
     $exe=Join-Path $resolvedRoot 'CreatureFrontier\Binaries\Win64\CreatureFrontier.exe'
     $module=$exe
