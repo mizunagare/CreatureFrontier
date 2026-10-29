@@ -1,4 +1,4 @@
-param([string]$BuildRoot='',[string]$EngineRoot='D:\Epic\UE_5.8')
+param([string]$BuildRoot='',[string]$EngineRoot='D:\Epic\UE_5.8',[switch]$Preview)
 $ErrorActionPreference='Stop'
 . (Join-Path $PSScriptRoot 'BuildFingerprint.ps1')
 $projectRoot=Split-Path $PSScriptRoot -Parent
@@ -20,6 +20,7 @@ try {
     }
     $log=Join-Path $run 'WorkAim.log'
     $arguments=@('-CFWorkCycleTest','-CFWorkAimTest','-nullrhi','-nosound','-unattended','-nop4',('-abslog="'+$log+'"'))
+    if($Preview){$arguments=@($arguments | Where-Object {$_ -ne '-nullrhi'});$arguments+=@('-CFWorkAimPreview','-RenderOffscreen','-ForceRes','-ResX=1280','-ResY=720','-norhithread','-forcerhibypass','-ExecCmds="t.MaxFPS 60"')}
     $exe=$module
     if(!$BuildRoot){$exe=Join-Path $EngineRoot 'Engine\Binaries\Win64\UnrealEditor-Cmd.exe';$arguments=@((Join-Path $projectRoot 'CreatureFrontier.uproject'),'-game')+$arguments}
     $process=Start-Process -FilePath $exe -ArgumentList $arguments -WindowStyle Hidden -PassThru
@@ -27,6 +28,20 @@ try {
     if($process.ExitCode -ne 0 -or !(Test-Path -LiteralPath $log)){throw "设施瞄准派工未正常通过：$log"}
     $body=Get-Content -LiteralPath $log -Raw
     if($body -match '\bFAIL\b|Fatal error|Assertion failed' -or !$body.Contains('CF_WORK_AIM PASS aimedFar=1 nearestFallback=1 feedingPreserved=1 noSave=1')){throw "设施瞄准派工标记不完整或构建不支持：$log"}
+    if($Preview){
+        if(!$body.Contains('CF_WORK_AIM_PREVIEW PASS')){throw '派工反馈预览未完成'}
+        $match=[regex]::Match($body,'CF_WORK_AIM_PREVIEW_ROOT [^\r\n]*?([A-F0-9]{32})\s*\r?\n')
+        if(!$match.Success){throw '派工反馈缺少独立截图目录'}
+        $savedRoot=if($BuildRoot){Join-Path $BuildRoot 'CreatureFrontier\Saved'}else{Join-Path $projectRoot 'Saved'}
+        foreach($scene in @('Aimed','Fallback','Feeding')){
+            $source=Join-Path $savedRoot ('WorkAimPreview\'+$match.Groups[1].Value+'\'+$scene+'.png')
+            $png=[IO.File]::ReadAllBytes($source)
+            if($png.Length -lt 24 -or $png[0] -ne 137 -or $png[1] -ne 80){throw '派工反馈截图不是PNG'}
+            $width=$png[16]*16777216+$png[17]*65536+$png[18]*256+$png[19];$height=$png[20]*16777216+$png[21]*65536+$png[22]*256+$png[23]
+            if($width -ne 1280 -or $height -ne 720){throw '派工反馈截图尺寸不符'}
+            Copy-Item -LiteralPath $source -Destination (Join-Path $run ($scene+'.png'))
+        }
+    }
     if((Get-FrontierBuildFingerprint -LiteralPath $module) -ne $hash){throw '设施瞄准派工测试期间模块变化'}
     [pscustomobject]@{Pass=$true;BuildSHA256=$hash;Log=$log} | Export-Csv -LiteralPath (Join-Path $run 'Results.csv') -NoTypeInformation
     Write-Host '瞄准较远设施、就近回退及喂食槽不改原指令通过；不代表自然工作或硬件输入验收'

@@ -16,6 +16,9 @@
 #include "Misc/Parse.h"
 #include "Camera/CameraComponent.h"
 #include "InputRoutingQA.h"
+#include "Misc/Paths.h"
+#include "HAL/FileManager.h"
+#include "UnrealClient.h"
 
 void RunWorkCycleScenario(UWorld* World, ACFPlayerCharacter* Hero)
 {
@@ -32,7 +35,7 @@ void RunWorkCycleScenario(UWorld* World, ACFPlayerCharacter* Hero)
         if(!Near || !Far || !Trough || !Leaf){UE_LOG(LogTemp,Error,TEXT("CF_WORK_AIM FAIL fixture %s"),*Hero->Feedback);FPlatformMisc::RequestExitWithStatus(false,1);return;}
         const FTransform At(FVector(-550,-1200,40));auto* Pet=World->SpawnActorDeferred<ACreatureCharacter>(ACreatureCharacter::StaticClass(),At,nullptr,nullptr,ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
         Pet->Definition=Leaf;Pet->FinishSpawning(At);Pet->Tame(Hero->GetController());
-        auto Aim=[&](FVector Target){const auto View=(Target-Hero->FirstPersonCamera->GetComponentLocation()).Rotation();Hero->GetController()->SetControlRotation(View);Hero->FirstPersonCamera->SetWorldRotation(View);};
+        auto Aim=[Hero](FVector Target){const auto View=(Target-Hero->FirstPersonCamera->GetComponentLocation()).Rotation();Hero->GetController()->SetControlRotation(View);Hero->FirstPersonCamera->SetWorldRotation(View);};
         Aim(Far->GetActorLocation()+FVector(0,0,20));
         const bool Target=CFInputQA::Press(Hero,EKeys::E) && Pet->WorkSite==Far && Pet->Activity==ECreatureActivity::Work;
         Aim(Hero->FirstPersonCamera->GetComponentLocation()+FVector(0,0,500));
@@ -41,6 +44,21 @@ void RunWorkCycleScenario(UWorld* World, ACFPlayerCharacter* Hero)
         const bool Feeding=CFInputQA::Press(Hero,EKeys::E) && !Pet->WorkSite && Pet->Activity==ECreatureActivity::Follow;
         const bool Pass=Target && Fallback && Feeding;
         UE_LOG(LogTemp,Display,TEXT("CF_WORK_AIM %s aimedFar=%d nearestFallback=%d feedingPreserved=%d noSave=1"),Pass?TEXT("PASS"):TEXT("FAIL"),Target,Fallback,Feeding);
+        if(Pass && FParse::Param(FCommandLine::Get(),TEXT("CFWorkAimPreview")))
+        {
+            const FString Root=FPaths::ProjectSavedDir()/TEXT("WorkAimPreview")/FGuid::NewGuid().ToString(EGuidFormats::Digits);
+            IFileManager::Get().MakeDirectory(*Root,true);UE_LOG(LogTemp,Display,TEXT("CF_WORK_AIM_PREVIEW_ROOT %s"),*Root);
+            Aim(Far->GetActorLocation()+FVector(0,0,20));CFInputQA::Press(Hero,EKeys::E);
+            FTimerHandle A,B,C,D,E,Done;
+            World->GetTimerManager().SetTimer(A,[Root](){FScreenshotRequest::RequestScreenshot(Root/TEXT("Aimed.png"),false,false);},.7f,false);
+            World->GetTimerManager().SetTimer(B,[Hero,Aim](){Aim(Hero->FirstPersonCamera->GetComponentLocation()+FVector(0,0,500));CFInputQA::Press(Hero,EKeys::E);},1.2f,false);
+            World->GetTimerManager().SetTimer(C,[Root](){FScreenshotRequest::RequestScreenshot(Root/TEXT("Fallback.png"),false,false);},1.7f,false);
+            World->GetTimerManager().SetTimer(D,[Hero,Trough,Aim](){Hero->CommandFollow();Aim(Trough->GetActorLocation()+FVector(0,0,20));CFInputQA::Press(Hero,EKeys::E);},2.2f,false);
+            World->GetTimerManager().SetTimer(E,[Root](){FScreenshotRequest::RequestScreenshot(Root/TEXT("Feeding.png"),false,false);},2.7f,false);
+            World->GetTimerManager().SetTimer(Done,[Root](){bool Ready=true;for(const TCHAR* Scene:{TEXT("Aimed"),TEXT("Fallback"),TEXT("Feeding")})Ready &= IFileManager::Get().FileSize(*(Root/(FString(Scene)+TEXT(".png"))))>1000;
+                UE_LOG(LogTemp,Display,TEXT("CF_WORK_AIM_PREVIEW %s"),Ready?TEXT("PASS"):TEXT("FAIL"));FPlatformMisc::RequestExitWithStatus(false,Ready?0:1);},3.5f,false);
+            return;
+        }
         FPlatformMisc::RequestExitWithStatus(false,Pass?0:1);return;
     }
     UCreatureDefinition* Leaf = nullptr;
