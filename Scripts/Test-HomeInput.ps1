@@ -1,5 +1,6 @@
-param([string]$BuildRoot='',[string]$EngineRoot='D:\Epic\UE_5.8',[switch]$Room,[switch]$Work,[ValidateSet('Test','Write','Read')][string]$Mode='Test',[switch]$Fence,[switch]$FenceNavigation,[switch]$FencePreview,[switch]$Courtyard,[switch]$Gathered,[switch]$Carried,[switch]$Befriended,[switch]$Walking)
+param([string]$BuildRoot='',[string]$EngineRoot='D:\Epic\UE_5.8',[switch]$Room,[switch]$Work,[ValidateSet('Test','Write','Read')][string]$Mode='Test',[switch]$Fence,[switch]$FenceNavigation,[switch]$FencePreview,[switch]$Courtyard,[switch]$Gathered,[switch]$Carried,[switch]$Befriended,[switch]$Walking,[switch]$Living)
 $ErrorActionPreference='Stop'
+if($Living){$Walking=$true}
 if($Walking){$Befriended=$true}
 if($Befriended){$Carried=$true}
 if($Carried){$Gathered=$true}
@@ -25,6 +26,7 @@ if(!$mutex.WaitOne(0)){$mutex.Dispose();throw '房屋输入测试正在运行'}
 $protected=@()
 try {
 $slots=@('FrontierHomeAutomation','FrontierHomeInvalid','FrontierHomeLegacy');if($Gathered){$slots+='HomeGatheredAutomation'}
+if($Living){$slots+='HomeLifeAutomation'}
 foreach($name in $slots){
     $path=Join-Path $saveRoot ($name+'.sav');$existed=Test-Path -LiteralPath $path
     $backup=Join-Path $run ($name+'-before.sav');$beforeHash=''
@@ -44,11 +46,12 @@ if($Gathered){$arguments+='-CFHomeGatheredWork'}
 if($Carried){$arguments+='-CFHomeCarriedWork'}
 if($Befriended){$arguments+='-CFHomeBefriendedWork'}
 if($Walking){$arguments+='-CFHomeWalkingWork'}
+if($Living){$arguments+='-CFHomeLivingWork'}
 if($FencePreview){$arguments=@($arguments | Where-Object {$_ -ne '-nullrhi'});$arguments+=@('-CFHomeFencePreview','-RenderOffscreen','-ForceRes','-ResX=1280','-ResY=720','-norhithread','-forcerhibypass','-ExecCmds="t.MaxFPS 60"')}
 $exe=$module
 if(!$BuildRoot){$exe=Join-Path $EngineRoot 'Engine\Binaries\Win64\UnrealEditor-Cmd.exe';$arguments=@((Join-Path $projectRoot 'CreatureFrontier.uproject'),'-game')+$arguments}
 $process=Start-Process -FilePath $exe -ArgumentList $arguments -WindowStyle Hidden -PassThru
-$timeout=if($Walking){480000}elseif($Befriended){300000}elseif($Carried){240000}elseif($Gathered){180000}else{60000}
+$timeout=if($Living){600000}elseif($Walking){480000}elseif($Befriended){300000}elseif($Carried){240000}elseif($Gathered){180000}else{60000}
 if(!$process.WaitForExit($timeout)){$process.Kill();$process.WaitForExit();throw '房屋输入绑定专项超时'}
 if($process.ExitCode -ne 0 -or !(Test-Path -LiteralPath $log)){throw '房屋输入绑定专项未正常退出'}
 $body=Get-Content -LiteralPath $log -Raw
@@ -81,6 +84,20 @@ if($Carried){
         }
     }
 }
+if($Living){
+    foreach($marker in @('CF_HOME_LIFE_WITHDRAW PASS entered=1 food=1 stored=0','CF_HOME_LIFE_EMPTY PASS food=1 stored=0','CF_HOME_LIFE_FEED PASS food=0 stored=0 bond=6',
+        'CF_HOME_LIFE_FEED_REJECT PASS food=0 bond=6','CF_HOME_LIFE_REJOIN PASS entered=1 exited=1 petExited=1 continuous=1',
+        'CF_HOME_LIFE_SAVE PASS modules=14 stored=3 farmFood=0 food=0 seeds=2 bond=6 follow=1','CF_HOME_LIFE PASS phase=2 reason=complete')){
+        if(!$body.Contains($marker)){throw '缺少实际家园生活、拒绝路径、归队或生活状态存读记录'}
+    }
+    foreach($stage in @('WITHDRAW','FEED','REJOIN','SAVE')){
+        $found=[regex]::Match($body,('CF_HOME_LIFE_'+$stage+' PASS[^\r\n]* pet=([A-F0-9]{32})'))
+        if(!$found.Success -or $found.Groups[1].Value -ne $petIds[0]){throw '进屋生活与原结交运输伙伴身份不一致'}
+    }
+    $rejoin=[regex]::Match($body,'CF_HOME_LIFE_REJOIN PASS[^\r\n]* heroTravel=([\d.]+) petTravel=([\d.]+)')
+    if(!$rejoin.Success -or [double]::Parse($rejoin.Groups[1].Value,[Globalization.CultureInfo]::InvariantCulture) -lt 1400 -or
+        [double]::Parse($rejoin.Groups[2].Value,[Globalization.CultureInfo]::InvariantCulture) -lt 600){throw '家园生活往返实际位移不足'}
+}
 if($Room -and $Mode -ne 'Read' -and ([regex]::Matches($body,'CF_HOME_ROOM_INPUT_PART PASS')).Count -ne $(if($Carried){14}elseif($Courtyard){13}else{10})){throw '整屋输入缺少预期新增模块的实际成功记录'}
 if($Courtyard){$marker=if($Mode -eq 'Write'){'CF_HOME_COURTYARD_WRITE PASS modules=14 material=75 closed=1'}else{'CF_HOME_COURTYARD_WORK PASS courtyard=1 doorway=1 noCross=1'};if(!$body.Contains($marker)){throw '缺少指定庭院工作／写档完成标记'}}
 if($Work){$number=if($Mode -eq 'Write'){1}elseif($Mode -eq 'Read'){2}else{0};if(!$body.Contains('CF_DOOR_FARM_MODE PASS mode='+$number)){throw '未完成指定的工作存读模式'}}
@@ -101,8 +118,11 @@ if($FencePreview){
 }
 $saveHash=''
 if($Gathered){$generated=Join-Path $saveRoot 'HomeGatheredAutomation.sav';$saveHash=(Get-FileHash -LiteralPath $generated).Hash;Copy-Item -LiteralPath $generated -Destination (Join-Path $run 'HomeGathered-generated.sav')}
-[pscustomobject]@{Room=[bool]$Room;Work=[bool]$Work;Fence=[bool]$Fence;FenceNavigation=[bool]$FenceNavigation;FencePreview=[bool]$FencePreview;Courtyard=[bool]$Courtyard;Gathered=[bool]$Gathered;Carried=[bool]$Carried;Befriended=[bool]$Befriended;Walking=[bool]$Walking;Mode=$Mode;Pass=$true;BuildSHA256=$hash;GeneratedSaveSHA256=$saveHash;Log=$log} | Export-Csv -LiteralPath (Join-Path $run 'Results.csv') -NoTypeInformation
-if($Walking){Write-Host '原生结交后六处资源实际步行采集返家、同一伙伴运输建设与农圃存读通过；建造仍固定观察站位，未验收完整自然风险或硬件操作'}
+$lifeSaveHash=''
+if($Living){$generated=Join-Path $saveRoot 'HomeLifeAutomation.sav';$lifeSaveHash=(Get-FileHash -LiteralPath $generated).Hash;Copy-Item -LiteralPath $generated -Destination (Join-Path $run 'HomeLife-generated.sav')}
+[pscustomobject]@{Room=[bool]$Room;Work=[bool]$Work;Fence=[bool]$Fence;FenceNavigation=[bool]$FenceNavigation;FencePreview=[bool]$FencePreview;Courtyard=[bool]$Courtyard;Gathered=[bool]$Gathered;Carried=[bool]$Carried;Befriended=[bool]$Befriended;Walking=[bool]$Walking;Living=[bool]$Living;Mode=$Mode;Pass=$true;BuildSHA256=$hash;GeneratedSaveSHA256=$saveHash;LifeSaveSHA256=$lifeSaveHash;Log=$log} | Export-Csv -LiteralPath (Join-Path $run 'Results.csv') -NoTypeInformation
+if($Living){Write-Host '原结交伙伴采集建设后，玩家实际进屋取粮、原伙伴进食归队并经门离开及生活状态存读通过；建造仍固定站位，未验收完整自然风险或硬件操作'}
+elseif($Walking){Write-Host '原生结交后六处资源实际步行采集返家、同一伙伴运输建设与农圃存读通过；建造仍固定观察站位，未验收完整自然风险或硬件操作'}
 elseif($Befriended){Write-Host '实际走近地图原生个体、支付食物结交、同一伙伴运输建设与农圃存读通过；后续手采建造仍固定站位，不是完整自然路线'}
 elseif($Carried){Write-Host '伙伴实采携带入箱、玩家取用建设与原伙伴继续农圃工作及建成存读通过；仍为固定站位和初始伙伴夹具'}
 elseif($Gathered){Write-Host '实际采集加工投入整屋、伙伴工作与建成存读通过；站位及伙伴仍为夹具，不是自然探索路线验收'}

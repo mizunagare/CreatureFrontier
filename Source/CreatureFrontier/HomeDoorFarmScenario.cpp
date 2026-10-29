@@ -1,5 +1,6 @@
 #include "HomeDoorScenario.h"
 #include "HomeFundingScenario.h"
+#include "HomeLifeScenario.h"
 #include "HomeModule.h"
 #include "CFPlayerCharacter.h"
 #include "CreatureCharacter.h"
@@ -290,6 +291,8 @@ void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode,b
                 UE_LOG(LogTemp,Display,TEXT("CF_HOME_GATHERED_SAVE %s modules=14 material=0 seeds=2 stored=3 task=1 source=1"),Saved?TEXT("PASS"):TEXT("FAIL"));
                 if(CheckCarried){UE_LOG(LogTemp,Display,TEXT("CF_HOME_CARGO_SAVED %s pet=%s"),Saved?TEXT("PASS"):TEXT("FAIL"),*FinalPetId.ToString());}
                 if(CheckBefriended){UE_LOG(LogTemp,Display,TEXT("CF_HOME_BEFRIEND_SAVED %s pet=%s food=0 bond=3"),Saved?TEXT("PASS"):TEXT("FAIL"),*FinalPetId.ToString());}
+                if(Saved && FParse::Param(FCommandLine::Get(),TEXT("CFHomeLivingWork")))
+                {RunHomeLifeScenario(PreviewWorld,Observer,FinalPetId,FinalFarmId,Complete);return;}
                 Complete(Saved);return;
             }
             if(Preview)
