@@ -26,6 +26,7 @@
 #include "Misc/Paths.h"
 #include "UnrealClient.h"
 #include "Components/BoxComponent.h"
+#include "Components/CapsuleComponent.h"
 #include "InputRoutingQA.h"
 #include "HomeDoorScenario.h"
 #include "InputKeyEventArgs.h"

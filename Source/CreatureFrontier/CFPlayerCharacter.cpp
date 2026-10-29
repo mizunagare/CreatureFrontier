@@ -31,6 +31,7 @@
 #include "HomeModule.h"
 #include "ResearchComponent.h"
 #include "PlayerPaceComponent.h"
+#include "PlayerGatheringComponent.h"
 
 void ACFPlayerCharacter::CraftSpear() { Equipment->CraftSpear(); }
 void ACFPlayerCharacter::InteractGarden() {if(auto* Site=TraceFacility()) Site->Crop->Interact(this,0);}
@@ -409,7 +410,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
             (Pet->GetFieldResource() || (IsValid(Pet->WorkSite) && Pet->WorkSite->RequiredSpecialty != EWorkSpecialty::Feeding));
         Pet->Cargo->RestoreSnapshot(Record,HomeRestore.Find(Record.DeliveryCrateId));
     }
-    UCompanionMemoryComponent::CloseAll(GetWorld());Naming->Close(); Pace->StopSlowWalk(); CancelMeleeAttack(); Building->Cancel();
+    UCompanionMemoryComponent::CloseAll(GetWorld());Naming->Close(); Pace->StopSlowWalk(); Gathering->Stop(); CancelMeleeAttack(); Building->Cancel();
     ResourceRestore.Commit();
     HomeRestore.Commit();
     for (auto* Site : OldBuilt) Site->Destroy();
@@ -461,7 +462,7 @@ float ACFPlayerCharacter::TakeDamage(float Amount, const FDamageEvent& Event, AC
     Feedback = Health <= 0.0f ? TEXT("已倒下，R 回基地复活并保留世界 | F9 读档") : TEXT("受到伤害！");
     if (Health <= 0.0f)
     {
-        Pace->StopSlowWalk();
+        Pace->StopSlowWalk();Gathering->Stop();
         UCompanionMemoryComponent::CloseAll(GetWorld());
         Naming->Close();
         Storage->Close();
@@ -604,6 +605,7 @@ void ACFPlayerCharacter::HealCompanion()
 ACFPlayerCharacter::ACFPlayerCharacter()
 {
     Pace=CreateDefaultSubobject<UPlayerPaceComponent>(TEXT("Pace"));
+    Gathering=CreateDefaultSubobject<UPlayerGatheringComponent>(TEXT("Gathering"));
     Naming=CreateDefaultSubobject<UCompanionNamingComponent>(TEXT("Naming"));
     FirstPersonCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FirstPersonCamera"));
     FirstPersonCamera->SetupAttachment(GetCapsuleComponent());
@@ -653,7 +655,8 @@ void ACFPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
     PlayerInputComponent->BindKey(EKeys::Y, IE_Pressed, this, &ACFPlayerCharacter::PetAimedCompanion);
     PlayerInputComponent->BindKey(EKeys::F6, IE_Pressed, this, &ACFPlayerCharacter::PlayAimedCompanion);
     PlayerInputComponent->BindKey(EKeys::F7, IE_Pressed, this, &ACFPlayerCharacter::RecallAimedJourney);
-    PlayerInputComponent->BindKey(EKeys::M, IE_Pressed, this, &ACFPlayerCharacter::GatherAimedResource);
+    PlayerInputComponent->BindKey(EKeys::M,IE_Pressed,Gathering.Get(),&UPlayerGatheringComponent::Start);
+    PlayerInputComponent->BindKey(EKeys::M,IE_Released,Gathering.Get(),&UPlayerGatheringComponent::Stop).bExecuteWhenPaused=true;
     PlayerInputComponent->BindKey(EKeys::F2,IE_Pressed,this,&ACFPlayerCharacter::DepositGardenSeed);
     PlayerInputComponent->BindKey(EKeys::F3,IE_Pressed,this,&ACFPlayerCharacter::WithdrawGardenSeed);
     PlayerInputComponent->BindKey(EKeys::F4,IE_Pressed,Naming.Get(),&UCompanionNamingComponent::OpenAimed);

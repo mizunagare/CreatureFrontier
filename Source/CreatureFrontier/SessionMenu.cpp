@@ -5,6 +5,7 @@
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
 #include "StorageInteractionComponent.h"
+#include "PlayerGatheringComponent.h"
 
 FString ACFPlayerCharacter::GetQuickSaveSlot() const
 {
@@ -28,6 +29,7 @@ void ACFPlayerCharacter::TogglePauseMenu()
     }
     if(!UGameplayStatics::SetGamePaused(this,true)) { Feedback=TEXT("当前游戏模式无法暂停"); return; }
     Storage->Close();
+    Gathering->Stop();
     CancelMeleeAttack(); Building->Cancel(); StopJumping(); GetCharacterMovement()->StopMovementImmediately(); ConsumeMovementInputVector();
     bRosterOpen=false; bJournalOpen=false; bHelpVisible=false; bBackpackOpen=false;
     bPauseMenu=true; bPauseConfirmation=false; PauseSelection=0;

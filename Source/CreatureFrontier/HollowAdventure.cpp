@@ -310,7 +310,7 @@ struct FAdventure
                 if(Cache->HarvestCooldown>0)return true;
                 const auto View=(Cache->GetActorLocation()-Hero->FirstPersonCamera->GetComponentLocation()).Rotation();Hero->GetController()->SetControlRotation(View);Hero->FirstPersonCamera->SetWorldRotation(View);
                 const int32 Before=Hero->Inventory->Count(EFrontierItem::Scrap);
-                if(!CFInputQA::Press(Hero,EKeys::M) || Hero->Inventory->Count(EFrontierItem::Scrap)!=Before+1)return Fail(TEXT("harvest"));
+                if(!CFInputQA::Press(Hero,EKeys::M) || !CFInputQA::Release(Hero,EKeys::M) || Hero->Inventory->Count(EFrontierItem::Scrap)!=Before+1)return Fail(TEXT("harvest"));
                 ++Harvested;return true;
             }
             if(PetSouth>-3600 || Pet->GetDistanceTo(Hero)>330)return true;

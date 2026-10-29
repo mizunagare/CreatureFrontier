@@ -36,7 +36,7 @@ void ACFHUD::DrawControlHelp(ACFPlayerCharacter* Player)
 {
     const TArray<FString> Lines={
         TEXT("WASD 移动 | 左Shift 慢行 | 鼠标转向/空格跳跃"),
-        TEXT("M 采集资源（3米）| 玩家与伙伴共享有限储量"),
+        TEXT("按住M采集（3米），松开停止 | 共享有限储量"),
         TEXT("左键近战 | 右键捕捉/取消长矛蓄力"),
         TEXT("0 切换普通/共鸣捕捉 | 对水晶按 C 研究"),
         TEXT("F8 护主/避战（当前指挥范围）| Q 集火 | G 技能"),

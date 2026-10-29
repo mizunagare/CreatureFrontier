@@ -23,5 +23,5 @@ void ACFPlayerCharacter::GatherAimedResource()
         if(Node->TryHarvest(this,this)) Feedback=NewSample?Research->GetHint():TEXT("采集了1份")+UCraftingCatalog::ItemName(Node->Definition->OutputItem)+TEXT("，来自共享储量");
         else Feedback=TEXT("无法采集：已采空、冷却中、受阻、距离过远或背包已满");
     }
-    else Feedback=TEXT("瞄准3米内的资源点，按M采集");
+    else Feedback=TEXT("瞄准3米内资源，按住M采集，松开停止");
 }

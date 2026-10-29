@@ -87,7 +87,7 @@ FString AResourceNode::GetStatus() const
     if(!Definition) return TEXT("资源不可用");
     if(Remaining==0) return FString::Printf(TEXT("%s | 已采空 | %s"),*Definition->DisplayName.ToString(),
         Definition->RegrowSeconds>0?*FString::Printf(TEXT("%.0f秒后再生"),FMath::CeilToFloat(RegrowRemaining)):TEXT("不会再生"));
-    return FString::Printf(TEXT("%s | %d / %d | %s | M 采集（3米）"),*Definition->DisplayName.ToString(),Remaining,Definition->Capacity,*UCraftingCatalog::ItemName(Definition->OutputItem));
+    return FString::Printf(TEXT("%s | %d / %d | %s | 按住M采集（3米）"),*Definition->DisplayName.ToString(),Remaining,Definition->Capacity,*UCraftingCatalog::ItemName(Definition->OutputItem));
 }
 void AResourceNode::Refresh()
 {

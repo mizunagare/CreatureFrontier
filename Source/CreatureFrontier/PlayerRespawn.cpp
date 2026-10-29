@@ -1,5 +1,6 @@
 #include "CFPlayerCharacter.h"
 #include "PlayerPaceComponent.h"
+#include "PlayerGatheringComponent.h"
 #include "CreatureCharacter.h"
 #include "BaseBuildingComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -54,7 +55,7 @@ bool ACFPlayerCharacter::RespawnAtBase()
     if(!FindRespawnLocation(Location)) { Feedback=TEXT("基地被阻挡或不安全，可按F9读取此前存档"); return false; }
     // 保留当前世界；仅取消战斗，不清除工作分配、生命或冷却状态。
     for(TActorIterator<ACreatureCharacter> It(GetWorld());It;++It) It->HandlePlayerDowned(this);
-    Pace->StopSlowWalk(); CancelMeleeAttack(); Building->Cancel(); bRosterOpen=false; bJournalOpen=false;
+    Pace->StopSlowWalk(); Gathering->Stop(); CancelMeleeAttack(); Building->Cancel(); bRosterOpen=false; bJournalOpen=false;
     GetCharacterMovement()->StopMovementImmediately(); StopJumping();
     SetActorLocationAndRotation(Location,FRotator(0,RespawnAnchor.Rotator().Yaw,0),false,nullptr,ETeleportType::TeleportPhysics);
     GetController()->SetControlRotation(FRotator(0,RespawnAnchor.Rotator().Yaw,0));
