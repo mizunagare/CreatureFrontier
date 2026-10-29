@@ -10,7 +10,7 @@
 
 ## 身份、组件和持久化
 
-CompanionPersonalityComponent 管理偏好分配、发现状态、玩耍需求与反馈，角色/玩家复用已有照料门槛和呈现。当前两个偏好为 Quiet / Playful；第一次驯服由稳定 GUID 四段异或的最低位分配，不按物种或昵称决定，不随 Actor 名/编队/重启随机重抽。持久化保存明确偏好，不在新格式加载时重新推导，便于以后拓展真实内容驱动的个性。
+CompanionPersonalityComponent 管理偏好分配、发现状态、玩耍需求与反馈，角色/玩家复用已有照料门槛和呈现。当前两个偏好为“喜欢安静陪伴／喜欢活泼玩耍”；内部枚举 Quiet / Playful 保留不变。第一次驯服由稳定 GUID 四段异或的最低位分配，不按物种或昵称决定，不随 Actor 名/编队/重启随机重抽。持久化保存明确偏好，不在新格式加载时重新推导，便于以后拓展真实内容驱动的个性。
 
 格式 26 显式写盘，根默认 21 保持冻结。追加 Preference 与 bPreferenceDiscovered；拥有的驯服个体（含倒下）必须是两种合法偏好之一，其他生物必须 None 且未发现。坏数据在替换世界前拒绝。1–25 忽略未来字段，已有 ID 的伙伴按 ID 迁移为未知偏好，不赠送关系/体力或虚构过去的发现；旧于 22 本来没有稳定 ID 的档仍沿用既有 ID 迁移边界。旧快照恢复不保留其保存后发生的发现。
 
@@ -20,7 +20,7 @@ CompanionPersonalityComponent 管理偏好分配、发现状态、玩耍需求�
 
 原照料/命名/喂食与完整本地回归保留；最终包还需真实 25 旧档迁移及 D3D12 新图检查。Script 的 IncludeNames 将真实昵称读取和偏好迁移都加入旧档审计，农业旧档读专项扩到 25 并保留 24 起有效作物状态。未新增 CI。真实物理键、IME、所有分辨率/帧率和长时行为仍非本轮矩阵。
 
-以下保留开发过程记录；最终交付与验收汇总以文末为准。开发前的可运行包为 Windows-CarePause-Final。
+以下保留开发过程记录；本页阶段的最终交付与验收汇总以文末为准。历史截图和日志中的 Quiet / Playful 分别表示“喜欢安静陪伴／喜欢活泼玩耍”，原始错误 Invalid companion preference 表示“伙伴偏好无效”；不改写旧证据冒充当前中文界面。当前中文显示复核见 `Docs/CHINESE.md`。开发前的可运行包为 Windows-CarePause-Final。
 
 Editor 首轮 `Saved/PersonalityEditor/20261028-083130/` 六项通过：偏好普通/写/读、原 Affection、Name 与 Feeding。补充主人倒下、20 点边界、体力低于门槛后拒绝、自动休息保留工作意图及视觉动作不改变 Actor Transform 后，重新编译并在 `Saved/PersonalityEditor/20261028-083418/` 三项通过；仅有已有引擎弃用和非首选工具链警告。Windows-Preferences-Final 正在打包，之后仍需最终包回归/真实旧档/新图，前述待验收状态保持。
 
@@ -38,13 +38,13 @@ Windows-Preferences-Verified 的 Editor / Windows 编译、烘焙和归档成功
 
 剩余边界：两种互动风格只是个体偏好首版，不是饮食/作息/环境喜好、复杂人格、记忆事件或完整生活 AI；图形首版主要观察叶系伙伴，焰/岩正式动作和声音、多分辨率、长时互动和联机均未验收。偏好不按物种区分，不替代已有物种技能/生态差异。下阶段应继续共同经历与关系事件，而非追加被动属性收益。
 
-### Boss 回归发现（保留失败记录）
+### 首领回归发现（保留失败记录）
 
 上述 D216 构建的完整回归在 `CFBossTest.log` 停止：`CF_BOSS FAIL ... save=0`，其他战斗/捕捉/掉落项为 1。因此它不是完整验收交付。Boss 夹具先 Tame，再直接把 Disposition / Tamer 改回野生来测试掉落，遗留了伙伴专属偏好，违反新快照不允许野生携带偏好的规则；当前游戏没有玩家释放操作。
 
 没有放宽存档校验或在写盘时静默丢掉非法字段。改为在夹具保留这份非法状态并显式断言 Load 拒绝且反馈 Invalid companion preference，随后清除夹具偏好，继续原保存/掉落检查。`Saved/PersonalityBossEditor/20261028-084414/Boss.log` 实际输出 `rejectedRetainedPreference=1` 且原 Boss 全项 PASS，证明拒绝原因和有效状态恢复。生产偏好代码未变，最终构建改为 Windows-Preferences-Release，需要新哈希的完整回归、真实旧档和图形证据，旧 D216 的局部成功不冒充最终验证。
 
-## Release 构建验收（2026-10-28）
+## 发布构建验收（2026-10-28）
 
 Editor 编译及 Windows Development 编译/烘焙/归档成功。`E:/CreatureFrontierBuilds/Windows-Preferences-Release/CreatureFrontier.exe` 内部 Win64 EXE SHA-256 `BA869EFBD08B440687B0026F298F5DF323D7A5C51316D373AB750E9D51C34116`，之后未改 C++。
 
