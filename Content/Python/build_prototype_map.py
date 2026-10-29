@@ -51,5 +51,5 @@ for index, location in enumerate(((700, 0, 90), (1250, 450, 90), (1500, -550, 90
     creature.set_editor_property("aggro_range", 650.0)
 
 unreal.EditorLevelLibrary.save_all_dirty_levels()
-unreal.log(f"Creature Frontier prototype map created: {MAP_PATH}")
+unreal.log(f"幻兽边境原型地图已创建：{MAP_PATH}")
 

@@ -13,4 +13,4 @@ assert found > 0
 world = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world()
 assert unreal.FrontierEditorLibrary.prepare_prototype_navigation(world)
 assert levels.save_current_level()
-unreal.log('CF_DYNAMIC_NAV_OK: dynamic runtime navigation saved')
+unreal.log('CF_DYNAMIC_NAV_OK: 已保存运行时动态导航设置')

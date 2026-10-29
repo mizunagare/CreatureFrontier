@@ -76,4 +76,4 @@ for job, position in [(unreal.WorkSpecialty.MINING, (-650, -350, 0)), (unreal.Wo
 world = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world()
 assert unreal.FrontierEditorLibrary.prepare_prototype_navigation(world)
 assert levels.save_current_level()
-unreal.log('CF_SPECIES_ASSETS_OK: 3 definitions and specialty work stations')
+unreal.log('CF_SPECIES_ASSETS_OK: 已更新3份生物定义及专长工作台')

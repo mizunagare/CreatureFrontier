@@ -126,7 +126,7 @@ assert not (set(existing)-used), '旧托管环境对象需要明确迁移，不�
 world = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world()
 assert unreal.FrontierEditorLibrary.prepare_prototype_navigation(world)
 assert levels.save_current_level()
-unreal.log('CF_VALLEY_ASSETS_OK: %d managed environment actors and %d materials' % (len(used),len(materials)))
+unreal.log('CF_VALLEY_ASSETS_OK: 已更新%d个托管环境对象和%d份材质' % (len(used),len(materials)))
 
 # 山谷边界重建后同步恢复已明确扩展的洞口，避免后续重建把支线封死。
 import runpy

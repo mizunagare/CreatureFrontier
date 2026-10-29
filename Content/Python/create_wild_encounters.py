@@ -20,4 +20,4 @@ for key, name, asset, location, level, seconds, boss in specs:
     site.set_editor_property('respawn_seconds', seconds)
     site.set_editor_property('boss', boss)
 assert levels.save_current_level()
-unreal.log('CF_ENCOUNTER_ASSETS_OK: meadow and crystal alpha habitats')
+unreal.log('CF_ENCOUNTER_ASSETS_OK: 已更新草甸林地与水晶高地首领栖息地')
