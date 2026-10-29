@@ -1,5 +1,6 @@
-param([string]$EngineRoot='D:\Epic\UE_5.8',[string]$BuildRoot='',[switch]$NoRoof,[ValidateSet('Test','Write','Read','Cancel','Dismantle')][string]$Mode='Test',[switch]$OriginalAim,[ValidateRange(-180,180)][double]$FollowYaw=-160,[switch]$FacingProbe,[switch]$AvoidCombat,[switch]$Furnished)
+param([string]$EngineRoot='D:\Epic\UE_5.8',[string]$BuildRoot='',[switch]$NoRoof,[ValidateSet('Test','Write','Read','Cancel','Dismantle')][string]$Mode='Test',[switch]$OriginalAim,[ValidateRange(-180,180)][double]$FollowYaw=-160,[switch]$FacingProbe,[switch]$AvoidCombat,[switch]$Furnished,[switch]$Preview)
 $ErrorActionPreference='Stop'
+if($Preview -and (!$Furnished -or $Mode -ne 'Test')){throw '室内预览仅用于双格房屋普通工作模式'}
 if($Furnished -and ($Mode -notin @('Test','Write','Read') -or $NoRoof -or $AvoidCombat -or $OriginalAim -or $FacingProbe)){throw '带家具房屋样本仅支持有顶工作与存读模式，不与其他探针组合'}
 . (Join-Path $PSScriptRoot 'BuildFingerprint.ps1')
 $projectRoot=Split-Path $PSScriptRoot -Parent
@@ -23,6 +24,7 @@ if($BuildRoot){$exe=$module;$arguments=$arguments[1..($arguments.Count-1)]}
 if($NoRoof){$arguments+='-CFDoorFarmNoRoof'}
 if($AvoidCombat){$arguments+='-CFStanceFarmTest'}
 if($Furnished){$arguments+='-CFFurnishedFarm'}
+if($Preview){$arguments=@($arguments | Where-Object {$_ -ne '-nullrhi'});$arguments+=@('-CFFurnishedFarmPreview','-RenderOffscreen','-ForceRes','-ResX=1280','-ResY=720','-norhithread','-forcerhibypass','-ExecCmds="t.MaxFPS 60"')}
 if($OriginalAim){$arguments+='-CFDoorFarmCancelOriginalAim'}
 if($FacingProbe){$arguments+='-CFDoorFarmFacingProbe'}
 if($Mode -eq 'Cancel' -and !$OriginalAim){$arguments+=('-CFDoorFarmFollowYaw='+$FollowYaw.ToString([Globalization.CultureInfo]::InvariantCulture))}
@@ -33,6 +35,21 @@ if($process.ExitCode -ne 0 -or !(Select-String -LiteralPath $log -SimpleMatch 'C
    !(Select-String -LiteralPath $log -SimpleMatch 'CF_DOOR_FARM_CLOSED PASS' -Quiet) -or
    (Select-String -LiteralPath $log -Pattern '\bFAIL\b|Fatal error|Assertion failed' -Quiet)){throw "门与农圃专项未通过：$log"}
 if((Get-FrontierBuildFingerprint -LiteralPath $module) -ne $hash){throw '专项期间模块发生变化'}
+if($Preview -and !(Select-String -LiteralPath $log -SimpleMatch 'CF_FURNISHED_PREVIEW PASS' -Quiet)){throw '室内预览没有生成有效截图'}
+if($Preview){
+    $rootLine=(Select-String -LiteralPath $log -Pattern 'CF_FURNISHED_PREVIEW_ROOT .*([A-F0-9]{32})$' | Select-Object -Last 1)
+    if(!$rootLine){throw '室内预览缺少独立截图目录'}
+    $directoryId=[regex]::Match($rootLine.Line,'[A-F0-9]{32}$').Value
+    $savedRoot=if($BuildRoot){Join-Path $BuildRoot 'CreatureFrontier\Saved'}else{Join-Path $projectRoot 'Saved'}
+    $source=Join-Path $savedRoot ('FurnishedFarmPreview\'+$directoryId+'\Interior.png')
+    $png=[IO.File]::ReadAllBytes($source)
+    if($png.Length -lt 24 -or $png[0] -ne 137 -or $png[1] -ne 80){throw '室内预览不是有效PNG'}
+    $width=$png[16]*16777216+$png[17]*65536+$png[18]*256+$png[19]
+    $height=$png[20]*16777216+$png[21]*65536+$png[22]*256+$png[23]
+    if($width -ne 1280 -or $height -ne 720){throw '室内预览尺寸不是1280×720'}
+    Copy-Item -LiteralPath $source -Destination (Join-Path $run 'Interior.png')
+    Write-Host ('室内预览图片：'+(Join-Path $run 'Interior.png'))
+}
 if($Furnished -and !(Select-String -LiteralPath $log -SimpleMatch 'CF_FURNISHED_FARM PASS' -Quiet)){throw '缺少门窗、储物及农圃整合成功标记'}
 if($Furnished -and $Mode -eq 'Read' -and !(Select-String -LiteralPath $log -SimpleMatch 'CF_FURNISHED_RESTORE PASS identity=1 inventory=1' -Quiet)){throw '缺少房屋身份与物资恢复核验标记'}
 if($AvoidCombat){foreach($marker in @('CF_STANCE_FARM_SWITCH PASS','CF_STANCE_FARM PASS')){if(!(Select-String -LiteralPath $log -SimpleMatch $marker -Quiet)){throw '缺少避战工作必要标记'}}}

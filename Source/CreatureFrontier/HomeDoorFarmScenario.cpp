@@ -24,6 +24,9 @@
 #include "StorageInteractionComponent.h"
 #include "FrontierSaveGame.h"
 #include "Kismet/GameplayStatics.h"
+#include "Misc/Paths.h"
+#include "HAL/FileManager.h"
+#include "UnrealClient.h"
 
 namespace CFDoorFarmVolumeQA
 {
@@ -149,7 +152,25 @@ void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
             UE_LOG(LogTemp,Display,TEXT("CF_DOOR_FARM_STATE phase=%d food=%d seeds=%d growth=%.2f travel=%.1f continuous=%d pet=%s"),Phase,LiveFarm?LiveFarm->StoredFood:-1,LiveFarm?LiveFarm->Crop->Seeds:-1,LiveFarm?LiveFarm->Crop->GrowthWork:-1,Travel,Continuous,Pet?*Pet->GetActorLocation().ToString():TEXT("无"));
             // 清除定时器会释放捕获对象；完成回调必须先复制到当前调用栈。
             const auto Complete=Finish;
-            FTimerHandle Handle=*Timer;World->GetTimerManager().ClearTimer(Handle);Complete(Pass);
+            const bool Preview=Pass && Furnished && Mode==0 && FParse::Param(FCommandLine::Get(),TEXT("CFFurnishedFarmPreview"));
+            auto* Observer=Hero;auto* PreviewWorld=World;
+            FTimerHandle Handle=*Timer;World->GetTimerManager().ClearTimer(Handle);
+            if(Preview)
+            {
+                // 仅移动观察者到室内合法站位，不移动伙伴，也不改变房屋碰撞。
+                Observer->SetActorLocation(FVector(-950,-950,60));
+                const auto View=(FVector(-700,-650,90)-(Observer->GetActorLocation()+FVector(0,0,64))).Rotation();
+                Observer->FirstPersonCamera->SetRelativeRotation(FRotator::ZeroRotator);Observer->GetController()->SetControlRotation(View);
+                Observer->Feedback=TEXT("双格家园：门窗、储物与农圃协同，伙伴已完成本次工作");
+                const FString Root=FPaths::ProjectSavedDir()/TEXT("FurnishedFarmPreview")/FGuid::NewGuid().ToString(EGuidFormats::Digits);
+                IFileManager::Get().MakeDirectory(*Root,true);UE_LOG(LogTemp,Display,TEXT("CF_FURNISHED_PREVIEW_ROOT %s"),*Root);
+                FTimerHandle Shot,Done;
+                PreviewWorld->GetTimerManager().SetTimer(Shot,[Root,Observer](){UE_LOG(LogTemp,Display,TEXT("CF_FURNISHED_CAMERA hero=%s camera=%s rotation=%s"),*Observer->GetActorLocation().ToString(),*Observer->FirstPersonCamera->GetComponentLocation().ToString(),*Observer->FirstPersonCamera->GetComponentRotation().ToString());FScreenshotRequest::RequestScreenshot(Root/TEXT("Interior.png"),false,false);},1.f,false);
+                PreviewWorld->GetTimerManager().SetTimer(Done,[Root,Complete](){const bool Ready=IFileManager::Get().FileSize(*(Root/TEXT("Interior.png")))>1000;
+                    UE_LOG(LogTemp,Display,TEXT("CF_FURNISHED_PREVIEW %s"),Ready?TEXT("PASS"):TEXT("FAIL"));Complete(Ready);},3.f,false);
+                return;
+            }
+            Complete(Pass);
         };
         const double Elapsed=World->GetTimeSeconds()-At;
         if(Pet){const auto Now=Pet->GetActorLocation();const double Step=FVector::Dist2D(Now,Previous);Travel+=Step;Previous=Now;Continuous &= Step<120;if(!Continuous || Pet->Health<=0 || Hero->Health<=0){End(false);return;}}
