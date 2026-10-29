@@ -58,7 +58,7 @@ bool UCompanionNamingComponent::Open(ACreatureCharacter* Pet)
     if(IsOpen() || !CanRename(Pet) || !PC || !GetWorld()->GetGameViewport() || !FSlateApplication::IsInitialized() ||
         UGameplayStatics::IsGamePaused(this) || Hero->Building->IsActive() || Hero->Storage->IsOpen() || Hero->IsBackpackOpen() || Hero->IsJournalOpen() || Hero->IsHelpVisible()) return false;
     if(!UGameplayStatics::SetGamePaused(this,true)) return false;
-    Hero->Feedback=TEXT("Enter 确认，Esc 取消。留空恢复物种名。关闭后按 F5 保存。");
+    Hero->Feedback=TEXT("回车确认，退出键取消。留空恢复物种名。关闭后按 F5 保存。");
     if(Hero->IsRosterOpen()) Hero->ToggleRoster();
     Target=Pet;Hero->CancelMeleeAttack();Hero->GetCharacterMovement()->StopMovementImmediately();Hero->ConsumeMovementInputVector();Hero->StopJumping();
     auto CommitEntry=[this](){if(Entry.IsValid()) Commit(Entry->GetText().ToString());return FReply::Handled();};
@@ -71,8 +71,8 @@ bool UCompanionNamingComponent::Open(ACreatureCharacter* Pet)
             [SAssignNew(Entry,SEditableTextBox).Font(FCoreStyle::GetDefaultFontStyle("Regular",22)).Text(FText::FromString(Pet->Nickname)).SelectAllTextWhenFocused(true)
                 .OnTextCommitted_Lambda([this](const FText& Text,ETextCommit::Type Type){if(Type==ETextCommit::OnEnter) Commit(Text.ToString());})
                 .OnKeyDownHandler_Lambda([this](const FGeometry&,const FKeyEvent& Event){if(Event.GetKey()==EKeys::Escape){Close();return FReply::Handled();}return FReply::Unhandled();})]
-            +SVerticalBox::Slot().AutoHeight().Padding(8)[SNew(SButton).OnClicked_Lambda(CommitEntry)[SNew(STextBlock).Font(FCoreStyle::GetDefaultFontStyle("Regular",18)).Text(FText::FromString(TEXT("确认 / Enter")))]]
-            +SVerticalBox::Slot().AutoHeight().Padding(8)[SNew(SButton).OnClicked_Lambda([this](){Close();return FReply::Handled();})[SNew(STextBlock).Font(FCoreStyle::GetDefaultFontStyle("Regular",18)).Text(FText::FromString(TEXT("取消 / Esc")))]]
+            +SVerticalBox::Slot().AutoHeight().Padding(8)[SNew(SButton).OnClicked_Lambda(CommitEntry)[SNew(STextBlock).Font(FCoreStyle::GetDefaultFontStyle("Regular",18)).Text(FText::FromString(TEXT("确认 / 回车键")))]]
+            +SVerticalBox::Slot().AutoHeight().Padding(8)[SNew(SButton).OnClicked_Lambda([this](){Close();return FReply::Handled();})[SNew(STextBlock).Font(FCoreStyle::GetDefaultFontStyle("Regular",18)).Text(FText::FromString(TEXT("取消 / 退出键")))]]
             +SVerticalBox::Slot().AutoHeight().Padding(8)[SNew(STextBlock).Font(FCoreStyle::GetDefaultFontStyle("Regular",16)).Text_Lambda([Hero](){return FText::FromString(Hero->Feedback);}).WrapTextAt(740)]
         ]
     ];

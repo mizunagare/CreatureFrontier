@@ -79,7 +79,7 @@ foreach($leader in $LeaderForms) {
 $results | Export-Csv -LiteralPath (Join-Path $logRoot 'Results.csv') -NoTypeInformation -Encoding utf8
 $failures=@($results | Where-Object { !$_.Passed })
 if($failures.Count) { throw "$($failures.Count)/$($results.Count) 个队形场景失败，请检查：$logRoot" }
-Write-Host "FORMATION_MATRIX PASS $($results.Count)/$($results.Count)"
+Write-Host "队形矩阵测试通过：$($results.Count)/$($results.Count)（FORMATION_MATRIX PASS）"
 } finally {
     try {
         try {if(Test-Path -LiteralPath $slot){Copy-Item -LiteralPath $slot -Destination (Join-Path $logRoot 'FrontierFormationAutomation-generated.sav')}} finally {
