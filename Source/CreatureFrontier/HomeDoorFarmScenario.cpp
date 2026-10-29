@@ -69,8 +69,9 @@ void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode,b
 {
     const bool AvoidTest=FParse::Param(FCommandLine::Get(),TEXT("CFStanceFarmTest"));
     const bool Furnished=FParse::Param(FCommandLine::Get(),TEXT("CFFurnishedFarm"));
-    if(UseExistingRoom && (!Furnished || Mode!=0)){UE_LOG(LogTemp,Error,TEXT("CF_HOME_ROOM_WORK FAIL reuse-mode"));FPlatformMisc::RequestExitWithStatus(false,1);return;}
-    const FString Slot=Furnished?TEXT("FurnishedFarmBlocked"):TEXT("DoorFarmBlocked");
+    const bool InputBuilt=UseExistingRoom || FParse::Param(FCommandLine::Get(),TEXT("CFHomeRoomWorkRead"));
+    if(InputBuilt && (!Furnished || Mode>2)){UE_LOG(LogTemp,Error,TEXT("CF_HOME_ROOM_WORK FAIL reuse-mode"));FPlatformMisc::RequestExitWithStatus(false,1);return;}
+    const FString Slot=InputBuilt?TEXT("HomeInputWorkBlocked"):Furnished?TEXT("FurnishedFarmBlocked"):TEXT("DoorFarmBlocked");
     if(Furnished && Mode>2){UE_LOG(LogTemp,Error,TEXT("CF_FURNISHED_FARM FAIL unsupported-mode"));FPlatformMisc::RequestExitWithStatus(false,1);return;}
     if(AvoidTest && Mode!=0){UE_LOG(LogTemp,Error,TEXT("CF_STANCE_FARM FAIL mode"));FPlatformMisc::RequestExitWithStatus(false,1);return;}
     // 固定房间只验证单伙伴工作，不替代自由放置、长期运输或自然冒险。
@@ -145,7 +146,7 @@ void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode,b
     if(Mode!=2)Farm->Crop->Seeds=1;
     const auto Timer=MakeShared<FTimerHandle>();
     const int32 HouseMaterials=Hero->Inventory->Count(EFrontierItem::Material);
-    World->GetTimerManager().SetTimer(*Timer,[World,Hero,Door,Farm,FarmWeak=TWeakObjectPtr<AWorkStation>(Farm),Definition,Timer,Finish,Mode,AvoidTest,Furnished,Slot,HouseMaterials,UseExistingRoom,Phase=Mode==2?1:0,At=World->GetTimeSeconds(),Pet=RestoredPet,Previous=RestoredPet?RestoredPet->GetActorLocation():FVector::ZeroVector,Travel=0.,Continuous=true,ExpectedMaterials=0,Diagnosed=false]() mutable
+    World->GetTimerManager().SetTimer(*Timer,[World,Hero,Door,Farm,FarmWeak=TWeakObjectPtr<AWorkStation>(Farm),Definition,Timer,Finish,Mode,AvoidTest,Furnished,Slot,HouseMaterials,InputBuilt,Phase=Mode==2?1:0,At=World->GetTimeSeconds(),Pet=RestoredPet,Previous=RestoredPet?RestoredPet->GetActorLocation():FVector::ZeroVector,Travel=0.,Continuous=true,ExpectedMaterials=0,Diagnosed=false]() mutable
     {
         auto End=[&](bool Pass)
         {
@@ -154,7 +155,7 @@ void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode,b
                 Pass &= CFDoorFarmVolumeQA::FurnishedRoom(World) && Hero->Inventory->Count(EFrontierItem::Material)==HouseMaterials;
                 UE_LOG(LogTemp,Display,TEXT("CF_FURNISHED_FARM %s stored=3 phase=%d"),Pass?TEXT("PASS"):TEXT("FAIL"),Phase);
             }
-            if(UseExistingRoom)UE_LOG(LogTemp,Display,TEXT("CF_HOME_ROOM_WORK %s noRebuild=1"),Pass?TEXT("PASS"):TEXT("FAIL"));
+            if(InputBuilt)UE_LOG(LogTemp,Display,TEXT("CF_HOME_ROOM_WORK %s noRebuild=1"),Pass?TEXT("PASS"):TEXT("FAIL"));
             if(AvoidTest)
             {
                 Pass &= Phase==2 && Pet && Pet->bAvoidCombat && Pet->WorkSite==Farm;
@@ -235,7 +236,7 @@ void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode,b
             Pet->Definition=Definition;Pet->FinishSpawning(Transform);Pet->Tame(Hero->GetController());Previous=Pet->GetActorLocation();
             // 使用玩家现有工作命令；看向上方避免优先命中门或野外资源。
             Hero->GetController()->SetControlRotation(FRotator(70,0,0));Hero->FirstPersonCamera->SetWorldRotation(FRotator(70,0,0));
-            if(UseExistingRoom){if(!CFInputQA::Press(Hero,EKeys::E)){End(false);return;}}else Hero->CommandWork();
+            if(InputBuilt){if(!CFInputQA::Press(Hero,EKeys::E)){End(false);return;}}else Hero->CommandWork();
             if(Pet->WorkSite!=Farm || Pet->Activity!=ECreatureActivity::Work){End(false);return;}
             if(AvoidTest)
             {
@@ -270,7 +271,7 @@ void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode,b
             Hero->SetActorLocation(FVector(-400,-720,60));
             const auto Rotation=(FVector(-555,-1000,120)-Hero->FirstPersonCamera->GetComponentLocation()).Rotation();
             Hero->GetController()->SetControlRotation(Rotation);Hero->FirstPersonCamera->SetWorldRotation(Rotation);
-            const bool Opened=UseExistingRoom?CFInputQA::Press(Hero,EKeys::E):Door->ToggleDoor(Hero);
+            const bool Opened=InputBuilt?CFInputQA::Press(Hero,EKeys::E):Door->ToggleDoor(Hero);
             if(!Opened || Door->DoorState!=2){End(false);return;}
             if(Mode==3)
             {

@@ -2,6 +2,16 @@
 
 ## 代表性双格房屋工作整合（当前P1）
 
+### 输入建房链自身保存与冷启动恢复
+
+`Scripts/Test-HomeDoorFarmPersistence.ps1 -InputBuilt` 复用存档链的互斥、备份恢复及输入哈希检查，使用独立 `HomeInputWorkBlocked` 槽。写进程经预览输入建好11模块原房屋，指派伙伴到农圃，闭门等待后保存退出；两个新进程直接读取该输入，不重新建房，逐项核对房屋身份/支撑/变换/成本/箱内物资及完整玩家背包，再核对原农圃工作绑定，保持闭门无生产，按E开门后自然继续一份作物。没有修改生产存档格式，仍为32。
+
+单步入口扩为 `Test-HomeInput.ps1 -Work -Mode Write/Read`；两模式必须带Work，读取模式不要求重复出现建房日志，而明确要求原房身份核对、模式2、闭门和工作标记。写入模式检查模式1，避免旧包忽略参数后把普通无保存样本误判成写档成功。单步会写/读QA槽；需要保留原档时使用外层Persistence链，外层负责该独立槽恢复。
+
+B638C334EA9440A1E7F4B6E0D4B8ED7B796E0ED9BAC4B7AD15C1CC8A5F71FB0A Editor构建成功。证据 `Saved/DoorFarmPersistenceQA/20261029-100117-2c07b39c/`；写进程 `Saved/HomeInputQA/20261029-100117-51052e94/`，读取 `100142-3a0cec70`、`100207-7309dc6e` 均退出0、CSV为同指纹，相应建房/身份/物资/闭门/模式及原房工作标记齐全，日志无失败。输入SHA-256 `BF6187D7A2EF6E2E03803F5B46FF509AD46B61C34EC6E6A807DDE3899F86433D` 两次读取不变，结束独立槽恢复为空。
+
+同模块原Furnished普通工作回归 `Saved/DoorFarmQA/20261029-100222-5b67fe5c/` 退出0通过。脚本语法与差异检查通过。Windows-Home-Input-Persistence正在独立打包；不能借Editor或旧C3324BD9包宣布新冷启动链打包通过。固定材料/种子/伙伴、固定玩家站位、农圃BuildAt而非预览输入和硬件/自然游玩缺口仍保留，不认定完整P1交付。
+
 ### 输入建房后复用原房开展伙伴工作
 
 Windows增量：Windows-Home-Input-Work已独立打包成功，内部程序SHA-256 `C3324BD9DA8DDB7F8A8A18550DFE4AEB673B092B60E7348D2E140057AEA4E2A5`。自身 `Scripts/Test-HomeInput.ps1 -BuildRoot E:\CreatureFrontierBuilds\Windows-Home-Input-Work -Work` 的 `Saved/HomeInputQA/20261029-095732-c339eea2/` 退出0：十次新增模块输入、11模块/112材料、原房闭门等待/E开门/工作及物资核对通过；结果CSV明确Room/Work均True、指纹一致。此为Windows自身证据，不借Editor结果。
