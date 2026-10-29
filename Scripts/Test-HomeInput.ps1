@@ -1,4 +1,4 @@
-param([string]$BuildRoot='',[string]$EngineRoot='D:\Epic\UE_5.8')
+param([string]$BuildRoot='',[string]$EngineRoot='D:\Epic\UE_5.8',[switch]$Room)
 $ErrorActionPreference='Stop'
 . (Join-Path $PSScriptRoot 'BuildFingerprint.ps1')
 $projectRoot=Split-Path $PSScriptRoot -Parent
@@ -21,16 +21,20 @@ foreach($name in @('FrontierHomeAutomation','FrontierHomeInvalid','FrontierHomeL
     $protected+= [pscustomobject]@{Path=$path;Existed=$existed;Backup=$backup;Hash=$beforeHash}
 }
 $arguments=@('-CFHomeTest','-CFHomeInputOnly','-nullrhi','-nosound','-unattended','-nop4',('-abslog="'+$log+'"'))
+if($Room){$arguments+='-CFHomeRoomInput'}
 $exe=$module
 if(!$BuildRoot){$exe=Join-Path $EngineRoot 'Engine\Binaries\Win64\UnrealEditor-Cmd.exe';$arguments=@((Join-Path $projectRoot 'CreatureFrontier.uproject'),'-game')+$arguments}
 $process=Start-Process -FilePath $exe -ArgumentList $arguments -WindowStyle Hidden -PassThru
 if(!$process.WaitForExit(60000)){$process.Kill();$process.WaitForExit();throw '房屋输入绑定专项超时'}
 if($process.ExitCode -ne 0 -or !(Test-Path -LiteralPath $log)){throw '房屋输入绑定专项未正常退出'}
 $body=Get-Content -LiteralPath $log -Raw
-if($body -match '\bFAIL\b|Fatal error|Assertion failed' -or !$body.Contains('CF_HOME_INPUT_BINDINGS PASS floor=1 rotated=1 cancelled=1 material=192') -or !$body.Contains('CF_HOME_INPUT_ONLY PASS noSave=1')){throw "房屋输入绑定专项未通过或构建不支持：$log"}
+$completion=if($Room){'CF_HOME_ROOM_INPUT PASS modules=11 material=112 noSave=1'}else{'CF_HOME_INPUT_ONLY PASS noSave=1'}
+if($body -match '\bFAIL\b|Fatal error|Assertion failed' -or !$body.Contains('CF_HOME_INPUT_BINDINGS PASS floor=1 rotated=1 cancelled=1 material=192') -or !$body.Contains($completion)){throw "房屋输入绑定专项未通过或构建不支持：$log"}
+if($Room -and ([regex]::Matches($body,'CF_HOME_ROOM_INPUT_PART PASS')).Count -ne 10){throw '整屋输入缺少十次新增模块的实际成功记录'}
 if((Get-FrontierBuildFingerprint -LiteralPath $module) -ne $hash){throw '房屋输入测试期间模块发生变化'}
 [pscustomobject]@{Pass=$true;BuildSHA256=$hash;Log=$log} | Export-Csv -LiteralPath (Join-Path $run 'Results.csv') -NoTypeInformation
-Write-Host '地板预览放置、墙预览旋转与取消绑定通过；不是系统鼠标或整屋人工建造验收'
+if($Room){Write-Host '双格门窗房屋及储物箱共11模块预览输入通过；不是系统鼠标或自然移动建房验收'}
+else{Write-Host '地板预览放置、墙预览旋转与取消绑定通过；不是系统鼠标或整屋人工建造验收'}
 } finally {
     try {foreach($entry in $protected){
         if($entry.Existed){Copy-Item -LiteralPath $entry.Backup -Destination $entry.Path;if((Get-FileHash -LiteralPath $entry.Path).Hash -ne $entry.Hash){throw '房屋输入测试原槽恢复失败'}}

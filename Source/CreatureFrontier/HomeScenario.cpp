@@ -487,6 +487,25 @@ bool PathInside(UWorld* World,ACFPlayerCharacter* Hero)
     auto* Path=UNavigationSystemV1::FindPathToLocationSynchronously(World,FVector(-400,-1250,40),FVector(-400,-800,60),Hero);
     return Path && Path->IsValid() && !Path->IsPartial() && !Path->PathPoints.IsEmpty() && Path->PathPoints.Last().Z<100;
 }
+bool PlaceThroughPreview(UWorld* World,ACFPlayerCharacter* Hero,EHomeModuleKind Kind,FVector Observer,FVector Aim,FVector Expected,double Yaw=0)
+{
+    Hero->SetActorLocation(Observer);
+    Hero->FirstPersonCamera->SetWorldRotation((Aim-Hero->FirstPersonCamera->GetComponentLocation()).Rotation());
+    bool Input=true;
+    for(int32 Step=0;Hero->HomeBuilding->Selected!=Kind && Step<8;++Step)Input &= CFInputQA::Press(Hero,EKeys::V);
+    Hero->HomeBuilding->UpdatePreview();
+    auto* Preview=Hero->HomeBuilding->GetPreview();
+    if(Preview && !FMath::IsNearlyEqual(Preview->GetActorRotation().Yaw,Yaw,.01))Input &= CFInputQA::Press(Hero,EKeys::Nine);
+    Hero->HomeBuilding->UpdatePreview();Preview=Hero->HomeBuilding->GetPreview();
+    const bool Matched=Preview && Preview->GetActorLocation().Equals(Expected,.01) && FMath::IsNearlyEqual(Preview->GetActorRotation().Yaw,Yaw,.01);
+    const int32 Before=Hero->Inventory->Count(EFrontierItem::Material);
+    if(Input && Matched)Input &= CFInputQA::Action(Hero,TEXT("Attack"),EKeys::LeftMouseButton);
+    auto* Built=Find(World,Kind,Expected);const auto* Definition=UHomeModuleDefinition::LoadDefault(Kind);
+    const bool Pass=Input && Matched && Built && Definition && Hero->Inventory->Count(EFrontierItem::Material)==Before-Definition->MaterialCost;
+    UE_LOG(LogTemp,Display,TEXT("CF_HOME_ROOM_INPUT_PART %s kind=%d expected=%s preview=%s material=%d feedback=%s"),Pass?TEXT("PASS"):TEXT("FAIL"),static_cast<int32>(Kind),*Expected.ToString(),Preview?*Preview->GetActorLocation().ToString():TEXT("无"),Hero->Inventory->Count(EFrontierItem::Material),*Hero->Feedback);
+    if(!Pass)UE_LOG(LogTemp,Display,TEXT("CF_HOME_ROOM_INPUT_REJECT matched=%d yaw=%.1f expectedYaw=%.1f hint=%s"),Matched,Preview?Preview->GetActorRotation().Yaw:-1,Yaw,*Hero->HomeBuilding->GetHint());
+    return Pass;
+}
 }
 
 void RunHomeScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
@@ -515,6 +534,26 @@ void RunHomeScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
     bool Input=Bindings && Rotated && FloorA && !Hero->Building->IsActive() && Hero->Inventory->Count(EFrontierItem::Material)==192;
     UE_LOG(LogTemp,Display,TEXT("CF_HOME_INPUT_BINDINGS %s floor=%d rotated=%d cancelled=%d material=%d"),Input?TEXT("PASS"):TEXT("FAIL"),FloorA!=nullptr,Rotated,!Hero->Building->IsActive(),Hero->Inventory->Count(EFrontierItem::Material));
     if(!Input) { UE_LOG(LogTemp,Error,TEXT("CF_HOME FAIL input %s"),*Hero->Feedback); FPlatformMisc::RequestExitWithStatus(false,1); return; }
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFHomeRoomInput")))
+    {
+        bool Room=CFInputQA::Press(Hero,EKeys::B) && CFInputQA::Press(Hero,EKeys::Eight);
+        auto Place=[&](EHomeModuleKind Kind,FVector Observer,FVector Aim,FVector Expected,double Yaw=0){return PlaceThroughPreview(World,Hero,Kind,Observer,Aim,Expected,Yaw);};
+        Room &= Place(EHomeModuleKind::Floor,FVector(-450,-900,60),FVector(-800,-800,-50),FVector(-800,-800,-40));
+        Room &= Place(EHomeModuleKind::Door,FVector(-570,-850,60),FVector(-400,-980,-30),FVector(-400,-1000,-30));
+        Room &= Place(EHomeModuleKind::Wall,FVector(-400,-800,60),FVector(-400,-620,-30),FVector(-400,-600,-30));
+        Room &= Place(EHomeModuleKind::Wall,FVector(-400,-800,60),FVector(-220,-800,-30),FVector(-200,-800,-30),90);
+        Room &= Place(EHomeModuleKind::Wall,FVector(-800,-800,60),FVector(-800,-980,-30),FVector(-800,-1000,-30));
+        Room &= Place(EHomeModuleKind::Wall,FVector(-800,-800,60),FVector(-800,-620,-30),FVector(-800,-600,-30));
+        Room &= Place(EHomeModuleKind::Window,FVector(-800,-800,60),FVector(-980,-800,-30),FVector(-1000,-800,-30),90);
+        Room &= Place(EHomeModuleKind::Storage,FVector(-800,-850,60),FVector(-900,-700,-30),FVector(-900,-700,-30));
+        Room &= Place(EHomeModuleKind::Roof,FVector(-400,-800,60),FVector(-400,-800,-30),FVector(-400,-800,280));
+        Room &= Place(EHomeModuleKind::Roof,FVector(-800,-800,60),FVector(-800,-800,-30),FVector(-800,-800,280));
+        Room &= CFInputQA::Action(Hero,TEXT("Capture"),EKeys::RightMouseButton) && !Hero->Building->IsActive();
+        FString Reason;const auto Layout=HomeLayout::Collect(World);
+        Room &= Layout.Num()==11 && HomeLayout::Validate(Layout,Reason) && Hero->Inventory->Count(EFrontierItem::Material)==112;
+        UE_LOG(LogTemp,Display,TEXT("CF_HOME_ROOM_INPUT %s modules=%d material=%d noSave=1"),Room?TEXT("PASS"):TEXT("FAIL"),Layout.Num(),Hero->Inventory->Count(EFrontierItem::Material));
+        FPlatformMisc::RequestExitWithStatus(false,Room?0:1);return;
+    }
     if(FParse::Param(FCommandLine::Get(),TEXT("CFHomeInputOnly")))
     {UE_LOG(LogTemp,Display,TEXT("CF_HOME_INPUT_ONLY PASS noSave=1"));FPlatformMisc::RequestExitWithStatus(false,0);return;}
     const FGuid FloorAId=FloorA->PersistentId;
