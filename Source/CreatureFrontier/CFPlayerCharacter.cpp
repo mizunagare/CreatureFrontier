@@ -547,21 +547,30 @@ void ACFPlayerCharacter::CommandWork()
         Feedback=FString::Printf(TEXT("已为%d位伙伴指派野外资源 | %s | F 取消"),Assigned,bDeliverySelection?TEXT("运到所选储物箱"):TEXT("直接放入玩家背包"));
         return;
     }
-    AWorkStation* Site = nullptr;
-    float Best = 800.0f;
-    for (TActorIterator<AWorkStation> It(GetWorld()); It; ++It)
+    // 明确瞄准的工作设施优先；没有设施目标时沿用原就近派工。
+    AWorkStation* Site=Cast<AWorkStation>(Hit.GetActor());
+    const bool AimedFacility=IsValid(Site) && !Site->IsActorBeingDestroyed();
+    if(AimedFacility && Site->RequiredSpecialty==EWorkSpecialty::Feeding)
+    { Feedback=TEXT("喂食槽无需指派工人；伙伴会自行进食，原指令未改变"); return; }
+    if(AimedFacility && GetDistanceTo(Site)>800)
+    { Feedback=TEXT("请靠近瞄准的工作设施8米内，原指令未改变"); return; }
+    if(!AimedFacility)
     {
-        if (It->RequiredSpecialty == EWorkSpecialty::Feeding) continue;
-        const float Distance = GetDistanceTo(*It);
-        if (Distance < Best) { Best = Distance; Site = *It; }
+        Site=nullptr;float Best=800.0f;
+        for(TActorIterator<AWorkStation> It(GetWorld());It;++It)
+        {
+            if(It->IsActorBeingDestroyed() || It->RequiredSpecialty==EWorkSpecialty::Feeding)continue;
+            const float Distance=GetDistanceTo(*It);
+            if(Distance<Best){Best=Distance;Site=*It;}
+        }
     }
     if (!Site) { Feedback = TEXT("请靠近工作设施8米内"); return; }
     int32 Count = 0;
     for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It)
         if (IsCommandTarget(*It) && It->Health > 0.0f)
         { It->CancelFieldResource(); It->WorkSite = Site; It->SetActivity(ECreatureActivity::Work); ++Count; }
-    Feedback = FString::Printf(TEXT("已指派%d位伙伴：%s。专长匹配时工作更快"),Count,
-        *FrontierChinese::Specialty(Site->RequiredSpecialty));
+    Feedback = FString::Printf(TEXT("已指派%d位伙伴：%s（%s）。专长匹配时工作更快"),Count,
+        *FrontierChinese::Specialty(Site->RequiredSpecialty),AimedFacility?TEXT("瞄准设施"):TEXT("就近设施"));
 }
 
 void ACFPlayerCharacter::CommandRest()

@@ -12,9 +12,37 @@
 #include "Kismet/GameplayStatics.h"
 #include "TimerManager.h"
 #include "HAL/PlatformMisc.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
+#include "Camera/CameraComponent.h"
+#include "InputRoutingQA.h"
 
 void RunWorkCycleScenario(UWorld* World, ACFPlayerCharacter* Hero)
 {
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFWorkAimTest")))
+    {
+        Hero->GetCharacterMovement()->DisableMovement();Hero->SetActorLocation(FVector(-400,-1250,40));
+        Hero->Inventory->Restore({{EFrontierItem::Material,100}});
+        auto Build=[&](EWorkSpecialty Kind,FVector Position){Hero->Building->Selected=Kind;return Hero->Building->BuildAt(FTransform(FRotator::ZeroRotator,Position,FVector(2,1,.7)));};
+        auto* Near=Build(EWorkSpecialty::Gathering,FVector(-100,-1100,-15));
+        auto* Far=Build(EWorkSpecialty::Farming,FVector(-400,-700,-15));
+        auto* Trough=Build(EWorkSpecialty::Feeding,FVector(-700,-1000,-15));
+        UCreatureDefinition* Leaf=nullptr;
+        for(TActorIterator<ACreatureCharacter> It(World);It;++It){if(It->Definition && It->Definition->Form==ECreatureForm::Leaf)Leaf=It->Definition;It->Destroy();}
+        if(!Near || !Far || !Trough || !Leaf){UE_LOG(LogTemp,Error,TEXT("CF_WORK_AIM FAIL fixture %s"),*Hero->Feedback);FPlatformMisc::RequestExitWithStatus(false,1);return;}
+        const FTransform At(FVector(-550,-1200,40));auto* Pet=World->SpawnActorDeferred<ACreatureCharacter>(ACreatureCharacter::StaticClass(),At,nullptr,nullptr,ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+        Pet->Definition=Leaf;Pet->FinishSpawning(At);Pet->Tame(Hero->GetController());
+        auto Aim=[&](FVector Target){const auto View=(Target-Hero->FirstPersonCamera->GetComponentLocation()).Rotation();Hero->GetController()->SetControlRotation(View);Hero->FirstPersonCamera->SetWorldRotation(View);};
+        Aim(Far->GetActorLocation()+FVector(0,0,20));
+        const bool Target=CFInputQA::Press(Hero,EKeys::E) && Pet->WorkSite==Far && Pet->Activity==ECreatureActivity::Work;
+        Aim(Hero->FirstPersonCamera->GetComponentLocation()+FVector(0,0,500));
+        const bool Fallback=CFInputQA::Press(Hero,EKeys::E) && Pet->WorkSite==Near;
+        Hero->CommandFollow();Aim(Trough->GetActorLocation()+FVector(0,0,20));
+        const bool Feeding=CFInputQA::Press(Hero,EKeys::E) && !Pet->WorkSite && Pet->Activity==ECreatureActivity::Follow;
+        const bool Pass=Target && Fallback && Feeding;
+        UE_LOG(LogTemp,Display,TEXT("CF_WORK_AIM %s aimedFar=%d nearestFallback=%d feedingPreserved=%d noSave=1"),Pass?TEXT("PASS"):TEXT("FAIL"),Target,Fallback,Feeding);
+        FPlatformMisc::RequestExitWithStatus(false,Pass?0:1);return;
+    }
     UCreatureDefinition* Leaf = nullptr;
     for (TActorIterator<ACreatureCharacter> It(World); It; ++It)
     { if (It->Definition && It->Definition->Form == ECreatureForm::Leaf) Leaf = It->Definition; It->Destroy(); }
