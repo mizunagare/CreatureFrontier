@@ -20,6 +20,8 @@ bool ACreatureCharacter::OrderAttack(ACreatureCharacter* Target)
     if (!HasAuthority() || Health <= 0 || Disposition != ECreatureDisposition::Tamed ||
         Activity == ECreatureActivity::Work || (Activity == ECreatureActivity::Rest && !AutoRest) || !IsValid(Target) ||
         Target->Health <= 0 || Target->Disposition == ECreatureDisposition::Tamed || Target->Activity == ECreatureActivity::ReturnHome) return false;
+    if(FocusTarget!=Target && bCombatRetreatActive)
+    {StopNavigation();NextNavigationUpdate=0;NextCombatRetreatSearch=0;}
     FocusTarget = Target;
     if (AutoRest) WorkSite = nullptr;
     SetActivity(ECreatureActivity::Combat);
@@ -58,6 +60,8 @@ bool ACreatureCharacter::RequestSpecial(ACreatureCharacter* Target)
 
 void ACreatureCharacter::ClearCombatOrders()
 {
+    if(bCombatRetreatActive)StopNavigation();
+    CombatRetreatRoute.Reset();
     SeenThreat.Reset();SeenThreatRemaining=0;LastSeenThreatLocation=FVector::ZeroVector;
     FocusTarget = nullptr;
     SpecialTarget.Reset();

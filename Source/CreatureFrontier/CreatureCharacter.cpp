@@ -161,6 +161,7 @@ float ACreatureCharacter::GetWorkEfficiency(const AWorkStation* Site) const
 void ACreatureCharacter::StopNavigation()
 {
     bCombatRetreatActive=false;
+    CombatRetreatRoute.Reset();
     bHasFollowPathDetour=false;
     if (auto* AI = Cast<AAIController>(GetController())) AI->StopMovement();
 }
