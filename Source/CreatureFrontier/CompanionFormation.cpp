@@ -61,6 +61,38 @@ const ACharacter* ACreatureCharacter::FindFollowPathBlocker(const FVector& Desti
 {
     return FrontierFollowPath::Blocker(this,GetActorLocation(),Destination);
 }
+
+bool ACreatureCharacter::FindOwnerYield(FVector& Out)
+{
+    const auto* Hero=Tamer?Cast<ACFPlayerCharacter>(Tamer->GetPawn()):nullptr;if(!Hero || Activity!=ECreatureActivity::Follow)return false;
+    const double Now=GetWorld()->GetTimeSeconds();
+    if(Now<OwnerYieldUntil && FVector::Dist2D(GetActorLocation(),OwnerYieldGoal)>12){Out=OwnerYieldGoal;return true;}
+    const FVector Intent=Hero->GetLastMovementInputVector().GetSafeNormal2D(),Offset=GetActorLocation()-Hero->GetActorLocation();
+    const auto* Shape=GetCapsuleComponent();const float Combined=Shape->GetScaledCapsuleRadius()+Hero->GetCapsuleComponent()->GetScaledCapsuleRadius();
+    if(Intent.IsNearlyZero() || FMath::Abs(Offset.Z)>40 || Offset.Size2D()>Combined+30 || FVector::DotProduct(Intent,Offset.GetSafeNormal2D())<.65 || Now<NextOwnerYieldSearch)return false;
+    NextOwnerYieldSearch=Now+.4;auto* Nav=FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());if(!Nav)return false;
+    const FVector Side(-Intent.Y,Intent.X,0);double Best=DBL_MAX;FVector Goal=FVector::ZeroVector;
+    // 只在真实侧方空间让行，不要求先穿过主人到达其身后，也不把侧步投影到别的楼层。
+    for(int32 Index=0;Index<4;++Index)
+    {
+        const auto Candidate=GetActorLocation()+Side*(Index%2?-1:1)*(90+(Index/2)*40)-FVector(0,0,Shape->GetScaledCapsuleHalfHeight());
+        FNavLocation Projected;if(!Nav->ProjectPointToNavigation(Candidate,Projected,FVector(35,35,60)))continue;
+        const auto Center=Projected.Location+FVector(0,0,Shape->GetScaledCapsuleHalfHeight());
+        if(FVector::Dist2D(Center,Hero->GetActorLocation())<Combined+24 || FVector::Dist2D(Center,GetActorLocation())<45)continue;
+        FCollisionQueryParams Query(SCENE_QUERY_STAT(OwnerYield),false,this);
+        if(GetWorld()->OverlapBlockingTestByChannel(Center,FQuat::Identity,ECC_Pawn,FCollisionShape::MakeCapsule(Shape->GetScaledCapsuleRadius()-1,Shape->GetScaledCapsuleHalfHeight()-1),Query))continue;
+        const auto* Path=UNavigationSystemV1::FindPathToLocationSynchronously(GetWorld(),GetActorLocation(),Projected.Location,this);
+        if(!FrontierFollowPath::ClearPath(this,Path))continue;
+        bool Clear=true;const auto Height=GetActorLocation().Z-Path->PathPoints[0].Z;
+        for(int32 Point=1;Point<Path->PathPoints.Num();++Point)
+        {FHitResult Hit;if(GetWorld()->SweepSingleByChannel(Hit,Path->PathPoints[Point-1]+FVector(0,0,Height),Path->PathPoints[Point]+FVector(0,0,Height),FQuat::Identity,ECC_Pawn,FCollisionShape::MakeCapsule(Shape->GetScaledCapsuleRadius()-1,Shape->GetScaledCapsuleHalfHeight()-1),Query)){Clear=false;break;}}
+        if(Clear && Path->GetPathLength()<Best){Best=Path->GetPathLength();Goal=Projected.Location;}
+    }
+    if(Best==DBL_MAX)return false;OwnerYieldGoal=Goal;OwnerYieldUntil=Now+1.2;Out=Goal;
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFHomeExpansionRead")) || FParse::Param(FCommandLine::Get(),TEXT("CFHomeExpansionTest")))
+    {UE_LOG(LogTemp,Display,TEXT("CF_OWNER_YIELD pet=%s goal=%s length=%.1f"),*PersistentId.ToString(),*Goal.ToString(),Best);}
+    return true;
+}
 bool ACreatureCharacter::FindCombatRetreat(const FVector& Destination,const ACharacter* Obstacle,TArray<FVector>& Out) const
 {
     const double SearchStarted=FPlatformTime::Seconds();

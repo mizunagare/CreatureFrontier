@@ -48,10 +48,14 @@ bool FResourceRestoreTransaction::Stage(const UFrontierSaveGame* Save)
             (Record.Remaining>0 && Record.RegrowRemaining!=0) ||
             (Record.Remaining==0 && Definition->RegrowSeconds>0 && Record.RegrowRemaining<=0)) return false;
         Ids.Add(Record.Id);
-        auto* Node=World->SpawnActorDeferred<AResourceNode>(AResourceNode::StaticClass(),Record.Transform,nullptr,nullptr,ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+        auto Transform=Record.Transform;
+        // 仅修正已知身份、定义和原始坐标的错误资源点，不重置已采储量、冷却或其他快照字段。
+        if(Record.Id==FGuid(0xCF170000,0,0,5) && Definition->GetPathName()==TEXT("/Game/Resources/DA_Stone.DA_Stone") &&
+            Transform.GetLocation().Equals(FVector(1250,1000,0),.01))Transform.SetLocation(StarterStoneMineLocation());
+        auto* Node=World->SpawnActorDeferred<AResourceNode>(AResourceNode::StaticClass(),Transform,nullptr,nullptr,ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
         if(!Node) return false;
         Node->Definition=Definition; Node->PersistentId=Record.Id; Node->SetActorEnableCollision(false);
-        Node->FinishSpawning(Record.Transform);
+        Node->FinishSpawning(Transform);
         Node->Remaining=Record.Remaining; Node->HarvestCooldown=Record.HarvestCooldown; Node->RegrowRemaining=Record.RegrowRemaining;
         Node->Refresh(); Staged.Add(Node);
     }

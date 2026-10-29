@@ -19,6 +19,7 @@
 #include "RescueRecallScenario.h"
 #include "HUDScenario.h"
 #include "HomeScenario.h"
+#include "HomeExpansionScenario.h"
 #include "StairsScenario.h"
 #include "ExpeditionScenario.h"
 #include "CFPlayerCharacter.h"
@@ -73,6 +74,8 @@ void ACFGameMode::BeginPlay()
 {
     Super::BeginPlay();
     SeedFrontierResources(GetWorld());
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFHomeExpansionTest")) || FParse::Param(FCommandLine::Get(),TEXT("CFHomeExpansionPlan")) || FParse::Param(FCommandLine::Get(),TEXT("CFHomeExpansionRepair")) || FParse::Param(FCommandLine::Get(),TEXT("CFHomeExpansionFunded")) || FParse::Param(FCommandLine::Get(),TEXT("CFHomeExpansionRead")))
+    {const bool Plan=FParse::Param(FCommandLine::Get(),TEXT("CFHomeExpansionPlan"));FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this,Plan](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunHomeExpansionScenario(GetWorld(),Hero,Plan);},1.f,false);return;}
     if(FParse::Param(FCommandLine::Get(),TEXT("CFStairsTest")) || FParse::Param(FCommandLine::Get(),TEXT("CFStairsRead")) || FParse::Param(FCommandLine::Get(),TEXT("CFStairsLegacy")))
     {const int32 Mode=FParse::Param(FCommandLine::Get(),TEXT("CFStairsLegacy"))?2:FParse::Param(FCommandLine::Get(),TEXT("CFStairsRead"))?1:0;FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this,Mode](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunStairsScenario(GetWorld(),Hero,Mode);},1.f,false);return;}
     if(FParse::Param(FCommandLine::Get(),TEXT("CFGatherHoldTest")))

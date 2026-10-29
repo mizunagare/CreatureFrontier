@@ -46,7 +46,9 @@ void AResourceNode::Tick(float DeltaSeconds)
     if(Remaining==0 && RegrowRemaining>0)
     {
         const float PreviousSeconds=FMath::CeilToFloat(RegrowRemaining);
-        RegrowRemaining=FMath::Max(0.f,RegrowRemaining-DeltaSeconds);
+        if(RegrowRemaining!=PublishedRegrowRemaining)PreciseRegrowRemaining=RegrowRemaining;
+        PreciseRegrowRemaining=FMath::Max(0.0,PreciseRegrowRemaining-static_cast<double>(DeltaSeconds));
+        RegrowRemaining=static_cast<float>(PreciseRegrowRemaining);PublishedRegrowRemaining=RegrowRemaining;
         if(RegrowRemaining==0) { Remaining=Definition->Capacity; Refresh(); }
         else if(PreviousSeconds!=FMath::CeilToFloat(RegrowRemaining)) Label->SetText(FText::FromString(GetWorldLabel()));
     }
@@ -117,13 +119,14 @@ bool SpawnStarterResources(UWorld* World,TArray<AResourceNode*>& OutNodes)
     }
     return true;
 }
+FVector StarterStoneMineLocation() { return FVector(1250,760,0); }
 bool MakeStarterResourceRecords(TArray<FResourceSaveRecord>& OutRecords)
 {
     struct FSeed { const TCHAR* Asset; FVector Position; uint32 Id; };
     const FSeed Seeds[]={
         {TEXT("DA_Brush"),FVector(-450,290,0),1}, {TEXT("DA_Stone"),FVector(-650,-60,0),2},
         {TEXT("DA_Salvage"),FVector(-650,640,0),3}, {TEXT("DA_Brush"),FVector(-1400,900,0),4},
-        {TEXT("DA_Stone"),FVector(1250,1000,0),5}, {TEXT("DA_Salvage"),FVector(800,-1000,0),6},
+        {TEXT("DA_Stone"),StarterStoneMineLocation(),5}, {TEXT("DA_Salvage"),FVector(800,-1000,0),6},
         {TEXT("DA_Crystal"),FVector(1400,1600,0),7},
         {TEXT("DA_Fiber"),FVector(-1500,1400,0),8},
         {TEXT("DA_Ore"),FVector(1800,-1100,0),9},

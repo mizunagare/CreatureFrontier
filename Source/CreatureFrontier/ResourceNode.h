@@ -26,6 +26,9 @@ public:
     void Refresh();
 private:
     FString GetWorldLabel() const;
+    // 对外和存档继续使用原浮点字段；内部双精度避免极短帧反复扣减造成累计偏差。
+    double PreciseRegrowRemaining=0;
+    float PublishedRegrowRemaining=-1;
     UPROPERTY() TObjectPtr<UStaticMeshComponent> Visual;
     UPROPERTY() TObjectPtr<UTextRenderComponent> Label;
     UPROPERTY() TObjectPtr<class UMaterialInstanceDynamic> ResourceMaterial;
@@ -35,3 +38,5 @@ private:
 void SeedFrontierResources(UWorld* World);
 bool SpawnStarterResources(UWorld* World,TArray<AResourceNode*>& OutNodes);
 bool MakeStarterResourceRecords(TArray<struct FResourceSaveRecord>& OutRecords);
+// 避开初始地图中封住旧矿床中心的水晶基座；新世界和旧档修复共用。
+FVector StarterStoneMineLocation();

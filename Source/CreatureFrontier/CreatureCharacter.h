@@ -149,6 +149,9 @@ protected:
     void OnRep_Activity();
 
 private:
+    bool FindOwnerYield(FVector& Out);
+    FVector OwnerYieldGoal=FVector::ZeroVector;
+    double OwnerYieldUntil=0,NextOwnerYieldSearch=0;
     const ACharacter* FindFollowPathBlocker(const FVector& Destination) const;
     bool FindFollowPathDetour(const FVector& Destination,const ACharacter* Blocker,FVector& Out) const;
     bool bHasFollowPathDetour=false;
