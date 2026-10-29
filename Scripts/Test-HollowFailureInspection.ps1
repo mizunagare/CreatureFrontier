@@ -1,5 +1,6 @@
-param([Parameter(Mandatory=$true)][string]$InputPath,[switch]$Editor,[string]$BuildRoot='',[string]$EngineRoot='D:\Epic\UE_5.8',[switch]$Dynamic,[switch]$WaitForPartner,[ValidateSet(30,60,120)][int]$FrameCap=60,[switch]$CancelRetreat,[switch]$RequireBattle,[switch]$SwitchRetreat)
+param([Parameter(Mandatory=$true)][string]$InputPath,[switch]$Editor,[string]$BuildRoot='',[string]$EngineRoot='D:\Epic\UE_5.8',[switch]$Dynamic,[switch]$WaitForPartner,[ValidateSet(30,60,120)][int]$FrameCap=60,[switch]$CancelRetreat,[switch]$RequireBattle,[switch]$SwitchRetreat,[switch]$BlockRetreat)
 $ErrorActionPreference='Stop'
+if($BlockRetreat -and (!$Dynamic -or !$WaitForPartner -or $CancelRetreat -or $SwitchRetreat)){throw '动态阻挡专项需要独立的动态原地等待模式'}
 if($WaitForPartner -and !$Dynamic){throw '原地等待伙伴仅适用于动态观察模式'}
 if($CancelRetreat -and (!$Dynamic -or !$WaitForPartner)){throw '取消绕行专项需要动态原地等待模式'}
 if($SwitchRetreat -and (!$Dynamic -or !$WaitForPartner -or $CancelRetreat)){throw '切换目标专项需要不取消的动态原地等待模式'}
@@ -34,6 +35,7 @@ try {
         if($WaitForPartner){$arguments+='-CFHollowInspectWait'}
         if($CancelRetreat){$arguments+='-CFHollowCancelRetreat'}
         if($SwitchRetreat){$arguments+='-CFHollowSwitchRetreat'}
+        if($BlockRetreat){$arguments+='-CFHollowBlockRetreat'}
         $process=Start-Process -FilePath $exe -WorkingDirectory $root -WindowStyle Hidden -PassThru -ArgumentList $arguments
         if(!$process.WaitForExit(60000)){$process.Kill();$process.WaitForExit();throw '现场检查超时'}
         $s=Get-Content -LiteralPath $log -Raw
@@ -43,6 +45,10 @@ try {
         if($Dynamic -and (!$s.Contains('waitForPartner='+[int][bool]$WaitForPartner) -or !$s.Contains('t.MaxFPS = "'+$FrameCap+'"'))){throw '动态观察模式或帧率不符'}
         if($CancelRetreat -and (!$s.Contains('CF_RETREAT_CANCEL PASS activeBefore=1 clearedImmediately=1') -or !$s.Contains('CF_RETREAT_CANCEL_FINAL PASS enemyUnhurt=1'))){throw '取消绕行专项断言未通过'}
         if($SwitchRetreat -and !$s.Contains('CF_RETREAT_SWITCH PASS activeBefore=1 invalidPreserved=1 newTargetCleared=1 returnAccepted=1')){throw '切换目标事务断言未通过'}
+        if($BlockRetreat){
+            $barrier=[regex]::Match($s,'CF_RETREAT_BLOCK_INSERT activeBefore=1 actor=(\S+)')
+            if(!$barrier.Success -or !$s.Contains('CF_COMBAT_ROUTE_ABORT cleared=1 actor='+$barrier.Groups[1].Value) -or !$s.Contains('CF_RETREAT_BLOCK PASS cleared=1 focusKept=1 removed=1')){throw '动态阻挡清理断言未通过'}
+        }
         if($RequireBattle){
             $samples=[regex]::Matches($s,'CF_HOLLOW_DYNAMIC_SAMPLE[^\r\n]*heroHP=([0-9.]+) petHP=([0-9.]+) enemyHP=([0-9.]+)')
             if(!$samples.Count){throw '缺少战斗采样'}
@@ -52,7 +58,7 @@ try {
         }
         foreach($path in @($InputPath,$slot,(Join-Path $run 'input.sav'))){if((Get-FileHash -LiteralPath $path).Hash -ne $inputHash){throw '现场检查改写了输入'}}
         if((Get-FrontierBuildFingerprint -LiteralPath $module) -ne $buildHash){throw '检查期间程序指纹变化'}
-        [pscustomobject]@{Pass=$true;SnapshotOnly=!$Dynamic;DynamicObservation=[bool]$Dynamic;WaitForPartner=[bool]$WaitForPartner;CancelRetreat=[bool]$CancelRetreat;SwitchRetreat=[bool]$SwitchRetreat;RequireBattle=[bool]$RequireBattle;FrameCap=$FrameCap;BuildSHA256=$buildHash;InputSHA256=$inputHash;Log=$log}|Export-Csv -LiteralPath (Join-Path $run 'Results.csv') -NoTypeInformation
+        [pscustomobject]@{Pass=$true;SnapshotOnly=!$Dynamic;DynamicObservation=[bool]$Dynamic;WaitForPartner=[bool]$WaitForPartner;CancelRetreat=[bool]$CancelRetreat;SwitchRetreat=[bool]$SwitchRetreat;BlockRetreat=[bool]$BlockRetreat;RequireBattle=[bool]$RequireBattle;FrameCap=$FrameCap;BuildSHA256=$buildHash;InputSHA256=$inputHash;Log=$log}|Export-Csv -LiteralPath (Join-Path $run 'Results.csv') -NoTypeInformation
         Write-Host "失败现场检查完成：$run；动态观察=$Dynamic；不等同恢复路线或瞬态重放通过"
     } finally {
         if($existed){Copy-Item -LiteralPath $backup -Destination $slot;if((Get-FileHash -LiteralPath $slot).Hash -ne $oldHash){throw '现场检查原槽恢复失败'}}

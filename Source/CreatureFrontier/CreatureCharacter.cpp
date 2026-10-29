@@ -195,7 +195,12 @@ void ACreatureCharacter::NavigateTo(const FVector& Destination, float Acceptance
         const auto* Shape=GetCapsuleComponent();
         if(GetWorld()->SweepSingleByChannel(Hit,GetActorLocation(),CombatRetreatGoal,FQuat::Identity,ECC_Pawn,
             FCollisionShape::MakeCapsule(Shape->GetScaledCapsuleRadius(),Shape->GetScaledCapsuleHalfHeight()),Query))
-        {bCombatRetreatActive=false;AI->StopMovement();return;}
+        {
+            StopNavigation();
+            if(FParse::Param(FCommandLine::Get(),TEXT("CFHollowDetourTrace")))
+                UE_LOG(LogTemp,Display,TEXT("CF_COMBAT_ROUTE_ABORT cleared=%d actor=%s"),!HasCombatRoute(),*GetNameSafe(Hit.GetActor()));
+            return;
+        }
         AI->MoveToLocation(CombatRetreatGoal,15,false,false,false,false,nullptr,false);
         return;
     }

@@ -94,6 +94,7 @@ public:
     bool RequestSpecial(ACreatureCharacter* Target);
     void ClearCombatOrders();
     bool HasCombatRoute() const { return bCombatRetreatActive || !CombatRetreatRoute.IsEmpty(); }
+    float GetAttackCooldownRemaining() const { return AttackCooldown; }
     void HandlePlayerDowned(const ACFPlayerCharacter* Player);
     bool IsSpecialReady() const;
     FString GetSpecialName() const;

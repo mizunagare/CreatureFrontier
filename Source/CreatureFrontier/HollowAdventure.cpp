@@ -35,6 +35,8 @@
 #include "NavigationSystem.h"
 #include "NavigationPath.h"
 #include "AIController.h"
+#include "Engine/StaticMeshActor.h"
+#include "Components/StaticMeshComponent.h"
 
 namespace
 {
@@ -419,12 +421,34 @@ void RunHollowAdventure(UWorld* World,ACFPlayerCharacter* Hero,int Mode)
             const bool SwitchRetreat=FParse::Param(FCommandLine::Get(),TEXT("CFHollowSwitchRetreat"));
             auto Cancelled=MakeShared<bool>(false);
             auto Switched=MakeShared<bool>(false);
+            const bool BlockRetreat=FParse::Param(FCommandLine::Get(),TEXT("CFHollowBlockRetreat"));
+            auto BlockStage=MakeShared<int32>(0);
+            auto Barrier=MakeShared<TWeakObjectPtr<AStaticMeshActor>>();
             UE_LOG(LogTemp,Display,TEXT("CF_HOLLOW_DYNAMIC_BEGIN reconstructedFocus=1 deterministicReplay=0 waitForPartner=%d"),WaitForPartner);
-            FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([World,Hero,Pet,Enemy,Movement,Goal,Started,Start,WaitForPartner,CancelRetreat,Cancelled,SwitchRetreat,Switched](float)
+            FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([World,Hero,Pet,Enemy,Movement,Goal,Started,Start,WaitForPartner,CancelRetreat,Cancelled,SwitchRetreat,Switched,BlockRetreat,BlockStage,Barrier](float)
             {
                 if(!IsValid(Hero) || !IsValid(Pet) || !IsValid(Enemy))
                 {UE_LOG(LogTemp,Error,TEXT("CF_HOLLOW_DYNAMIC FAIL actors"));FPlatformMisc::RequestExitWithStatus(false,1);return false;}
                 const FVector Now=Hero->GetActorLocation();
+                if(BlockRetreat && *BlockStage==0 && Pet->HasCombatRoute())
+                {
+                    const auto* Controller=Cast<AAIController>(Pet->GetController());
+                    FVector At=Controller?Controller->GetImmediateMoveDestination():Pet->GetActorLocation();At.Z=Pet->GetActorLocation().Z;
+                    auto* Actor=World->SpawnActor<AStaticMeshActor>(At,FRotator::ZeroRotator);
+                    if(!Actor){UE_LOG(LogTemp,Error,TEXT("CF_RETREAT_BLOCK FAIL spawn"));FPlatformMisc::RequestExitWithStatus(false,1);return false;}
+                    auto* Mesh=Actor->GetStaticMeshComponent();Mesh->SetMobility(EComponentMobility::Movable);
+                    Mesh->SetStaticMesh(LoadObject<UStaticMesh>(nullptr,TEXT("/Engine/BasicShapes/Cube.Cube")));
+                    Mesh->SetCanEverAffectNavigation(false);Mesh->SetCollisionProfileName(TEXT("BlockAll"));Actor->SetActorScale3D(FVector(.2,.2,1));
+                    *Barrier=Actor;*BlockStage=1;
+                    UE_LOG(LogTemp,Display,TEXT("CF_RETREAT_BLOCK_INSERT activeBefore=1 actor=%s"),*Actor->GetName());
+                }
+                else if(BlockRetreat && *BlockStage==1 && !Pet->HasCombatRoute())
+                {
+                    const bool Pass=Pet->FocusTarget==Enemy && Barrier->IsValid() && Barrier->Get()->Destroy();
+                    UE_LOG(LogTemp,Display,TEXT("CF_RETREAT_BLOCK %s cleared=1 focusKept=%d removed=%d"),Pass?TEXT("PASS"):TEXT("FAIL"),Pet->FocusTarget==Enemy,Pass);
+                    if(!Pass){FPlatformMisc::RequestExitWithStatus(false,1);return false;}
+                    *BlockStage=2;
+                }
                 if(SwitchRetreat && !*Switched && Pet->HasCombatRoute())
                 {
                     // 只验证正式指令事务，不移动或新造敌人；立即切回原目标后继续正常战斗。
@@ -462,6 +486,10 @@ void RunHollowAdventure(UWorld* World,ACFPlayerCharacter* Hero,int Mode)
                 const FVector Segment=AI?AI->GetImmediateMoveDestination():Pet->GetActorLocation();
                 FHitResult PetHit;FCollisionQueryParams PetQuery(SCENE_QUERY_STAT(HollowDynamicPet),false,Pet);
                 const auto* PetShape=Pet->GetCapsuleComponent();const FVector PetPosition=Pet->GetActorLocation();
+                FHitResult CombatSight;FCollisionQueryParams CombatQuery(SCENE_QUERY_STAT(HollowCombatObserve),false,Pet);
+                const bool SightHit=World->LineTraceSingleByChannel(CombatSight,PetPosition,Enemy->GetActorLocation(),ECC_Visibility,CombatQuery);
+                UE_LOG(LogTemp,Display,TEXT("CF_HOLLOW_DYNAMIC_COMBAT gameTime=%.3f enemy=%s distance=%.2f range=%.2f visible=%d cooldown=%.3f stamina=%.2f"),
+                    World->GetTimeSeconds(),*Enemy->GetActorLocation().ToString(),Pet->GetDistanceTo(Enemy),Pet->AttackRange,!SightHit || CombatSight.GetActor()==Enemy,Pet->GetAttackCooldownRemaining(),Pet->Stamina);
                 World->SweepSingleByChannel(PetHit,PetPosition,PetPosition+(Segment-PetPosition).GetSafeNormal2D()*100,FQuat::Identity,ECC_Pawn,
                     FCollisionShape::MakeCapsule(PetShape->GetScaledCapsuleRadius(),PetShape->GetScaledCapsuleHalfHeight()),PetQuery);
                 UE_LOG(LogTemp,Display,TEXT("CF_HOLLOW_DYNAMIC_PATH moveStatus=%d segment=%s blocker=%s component=%s heroBlock=%d penetrating=%d depth=%.3f"),
@@ -470,6 +498,8 @@ void RunHollowAdventure(UWorld* World,ACFPlayerCharacter* Hero,int Mode)
                     FPlatformTime::Seconds()-Started,*Now.ToString(),*Hero->GetVelocity().ToString(),*Pet->GetActorLocation().ToString(),*Pet->GetVelocity().ToString(),
                     static_cast<int32>(Pet->Activity),*GetNameSafe(Pet->FocusTarget),*GetNameSafe(Block.GetActor()),Block.GetActor()==Pet,Hero->Health,Pet->Health,Enemy->Health,FVector::Dist2D(Now,Goal));
                 if(FPlatformTime::Seconds()-Started<15)return true;
+                if(BlockRetreat && *BlockStage!=2)
+                {UE_LOG(LogTemp,Error,TEXT("CF_RETREAT_BLOCK FAIL incomplete"));FPlatformMisc::RequestExitWithStatus(false,1);return false;}
                 if(SwitchRetreat && !*Switched)
                 {UE_LOG(LogTemp,Error,TEXT("CF_RETREAT_SWITCH FAIL no-active-route"));FPlatformMisc::RequestExitWithStatus(false,1);return false;}
                 if(CancelRetreat)
