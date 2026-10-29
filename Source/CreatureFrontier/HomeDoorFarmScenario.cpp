@@ -141,9 +141,40 @@ void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode,b
     auto* Definition=LoadObject<UCreatureDefinition>(nullptr,TEXT("/Game/Creatures/DA_Mosskip.DA_Mosskip"));
     if(!Door || !Definition || (NoRoof && RemovedRoofs!=1)){Finish(false);return;}
     const FTransform FarmTransform(FRotator::ZeroRotator,FVector(-400,-700,5),FVector(2,1,.7));
-    if(Mode!=2){Hero->Building->Selected=EWorkSpecialty::Farming;Farm=Hero->Building->BuildAt(FarmTransform);}
+    if(Mode!=2)
+    {
+        if(UseExistingRoom)
+        {
+            Hero->SetActorLocation(FVector(-570,-700,60));
+            auto View=(FVector(-400,-700,-30)-Hero->FirstPersonCamera->GetComponentLocation()).Rotation();
+            Hero->GetController()->SetControlRotation(View);Hero->FirstPersonCamera->SetWorldRotation(View);
+            const int32 Before=Hero->Inventory->Count(EFrontierItem::Material);
+            bool Placed=CFInputQA::Press(Hero,EKeys::B);
+            for(int32 Step=0;Hero->Building->Selected!=EWorkSpecialty::Farming && Step<6;++Step)Placed &= CFInputQA::Press(Hero,EKeys::V);
+            Placed &= CFInputQA::Action(Hero,TEXT("Attack"),EKeys::LeftMouseButton) && CFInputQA::Action(Hero,TEXT("Capture"),EKeys::RightMouseButton);
+            for(TActorIterator<AWorkStation> It(World);It;++It)if(It->bPlayerBuilt && It->RequiredSpecialty==EWorkSpecialty::Farming)Farm=*It;
+            Placed &= Farm && Farm->GetActorTransform().Equals(FarmTransform,.01) && !Hero->Building->IsActive() &&
+                Hero->Inventory->Count(EFrontierItem::Material)==Before-UBaseBuildingComponent::GetCost(EWorkSpecialty::Farming);
+            UE_LOG(LogTemp,Display,TEXT("CF_HOME_FARM_INPUT %s"),Placed?TEXT("PASS"):TEXT("FAIL"));
+            if(!Placed){UE_LOG(LogTemp,Error,TEXT("CF_HOME_FARM_INPUT_REASON %s"),*Hero->Feedback);Finish(false);return;}
+        }
+        else {Hero->Building->Selected=EWorkSpecialty::Farming;Farm=Hero->Building->BuildAt(FarmTransform);}
+    }
     if(!Farm){UE_LOG(LogTemp,Display,TEXT("CF_DOOR_FARM_FIXTURE %s"),*Hero->Feedback);Finish(false);return;}
-    if(Mode!=2)Farm->Crop->Seeds=1;
+    if(Mode!=2)
+    {
+        if(UseExistingRoom)
+        {
+            // 初始种子仍是夹具物资；存入通过正常F2绑定，不能直接改农圃库存。
+            const auto View=(Farm->GetActorLocation()+FVector(0,0,30)-Hero->FirstPersonCamera->GetComponentLocation()).Rotation();
+            Hero->GetController()->SetControlRotation(View);Hero->FirstPersonCamera->SetWorldRotation(View);
+            const bool Seeded=Hero->Inventory->AddItem(EFrontierItem::Seeds,1) && CFInputQA::Press(Hero,EKeys::F2) &&
+                Farm->Crop->Seeds==1 && Hero->Inventory->Count(EFrontierItem::Seeds)==0;
+            UE_LOG(LogTemp,Display,TEXT("CF_HOME_FARM_SEED_INPUT %s"),Seeded?TEXT("PASS"):TEXT("FAIL"));
+            if(!Seeded){Finish(false);return;}
+        }
+        else Farm->Crop->Seeds=1;
+    }
     const auto Timer=MakeShared<FTimerHandle>();
     const int32 HouseMaterials=Hero->Inventory->Count(EFrontierItem::Material);
     World->GetTimerManager().SetTimer(*Timer,[World,Hero,Door,Farm,FarmWeak=TWeakObjectPtr<AWorkStation>(Farm),Definition,Timer,Finish,Mode,AvoidTest,Furnished,Slot,HouseMaterials,InputBuilt,Phase=Mode==2?1:0,At=World->GetTimeSeconds(),Pet=RestoredPet,Previous=RestoredPet?RestoredPet->GetActorLocation():FVector::ZeroVector,Travel=0.,Continuous=true,ExpectedMaterials=0,Diagnosed=false]() mutable
