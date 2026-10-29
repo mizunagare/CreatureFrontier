@@ -664,21 +664,29 @@ void RunHomeScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
     }
     if(FParse::Param(FCommandLine::Get(),TEXT("CFHomeRoomInput")))
     {
+        const bool Courtyard=FParse::Param(FCommandLine::Get(),TEXT("CFHomeCourtyardWork"));
         bool Room=CFInputQA::Press(Hero,EKeys::B) && CFInputQA::Press(Hero,EKeys::Eight);
         auto Place=[&](EHomeModuleKind Kind,FVector Observer,FVector Aim,FVector Expected,double Yaw=0){return PlaceThroughPreview(World,Hero,Kind,Observer,Aim,Expected,Yaw);};
         Room &= Place(EHomeModuleKind::Floor,FVector(-450,-900,60),FVector(-800,-800,-50),FVector(-800,-800,-40));
-        Room &= Place(EHomeModuleKind::Door,FVector(-570,-850,60),FVector(-400,-980,-30),FVector(-400,-1000,-30));
+        Room &= Place(Courtyard?EHomeModuleKind::Wall:EHomeModuleKind::Door,FVector(-570,-850,60),FVector(-400,-980,-30),FVector(-400,-1000,-30));
         Room &= Place(EHomeModuleKind::Wall,FVector(-400,-800,60),FVector(-400,-620,-30),FVector(-400,-600,-30));
-        Room &= Place(EHomeModuleKind::Wall,FVector(-400,-800,60),FVector(-220,-800,-30),FVector(-200,-800,-30),90);
+        Room &= Place(Courtyard?EHomeModuleKind::Door:EHomeModuleKind::Wall,Courtyard?FVector(-550,-800,60):FVector(-400,-800,60),FVector(-220,-800,-30),FVector(-200,-800,-30),90);
         Room &= Place(EHomeModuleKind::Wall,FVector(-800,-800,60),FVector(-800,-980,-30),FVector(-800,-1000,-30));
         Room &= Place(EHomeModuleKind::Wall,FVector(-800,-800,60),FVector(-800,-620,-30),FVector(-800,-600,-30));
         Room &= Place(EHomeModuleKind::Window,FVector(-800,-800,60),FVector(-980,-800,-30),FVector(-1000,-800,-30),90);
-        Room &= Place(EHomeModuleKind::Storage,FVector(-800,-850,60),FVector(-900,-700,-30),FVector(-900,-700,-30));
+        const FVector CratePosition=Courtyard?FVector(-900,-900,-30):FVector(-900,-700,-30);
+        Room &= Place(EHomeModuleKind::Storage,FVector(-800,-850,60),CratePosition,CratePosition);
         Room &= Place(EHomeModuleKind::Roof,FVector(-400,-800,60),FVector(-400,-800,-30),FVector(-400,-800,280));
         Room &= Place(EHomeModuleKind::Roof,FVector(-800,-800,60),FVector(-800,-800,-30),FVector(-800,-800,280));
+        if(Courtyard)
+        {
+            Room &= Place(EHomeModuleKind::Floor,FVector(-100,-850,60),FVector(0,-800,-50),FVector(0,-800,-40));
+            Room &= Place(EHomeModuleKind::Fence,FVector(0,-800,60),FVector(0,-980,-30),FVector(0,-1000,-30));
+            Room &= Place(EHomeModuleKind::Fence,FVector(0,-800,60),FVector(0,-620,-30),FVector(0,-600,-30));
+        }
         Room &= CFInputQA::Action(Hero,TEXT("Capture"),EKeys::RightMouseButton) && !Hero->Building->IsActive();
         FString Reason;const auto Layout=HomeLayout::Collect(World);
-        Room &= Layout.Num()==11 && HomeLayout::Validate(Layout,Reason) && Hero->Inventory->Count(EFrontierItem::Material)==112;
+        Room &= Layout.Num()==(Courtyard?14:11) && HomeLayout::Validate(Layout,Reason) && Hero->Inventory->Count(EFrontierItem::Material)==(Courtyard?96:112);
         UE_LOG(LogTemp,Display,TEXT("CF_HOME_ROOM_INPUT %s modules=%d material=%d noSave=1"),Room?TEXT("PASS"):TEXT("FAIL"),Layout.Num(),Hero->Inventory->Count(EFrontierItem::Material));
         if(Room && FParse::Param(FCommandLine::Get(),TEXT("CFHomeRoomWork"))){RunHomeDoorFarmScenario(World,Hero,FParse::Param(FCommandLine::Get(),TEXT("CFHomeRoomWorkWrite"))?1:0,true);return;}
         FPlatformMisc::RequestExitWithStatus(false,Room?0:1);return;

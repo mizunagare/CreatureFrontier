@@ -32,19 +32,23 @@ namespace CFDoorFarmVolumeQA
 {
 bool InsideRoom(FVector Position)
 {return Position.X>-560 && Position.X<-240 && Position.Y>-1000 && Position.Y<-600 && Position.Z>40 && Position.Z<120;}
+bool InsideCourtyardHome(FVector Position)
+{return Position.X>-960 && Position.X<-240 && Position.Y>-1000 && Position.Y<-600 && Position.Z>40 && Position.Z<120;}
 bool FurnishedRoom(UWorld* World)
 {
-    TSet<FGuid> Floors;int32 Modules=0,Windows=0,Doors=0,Roofs=0,Crates=0;
+    const bool Courtyard=FParse::Param(FCommandLine::Get(),TEXT("CFHomeCourtyardWork"));
+    TSet<FGuid> Floors;int32 Modules=0,Windows=0,Doors=0,Roofs=0,Crates=0,Fences=0;
     for(TActorIterator<AHomeModule> It(World);It;++It)
     {
         if(It->bPreview || It->bStaged)continue;++Modules;
         if(It->GetKind()==EHomeModuleKind::Floor)Floors.Add(It->PersistentId);
         Windows+=It->GetKind()==EHomeModuleKind::Window;Doors+=It->GetKind()==EHomeModuleKind::Door;
         Roofs+=It->GetKind()==EHomeModuleKind::Roof;
+        Fences+=It->GetKind()==EHomeModuleKind::Fence;
         if(It->GetKind()==EHomeModuleKind::Storage)
         {++Crates;if(It->StorageInventory->Count(EFrontierItem::Material)!=3)return false;}
     }
-    if(Floors.Num()!=2 || Modules!=11 || Windows!=1 || Doors!=1 || Roofs!=2 || Crates!=1)return false;
+    if(Floors.Num()!=(Courtyard?3:2) || Modules!=(Courtyard?14:11) || Fences!=(Courtyard?2:0) || Windows!=1 || Doors!=1 || Roofs!=2 || Crates!=1)return false;
     for(TActorIterator<AHomeModule> It(World);It;++It)
         if(It->GetKind()!=EHomeModuleKind::Floor && !It->bPreview && ( !Floors.Contains(It->FloorId) || It->PaidMaterials<=0))return false;
     return true;
@@ -70,6 +74,8 @@ void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode,b
     const bool AvoidTest=FParse::Param(FCommandLine::Get(),TEXT("CFStanceFarmTest"));
     const bool Furnished=FParse::Param(FCommandLine::Get(),TEXT("CFFurnishedFarm"));
     const bool InputBuilt=UseExistingRoom || FParse::Param(FCommandLine::Get(),TEXT("CFHomeRoomWorkRead"));
+    const bool Courtyard=FParse::Param(FCommandLine::Get(),TEXT("CFHomeCourtyardWork"));
+    if(Courtyard && (!UseExistingRoom || Mode!=0)){UE_LOG(LogTemp,Error,TEXT("CF_HOME_COURTYARD_WORK FAIL mode"));FPlatformMisc::RequestExitWithStatus(false,1);return;}
     if(InputBuilt && (!Furnished || Mode>2)){UE_LOG(LogTemp,Error,TEXT("CF_HOME_ROOM_WORK FAIL reuse-mode"));FPlatformMisc::RequestExitWithStatus(false,1);return;}
     const FString Slot=InputBuilt?TEXT("HomeInputWorkBlocked"):Furnished?TEXT("FurnishedFarmBlocked"):TEXT("DoorFarmBlocked");
     if(Furnished && Mode>2){UE_LOG(LogTemp,Error,TEXT("CF_FURNISHED_FARM FAIL unsupported-mode"));FPlatformMisc::RequestExitWithStatus(false,1);return;}
@@ -140,23 +146,26 @@ void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode,b
     UE_LOG(LogTemp,Display,TEXT("CF_DOOR_FARM_FIXTURE roof=%d removed=%d"),!NoRoof,RemovedRoofs);
     auto* Definition=LoadObject<UCreatureDefinition>(nullptr,TEXT("/Game/Creatures/DA_Mosskip.DA_Mosskip"));
     if(!Door || !Definition || (NoRoof && RemovedRoofs!=1)){Finish(false);return;}
-    const FTransform FarmTransform(FRotator::ZeroRotator,FVector(-400,-700,5),FVector(2,1,.7));
+    const FVector FarmPosition=Courtyard?FVector(-800,-700,5):FVector(-400,-700,5);
+    const FTransform FarmTransform(FRotator(0,Courtyard?180:0,0),FarmPosition,FVector(2,1,.7));
     if(Mode!=2)
     {
         if(UseExistingRoom)
         {
             Hero->SetActorLocation(FVector(-570,-700,60));
-            auto View=(FVector(-400,-700,-30)-Hero->FirstPersonCamera->GetComponentLocation()).Rotation();
+            auto View=(FarmPosition-FVector(0,0,35)-Hero->FirstPersonCamera->GetComponentLocation()).Rotation();
             Hero->GetController()->SetControlRotation(View);Hero->FirstPersonCamera->SetWorldRotation(View);
             const int32 Before=Hero->Inventory->Count(EFrontierItem::Material);
             bool Placed=CFInputQA::Press(Hero,EKeys::B);
             for(int32 Step=0;Hero->Building->Selected!=EWorkSpecialty::Farming && Step<6;++Step)Placed &= CFInputQA::Press(Hero,EKeys::V);
-            Placed &= CFInputQA::Action(Hero,TEXT("Attack"),EKeys::LeftMouseButton) && CFInputQA::Action(Hero,TEXT("Capture"),EKeys::RightMouseButton);
+            Placed &= CFInputQA::Action(Hero,TEXT("Attack"),EKeys::LeftMouseButton);
+            const FString PlacementHint=Hero->Building->GetHint();
+            Placed &= CFInputQA::Action(Hero,TEXT("Capture"),EKeys::RightMouseButton);
             for(TActorIterator<AWorkStation> It(World);It;++It)if(It->bPlayerBuilt && It->RequiredSpecialty==EWorkSpecialty::Farming)Farm=*It;
             Placed &= Farm && Farm->GetActorTransform().Equals(FarmTransform,.01) && !Hero->Building->IsActive() &&
                 Hero->Inventory->Count(EFrontierItem::Material)==Before-UBaseBuildingComponent::GetCost(EWorkSpecialty::Farming);
             UE_LOG(LogTemp,Display,TEXT("CF_HOME_FARM_INPUT %s"),Placed?TEXT("PASS"):TEXT("FAIL"));
-            if(!Placed){UE_LOG(LogTemp,Error,TEXT("CF_HOME_FARM_INPUT_REASON %s"),*Hero->Feedback);Finish(false);return;}
+            if(!Placed){UE_LOG(LogTemp,Error,TEXT("CF_HOME_FARM_INPUT_REASON actual=%s expected=%s material=%d before=%d hint=%s"),Farm?*Farm->GetActorTransform().ToString():TEXT("无"),*FarmTransform.ToString(),Hero->Inventory->Count(EFrontierItem::Material),Before,*PlacementHint);Finish(false);return;}
         }
         else {Hero->Building->Selected=EWorkSpecialty::Farming;Farm=Hero->Building->BuildAt(FarmTransform);}
     }
@@ -177,7 +186,7 @@ void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode,b
     }
     const auto Timer=MakeShared<FTimerHandle>();
     const int32 HouseMaterials=Hero->Inventory->Count(EFrontierItem::Material);
-    World->GetTimerManager().SetTimer(*Timer,[World,Hero,Door,Farm,FarmWeak=TWeakObjectPtr<AWorkStation>(Farm),Definition,Timer,Finish,Mode,AvoidTest,Furnished,Slot,HouseMaterials,InputBuilt,Phase=Mode==2?1:0,At=World->GetTimeSeconds(),Pet=RestoredPet,Previous=RestoredPet?RestoredPet->GetActorLocation():FVector::ZeroVector,Travel=0.,Continuous=true,ExpectedMaterials=0,Diagnosed=false]() mutable
+    World->GetTimerManager().SetTimer(*Timer,[World,Hero,Door,Farm,FarmWeak=TWeakObjectPtr<AWorkStation>(Farm),Definition,Timer,Finish,Mode,AvoidTest,Furnished,Slot,HouseMaterials,InputBuilt,Courtyard,VisitedCourt=false,CrossedDoor=false,CourtClear=true,Phase=Mode==2?1:0,At=World->GetTimeSeconds(),Pet=RestoredPet,Previous=RestoredPet?RestoredPet->GetActorLocation():FVector::ZeroVector,Travel=0.,Continuous=true,ExpectedMaterials=0,Diagnosed=false]() mutable
     {
         auto End=[&](bool Pass)
         {
@@ -187,6 +196,11 @@ void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode,b
                 UE_LOG(LogTemp,Display,TEXT("CF_FURNISHED_FARM %s stored=3 phase=%d"),Pass?TEXT("PASS"):TEXT("FAIL"),Phase);
             }
             if(InputBuilt)UE_LOG(LogTemp,Display,TEXT("CF_HOME_ROOM_WORK %s noRebuild=1"),Pass?TEXT("PASS"):TEXT("FAIL"));
+            if(Courtyard)
+            {
+                Pass &= Phase==2 && VisitedCourt && CrossedDoor && CourtClear && Pet && CFDoorFarmVolumeQA::InsideCourtyardHome(Pet->GetActorLocation());
+                UE_LOG(LogTemp,Display,TEXT("CF_HOME_COURTYARD_WORK %s courtyard=%d doorway=%d noCross=%d"),Pass?TEXT("PASS"):TEXT("FAIL"),VisitedCourt,CrossedDoor,CourtClear);
+            }
             if(AvoidTest)
             {
                 Pass &= Phase==2 && Pet && Pet->bAvoidCombat && Pet->WorkSite==Farm;
@@ -217,7 +231,29 @@ void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode,b
             Complete(Pass);
         };
         const double Elapsed=World->GetTimeSeconds()-At;
-        if(Pet){const auto Now=Pet->GetActorLocation();const double Step=FVector::Dist2D(Now,Previous);Travel+=Step;Previous=Now;Continuous &= Step<120;if(!Continuous || Pet->Health<=0 || Hero->Health<=0){End(false);return;}}
+        if(Pet)
+        {
+            const auto Now=Pet->GetActorLocation();const double Step=FVector::Dist2D(Now,Previous);Travel+=Step;Continuous &= Step<120;
+            if(Courtyard)
+            {
+                VisitedCourt |= FMath::Abs(Now.X)<170 && FMath::Abs(Now.Y+800)<160 && Now.Z>40 && Now.Z<120;
+                // 检查实际位移线段，防止把绕到屋外或越过栅栏误记为经庭院入室。
+                bool CrossedFence=false;
+                for(double Boundary:{-1000.,-600.})if((Previous.Y-Boundary)*(Now.Y-Boundary)<0)
+                {const double X=FMath::Lerp(Previous.X,Now.X,(Boundary-Previous.Y)/(Now.Y-Previous.Y));CrossedFence |= X>-190 && X<190;}
+                const bool CrossesPlane=Previous.X>=-200 && Now.X<-200;
+                const double CrossingY=CrossesPlane?FMath::Lerp(Previous.Y,Now.Y,(-200-Previous.X)/(Now.X-Previous.X)):0;
+                if(CrossesPlane && FMath::Abs(CrossingY+800)<72)
+                {
+                    if(!VisitedCourt || Door->DoorState!=2){End(false);return;}
+                    CrossedDoor=true;
+                }
+                CourtClear &= !CrossedFence && Pet->GetActorEnableCollision();
+                if(!CourtClear){End(false);return;}
+            }
+            Previous=Now;
+            if(!Continuous || Pet->Health<=0 || Hero->Health<=0){End(false);return;}
+        }
         if(Phase==4)
         {
             if(Elapsed<8)return;
@@ -261,7 +297,7 @@ void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode,b
         if(Phase==0 && Elapsed>=2)
         {
             Hero->SetActorLocation(FVector(-510,-730,60));
-            const FTransform Transform(FVector(-400,-1350,60));
+            const FTransform Transform(Courtyard?FVector(400,-800,60):FVector(-400,-1350,60));
             Pet=World->SpawnActorDeferred<ACreatureCharacter>(ACreatureCharacter::StaticClass(),Transform,nullptr,nullptr,ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
             if(!Pet){End(false);return;}
             Pet->Definition=Definition;Pet->FinishSpawning(Transform);Pet->Tame(Hero->GetController());Previous=Pet->GetActorLocation();
@@ -279,7 +315,7 @@ void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode,b
         if(Phase==1)
         {
             const bool Unchanged=Farm->StoredFood==0 && Farm->Crop->Seeds==1 && !Farm->Crop->bPlanted && Farm->Crop->GrowthWork==0;
-            if(!Unchanged || Pet->GetActorLocation().Y>-1000){End(false);return;}
+            if(!Unchanged || (Courtyard?CFDoorFarmVolumeQA::InsideCourtyardHome(Pet->GetActorLocation()):Pet->GetActorLocation().Y>-1000)){End(false);return;}
             if(Elapsed<12)return;
             UE_LOG(LogTemp,Display,TEXT("CF_DOOR_FARM_CLOSED PASS"));
             if(Mode==1)
@@ -299,8 +335,8 @@ void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode,b
                 Phase=4;At=World->GetTimeSeconds();return;
             }
             if(Mode==3){Hero->CommandFollow();if(Pet->WorkSite || Pet->Activity!=ECreatureActivity::Follow){End(false);return;}}
-            Hero->SetActorLocation(FVector(-400,-720,60));
-            const auto Rotation=(FVector(-555,-1000,120)-Hero->FirstPersonCamera->GetComponentLocation()).Rotation();
+            Hero->SetActorLocation(Courtyard?FVector(0,-950,60):FVector(-400,-720,60));
+            const auto Rotation=((Courtyard?FVector(-200,-955,120):FVector(-555,-1000,120))-Hero->FirstPersonCamera->GetComponentLocation()).Rotation();
             Hero->GetController()->SetControlRotation(Rotation);Hero->FirstPersonCamera->SetWorldRotation(Rotation);
             const bool Opened=InputBuilt?CFInputQA::Press(Hero,EKeys::E):Door->ToggleDoor(Hero);
             if(!Opened || Door->DoorState!=2){End(false);return;}
