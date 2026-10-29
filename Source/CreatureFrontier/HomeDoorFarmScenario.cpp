@@ -22,6 +22,8 @@
 #include "InputRoutingQA.h"
 #include "HomeBuildingComponent.h"
 #include "StorageInteractionComponent.h"
+#include "FrontierSaveGame.h"
+#include "Kismet/GameplayStatics.h"
 
 namespace CFDoorFarmVolumeQA
 {
@@ -44,13 +46,28 @@ bool FurnishedRoom(UWorld* World)
         if(It->GetKind()!=EHomeModuleKind::Floor && !It->bPreview && ( !Floors.Contains(It->FloorId) || It->PaidMaterials<=0))return false;
     return true;
 }
+bool FurnishedSnapshot(UWorld* World,ACFPlayerCharacter* Hero,const FString& Slot)
+{
+    const auto* Save=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot,0));
+    if(!Save || !FurnishedRoom(World) || !Hero->Inventory->GetStacks().OrderIndependentCompareEqual(Save->InventoryStacks))return false;
+    const auto Live=HomeLayout::Collect(World);if(Live.Num()!=Save->HomeModules.Num())return false;
+    for(const auto& Record:Save->HomeModules)
+    {
+        const auto* Found=Live.FindByPredicate([&Record](const FHomeModuleRecord& Other){return Other.Id==Record.Id;});
+        if(!Found || Found->FloorId!=Record.FloorId || Found->Definition!=Record.Definition || !Found->Transform.Equals(Record.Transform,.01) ||
+            Found->DoorState!=Record.DoorState || Found->PaidMaterials!=Record.PaidMaterials ||
+            !Found->PaidExtraItems.OrderIndependentCompareEqual(Record.PaidExtraItems) || !Found->StoredItems.OrderIndependentCompareEqual(Record.StoredItems))return false;
+    }
+    return true;
+}
 }
 
 void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
 {
     const bool AvoidTest=FParse::Param(FCommandLine::Get(),TEXT("CFStanceFarmTest"));
     const bool Furnished=FParse::Param(FCommandLine::Get(),TEXT("CFFurnishedFarm"));
-    if(Furnished && Mode!=0){UE_LOG(LogTemp,Error,TEXT("CF_FURNISHED_FARM FAIL unsupported-mode"));FPlatformMisc::RequestExitWithStatus(false,1);return;}
+    const FString Slot=Furnished?TEXT("FurnishedFarmBlocked"):TEXT("DoorFarmBlocked");
+    if(Furnished && Mode>2){UE_LOG(LogTemp,Error,TEXT("CF_FURNISHED_FARM FAIL unsupported-mode"));FPlatformMisc::RequestExitWithStatus(false,1);return;}
     if(AvoidTest && Mode!=0){UE_LOG(LogTemp,Error,TEXT("CF_STANCE_FARM FAIL mode"));FPlatformMisc::RequestExitWithStatus(false,1);return;}
     // 固定房间只验证单伙伴工作，不替代自由放置、长期运输或自然冒险。
     auto Finish=[Mode](bool Pass)
@@ -58,7 +75,13 @@ void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
     AHomeModule* Door=nullptr;AWorkStation* Farm=nullptr;ACreatureCharacter* RestoredPet=nullptr;
     if(Mode==2)
     {
-        if(!Hero->LoadProgress(TEXT("DoorFarmBlocked"))){Finish(false);return;}
+        if(!Hero->LoadProgress(Slot)){Finish(false);return;}
+        if(Furnished)
+        {
+            const bool Snapshot=CFDoorFarmVolumeQA::FurnishedSnapshot(World,Hero,Slot);
+            UE_LOG(LogTemp,Display,TEXT("CF_FURNISHED_RESTORE %s identity=1 inventory=1"),Snapshot?TEXT("PASS"):TEXT("FAIL"));
+            if(!Snapshot){Finish(false);return;}
+        }
         for(TActorIterator<AWildEncounter> It(World);It;++It)It->SetActorTickEnabled(false);
         for(TActorIterator<ACreatureCharacter> It(World);It;++It)
             if(It->Tamer==Hero->GetController())RestoredPet=*It;
@@ -70,7 +93,7 @@ void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
         Hero->GetCharacterMovement()->DisableMovement();
     }
     else Door=CFDoorNavigationQA::Room(World,Hero,0);
-    if(Furnished && Door)
+    if(Furnished && Door && Mode!=2)
     {
         AHomeModule* West=nullptr;
         for(TActorIterator<AHomeModule> It(World);It;++It)
@@ -108,7 +131,7 @@ void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
     if(Mode!=2)Farm->Crop->Seeds=1;
     const auto Timer=MakeShared<FTimerHandle>();
     const int32 HouseMaterials=Hero->Inventory->Count(EFrontierItem::Material);
-    World->GetTimerManager().SetTimer(*Timer,[World,Hero,Door,Farm,FarmWeak=TWeakObjectPtr<AWorkStation>(Farm),Definition,Timer,Finish,Mode,AvoidTest,Furnished,HouseMaterials,Phase=Mode==2?1:0,At=World->GetTimeSeconds(),Pet=RestoredPet,Previous=RestoredPet?RestoredPet->GetActorLocation():FVector::ZeroVector,Travel=0.,Continuous=true,ExpectedMaterials=0,Diagnosed=false]() mutable
+    World->GetTimerManager().SetTimer(*Timer,[World,Hero,Door,Farm,FarmWeak=TWeakObjectPtr<AWorkStation>(Farm),Definition,Timer,Finish,Mode,AvoidTest,Furnished,Slot,HouseMaterials,Phase=Mode==2?1:0,At=World->GetTimeSeconds(),Pet=RestoredPet,Previous=RestoredPet?RestoredPet->GetActorLocation():FVector::ZeroVector,Travel=0.,Continuous=true,ExpectedMaterials=0,Diagnosed=false]() mutable
     {
         auto End=[&](bool Pass)
         {
@@ -196,7 +219,9 @@ void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
             if(Mode==1)
             {
                 Hero->SetActorLocation(FVector(-530,-900,60));
-                End(Hero->SaveProgress(TEXT("DoorFarmBlocked")));return;
+                bool Saved=Hero->SaveProgress(Slot);
+                if(Furnished)Saved &= CFDoorFarmVolumeQA::FurnishedSnapshot(World,Hero,Slot);
+                End(Saved);return;
             }
             if(Mode==4)
             {

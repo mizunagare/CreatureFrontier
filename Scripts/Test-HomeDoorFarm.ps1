@@ -1,6 +1,6 @@
 param([string]$EngineRoot='D:\Epic\UE_5.8',[string]$BuildRoot='',[switch]$NoRoof,[ValidateSet('Test','Write','Read','Cancel','Dismantle')][string]$Mode='Test',[switch]$OriginalAim,[ValidateRange(-180,180)][double]$FollowYaw=-160,[switch]$FacingProbe,[switch]$AvoidCombat,[switch]$Furnished)
 $ErrorActionPreference='Stop'
-if($Furnished -and ($Mode -ne 'Test' -or $NoRoof -or $AvoidCombat -or $OriginalAim -or $FacingProbe)){throw '带家具房屋样本仅支持普通有顶工作模式，不与其他探针组合'}
+if($Furnished -and ($Mode -notin @('Test','Write','Read') -or $NoRoof -or $AvoidCombat -or $OriginalAim -or $FacingProbe)){throw '带家具房屋样本仅支持有顶工作与存读模式，不与其他探针组合'}
 . (Join-Path $PSScriptRoot 'BuildFingerprint.ps1')
 $projectRoot=Split-Path $PSScriptRoot -Parent
 $module=Join-Path $projectRoot 'Binaries\Win64\UnrealEditor-CreatureFrontier.dll'
@@ -34,6 +34,7 @@ if($process.ExitCode -ne 0 -or !(Select-String -LiteralPath $log -SimpleMatch 'C
    (Select-String -LiteralPath $log -Pattern '\bFAIL\b|Fatal error|Assertion failed' -Quiet)){throw "门与农圃专项未通过：$log"}
 if((Get-FrontierBuildFingerprint -LiteralPath $module) -ne $hash){throw '专项期间模块发生变化'}
 if($Furnished -and !(Select-String -LiteralPath $log -SimpleMatch 'CF_FURNISHED_FARM PASS' -Quiet)){throw '缺少门窗、储物及农圃整合成功标记'}
+if($Furnished -and $Mode -eq 'Read' -and !(Select-String -LiteralPath $log -SimpleMatch 'CF_FURNISHED_RESTORE PASS identity=1 inventory=1' -Quiet)){throw '缺少房屋身份与物资恢复核验标记'}
 if($AvoidCombat){foreach($marker in @('CF_STANCE_FARM_SWITCH PASS','CF_STANCE_FARM PASS')){if(!(Select-String -LiteralPath $log -SimpleMatch $marker -Quiet)){throw '缺少避战工作必要标记'}}}
 if($Mode -eq 'Cancel' -and !$OriginalAim){$dockMarker=if($FacingProbe){'CF_DOOR_FARM_DOCK probe=1'}else{'CF_DOOR_FARM_DOCK probe=0 inside=1'};if(!(Select-String -LiteralPath $log -SimpleMatch $dockMarker -Quiet)){throw '缺少对应停靠或室内归队的实际断言标记'}}
 if($Mode -eq 'Cancel' -and !$OriginalAim -and !(Select-String -LiteralPath $log -SimpleMatch 'CF_DOOR_FARM_VOLUME PASS sameFloor=1' -Quiet)){throw '缺少空间边界和同层高度成功标记'}
