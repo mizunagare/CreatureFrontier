@@ -50,21 +50,27 @@ try{
     if($process.ExitCode -ne 0 -or !(Test-Path -LiteralPath $log)){throw ('楼梯专项未正常退出：'+$log)}
     $body=Get-Content -LiteralPath $log -Raw
     if($body -match '\bFAIL\b|Fatal error|Assertion failed' -or $body -notmatch 'LogExit: Exiting\.') {throw ('楼梯专项出现失败或未正常关闭：'+$log)}
+    $restoredVersion=0
+    if($Mode -eq 'Read'){
+        $prefix=if($Work){'CF_UPPER_FARM_RESTORE'}else{'CF_STAIRS_RESTORE'}
+        $versionMatch=[regex]::Match($body,($prefix+' PASS version=(34|35) '))
+        if(!$versionMatch.Success){throw '缺少受支持的实际恢复版本'};$restoredVersion=$versionMatch.Groups[1].Value
+    }
     $markers=if($Work){
         @('CF_UPPER_FARM_PRODUCED PASS upstairs=1 actualSteps=1 seed=0 food=1 xp=1',
           'CF_UPPER_FARM_WITHDRAW PASS upstairs=1 food=1 stored=0 follow=1',
           'CF_UPPER_FARM_RETURN PASS downstairs=1 continuous=1 food=1 seeds=1 material=94',
-          'CF_UPPER_FARM_DONE_SAVE PASS version=34 modules=12 farm=1 food=1 seeds=1 material=94 follow=1',
+          'CF_UPPER_FARM_DONE_SAVE PASS version=35 modules=12 farm=1 food=1 seeds=1 material=94 follow=1',
           ('CF_UPPER_FARM PASS mode='+$(if($Mode -eq 'Read'){1}else{0})+' phase=4 reason=complete'))
     }elseif($Mode -eq 'Legacy'){@('CF_STAIRS_LEGACY PASS version=33 modules=14 identity=1 inventory=1')}else{
         @('CF_STAIRS_DOWN PASS continuous=1','CF_STAIRS_OCCUPIED PASS rejected=1 material=109','CF_STAIRS_DISMANTLE PASS refund=6 blocked=1 modules=11 material=115',('CF_STAIRS PASS mode='+$(if($Mode -eq 'Read'){1}else{0})+' phase=6 reason=complete'))
     }
     if($Work){
-        if($Mode -eq 'Test'){$markers+=@('CF_STAIRS_INPUT PASS modules=12 material=112 upper=1 stairs=1 rotate4=1 support=1 headroom=1','CF_STAIRS_FACILITY_SPACE PASS valid=1 support=1 noBuild=1','CF_UPPER_FARM_INPUT PASS modules=12 material=94 seeds=1 reserved=1','CF_UPPER_FARM_ORDER PASS downstairs=1 aimed=1','CF_UPPER_FARM_SAVED PASS version=34 downstairs=1 task=1 seed=1 food=0')}
-        else{$markers+='CF_UPPER_FARM_RESTORE PASS version=34 modules=12 farm=1 downstairs=1 task=1 seed=1 food=0'}
+        if($Mode -eq 'Test'){$markers+=@('CF_STAIRS_INPUT PASS modules=12 material=112 upper=1 stairs=1 rotate4=1 support=1 headroom=1','CF_STAIRS_FACILITY_SPACE PASS valid=1 support=1 noBuild=1','CF_UPPER_FARM_INPUT PASS modules=12 material=94 seeds=1 reserved=1','CF_UPPER_FARM_ORDER PASS downstairs=1 aimed=1','CF_UPPER_FARM_SAVED PASS version=35 downstairs=1 task=1 seed=1 food=0')}
+        else{$markers+="CF_UPPER_FARM_RESTORE PASS version=$restoredVersion modules=12 farm=1 downstairs=1 task=1 seed=1 food=0"}
     }else{
-        if($Mode -eq 'Test'){$markers+=@('CF_STAIRS_INPUT PASS modules=12 material=112 upper=1 stairs=1 rotate4=1 support=1 headroom=1','CF_STAIRS_FACILITY_SPACE PASS valid=1 support=1 noBuild=1','CF_STAIRS_NAV PASS partial=0','CF_STAIRS_UP PASS','landed=1 actualSteps=1 stored=3 material=109','CF_STAIRS_SAVE PASS version=34 identity=1 inventory=1 upper=1 bad33=1','CF_STAIRS_RESUME_INPUT PASS slow=1')}
-        if($Mode -eq 'Read'){$markers+='CF_STAIRS_RESTORE PASS version=34 modules=12 stored=3 material=109'}
+        if($Mode -eq 'Test'){$markers+=@('CF_STAIRS_INPUT PASS modules=12 material=112 upper=1 stairs=1 rotate4=1 support=1 headroom=1','CF_STAIRS_FACILITY_SPACE PASS valid=1 support=1 noBuild=1','CF_STAIRS_NAV PASS partial=0','CF_STAIRS_UP PASS','landed=1 actualSteps=1 stored=3 material=109','CF_STAIRS_SAVE PASS version=35 identity=1 inventory=1 upper=1 bad33=1','CF_STAIRS_RESUME_INPUT PASS slow=1')}
+        if($Mode -eq 'Read'){$markers+="CF_STAIRS_RESTORE PASS version=$restoredVersion modules=12 stored=3 material=109"}
     }
     foreach($marker in $markers){if(!$body.Contains($marker)){throw ('缺少指定楼梯行为标记：'+$marker)}}
     if($Work){

@@ -67,7 +67,7 @@ struct FUpperFarmTest
     bool CheckSnapshot(const FString& Slot,bool Done)
     {
         const auto* Save=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot,0));
-        if(!Save || Save->FormatVersion!=34 || Save->Facilities.Num()!=1 || !EqualHouse(Save->HomeModules,HomeLayout::Collect(World)) || !EqualHouse(House,Save->HomeModules) ||
+        if(!Save || (Save->FormatVersion<34 || Save->FormatVersion>FrontierCurrentSaveVersion) || Save->Facilities.Num()!=1 || !EqualHouse(Save->HomeModules,HomeLayout::Collect(World)) || !EqualHouse(House,Save->HomeModules) ||
             !FindActors() || !Hero->Inventory->GetStacks().OrderIndependentCompareEqual(Save->InventoryStacks) ||
             Hero->Inventory->Count(EFrontierItem::Material)!=94 || Hero->Inventory->Count(EFrontierItem::Seeds)!=1 || Hero->Inventory->Count(EFrontierItem::Food)!=(Done?1:0))return false;
         const auto* Creature=Save->Creatures.FindByPredicate([this](const FCreatureSaveRecord& Value){return Value.bOwned && Value.Id==Pet->PersistentId;});
@@ -105,7 +105,7 @@ struct FUpperFarmTest
         if(!CFInputQA::Press(Hero,EKeys::E) || Partner->WorkSite!=Farm.Get() || Partner->Activity!=ECreatureActivity::Work || !Hero->Feedback.Contains(TEXT("瞄准设施")))return false;
         UE_LOG(LogTemp,Display,TEXT("CF_UPPER_FARM_ORDER PASS downstairs=1 aimed=1 pet=%s farm=%s"),*PetId.ToString(),*FarmId.ToString());
         if(!Hero->SaveProgress(TEXT("UpperFarmAutomation")) || !Hero->LoadProgress(TEXT("UpperFarmAutomation")) || !CheckSnapshot(TEXT("UpperFarmAutomation"),false))return false;
-        UE_LOG(LogTemp,Display,TEXT("CF_UPPER_FARM_SAVED PASS version=34 downstairs=1 task=1 seed=1 food=0 pet=%s farm=%s"),*PetId.ToString(),*FarmId.ToString());
+        UE_LOG(LogTemp,Display,TEXT("CF_UPPER_FARM_SAVED PASS version=%d downstairs=1 task=1 seed=1 food=0 pet=%s farm=%s"),FrontierCurrentSaveVersion,*PetId.ToString(),*FarmId.ToString());
         return true;
     }
     int32 Move()
@@ -159,7 +159,7 @@ struct FUpperFarmTest
             Farm->StoredFood!=0 || Farm->Crop->Seeds!=0 || Hero->Inventory->Count(EFrontierItem::Food)!=1)return Finish(false,TEXT("rejoin-state"));
         UE_LOG(LogTemp,Display,TEXT("CF_UPPER_FARM_RETURN PASS downstairs=1 continuous=1 food=1 seeds=1 material=94 pet=%s farm=%s"),*PetId.ToString(),*FarmId.ToString());
         Stop();const bool Saved=Hero->SaveProgress(TEXT("UpperFarmDoneAutomation")) && Hero->LoadProgress(TEXT("UpperFarmDoneAutomation")) && CheckSnapshot(TEXT("UpperFarmDoneAutomation"),true);
-        UE_LOG(LogTemp,Display,TEXT("CF_UPPER_FARM_DONE_SAVE %s version=34 modules=12 farm=1 food=1 seeds=1 material=94 follow=1 pet=%s farmId=%s"),Saved?TEXT("PASS"):TEXT("FAIL"),*PetId.ToString(),*FarmId.ToString());
+        UE_LOG(LogTemp,Display,TEXT("CF_UPPER_FARM_DONE_SAVE %s version=%d modules=12 farm=1 food=1 seeds=1 material=94 follow=1 pet=%s farmId=%s"),Saved?TEXT("PASS"):TEXT("FAIL"),FrontierCurrentSaveVersion,*PetId.ToString(),*FarmId.ToString());
         return Finish(Saved,TEXT("complete"));
     }
 };
@@ -173,7 +173,7 @@ void RunUpperFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read)
         State->House=HomeLayout::Collect(World);
         if(!State->CheckSnapshot(TEXT("UpperFarmAutomation"),false)){State->Finish(false,TEXT("restore"));return;}
         State->PetId=State->Pet->PersistentId;State->FarmId=State->Farm->PersistentId;
-        UE_LOG(LogTemp,Display,TEXT("CF_UPPER_FARM_RESTORE PASS version=34 modules=12 farm=1 downstairs=1 task=1 seed=1 food=0 pet=%s farmId=%s"),*State->PetId.ToString(),*State->FarmId.ToString());
+        UE_LOG(LogTemp,Display,TEXT("CF_UPPER_FARM_RESTORE PASS version=%d modules=12 farm=1 downstairs=1 task=1 seed=1 food=0 pet=%s farmId=%s"),Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("UpperFarmAutomation"),0))->FormatVersion,*State->PetId.ToString(),*State->FarmId.ToString());
     }
     else if(!State->Init()){State->Finish(false,TEXT("construction-order-save"));return;}
     auto* Input=NewObject<UHomeMovementProbe>(Hero);Input->RegisterComponent();State->Input=Input;

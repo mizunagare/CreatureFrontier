@@ -17,11 +17,13 @@ class CREATUREFRONTIER_API ACreatureCharacter : public ACharacter
 
 public:
     friend class UCompanionCargoComponent;
+    friend class UCompanionConstructionComponent;
     ACreatureCharacter();
     UPROPERTY(BlueprintReadOnly) FGuid PersistentId;
     UPROPERTY(BlueprintReadOnly) FString Nickname;
     UPROPERTY(VisibleAnywhere,BlueprintReadOnly) TObjectPtr<class UInventoryComponent> CargoInventory;
     UPROPERTY(VisibleAnywhere,BlueprintReadOnly) TObjectPtr<class UCompanionCargoComponent> Cargo;
+    UPROPERTY(VisibleAnywhere,BlueprintReadOnly) TObjectPtr<class UCompanionConstructionComponent> Construction;
     UPROPERTY(VisibleAnywhere,BlueprintReadOnly) TObjectPtr<class UCompanionPersonalityComponent> Personality;
     UPROPERTY(VisibleAnywhere,BlueprintReadOnly) TObjectPtr<class UCompanionMemoryComponent> Memory;
     virtual void OnConstruction(const FTransform& Transform) override;

@@ -20,6 +20,7 @@
 #include "HUDScenario.h"
 #include "HomeScenario.h"
 #include "HomeExpansionScenario.h"
+#include "ConstructionScenario.h"
 #include "StairsScenario.h"
 #include "ExpeditionScenario.h"
 #include "CFPlayerCharacter.h"
@@ -74,6 +75,12 @@ void ACFGameMode::BeginPlay()
 {
     Super::BeginPlay();
     SeedFrontierResources(GetWorld());
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFConstructionHome")) || FParse::Param(FCommandLine::Get(),TEXT("CFConstructionHomeRead")))
+    {const bool Read=FParse::Param(FCommandLine::Get(),TEXT("CFConstructionHomeRead"));FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this,Read](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunConstructionHomeScenario(GetWorld(),Hero,Read);},1.f,false);return;}
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFConstructionInput")))
+    {FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunConstructionInputScenario(GetWorld(),Hero);},1.f,false);return;}
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFConstructionTest")) || FParse::Param(FCommandLine::Get(),TEXT("CFConstructionRead")))
+    {const bool Read=FParse::Param(FCommandLine::Get(),TEXT("CFConstructionRead"));FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this,Read](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunConstructionScenario(GetWorld(),Hero,Read);},1.f,false);return;}
     if(FParse::Param(FCommandLine::Get(),TEXT("CFHomeExpansionTest")) || FParse::Param(FCommandLine::Get(),TEXT("CFHomeExpansionPlan")) || FParse::Param(FCommandLine::Get(),TEXT("CFHomeExpansionRepair")) || FParse::Param(FCommandLine::Get(),TEXT("CFHomeExpansionFunded")) || FParse::Param(FCommandLine::Get(),TEXT("CFHomeExpansionRead")))
     {const bool Plan=FParse::Param(FCommandLine::Get(),TEXT("CFHomeExpansionPlan"));FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this,Plan](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunHomeExpansionScenario(GetWorld(),Hero,Plan);},1.f,false);return;}
     if(FParse::Param(FCommandLine::Get(),TEXT("CFStairsTest")) || FParse::Param(FCommandLine::Get(),TEXT("CFStairsRead")) || FParse::Param(FCommandLine::Get(),TEXT("CFStairsLegacy")))

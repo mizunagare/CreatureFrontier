@@ -13,6 +13,9 @@ struct FHomeModuleRecord
     UPROPERTY() TMap<EFrontierItem,int32> PaidExtraItems;
     UPROPERTY() TMap<EFrontierItem,int32> StoredItems;
     UPROPERTY() uint8 DoorState=0;
+    UPROPERTY() bool bUnderConstruction=false;
+    UPROPERTY() FGuid ConstructionCrateId;
+    UPROPERTY() float ConstructionWork=0;
     UPROPERTY() TSoftObjectPtr<UHomeModuleDefinition> Definition;
     UPROPERTY() FTransform Transform;
 };

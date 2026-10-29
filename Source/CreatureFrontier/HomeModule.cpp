@@ -4,6 +4,8 @@
 #include "UObject/ConstructorHelpers.h"
 #include "Components/PointLightComponent.h"
 #include "InventoryComponent.h"
+#include "CFPlayerCharacter.h"
+#include "Camera/CameraComponent.h"
 
 bool UHomeModuleDefinition::IsValidDefinition() const
 {
@@ -70,7 +72,10 @@ void AHomeModule::OnConstruction(const FTransform& Transform)
     // 从基础材质创建独立实例，避免从共享MID创建而意外改写门框。
     if(!DoorLeafPalette && Palette) DoorLeafPalette=UMaterialInstanceDynamic::Create(Palette->GetMaterial(),this);
     if(DoorLeafPalette && Definition) DoorLeafPalette->SetVectorParameterValue(TEXT("Tint"),Definition->DoorLeafColor);
-    const auto Geometry=Parts(GetKind());
+    // 待建模块使用有实体碰撞的低矮脚手架；完整墙体仅在实际施工完成后出现。
+    const TArray<FHomePart> Geometry=bUnderConstruction?TArray<FHomePart>{{FVector(-160,0,50),FVector(10,10,50)},
+        {FVector(160,0,50),FVector(10,10,50)},{FVector(0,0,90),FVector(160,10,8)},{FVector(0,0,12),FVector(35,25,12)}}:Parts(GetKind());
+    if(bUnderConstruction && Palette)Palette->SetVectorParameterValue(TEXT("Tint"),FLinearColor(.65f,.38f,.08f));
     // 普通模块仍保留原四个组件，只有楼梯按实际踏步数补充组件。
     while(Meshes.Num()<Geometry.Num())
     {
@@ -103,4 +108,16 @@ void AHomeModule::SetPreviewTint(bool Valid)
 {
     if(Palette && bPreview) Palette->SetVectorParameterValue(TEXT("Tint"),Valid?FLinearColor(.08f,.8f,.15f):FLinearColor(.9f,.04f,.02f));
     if(DoorLeafPalette && bPreview) DoorLeafPalette->SetVectorParameterValue(TEXT("Tint"),Valid?FLinearColor(.08f,.8f,.15f):FLinearColor(.9f,.04f,.02f));
+}
+AHomeModule* AHomeModule::TraceConstruction(ACFPlayerCharacter* Hero)
+{
+    if(!Hero)return nullptr;FHitResult Hit;FCollisionQueryParams Query(SCENE_QUERY_STAT(ConstructionAim),false,Hero);
+    const auto Start=Hero->FirstPersonCamera->GetComponentLocation();
+    Hero->GetWorld()->LineTraceSingleByChannel(Hit,Start,Start+Hero->FirstPersonCamera->GetForwardVector()*800,ECC_Visibility,Query);
+    auto* Site=Cast<AHomeModule>(Hit.GetActor());return Site && Site->bUnderConstruction && !Site->bPreview && !Site->bStaged?Site:nullptr;
+}
+FString AHomeModule::ConstructionStatus() const
+{
+    return FString::Printf(TEXT("待建%s | 材料%d/%d | 施工%.1f/6\n先瞄准箱子按V，再瞄准此处按E派工\nF取消伙伴任务 | X取消施工并退回已交材料"),
+        Definition?*Definition->DisplayName.ToString():TEXT("模块"),StorageInventory->Count(EFrontierItem::Material),Definition?Definition->MaterialCost:0,ConstructionWork);
 }

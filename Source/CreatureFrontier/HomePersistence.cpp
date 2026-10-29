@@ -44,6 +44,8 @@ bool FHomeRestoreTransaction::Stage(UFrontierSaveGame* Save)
     for(auto& Record:Save->HomeModules) if(!Record.Definition.LoadSynchronous()) return false;
     for(auto& Record:Save->HomeModules)
     {
+        if(Save->FormatVersion<35 && (Record.bUnderConstruction || Record.ConstructionCrateId.IsValid() || Record.ConstructionWork!=0))return false;
+        if(Record.ConstructionCrateId.IsValid() && !Save->HomeModules.ContainsByPredicate([&](const FHomeModuleRecord& Source){return Source.Id==Record.ConstructionCrateId && Source.Definition.Get() && Source.Definition.Get()->Kind==EHomeModuleKind::Storage && !Source.bUnderConstruction;}))return false;
         const auto Kind=Record.Definition.Get()->Kind;
         const double OldHeight=Kind==EHomeModuleKind::Floor?-40:Kind==EHomeModuleKind::Roof?280:-30;
         if(Save->FormatVersion<34 && (Kind==EHomeModuleKind::Stairs || Record.Transform.GetLocation().Z>OldHeight+1))return false;
@@ -100,6 +102,7 @@ bool FHomeRestoreTransaction::Stage(UFrontierSaveGame* Save)
         Module->Definition=Record.Definition.Get(); Module->PersistentId=Record.Id; Module->FloorId=Record.FloorId;
         Module->PaidMaterials=Record.PaidMaterials;
         Module->PaidExtraItems=Record.PaidExtraItems;
+        Module->bUnderConstruction=Record.bUnderConstruction;Module->ConstructionCrateId=Record.ConstructionCrateId;Module->ConstructionWork=Record.ConstructionWork;
         Module->DoorState=Record.DoorState;
         Module->bStaged=true; Module->SetActorEnableCollision(false); Module->FinishSpawning(Record.Transform); Staged.Add(Module);
         if(!Module->StorageInventory->Restore(Record.StoredItems)) return false;

@@ -175,7 +175,7 @@ struct FExpansionTest
         const float HP=Pet->Health,Nutrition=Pet->Nutrition,Stamina=Pet->Stamina;const auto Name=Pet->Nickname;const auto Definition=Pet->Definition;const auto Level=Pet->Level;
         if(!Hero->SaveProgress(TEXT("HomeExpansionDone")) || !Hero->LoadProgress(TEXT("HomeExpansionDone")))return false;
         const auto* Save=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("HomeExpansionDone"),0));
-        if(!Save || Save->FormatVersion!=34 || Save->HomeModules.Num()!=19 || Save->Facilities.Num()!=2 || !Bag.OrderIndependentCompareEqual(Hero->Inventory->GetStacks()))return false;
+        if(!Save || Save->FormatVersion!=FrontierCurrentSaveVersion || Save->HomeModules.Num()!=19 || Save->Facilities.Num()!=2 || !Bag.OrderIndependentCompareEqual(Hero->Inventory->GetStacks()))return false;
         const auto LiveLayout=HomeLayout::Collect(World);
         auto Same=[](const FHomeModuleRecord& A,const FHomeModuleRecord& B){return A.Id==B.Id && A.FloorId==B.FloorId && A.Definition==B.Definition && A.Transform.Equals(B.Transform,.01) && A.PaidMaterials==B.PaidMaterials && A.DoorState==B.DoorState && A.StoredItems.OrderIndependentCompareEqual(B.StoredItems) && A.PaidExtraItems.OrderIndependentCompareEqual(B.PaidExtraItems);};
         for(const auto& BeforeRecord:Expanded){const auto* After=Save->HomeModules.FindByPredicate([&](const FHomeModuleRecord& R){return R.Id==BeforeRecord.Id;});const auto* Live=LiveLayout.FindByPredicate([&](const FHomeModuleRecord& R){return R.Id==BeforeRecord.Id;});if(!After || !Live || !Same(*After,BeforeRecord) || !Same(*Live,BeforeRecord))return false;}
@@ -270,7 +270,7 @@ struct FExpansionTest
         }
         const auto Arrived=Move();if(Arrived<0)return Finish(false,TEXT("descend-walk"));if(!Arrived || PetNow.Z>100 || PetNow.X<240 || FVector::Dist2D(PetNow,Pet->GetFollowDestination())>65)return true;
         if(!PetDown || !HeroUp || !PetUp || HeroTravel<(FundedRestore?1400:7000) || PetTravel<(FundedRestore?1000:5000) || !EndSave())return Finish(false,TEXT("end-state-or-save"));
-        UE_LOG(LogTemp,Display,TEXT("CF_HOME_EXPAND_SAVE PASS version=34 modules=19 farms=2 material=2 food=1 seeds=1 bond=6 pet=%s"),*PetId.ToString());return Finish(true,TEXT("complete"));
+        UE_LOG(LogTemp,Display,TEXT("CF_HOME_EXPAND_SAVE PASS version=%d modules=19 farms=2 material=2 food=1 seeds=1 bond=6 pet=%s"),FrontierCurrentSaveVersion,*PetId.ToString());return Finish(true,TEXT("complete"));
     }
 };
 }
@@ -283,7 +283,7 @@ void RunHomeExpansionScenario(UWorld* World,ACFPlayerCharacter* Hero,bool PlanOn
     if(Read && Pass)
     {
         const auto* Save=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("HomeExpansionInput"),0));const auto Layout=HomeLayout::Collect(World);
-        Pass=Save && Save->FormatVersion==34 && Save->HomeModules.Num()==19 && Layout.Num()==19 && Save->Facilities.Num()==2 &&
+        Pass=Save && (Save->FormatVersion>=34 && Save->FormatVersion<=FrontierCurrentSaveVersion) && Save->HomeModules.Num()==19 && Layout.Num()==19 && Save->Facilities.Num()==2 &&
             Hero->GetActorTransform().Equals(Save->PlayerTransform,.01) && Hero->Inventory->GetStacks().OrderIndependentCompareEqual(Save->InventoryStacks) &&
             Hero->Inventory->Count(EFrontierItem::Material)==2 && Hero->Inventory->Count(EFrontierItem::Food)==1 && Hero->Inventory->Count(EFrontierItem::Seeds)==1;
         if(Pass)for(const auto& R:Save->HomeModules){const auto* L=Layout.FindByPredicate([&](const FHomeModuleRecord& V){return V.Id==R.Id;});Pass &= L && L->Definition==R.Definition && L->FloorId==R.FloorId && L->Transform.Equals(R.Transform,.01) && L->PaidMaterials==R.PaidMaterials && L->DoorState==R.DoorState && L->StoredItems.OrderIndependentCompareEqual(R.StoredItems) && L->PaidExtraItems.OrderIndependentCompareEqual(R.PaidExtraItems);}
@@ -328,6 +328,6 @@ void RunHomeExpansionScenario(UWorld* World,ACFPlayerCharacter* Hero,bool PlanOn
     if(!CFInputQA::Press(Hero,EKeys::LeftShift) || !Hero->Pace->IsSlowWalking()){State->Finish(false,TEXT("slow-input"));return;}
     State->PreviousHero=Hero->GetActorLocation();State->PreviousPet=State->Pet->GetActorLocation();State->Deadline=FPlatformTime::Seconds()+540;State->StartedAt=World->GetTimeSeconds();State->StartRegrow=State->Node(1)->RegrowRemaining;
     if(Funded){State->Deadline=FPlatformTime::Seconds()+120;State->Step=4;State->Phase=6;State->Route({Hero->GetActorLocation()});UE_LOG(LogTemp,Display,TEXT("CF_HOME_EXPAND_FUNDED_RESTORE PASS modules=14 material=74 stored=0 seeds=2 pet=%s"),*State->PetId.ToString());}
-    if(Read){State->Expanded=HomeLayout::Collect(World);State->Deadline=FPlatformTime::Seconds()+120;State->Step=4;State->Phase=7;State->At=World->GetTimeSeconds();State->Route({FVector(-400,-850,380),FVector(-510,-850,380)});UE_LOG(LogTemp,Display,TEXT("CF_HOME_EXPAND_RESTORE PASS version=34 modules=19 farms=2 material=2 food=1 seeds=1 pet=%s box=%s"),*State->PetId.ToString(),*State->BoxId.ToString());}
+    if(Read){State->Expanded=HomeLayout::Collect(World);State->Deadline=FPlatformTime::Seconds()+120;State->Step=4;State->Phase=7;State->At=World->GetTimeSeconds();State->Route({FVector(-400,-850,380),FVector(-510,-850,380)});UE_LOG(LogTemp,Display,TEXT("CF_HOME_EXPAND_RESTORE PASS version=%d modules=19 farms=2 material=2 food=1 seeds=1 pet=%s box=%s"),Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("HomeExpansionInput"),0))->FormatVersion,*State->PetId.ToString(),*State->BoxId.ToString());}
     FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([State](float){return State->Tick();}));
 }

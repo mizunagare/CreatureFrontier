@@ -1,6 +1,7 @@
 #include "CreatureCharacter.h"
 #include "CreatureDefinition.h"
 #include "WorkStation.h"
+#include "CompanionConstructionComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/SceneComponent.h"
 
@@ -21,9 +22,9 @@ void ACreatureCharacter::UpdateCreaturePresentation(float DeltaSeconds)
     const bool Dead=Health<=0;
     const bool Moving=!Dead && Speed>10;
     const bool Resting=!Dead && !Moving && Activity==ECreatureActivity::Rest;
-    const bool Working=!Dead && !Moving && Activity==ECreatureActivity::Work && IsValid(WorkSite) &&
+    const bool Working=!Dead && !Moving && Activity==ECreatureActivity::Work && (Construction->IsWorking() || (IsValid(WorkSite) &&
         WorkSite->RequiredSpecialty!=EWorkSpecialty::Transport && WorkSite->RequiredSpecialty!=EWorkSpecialty::Feeding &&
-        !FeedingSite.IsValid() && ((WorkSite->RequiredSpecialty==EWorkSpecialty::Farming && FVector::Dist2D(GetActorLocation(),WorkSite->GetActorLocation())<=220) || bGatheringActive);
+        !FeedingSite.IsValid() && ((WorkSite->RequiredSpecialty==EWorkSpecialty::Farming && FVector::Dist2D(GetActorLocation(),WorkSite->GetActorLocation())<=220) || bGatheringActive)));
     const bool Charging=!Dead && (SpecialWindupRemaining>0 || AlphaWindup>0);
     VisualState=Dead?TEXT("Downed"):HitPoseRemaining>0?TEXT("Hurt"):Charging?TEXT("Charging"):StrikePoseRemaining>0?TEXT("Striking"):
         AffectionPoseRemaining>0?(bPlayfulResponse?TEXT("Playing"):TEXT("Affection")):Resting?TEXT("Resting"):Moving?TEXT("Moving"):Working?TEXT("Working"):TEXT("Idle");

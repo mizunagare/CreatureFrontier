@@ -95,7 +95,7 @@ struct FStairsTest
     bool Snapshot()
     {
         const auto* Saved=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("StairsAutomation"),0));
-        if(!Saved || Saved->FormatVersion!=34 || Saved->HomeModules.Num()!=12 || !SameModules(Saved->HomeModules,HomeLayout::Collect(World)) ||
+        if(!Saved || (Saved->FormatVersion<34 || Saved->FormatVersion>FrontierCurrentSaveVersion) || Saved->HomeModules.Num()!=12 || !SameModules(Saved->HomeModules,HomeLayout::Collect(World)) ||
             !Hero->Inventory->GetStacks().OrderIndependentCompareEqual(Saved->InventoryStacks) || Hero->Inventory->Count(EFrontierItem::Material)!=109 || !FindActors())return false;
         const auto* Record=Saved->Creatures.FindByPredicate([this](const FCreatureSaveRecord& Value){return Value.bOwned && Value.Id==Pet->PersistentId;});
         return Record && ( !PetId.IsValid() || Record->Id==PetId ) && Pet->Activity==ECreatureActivity::Follow && Pet->GetActorLocation().Z>350 &&
@@ -216,7 +216,7 @@ struct FStairsTest
             const auto Before=HomeLayout::Collect(World);
             if(!UGameplayStatics::SaveGameToSlot(Bad,TEXT("StairsInvalid"),0) || Hero->LoadProgress(TEXT("StairsInvalid")) || !SameModules(Before,HomeLayout::Collect(World)) || Hero->Inventory->Count(EFrontierItem::Material)!=109)return Finish(false,TEXT("old-version-guard"));
             if(!Hero->LoadProgress(TEXT("StairsAutomation")) || !Snapshot())return Finish(false,TEXT("snapshot"));
-            UE_LOG(LogTemp,Display,TEXT("CF_STAIRS_SAVE PASS version=34 identity=1 inventory=1 upper=1 bad33=1 pet=%s"),*PetId.ToString());
+            UE_LOG(LogTemp,Display,TEXT("CF_STAIRS_SAVE PASS version=%d identity=1 inventory=1 upper=1 bad33=1 pet=%s"),FrontierCurrentSaveVersion,*PetId.ToString());
             // 正常读档会释放持续输入，须重新按下慢行；不能沿用读档前的测试按住状态。
             if(!CFInputQA::Press(Hero,EKeys::LeftShift) || !Hero->Pace->IsSlowWalking())return Finish(false,TEXT("resume-input"));
             UE_LOG(LogTemp,Display,TEXT("CF_STAIRS_RESUME_INPUT PASS slow=1"));
@@ -276,7 +276,7 @@ void RunStairsScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
         State->PetId=State->Pet->PersistentId;Hero->GetCharacterMovement()->SetMovementMode(MOVE_Walking);
         auto* Input=NewObject<UHomeMovementProbe>(Hero);Input->RegisterComponent();State->Input=Input;CFInputQA::Press(Hero,EKeys::LeftShift);
         State->PreviousHero=Hero->GetActorLocation();State->PreviousPet=State->Pet->GetActorLocation();State->HeroMax=State->PreviousHero.Z;State->PetMax=State->PreviousPet.Z;
-        UE_LOG(LogTemp,Display,TEXT("CF_STAIRS_RESTORE PASS version=34 modules=12 stored=3 material=109 pet=%s"),*State->PetId.ToString());State->BeginReturn();
+        UE_LOG(LogTemp,Display,TEXT("CF_STAIRS_RESTORE PASS version=%d modules=12 stored=3 material=109 pet=%s"),Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("StairsAutomation"),0))->FormatVersion,*State->PetId.ToString());State->BeginReturn();
     }
     else
     {

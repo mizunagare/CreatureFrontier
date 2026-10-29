@@ -27,6 +27,11 @@ public:
     UPROPERTY() bool bStaged=false;
     // 0为非门模块，1为关闭，2为开启；保存原始字节以校验非法状态。
     UPROPERTY() uint8 DoorState=0;
+    UPROPERTY() bool bUnderConstruction=false;
+    UPROPERTY() FGuid ConstructionCrateId;
+    UPROPERTY() float ConstructionWork=0;
+    static AHomeModule* TraceConstruction(class ACFPlayerCharacter* Hero);
+    FString ConstructionStatus() const;
     EHomeModuleKind GetKind() const { return Definition?Definition->Kind:EHomeModuleKind::Floor; }
     static TArray<FHomePart> Parts(EHomeModuleKind Kind);
     static TArray<FHomePart> PlacementParts(EHomeModuleKind Kind);

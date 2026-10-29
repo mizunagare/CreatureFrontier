@@ -7,6 +7,7 @@
 #include "EngineUtils.h"
 #include "CreatureDefinition.h"
 #include "CompanionCargoComponent.h"
+#include "CompanionConstructionComponent.h"
 
 AResourceNode* ACreatureCharacter::GetFieldResource() const { return FieldResource.Get(); }
 
@@ -14,13 +15,14 @@ bool ACreatureCharacter::AssignFieldResource(AResourceNode* Node)
 {
     if(!HasAuthority() || Health<=0 || Disposition!=ECreatureDisposition::Tamed || !IsValid(Node) ||
         Node->GetWorld()!=GetWorld() || !Node->Definition || !Node->Definition->IsValidDefinition()) return false;
-    Cargo->CancelOrder();
+    Construction->Cancel();Cargo->CancelOrder();
     ResetGathering(); StopNavigation(); ClearCombatOrders();
     WorkSite=nullptr; FieldResource=Node; bResumeWorkAfterRest=false;
     SetActivity(ECreatureActivity::Work); return true;
 }
 void ACreatureCharacter::CancelFieldResource()
 {
+    Construction->Cancel();
     FieldResource.Reset(); ResetGathering(); Cargo->CancelOrder();
 }
 

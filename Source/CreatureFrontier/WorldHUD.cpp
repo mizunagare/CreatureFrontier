@@ -52,7 +52,7 @@ void ACFHUD::DrawWorldHUD(ACFPlayerCharacter* Player)
     for(TActorIterator<AWildEncounter> It(GetWorld());It;++It)if(Player->GetDistanceTo(*It)<Distance){Distance=Player->GetDistanceTo(*It);Nearest=*It;}
     if(Nearest)Research.Add({Nearest->GetStatus(),Nearest->bBoss?Yellow:Green,2});DrawHUDPanel(Layout.Research,Research);
     TArray<FFrontierHUDRow> Rows;
-    if(Player->Building->IsActive()){Audit.Context=EFrontierHUDContext::Building;Rows.Add({TEXT("建造模式"),Yellow});Rows.Add({Player->Building->GetHint(),Yellow,4});}
+    if(Player->Building->IsActive()){Audit.Context=EFrontierHUDContext::Building;Rows.Add({TEXT("建造模式"),Yellow});Rows.Add({Player->Building->GetHint(),Yellow,7});}
     else if(Player->Health<=0 && !Creature)Rows.Add({TEXT("倒下时无法交互，请先复活或读档"),Yellow,2});
     else if(Creature)
     {
@@ -99,6 +99,8 @@ void ACFHUD::DrawWorldHUD(ACFPlayerCharacter* Player)
         if(Creature->SlowRemaining>0 || Creature->GuardRemaining>0)Rows.Add({FString::Printf(TEXT("减速 %.1f秒 | 守护 %.1f秒"),Creature->SlowRemaining,Creature->GuardRemaining),Blue});
         Rows.Add({Tamed?CreatureAffinity::Describe(Creature->Definition):Player->GetGroupMatchupText(Creature),Blue,2});
     }
+    else if(auto* Construction=AHomeModule::TraceConstruction(Player))
+    {Audit.Context=EFrontierHUDContext::Facility;Rows.Add({TEXT("伙伴施工"),Blue});Rows.Add({Construction->ConstructionStatus(),Yellow,4});}
     else if(auto* Node=Player->TraceResource()){Audit.Context=EFrontierHUDContext::Resource;Rows.Add({TEXT("资源"),Blue});Rows.Add({Node->GetStatus(),Yellow,4});}
     else if(Player->Storage->TraceCrate()){Audit.Context=EFrontierHUDContext::Storage;Rows.Add({TEXT("仓储"),Blue});Rows.Add({TEXT("E 打开（3米）| V 设为运输目标 | X 拆除前需清空"),Yellow,3});}
     else if(auto* Door=AHomeModule::TraceDoor(Player))

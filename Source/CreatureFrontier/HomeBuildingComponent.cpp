@@ -11,6 +11,8 @@
 #include "ResearchComponent.h"
 #include "CraftingCatalog.h"
 #include "Components/CapsuleComponent.h"
+#include "PlayerPaceComponent.h"
+#include "GameFramework/PlayerController.h"
 
 namespace
 {
@@ -34,16 +36,19 @@ void UHomeBuildingComponent::Cycle()
     Selected=static_cast<EHomeModuleKind>((static_cast<int32>(Selected)+1)%static_cast<int32>(EHomeModuleKind::Count)); StartPreview();
 }
 void UHomeBuildingComponent::Rotate() { PendingReplacement.Reset(); YawStep=(YawStep+1)%4; UpdatePreview(); }
-bool UHomeBuildingComponent::ValidatePlacement(const FTransform& Transform,FGuid FloorId,FString& Reason) const
+bool UHomeBuildingComponent::ValidatePlacement(const FTransform& Transform,FGuid FloorId,FString& Reason,bool Plan,const AHomeModule* Completing) const
 {
     const auto* Hero=Cast<ACFPlayerCharacter>(GetOwner()); auto* Definition=UHomeModuleDefinition::LoadDefault(Selected);
     if(!Hero || !Hero->HasAuthority() || Hero->Health<=0 || UGameplayStatics::IsGamePaused(this)) { Reason=TEXT("需要玩家存活且世界未暂停"); return false; }
-    if(!Definition || !Definition->IsValidDefinition() || Hero->Inventory->Count(EFrontierItem::Material)<Definition->MaterialCost)
+    if(!Definition || !Definition->IsValidDefinition() || (!Plan && Hero->Inventory->Count(EFrontierItem::Material)<Definition->MaterialCost))
     { Reason=TEXT("定义缺失或材料不足"); return false; }
+    if(Plan && Selected!=EHomeModuleKind::Wall && Selected!=EHomeModuleKind::Window && Selected!=EHomeModuleKind::Doorway && Selected!=EHomeModuleKind::Fence)
+    {Reason=TEXT("伙伴施工首版仅支持墙、窗墙、门框和栅栏；松开右Shift可直接建造其他模块");return false;}
     if(!Hero->Research->Has(Definition->RequiredResearch)) { Reason=TEXT("尚未解锁，请在基地研究实际采集的水晶样本"); return false; }
     for(const auto& Cost:Definition->ExtraCosts) if(Hero->Inventory->Count(Cost.Key)<Cost.Value) { Reason=TEXT("需要")+UCraftingCatalog::FormatItems(Definition->ExtraCosts); return false; }
-    if(FVector::Dist(Hero->GetActorLocation(),Transform.GetLocation())>800) { Reason=TEXT("距离过远（限8米）"); return false; }
-    auto Layout=HomeLayout::Collect(GetWorld()); const auto Proposed=Candidate(Definition,Transform,FloorId); Layout.Add(Proposed);
+    if(!Completing && FVector::Dist(Hero->GetActorLocation(),Transform.GetLocation())>800) { Reason=TEXT("距离过远（限8米）"); return false; }
+    auto Layout=HomeLayout::Collect(GetWorld());if(Completing)Layout.RemoveAll([Completing](const FHomeModuleRecord& R){return R.Id==Completing->PersistentId;});
+    const auto Proposed=Candidate(Definition,Transform,FloorId); Layout.Add(Proposed);
     if(!HomeLayout::Validate(Layout,Reason)) return false;
     FCollisionQueryParams Params(SCENE_QUERY_STAT(HomePlacement),false);
     // 规范吸附点允许地板与墙接触，以及垂直转角连接。
@@ -72,10 +77,38 @@ AHomeModule* UHomeBuildingComponent::BuildAt(const FTransform& Transform,FGuid F
     if(!Hero->Inventory->Transact(Costs,{})) { Module->Destroy(); return nullptr; }
     Hero->Feedback=TEXT("房屋模块已建造 | X 拆除 | 移除最后支撑前请先拆屋顶"); return Module;
 }
+AHomeModule* UHomeBuildingComponent::QueueAt(const FTransform& Transform,FGuid FloorId)
+{
+    auto* Hero=Cast<ACFPlayerCharacter>(GetOwner());FString Reason;
+    if(Selected!=EHomeModuleKind::Wall && Selected!=EHomeModuleKind::Window && Selected!=EHomeModuleKind::Doorway && Selected!=EHomeModuleKind::Fence)
+    {if(Hero)Hero->Feedback=TEXT("首版伙伴施工支持木墙、开放窗墙、门框和栅栏；其他模块仍直接建造");return nullptr;}
+    if(!ValidatePlacement(Transform,FloorId,Reason,true)){if(Hero)Hero->Feedback=Reason;return nullptr;}
+    auto* Module=GetWorld()->SpawnActorDeferred<AHomeModule>(AHomeModule::StaticClass(),Transform,nullptr,nullptr,ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+    if(!Module)return nullptr;Module->Definition=UHomeModuleDefinition::LoadDefault(Selected);Module->PersistentId=FGuid::NewGuid();Module->FloorId=FloorId;Module->bUnderConstruction=true;Module->FinishSpawning(Transform);
+    Hero->Feedback=TEXT("已设下施工架，尚未扣料；先V选材料箱，再瞄准施工架按E派伙伴");return Module;
+}
+bool UHomeBuildingComponent::CompleteConstruction(AHomeModule* Module)
+{
+    if(!IsValid(Module) || !Module->bUnderConstruction || Module->bPreview || Module->bStaged || Module->GetWorld()!=GetWorld() || !Module->Definition ||
+        Module->ConstructionWork<6 || Module->StorageInventory->Count(EFrontierItem::Material)!=Module->Definition->MaterialCost)return false;
+    TGuardValue<EHomeModuleKind> Guard(Selected,Module->GetKind());FString Reason;
+    if(!ValidatePlacement(Module->GetActorTransform(),Module->FloorId,Reason,true,Module)){if(auto* Hero=Cast<ACFPlayerCharacter>(GetOwner()))Hero->Feedback=TEXT("施工暂不能完工：")+Reason;return false;}
+    if(!Module->StorageInventory->Consume(EFrontierItem::Material,Module->Definition->MaterialCost))return false;
+    Module->PaidMaterials=Module->Definition->MaterialCost;Module->bUnderConstruction=false;Module->ConstructionWork=0;Module->ConstructionCrateId.Invalidate();Module->OnConstruction(Module->GetActorTransform());
+    if(auto* Hero=Cast<ACFPlayerCharacter>(GetOwner()))Hero->Feedback=TEXT("伙伴已完成施工，材料只结算一次，模块开始提供支撑与实体阻挡");return true;
+}
 bool UHomeBuildingComponent::Dismantle(AHomeModule* Module)
 {
     auto* Hero=Cast<ACFPlayerCharacter>(GetOwner());
     if(!Hero || !Hero->HasAuthority() || Hero->Health<=0 || UGameplayStatics::IsGamePaused(this) || !IsValid(Module) || Module->IsActorBeingDestroyed() || Module->bPreview || !Module->Definition || Hero->GetDistanceTo(Module)>600) return false;
+    if(Module->bUnderConstruction)
+    {
+        const int32 Supplied=Module->StorageInventory->Count(EFrontierItem::Material);
+        if(Supplied>0 && !Module->StorageInventory->TransferTo(Hero->Inventory,{{EFrontierItem::Material,Supplied}})){Hero->Feedback=TEXT("请腾出背包空间接收全部已交施工材料");return false;}
+        Module->Destroy();Hero->Feedback=TEXT("已取消施工，已交材料全部退回；伙伴尚未交出的携带物仍保留，可按Z取回");return true;
+    }
+    for(TActorIterator<AHomeModule> It(GetWorld());It;++It)if(It->bUnderConstruction && It->ConstructionCrateId==Module->PersistentId)
+    {Hero->Feedback=TEXT("该箱仍是施工料源，请先取消施工或重新指定材料箱");return false;}
     if(Module->GetKind()==EHomeModuleKind::Stairs)
         for(TActorIterator<ACharacter> It(GetWorld());It;++It)
         {
@@ -105,7 +138,7 @@ AHomeModule* UHomeBuildingComponent::ReplaceWall(AHomeModule* Module)
     const auto IsWall=[](EHomeModuleKind Kind){return Kind==EHomeModuleKind::Wall || Kind==EHomeModuleKind::Window || Kind==EHomeModuleKind::Doorway || Kind==EHomeModuleKind::Door;};
     if(!IsInGameThread() || !Hero || !Hero->HasAuthority() || Hero->Health<=0 || UGameplayStatics::IsGamePaused(this) ||
        !IsValid(Module) || Module->GetWorld()!=GetWorld() || Module->IsActorBeingDestroyed() || Module->bPreview || Module->bStaged ||
-       !Module->Definition || !IsWall(Module->GetKind()) || !IsWall(Selected) || Hero->GetDistanceTo(Module)>600)
+       Module->bUnderConstruction || !Module->Definition || !IsWall(Module->GetKind()) || !IsWall(Selected) || Hero->GetDistanceTo(Module)>600)
         return Reject(TEXT("请在存活且未暂停时，选择6米内的墙类模块进行替换"));
     if(Module->GetKind()==Selected)return Reject(TEXT("同类模块无需替换"));
     auto* Definition=UHomeModuleDefinition::LoadDefault(Selected);
@@ -199,11 +232,13 @@ void UHomeBuildingComponent::UpdatePreview()
     else if(Selected==EHomeModuleKind::Stairs)Position.Z=Center.Z+10;
     if(Selected==EHomeModuleKind::Lantern || Selected==EHomeModuleKind::Storage) Position=FVector(FMath::GridSnap(Hit.ImpactPoint.X,100.),FMath::GridSnap(Hit.ImpactPoint.Y,100.),Center.Z+10);
     Placement=FTransform(FRotator(0,Selected==EHomeModuleKind::Stairs?YawStep*90:Wall?(YawStep%2)*90:0,0),Position);
-    bValid=ValidatePlacement(Placement,SupportingFloor,Status);
+    bValid=ValidatePlacement(Placement,SupportingFloor,Status,IsConstructionInput());
     Preview->SetActorTransform(Placement); Preview->SetActorHiddenInGame(PendingReplacement.IsValid()); Preview->SetPreviewTint(bValid);
     if(PendingReplacement.IsValid())Status=TEXT("原位替换待确认；再按Insert确认，移开视线取消");
 }
-void UHomeBuildingComponent::Confirm() { PendingReplacement.Reset(); UpdatePreview(); if(bValid) BuildAt(Placement,SupportingFloor); }
+bool UHomeBuildingComponent::IsConstructionInput() const
+{const auto* Hero=Cast<ACFPlayerCharacter>(GetOwner());const auto* Controller=Hero?Cast<APlayerController>(Hero->GetController()):nullptr;return Controller && Controller->IsInputKeyDown(EKeys::RightShift);}
+void UHomeBuildingComponent::Confirm() { PendingReplacement.Reset(); UpdatePreview(); if(bValid){if(IsConstructionInput())QueueAt(Placement,SupportingFloor);else BuildAt(Placement,SupportingFloor);} }
 void UHomeBuildingComponent::ConfirmAimedReplacement()
 {
     auto* Hero=Cast<ACFPlayerCharacter>(GetOwner());
@@ -230,5 +265,5 @@ FString UHomeBuildingComponent::GetHint() const
     const auto* Definition=UHomeModuleDefinition::LoadDefault(Selected);
     TMap<EFrontierItem,int32> Costs;
     if(Definition) { Costs=Definition->ExtraCosts; Costs.Add(EFrontierItem::Material,Definition->MaterialCost); }
-    return FString::Printf(TEXT("房屋 %s | %s\nV选择 | 9旋转 | 8设施 | Insert替换\n左键放置 | 右键/B取消 | X拆除\n%s"),Definition?*Definition->DisplayName.ToString():TEXT("不可用"),*UCraftingCatalog::FormatItems(Costs),*Status);
+    return FString::Printf(TEXT("房屋 %s | %s\nV选择 | 9旋转 | 8设施 | Insert替换\n左键建造 | 右Shift+左键施工架\n右键/B取消 | X拆除\n%s"),Definition?*Definition->DisplayName.ToString():TEXT("不可用"),*UCraftingCatalog::FormatItems(Costs),*Status);
 }

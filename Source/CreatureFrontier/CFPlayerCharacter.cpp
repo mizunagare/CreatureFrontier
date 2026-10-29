@@ -24,6 +24,7 @@
 #include "HomePersistence.h"
 #include "StorageInteractionComponent.h"
 #include "CompanionCargoComponent.h"
+#include "CompanionConstructionComponent.h"
 #include "FarmCropComponent.h"
 #include "CompanionNamingComponent.h"
 #include "CompanionPersonalityComponent.h"
@@ -150,6 +151,7 @@ bool ACFPlayerCharacter::SaveProgress(const FString& Slot)
         Record.WorkSiteName = IsValid(It->WorkSite) ? It->WorkSite->GetFName() : NAME_None;
         Record.WorkSiteId = IsValid(It->WorkSite) && It->WorkSite->bPlayerBuilt ? It->WorkSite->PersistentId : FGuid();
         Record.FieldResourceId=It->GetFieldResource()?It->GetFieldResource()->PersistentId:FGuid();
+        Record.ConstructionModuleId=It->Construction->GetSite()?It->Construction->GetSite()->PersistentId:FGuid();
         It->Cargo->WriteSnapshot(Record);
         Save->Creatures.Add(Record);
     }
@@ -284,6 +286,18 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
     }
     FHomeRestoreTransaction HomeRestore(GetWorld());
     if(!HomeRestore.Stage(Save)) { Feedback=TEXT("房屋结构或室内设施支撑无效，世界未改变"); return false; }
+    TSet<FGuid> ConstructionWorkers;
+    for(const auto& Record:Save->Creatures)if(Record.ConstructionModuleId.IsValid())
+    {
+        const auto* Site=HomeRestore.Find(Record.ConstructionModuleId);
+        bool Valid=Save->FormatVersion>=35 && Site && Site->bUnderConstruction && Record.bOwned && Record.Disposition==ECreatureDisposition::Tamed && Record.Health>0 &&
+            !Record.WorkSiteId.IsValid() && Record.WorkSiteName.IsNone() && !Record.FieldResourceId.IsValid() && !Record.DeliveryCrateId.IsValid() && !Record.bReturningCargo && Record.CarriedFood==0 &&
+            (Record.Activity==ECreatureActivity::Work || (Record.Activity==ECreatureActivity::Rest && Record.bResumeWorkAfterRest)) && !ConstructionWorkers.Contains(Record.ConstructionModuleId);
+        for(const auto& Item:Record.CargoItems)Valid &= Item.Key==EFrontierItem::Material;
+        if(Site)Valid &= Record.CargoItems.FindRef(EFrontierItem::Material)<=Site->Definition->MaterialCost-Site->StorageInventory->Count(EFrontierItem::Material);
+        if(!Valid){Feedback=TEXT("施工任务或携带建材无效，世界未改变");return false;}
+        ConstructionWorkers.Add(Record.ConstructionModuleId);
+    }
     for(const auto& Record:Save->Creatures)
         if(!UCompanionCargoComponent::ValidateSnapshot(Record,HomeRestore.Find(Record.DeliveryCrateId)))
         { Feedback=TEXT("携带资源或运输意图无效，世界未改变"); return false; }
@@ -405,10 +419,11 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
         }
         if (Record.WorkSiteId.IsValid())
             for (auto* Site : RestoredBuilt) if (Site->PersistentId == Record.WorkSiteId) { Pet->WorkSite = Site; break; }
-        if (Pet->Activity == ECreatureActivity::Work && !IsValid(Pet->WorkSite) && !Pet->GetFieldResource())
+        Pet->Construction->Restore(HomeRestore.Find(Record.ConstructionModuleId));
+        if (Pet->Activity == ECreatureActivity::Work && !IsValid(Pet->WorkSite) && !Pet->GetFieldResource() && !Pet->Construction->GetSite())
             Pet->Activity = Record.bOwned ? ECreatureActivity::Follow : ECreatureActivity::Idle;
         Pet->bResumeWorkAfterRest = Record.bResumeWorkAfterRest && Record.bOwned && Pet->Health > 0 && Pet->Activity == ECreatureActivity::Rest &&
-            (Pet->GetFieldResource() || (IsValid(Pet->WorkSite) && Pet->WorkSite->RequiredSpecialty != EWorkSpecialty::Feeding));
+            (Pet->Construction->GetSite() || Pet->GetFieldResource() || (IsValid(Pet->WorkSite) && Pet->WorkSite->RequiredSpecialty != EWorkSpecialty::Feeding));
         Pet->Cargo->RestoreSnapshot(Record,HomeRestore.Find(Record.DeliveryCrateId));
     }
     UCompanionMemoryComponent::CloseAll(GetWorld());Naming->Close(); Pace->StopSlowWalk(); Gathering->Stop(); CancelMeleeAttack(); Building->Cancel();
@@ -533,6 +548,13 @@ void ACFPlayerCharacter::CommandSpecial()
 void ACFPlayerCharacter::CommandWork()
 {
     if (!HasAuthority() || Health <= 0 || UGameplayStatics::IsGamePaused(this) || Building->IsActive()) return;
+    if(Storage->IsOpen()){Storage->Close();return;}
+    if(auto* ConstructionSite=AHomeModule::TraceConstruction(this))
+    {
+        for(TActorIterator<ACreatureCharacter> It(GetWorld());It;++It)if(IsCommandTarget(*It) && It->Construction->Assign(ConstructionSite,DeliverySelection.Get(),this))
+        {Feedback=TEXT("已指派伙伴搬运箱内材料并施工；缺料时等待，F取消伙伴任务，X取消施工架");return;}
+        Feedback=TEXT("请先瞄准材料箱按V，选择存活且无其他携物的伙伴；每个施工架限一位工人");return;
+    }
     if(Storage->TryOpenAimed()) return;
     if(auto* Door=AHomeModule::TraceDoor(this)){Door->ToggleDoor(this);return;}
     FHitResult Hit; FCollisionQueryParams Params(SCENE_QUERY_STAT(FieldOrder),false,this);

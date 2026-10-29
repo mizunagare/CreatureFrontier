@@ -1,4 +1,5 @@
 #include "CreatureCharacter.h"
+#include "CompanionConstructionComponent.h"
 #include "CreatureDefinition.h"
 #include "CompanionCargoComponent.h"
 #include "CompanionPersonalityComponent.h"
@@ -28,6 +29,7 @@ ACreatureCharacter::ACreatureCharacter()
     PrimaryActorTick.bCanEverTick = true;
     CargoInventory=CreateDefaultSubobject<UInventoryComponent>(TEXT("CargoInventory"));
     Cargo=CreateDefaultSubobject<UCompanionCargoComponent>(TEXT("Cargo"));
+    Construction=CreateDefaultSubobject<UCompanionConstructionComponent>(TEXT("Construction"));
     Personality=CreateDefaultSubobject<UCompanionPersonalityComponent>(TEXT("Personality"));
     Memory=CreateDefaultSubobject<UCompanionMemoryComponent>(TEXT("Memory"));
     bReplicates = true;
@@ -300,6 +302,7 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
         if(!Cargo->ValidateOrder()) return;
         Nutrition = FMath::Max(0.0f,Nutrition - DeltaSeconds*(Activity == ECreatureActivity::Work ? .35f : Activity == ECreatureActivity::Rest ? .04f : .08f));
         if (TickAutoFeeding()) return;
+        if(Construction->TickWork(DeltaSeconds,OwnerPlayer))return;
         if (Nutrition <= 0 && Activity == ECreatureActivity::Work)
         {
             bResumeWorkAfterRest = GetFieldResource() || (IsValid(WorkSite) && WorkSite->RequiredSpecialty != EWorkSpecialty::Feeding);

@@ -18,7 +18,7 @@ bool At(const FHomeModuleRecord& Record,const FVector& Position,double Yaw)
 bool WallAt(const TArray<FHomeModuleRecord>& Records,const FVector& Position,double Yaw)
 {
     for(const auto& Other:Records)
-        if(auto* Definition=Other.Definition.Get();Definition && IsWall(Definition->Kind) && At(Other,Position,Yaw)) return true;
+        if(auto* Definition=Other.Definition.Get();Definition && !Other.bUnderConstruction && IsWall(Definition->Kind) && At(Other,Position,Yaw)) return true;
     return false;
 }
 bool OppositeWalls(const TArray<FHomeModuleRecord>& Records,FVector Floor)
@@ -32,11 +32,19 @@ bool HomeLayout::IsFloorHeight(double Z)
 bool HomeLayout::IsCanonical(const FHomeModuleRecord& Record)
 {
     const auto* Definition=Record.Definition.Get();
-    if(!Record.Id.IsValid() || !Definition || !Definition->IsValidDefinition() || Record.PaidMaterials<2 || Record.PaidMaterials>100 || Record.Transform.ContainsNaN() ||
+    if(!Record.Id.IsValid() || !Definition || !Definition->IsValidDefinition() || (Record.bUnderConstruction?Record.PaidMaterials!=0:Record.PaidMaterials<2) || Record.PaidMaterials>100 || Record.Transform.ContainsNaN() ||
         !Record.Transform.GetRotation().IsNormalized() || !Record.Transform.GetScale3D().Equals(FVector::OneVector,.001)) return false;
     const FVector Position=Record.Transform.GetLocation(); const auto Rotation=Record.Transform.Rotator();
     for(const auto& Cost:Record.PaidExtraItems) if(Cost.Key==EFrontierItem::Material || Cost.Key>=EFrontierItem::Count || Cost.Value<=0 || Cost.Value>999) return false;
-    if(!UInventoryComponent::Validate(Record.StoredItems) || (Definition->Kind!=EHomeModuleKind::Storage && !Record.StoredItems.IsEmpty())) return false;
+    if(!UInventoryComponent::Validate(Record.StoredItems))return false;
+    if(Record.bUnderConstruction)
+    {
+        if((Definition->Kind!=EHomeModuleKind::Wall && Definition->Kind!=EHomeModuleKind::Window && Definition->Kind!=EHomeModuleKind::Doorway && Definition->Kind!=EHomeModuleKind::Fence) ||
+            !Record.PaidExtraItems.IsEmpty() || !Definition->ExtraCosts.IsEmpty() || !FMath::IsFinite(Record.ConstructionWork) || Record.ConstructionWork<0 || Record.ConstructionWork>6)return false;
+        for(const auto& Item:Record.StoredItems)if(Item.Key!=EFrontierItem::Material || Item.Value>Definition->MaterialCost)return false;
+        if(Record.ConstructionWork>0 && Record.StoredItems.FindRef(EFrontierItem::Material)!=Definition->MaterialCost)return false;
+    }
+    else if(Record.ConstructionCrateId.IsValid() || Record.ConstructionWork!=0 || (Definition->Kind!=EHomeModuleKind::Storage && !Record.StoredItems.IsEmpty()))return false;
     if(Definition->Kind==EHomeModuleKind::Door?(Record.DoorState!=1 && Record.DoorState!=2):Record.DoorState!=0)return false;
     if(FVector::Dist2D(Position,UBaseBuildingComponent::BaseOrigin())>1200 || !FMath::IsNearlyZero(Rotation.Pitch,.01) || !FMath::IsNearlyZero(Rotation.Roll,.01)) return false;
     if(IsWall(Definition->Kind) || Definition->Kind==EHomeModuleKind::Fence)
@@ -66,7 +74,7 @@ bool HomeLayout::Validate(const TArray<FHomeModuleRecord>& Records,FString& Reas
         if(Kind==EHomeModuleKind::Floor && FMath::IsNearlyEqual(Record.Transform.GetLocation().Z,-40.,.01))
         { if(Record.FloorId.IsValid()) { Reason=TEXT("地面地板不能依附父地板"); return false; } continue; }
         const FHomeModuleRecord* Floor=Records.FindByPredicate([&Record](const FHomeModuleRecord& Other){return Other.Id==Record.FloorId;});
-        if(!Floor || !Floor->Definition.Get() || Floor->Definition.Get()->Kind!=EHomeModuleKind::Floor)
+        if(!Floor || Floor->bUnderConstruction || !Floor->Definition.Get() || Floor->Definition.Get()->Kind!=EHomeModuleKind::Floor)
         { Reason=TEXT("模块需要支撑地板"); return false; }
         const FVector Center=Floor->Transform.GetLocation(); const FVector Position=Record.Transform.GetLocation();
         if(Kind==EHomeModuleKind::Floor || Kind==EHomeModuleKind::Roof)
@@ -139,8 +147,11 @@ TArray<FHomeModuleRecord> HomeLayout::Collect(UWorld* World)
     {
         FHomeModuleRecord Record; Record.Id=It->PersistentId; Record.FloorId=It->FloorId;
         Record.Definition=It->Definition.Get(); Record.Transform=It->GetActorTransform(); Record.PaidMaterials=It->PaidMaterials; Record.PaidExtraItems=It->PaidExtraItems; Result.Add(Record);
-        if(It->GetKind()==EHomeModuleKind::Storage) Result.Last().StoredItems=It->StorageInventory->GetStacks();
+        if(It->GetKind()==EHomeModuleKind::Storage || It->bUnderConstruction) Result.Last().StoredItems=It->StorageInventory->GetStacks();
         Result.Last().DoorState=It->DoorState;
+        Result.Last().bUnderConstruction=It->bUnderConstruction;
+        Result.Last().ConstructionCrateId=It->ConstructionCrateId;
+        Result.Last().ConstructionWork=It->ConstructionWork;
     }
     return Result;
 }
