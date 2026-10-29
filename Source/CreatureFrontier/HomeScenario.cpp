@@ -511,6 +511,35 @@ bool PlaceThroughPreview(UWorld* World,ACFPlayerCharacter* Hero,EHomeModuleKind 
 
 void RunHomeScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
 {
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFHomeFenceRead")))
+    {
+        const FString Slot=TEXT("HomeFenceCross");
+        const auto* Saved=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot,0));
+        auto Matches=[&]()
+        {
+            if(!Saved || Saved->FormatVersion!=FrontierCurrentSaveVersion || Saved->HomeModules.Num()!=4 ||
+                Saved->InventoryStacks.FindRef(EFrontierItem::Material)!=180 || !Hero->Inventory->GetStacks().OrderIndependentCompareEqual(Saved->InventoryStacks))return false;
+            const auto Live=HomeLayout::Collect(World);if(Live.Num()!=Saved->HomeModules.Num())return false;
+            int32 Fences=0;
+            for(const auto& Record:Saved->HomeModules)
+            {
+                const auto* Found=Live.FindByPredicate([&](const FHomeModuleRecord& Other){return Other.Id==Record.Id;});
+                if(!Found || Found->Definition!=Record.Definition || Found->FloorId!=Record.FloorId || !Found->Transform.Equals(Record.Transform,.01) ||
+                    Found->PaidMaterials!=Record.PaidMaterials || Found->DoorState!=Record.DoorState ||
+                    !Found->StoredItems.OrderIndependentCompareEqual(Record.StoredItems) || !Found->PaidExtraItems.OrderIndependentCompareEqual(Record.PaidExtraItems))return false;
+                Fences+=Found->Definition.Get()->Kind==EHomeModuleKind::Fence;
+            }
+            return Fences==3;
+        };
+        bool Restored=Hero->LoadProgress(Slot) && Matches() && Hero->LoadProgress(Slot) && Matches();
+        auto* Before=Find(World,EHomeModuleKind::Fence,FVector(-400,-1000,-30));
+        auto* Bad=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot,0));
+        bool Rejected=false;
+        if(Restored && Bad){Bad->FormatVersion=32;Rejected=UGameplayStatics::SaveGameToSlot(Bad,TEXT("HomeFenceBad32"),0) &&
+            !Hero->LoadProgress(TEXT("HomeFenceBad32")) && IsValid(Before) && Matches();}
+        UE_LOG(LogTemp,Display,TEXT("CF_HOME_FENCE_READ %s identity=%d badVersion=%d material=%d"),Restored && Rejected?TEXT("PASS"):TEXT("FAIL"),Restored,Rejected,Hero->Inventory->Count(EFrontierItem::Material));
+        FPlatformMisc::RequestExitWithStatus(false,Restored && Rejected?0:1);return;
+    }
     const FString CrossSlot=TEXT("FrontierHomeCrossProcess");
     if(Mode==2)
     {
@@ -543,6 +572,13 @@ void RunHomeScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
         Pass &= PlaceThroughPreview(World,Hero,EHomeModuleKind::Fence,FVector(-400,-800,60),FVector(-580,-800,-30),FVector(-600,-800,-30),90);
         Pass &= CFInputQA::Action(Hero,TEXT("Capture"),EKeys::RightMouseButton);
         const int32 Before=Hero->Inventory->Count(EFrontierItem::Material);
+        if(FParse::Param(FCommandLine::Get(),TEXT("CFHomeFenceWrite")))
+        {
+            Hero->SetActorLocation(FVector(-400,-800,60));
+            const bool Saved=Pass && Before==180 && Hero->SaveProgress(TEXT("HomeFenceCross"));
+            UE_LOG(LogTemp,Display,TEXT("CF_HOME_FENCE_WRITE %s modules=%d material=%d"),Saved?TEXT("PASS"):TEXT("FAIL"),HomeLayout::Collect(World).Num(),Before);
+            FPlatformMisc::RequestExitWithStatus(false,Saved?0:1);return;
+        }
         Pass &= Before==180 && !Build(Hero,EHomeModuleKind::Roof,FVector(-400,-800,280),FloorA->PersistentId) &&
             !Build(Hero,EHomeModuleKind::Fence,FVector(-400,-1000,-30),FloorA->PersistentId) && Hero->Inventory->Count(EFrontierItem::Material)==Before;
         auto* South=Find(World,EHomeModuleKind::Fence,FVector(-400,-1000,-30));
