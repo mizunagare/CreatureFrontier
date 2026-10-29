@@ -44,4 +44,6 @@ if(!(Select-String -LiteralPath $log -SimpleMatch ('CF_DOOR_FARM_MODE PASS mode=
 $fixtureMarker=if($NoRoof){'CF_DOOR_FARM_FIXTURE roof=0 removed=1'}else{'CF_DOOR_FARM_FIXTURE roof=1 removed=0'}
 if(!(Select-String -LiteralPath $log -SimpleMatch $fixtureMarker -Quiet)){throw '缺少预期屋顶对照标记'}
 [pscustomobject]@{Case=$flag;NoRoof=[bool]$NoRoof;AvoidCombat=[bool]$AvoidCombat;Furnished=[bool]$Furnished;Pass=$true;BuildSHA256=$hash;Log=$log} | Export-Csv -LiteralPath (Join-Path $run 'Results.csv') -NoTypeInformation
-Write-Host '门与农圃工作专项通过；不代表运输、多伙伴或跨进程恢复已验收'
+if($Mode -eq 'Read'){Write-Host '本次独立进程读取及开门继续工作通过；完整链结果由存档链脚本汇总'}
+elseif($Mode -eq 'Write'){Write-Host '闭门工作任务写入通过；尚需独立进程读取验证'}
+else{Write-Host '门与农圃工作专项通过；不代表运输、多伙伴或跨进程恢复已验收'}
