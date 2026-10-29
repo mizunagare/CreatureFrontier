@@ -1,4 +1,5 @@
 #include "HomeScenario.h"
+#include "HomeFundingScenario.h"
 #include "HomeBuildingComponent.h"
 #include "HomeModule.h"
 #include "HomeLayout.h"
@@ -562,8 +563,15 @@ bool PlaceThroughPreview(UWorld* World,ACFPlayerCharacter* Hero,EHomeModuleKind 
 }
 }
 
-void RunHomeScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
+void RunHomeScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode,bool UseGatheredStock)
 {
+    const bool Gathered=FParse::Param(FCommandLine::Get(),TEXT("CFHomeGatheredWork"));
+    if(Gathered)
+    {
+        if(Mode!=0 || !FParse::Param(FCommandLine::Get(),TEXT("CFHomeCourtyardWork")) || !FParse::Param(FCommandLine::Get(),TEXT("CFHomeRoomWork")))
+        {UE_LOG(LogTemp,Error,TEXT("CF_HOME_FUNDING FAIL mode"));FPlatformMisc::RequestExitWithStatus(false,1);return;}
+        if(!UseGatheredStock){RunHomeFundingScenario(World,Hero);return;}
+    }
     if(FParse::Param(FCommandLine::Get(),TEXT("CFHomeFenceRead")))
     {
         const FString Slot=TEXT("HomeFenceCross");
@@ -605,7 +613,8 @@ void RunHomeScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
     { if(It->Definition && It->Definition->Form==ECreatureForm::Leaf) Leaf=It->Definition; It->Destroy(); }
     if(!Leaf || !Brush(World)) { UE_LOG(LogTemp,Error,TEXT("CF_HOME FAIL fixture")); FPlatformMisc::RequestExitWithStatus(false,1); return; }
     Hero->GetCharacterMovement()->DisableMovement(); Hero->SetActorLocation(FVector(-350,-1150,40));
-    Hero->Inventory->Restore({{EFrontierItem::Material,200}});
+    const int32 InitialMaterials=Gathered?125:200;
+    if(!Gathered)Hero->Inventory->Restore({{EFrontierItem::Material,200}});
     Hero->FirstPersonCamera->SetWorldRotation((FVector(-400,-800,-50)-Hero->FirstPersonCamera->GetComponentLocation()).Rotation());
     bool Bindings=CFInputQA::UniqueBindings(Hero) && CFInputQA::Press(Hero,EKeys::B) && CFInputQA::Press(Hero,EKeys::Eight) &&
         CFInputQA::Action(Hero,TEXT("Attack"),EKeys::LeftMouseButton);
@@ -614,7 +623,7 @@ void RunHomeScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
     Bindings &= CFInputQA::Press(Hero,EKeys::Nine) && CFInputQA::Press(Hero,EKeys::V) && CFInputQA::Press(Hero,EKeys::V) &&
         CFInputQA::Press(Hero,EKeys::V) && CFInputQA::Action(Hero,TEXT("Capture"),EKeys::RightMouseButton);
     auto* FloorA=Find(World,EHomeModuleKind::Floor,FVector(-400,-800,-40));
-    bool Input=Bindings && Rotated && FloorA && !Hero->Building->IsActive() && Hero->Inventory->Count(EFrontierItem::Material)==192;
+    bool Input=Bindings && Rotated && FloorA && !Hero->Building->IsActive() && Hero->Inventory->Count(EFrontierItem::Material)==InitialMaterials-8;
     UE_LOG(LogTemp,Display,TEXT("CF_HOME_INPUT_BINDINGS %s floor=%d rotated=%d cancelled=%d material=%d"),Input?TEXT("PASS"):TEXT("FAIL"),FloorA!=nullptr,Rotated,!Hero->Building->IsActive(),Hero->Inventory->Count(EFrontierItem::Material));
     if(!Input) { UE_LOG(LogTemp,Error,TEXT("CF_HOME FAIL input %s"),*Hero->Feedback); FPlatformMisc::RequestExitWithStatus(false,1); return; }
     if(FParse::Param(FCommandLine::Get(),TEXT("CFHomeFenceTest")))
@@ -687,7 +696,7 @@ void RunHomeScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
         }
         Room &= CFInputQA::Action(Hero,TEXT("Capture"),EKeys::RightMouseButton) && !Hero->Building->IsActive();
         FString Reason;const auto Layout=HomeLayout::Collect(World);
-        Room &= Layout.Num()==(Courtyard?14:11) && HomeLayout::Validate(Layout,Reason) && Hero->Inventory->Count(EFrontierItem::Material)==(Courtyard?96:112);
+        Room &= Layout.Num()==(Courtyard?14:11) && HomeLayout::Validate(Layout,Reason) && Hero->Inventory->Count(EFrontierItem::Material)==InitialMaterials-(Courtyard?104:88);
         UE_LOG(LogTemp,Display,TEXT("CF_HOME_ROOM_INPUT %s modules=%d material=%d noSave=1"),Room?TEXT("PASS"):TEXT("FAIL"),Layout.Num(),Hero->Inventory->Count(EFrontierItem::Material));
         if(Room && FParse::Param(FCommandLine::Get(),TEXT("CFHomeRoomWork"))){RunHomeDoorFarmScenario(World,Hero,FParse::Param(FCommandLine::Get(),TEXT("CFHomeRoomWorkWrite"))?1:0,true);return;}
         FPlatformMisc::RequestExitWithStatus(false,Room?0:1);return;

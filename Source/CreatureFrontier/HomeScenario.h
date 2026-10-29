@@ -15,5 +15,5 @@ public:
     FVector Direction=FVector::ZeroVector;
     virtual void TickComponent(float DeltaTime,ELevelTick TickType,FActorComponentTickFunction* Tick) override;
 };
-void RunHomeScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode=0);
+void RunHomeScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode=0,bool UseGatheredStock=false);
 void RunHomeWindowScenario(UWorld* World,ACFPlayerCharacter* Hero);

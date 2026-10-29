@@ -1,4 +1,5 @@
 #include "HomeDoorScenario.h"
+#include "HomeFundingScenario.h"
 #include "HomeModule.h"
 #include "CFPlayerCharacter.h"
 #include "CreatureCharacter.h"
@@ -86,12 +87,27 @@ bool CourtyardTaskSnapshot(ACFPlayerCharacter* Hero,const FString& Slot,ACreatur
 }
 }
 
+namespace CFDoorFarmVolumeQA
+{
+bool GatheredEndSnapshot(UWorld* World,ACFPlayerCharacter* Hero,const FString& Slot,FGuid PetId,FGuid FarmId)
+{
+    if(!FurnishedSnapshot(World,Hero,Slot) || !VerifyHomeFundingSources(World) || Hero->Inventory->Count(EFrontierItem::Material)!=0 ||
+        Hero->Inventory->Count(EFrontierItem::Seeds)!=2 || Hero->Inventory->Count(EFrontierItem::Food)!=2)return false;
+    ACreatureCharacter* Pet=nullptr;AWorkStation* Farm=nullptr;
+    for(TActorIterator<ACreatureCharacter> It(World);It;++It)if(It->PersistentId==PetId && It->Tamer==Hero->GetController())Pet=*It;
+    for(TActorIterator<AWorkStation> It(World);It;++It)if(It->PersistentId==FarmId && It->bPlayerBuilt)Farm=*It;
+    return Pet && Farm && Pet->Activity==ECreatureActivity::Work && Pet->WorkSite==Farm && Farm->StoredFood==1 && Farm->Crop->Seeds==0 &&
+        !Farm->Crop->bPlanted && Farm->Crop->GrowthWork==0;
+}
+}
 void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode,bool UseExistingRoom)
 {
     const bool AvoidTest=FParse::Param(FCommandLine::Get(),TEXT("CFStanceFarmTest"));
     const bool Furnished=FParse::Param(FCommandLine::Get(),TEXT("CFFurnishedFarm"));
     const bool InputBuilt=UseExistingRoom || FParse::Param(FCommandLine::Get(),TEXT("CFHomeRoomWorkRead"));
     const bool Courtyard=FParse::Param(FCommandLine::Get(),TEXT("CFHomeCourtyardWork"));
+    const bool Gathered=FParse::Param(FCommandLine::Get(),TEXT("CFHomeGatheredWork"));
+    if(Gathered && (!Courtyard || !UseExistingRoom || Mode!=0)){UE_LOG(LogTemp,Error,TEXT("CF_HOME_FUNDING FAIL work-mode"));FPlatformMisc::RequestExitWithStatus(false,1);return;}
     if(Courtyard && (!InputBuilt || !Furnished || Mode>2)){UE_LOG(LogTemp,Error,TEXT("CF_HOME_COURTYARD_WORK FAIL mode"));FPlatformMisc::RequestExitWithStatus(false,1);return;}
     if(InputBuilt && (!Furnished || Mode>2)){UE_LOG(LogTemp,Error,TEXT("CF_HOME_ROOM_WORK FAIL reuse-mode"));FPlatformMisc::RequestExitWithStatus(false,1);return;}
     const FString Slot=Courtyard?TEXT("CourtyardHomeWorkBlocked"):InputBuilt?TEXT("HomeInputWorkBlocked"):Furnished?TEXT("FurnishedFarmBlocked"):TEXT("DoorFarmBlocked");
@@ -200,8 +216,8 @@ void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode,b
             // 初始种子仍是夹具物资；存入通过正常F2绑定，不能直接改农圃库存。
             const auto View=(Farm->GetActorLocation()+FVector(0,0,30)-Hero->FirstPersonCamera->GetComponentLocation()).Rotation();
             Hero->GetController()->SetControlRotation(View);Hero->FirstPersonCamera->SetWorldRotation(View);
-            const bool Seeded=Hero->Inventory->AddItem(EFrontierItem::Seeds,1) && CFInputQA::Press(Hero,EKeys::F2) &&
-                Farm->Crop->Seeds==1 && Hero->Inventory->Count(EFrontierItem::Seeds)==0;
+            const bool Seeded=(Gathered?Hero->Inventory->Count(EFrontierItem::Seeds)==3:Hero->Inventory->AddItem(EFrontierItem::Seeds,1)) && CFInputQA::Press(Hero,EKeys::F2) &&
+                Farm->Crop->Seeds==1 && Hero->Inventory->Count(EFrontierItem::Seeds)==(Gathered?2:0);
             UE_LOG(LogTemp,Display,TEXT("CF_HOME_FARM_SEED_INPUT %s"),Seeded?TEXT("PASS"):TEXT("FAIL"));
             if(!Seeded){Finish(false);return;}
         }
@@ -209,7 +225,7 @@ void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode,b
     }
     const auto Timer=MakeShared<FTimerHandle>();
     const int32 HouseMaterials=Hero->Inventory->Count(EFrontierItem::Material);
-    World->GetTimerManager().SetTimer(*Timer,[World,Hero,Door,Farm,FarmWeak=TWeakObjectPtr<AWorkStation>(Farm),Definition,Timer,Finish,Mode,AvoidTest,Furnished,Slot,HouseMaterials,InputBuilt,Courtyard,VisitedCourt=false,CrossedDoor=false,CourtClear=true,Phase=Mode==2?1:0,At=World->GetTimeSeconds(),Pet=RestoredPet,Previous=RestoredPet?RestoredPet->GetActorLocation():FVector::ZeroVector,Travel=0.,Continuous=true,ExpectedMaterials=0,Diagnosed=false]() mutable
+    World->GetTimerManager().SetTimer(*Timer,[World,Hero,Door,Farm,FarmWeak=TWeakObjectPtr<AWorkStation>(Farm),Definition,Timer,Finish,Mode,AvoidTest,Furnished,Slot,HouseMaterials,InputBuilt,Courtyard,Gathered,VisitedCourt=false,CrossedDoor=false,CourtClear=true,Phase=Mode==2?1:0,At=World->GetTimeSeconds(),Pet=RestoredPet,Previous=RestoredPet?RestoredPet->GetActorLocation():FVector::ZeroVector,Travel=0.,Continuous=true,ExpectedMaterials=0,Diagnosed=false]() mutable
     {
         auto End=[&](bool Pass)
         {
@@ -241,9 +257,19 @@ void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode,b
             UE_LOG(LogTemp,Display,TEXT("CF_DOOR_FARM_STATE phase=%d food=%d seeds=%d growth=%.2f travel=%.1f continuous=%d pet=%s"),Phase,LiveFarm?LiveFarm->StoredFood:-1,LiveFarm?LiveFarm->Crop->Seeds:-1,LiveFarm?LiveFarm->Crop->GrowthWork:-1,Travel,Continuous,Pet?*Pet->GetActorLocation().ToString():TEXT("无"));
             // 清除定时器会释放捕获对象；完成回调必须先复制到当前调用栈。
             const auto Complete=Finish;
+            const bool CheckGathered=Pass && Gathered;
+            const FGuid FinalPetId=Pet?Pet->PersistentId:FGuid(),FinalFarmId=LiveFarm?LiveFarm->PersistentId:FGuid();
             const bool Preview=Pass && Furnished && Mode==0 && FParse::Param(FCommandLine::Get(),TEXT("CFFurnishedFarmPreview"));
             auto* Observer=Hero;auto* PreviewWorld=World;
             FTimerHandle Handle=*Timer;World->GetTimerManager().ClearTimer(Handle);
+            if(CheckGathered)
+            {
+                const FString GatheredSlot=TEXT("HomeGatheredAutomation");
+                const bool Saved=Observer->SaveProgress(GatheredSlot) && Observer->LoadProgress(GatheredSlot) &&
+                    CFDoorFarmVolumeQA::GatheredEndSnapshot(PreviewWorld,Observer,GatheredSlot,FinalPetId,FinalFarmId);
+                UE_LOG(LogTemp,Display,TEXT("CF_HOME_GATHERED_SAVE %s modules=14 material=0 seeds=2 stored=3 task=1 source=1"),Saved?TEXT("PASS"):TEXT("FAIL"));
+                Complete(Saved);return;
+            }
             if(Preview)
             {
                 // 仅移动观察者到室内合法站位，不移动伙伴，也不改变房屋碰撞。
