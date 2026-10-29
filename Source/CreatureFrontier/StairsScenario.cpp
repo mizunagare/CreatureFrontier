@@ -1,4 +1,5 @@
 #include "StairsScenario.h"
+#include "UpperFarmScenario.h"
 #include "HomeScenario.h"
 #include "HomeModule.h"
 #include "HomeLayout.h"
@@ -151,6 +152,7 @@ struct FStairsTest
             const FTransform Facility(FRotator::ZeroRotator,FVector(0,-700,325),FVector(2,1,.7));
             if(!Hero->Building->ValidatePlacement(Facility,FacilityReason) || !HomeLayout::SupportsFacility(Facility,HomeLayout::Collect(World)))return Finish(false,*FacilityReason);
             UE_LOG(LogTemp,Display,TEXT("CF_STAIRS_FACILITY_SPACE PASS valid=1 support=1 noBuild=1"));
+            if(FParse::Param(FCommandLine::Get(),TEXT("CFStairsWork"))) {RunUpperFarmScenario(World,Hero,false);return false;}
             Hero->SetActorLocation(FVector(-780,-800,40));Hero->GetCharacterMovement()->SetMovementMode(MOVE_Walking);Face(FVector(0,-800,104));
             const FTransform Spawn(FVector(-950,-800,40));auto* Partner=World->SpawnActorDeferred<ACreatureCharacter>(ACreatureCharacter::StaticClass(),Spawn,nullptr,nullptr,ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
             Partner->Definition=LoadObject<UCreatureDefinition>(nullptr,TEXT("/Game/Creatures/DA_Mosskip.DA_Mosskip"));Partner->FinishSpawning(Spawn);Partner->Tame(Hero->GetController());Pet=Partner;PetId=Partner->PersistentId;
@@ -256,6 +258,9 @@ struct FStairsTest
 }
 void RunStairsScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
 {
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFStairsWork")) && (Mode==2 || FParse::Param(FCommandLine::Get(),TEXT("CFStairsPreview"))))
+    {UE_LOG(LogTemp,Error,TEXT("CF_UPPER_FARM FAIL reason=invalid-mode"));FPlatformMisc::RequestExitWithStatus(false,1);return;}
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFStairsWork")) && Mode==1) {RunUpperFarmScenario(World,Hero,true);return;}
     const auto State=MakeShared<FStairsTest>();State->World=World;State->Hero=Hero;State->Mode=Mode;State->At=World->GetTimeSeconds();State->Deadline=FPlatformTime::Seconds()+90;
     if(Mode==2)
     {
