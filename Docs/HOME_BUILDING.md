@@ -4,6 +4,12 @@
 
 ### 输入建房后复用原房开展伙伴工作
 
+Windows增量：Windows-Home-Input-Work已独立打包成功，内部程序SHA-256 `C3324BD9DA8DDB7F8A8A18550DFE4AEB673B092B60E7348D2E140057AEA4E2A5`。自身 `Scripts/Test-HomeInput.ps1 -BuildRoot E:\CreatureFrontierBuilds\Windows-Home-Input-Work -Work` 的 `Saved/HomeInputQA/20261029-095732-c339eea2/` 退出0：十次新增模块输入、11模块/112材料、原房闭门等待/E开门/工作及物资核对通过；结果CSV明确Room/Work均True、指纹一致。此为Windows自身证据，不借Editor结果。
+
+同指纹原Furnished存读关联回归 `Saved/DoorFarmPersistenceQA/20261029-095742-78390dbd/` 三进程退出0（写档 `095742-3f532d5a`、读取 `095756-db16bb4b`、`095810-98ca7fa6`，均在Saved/DoorFarmQA），三个日志无FAIL且闭门/农圃成功标记齐全，两个读取身份核对通过；源输入两读不变。FurnishedFarmBlocked及输入专项可能触及的三个旧QA槽均恢复为空，程序哈希重审一致。注意该存读链仍由旧房屋工厂建造，不能替代“输入建房后保存退出再恢复”的同一链证明。
+
+该包未做完整全项目/图形/真实旧档迁移或普通硬件建房验收，README的55EACC6F开发体验入口保持不变。此轮只追加新包限定集成证据，不把QA增量当作新增游戏内容；下一主要任务是输入建房链本身的保存/冷启动衔接，而不是继续重跑已有矩阵。
+
 `Scripts/Test-HomeInput.ps1 -Work` 自动启用Room，完成11模块的预览输入放置后，直接把原房屋交给既有HomeDoorFarm状态机。新增UseExistingRoom仅供该QA衔接，跳过原工厂建房和拆建步骤，核对原门/窗/两地板/两屋顶/箱体结构，通过正常仓储接口存入3材料，再使用原农圃建造与工作逻辑。本分支派工和开门均通过E已注册绑定，闭门等待12秒无生产、开门后真实行走完成一份作物，玩家建材与箱内材料保持不变；不瞬移伙伴，不重建房壳。
 
 97906F93C65E61718F598292E7D8CAEE9C73CD06DCD501C77150F00B67ADE367 Editor模块构建成功。整合证据 `Saved/HomeInputQA/20261029-095423-1a119c8f/` 退出0：建房11模块/112材料标记、闭门等待、农圃物资检查与 `CF_HOME_ROOM_WORK PASS noRebuild=1` 齐全；实际一份食物、种子归零、行走437.1厘米且连续。新增脚本报告显式区分Room/Work，但该旧CSV生成于报告字段补充前，不能要求它已有后来的列。
