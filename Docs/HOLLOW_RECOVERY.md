@@ -1,5 +1,11 @@
 # 洞窟倒地与伙伴重聚（首版限定验收）
 
+## 新Windows候选自身取消与目标事务
+
+1ED615BD候选自身 `Saved/HollowFailureInspection/20261029-090204-9d610186/` 60帧F8中途取消实际退出0，活动绕行立即清空、Focus清除及15秒敌人未受伤标记均通过。`20261029-090224-fbac9ea2/` 60帧SwitchRetreat/RequireBattle实际退出0：无效目标保留原指令、切换目标清旧路径、切回后自然战斗完成，末次生命断言通过。
+
+两项均为新候选自身指纹1ED615BD181BC4663404AD860EC744D1402DE68FB9F293C0445F5E0BB6D04471，输入哈希不变，临时输入槽实际恢复为空。目标切换仍为同采样内指令事务，不等同持续追新目标或完整瞄准输入验收。原完整回归继续运行，稳定入口不变。
+
 ## 新Windows动态恢复候选：分阶段三帧率通过
 
 独立 `E:\CreatureFrontierBuilds\Windows-Combat-Route-Recovery` 打包成功，BuildCookRun/归档退出0；内部EXE `1ED615BD181BC4663404AD860EC744D1402DE68FB9F293C0445F5E0BB6D04471`。包含动态受阻统一清队列生产修复及后续诊断，不覆盖D417包或其已完成证据。
