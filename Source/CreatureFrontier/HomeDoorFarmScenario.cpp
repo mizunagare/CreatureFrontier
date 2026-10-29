@@ -20,16 +20,37 @@
 #include "Components/CapsuleComponent.h"
 #include "Engine/OverlapResult.h"
 #include "InputRoutingQA.h"
+#include "HomeBuildingComponent.h"
+#include "StorageInteractionComponent.h"
 
 namespace CFDoorFarmVolumeQA
 {
 bool InsideRoom(FVector Position)
 {return Position.X>-560 && Position.X<-240 && Position.Y>-1000 && Position.Y<-600 && Position.Z>40 && Position.Z<120;}
+bool FurnishedRoom(UWorld* World)
+{
+    TSet<FGuid> Floors;int32 Modules=0,Windows=0,Doors=0,Roofs=0,Crates=0;
+    for(TActorIterator<AHomeModule> It(World);It;++It)
+    {
+        if(It->bPreview || It->bStaged)continue;++Modules;
+        if(It->GetKind()==EHomeModuleKind::Floor)Floors.Add(It->PersistentId);
+        Windows+=It->GetKind()==EHomeModuleKind::Window;Doors+=It->GetKind()==EHomeModuleKind::Door;
+        Roofs+=It->GetKind()==EHomeModuleKind::Roof;
+        if(It->GetKind()==EHomeModuleKind::Storage)
+        {++Crates;if(It->StorageInventory->Count(EFrontierItem::Material)!=3)return false;}
+    }
+    if(Floors.Num()!=2 || Modules!=11 || Windows!=1 || Doors!=1 || Roofs!=2 || Crates!=1)return false;
+    for(TActorIterator<AHomeModule> It(World);It;++It)
+        if(It->GetKind()!=EHomeModuleKind::Floor && !It->bPreview && ( !Floors.Contains(It->FloorId) || It->PaidMaterials<=0))return false;
+    return true;
+}
 }
 
 void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
 {
     const bool AvoidTest=FParse::Param(FCommandLine::Get(),TEXT("CFStanceFarmTest"));
+    const bool Furnished=FParse::Param(FCommandLine::Get(),TEXT("CFFurnishedFarm"));
+    if(Furnished && Mode!=0){UE_LOG(LogTemp,Error,TEXT("CF_FURNISHED_FARM FAIL unsupported-mode"));FPlatformMisc::RequestExitWithStatus(false,1);return;}
     if(AvoidTest && Mode!=0){UE_LOG(LogTemp,Error,TEXT("CF_STANCE_FARM FAIL mode"));FPlatformMisc::RequestExitWithStatus(false,1);return;}
     // 固定房间只验证单伙伴工作，不替代自由放置、长期运输或自然冒险。
     auto Finish=[Mode](bool Pass)
@@ -49,6 +70,32 @@ void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
         Hero->GetCharacterMovement()->DisableMovement();
     }
     else Door=CFDoorNavigationQA::Room(World,Hero,0);
+    if(Furnished && Door)
+    {
+        AHomeModule* West=nullptr;
+        for(TActorIterator<AHomeModule> It(World);It;++It)
+            if(It->GetKind()==EHomeModuleKind::Wall && FMath::IsNearlyEqual(It->GetActorLocation().X,-600.))West=*It;
+        Hero->SetActorLocation(FVector(-430,-800,60));
+        // 标准农圃和家具保持原尺寸，通过正常拆建扩展第二格室内空间。
+        auto Build=[Hero](EHomeModuleKind Kind,FVector Position,FGuid Floor=FGuid(),double Yaw=0)
+        {Hero->HomeBuilding->Selected=Kind;auto* Module=Hero->HomeBuilding->BuildAt(FTransform(FRotator(0,Yaw,0),Position),Floor);
+            if(!Module)for(const auto& Part:AHomeModule::PlacementParts(Kind))
+            {TArray<FOverlapResult> Hits;Hero->GetWorld()->OverlapMultiByObjectType(Hits,Position+FRotator(0,Yaw,0).RotateVector(Part.Center),FRotator(0,Yaw,0).Quaternion(),FCollisionObjectQueryParams(FCollisionObjectQueryParams::AllObjects),FCollisionShape::MakeBox(Part.Extent-FVector(1)));
+                for(const auto& Hit:Hits)UE_LOG(LogTemp,Display,TEXT("CF_FURNISHED_OVERLAP actor=%s component=%s"),*GetNameSafe(Hit.GetActor()),*GetNameSafe(Hit.GetComponent()));}
+            UE_LOG(LogTemp,Display,TEXT("CF_FURNISHED_BUILD kind=%d position=%s built=%d feedback=%s"),static_cast<int32>(Kind),*Position.ToString(),Module!=nullptr,*Hero->Feedback);return Module;};
+        const bool Opened=West && Hero->HomeBuilding->Dismantle(West);
+        auto* Extension=Opened?Build(EHomeModuleKind::Floor,FVector(-800,-800,-40)):nullptr;
+        Hero->SetActorLocation(FVector(-800,-900,60));
+        const bool Shell=Extension && Build(EHomeModuleKind::Wall,FVector(-800,-1000,-30),Extension->PersistentId) &&
+            Build(EHomeModuleKind::Wall,FVector(-800,-600,-30),Extension->PersistentId) &&
+            Build(EHomeModuleKind::Window,FVector(-1000,-800,-30),Extension->PersistentId,90) &&
+            Build(EHomeModuleKind::Roof,FVector(-800,-800,280),Extension->PersistentId);
+        auto* Crate=Shell?Build(EHomeModuleKind::Storage,FVector(-900,-700,-30),Extension->PersistentId):nullptr;
+        const bool Ready=Crate && Hero->Storage->Open(Crate) && Hero->Storage->Transfer(EFrontierItem::Material,3,true);
+        Hero->Storage->Close();Hero->SetActorLocation(FVector(-400,-1250,60));
+        if(!Ready || !CFDoorFarmVolumeQA::FurnishedRoom(World))
+        {UE_LOG(LogTemp,Error,TEXT("CF_FURNISHED_FARM FAIL fixture %s"),*Hero->Feedback);Finish(false);return;}
+    }
     const bool NoRoof=FParse::Param(FCommandLine::Get(),TEXT("CFDoorFarmNoRoof"));
     int32 RemovedRoofs=0;
     if(NoRoof)for(TActorIterator<AHomeModule> It(World);It;++It)if(It->GetKind()==EHomeModuleKind::Roof){It->Destroy();++RemovedRoofs;}
@@ -60,10 +107,16 @@ void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
     if(!Farm){UE_LOG(LogTemp,Display,TEXT("CF_DOOR_FARM_FIXTURE %s"),*Hero->Feedback);Finish(false);return;}
     if(Mode!=2)Farm->Crop->Seeds=1;
     const auto Timer=MakeShared<FTimerHandle>();
-    World->GetTimerManager().SetTimer(*Timer,[World,Hero,Door,Farm,FarmWeak=TWeakObjectPtr<AWorkStation>(Farm),Definition,Timer,Finish,Mode,AvoidTest,Phase=Mode==2?1:0,At=World->GetTimeSeconds(),Pet=RestoredPet,Previous=RestoredPet?RestoredPet->GetActorLocation():FVector::ZeroVector,Travel=0.,Continuous=true,ExpectedMaterials=0,Diagnosed=false]() mutable
+    const int32 HouseMaterials=Hero->Inventory->Count(EFrontierItem::Material);
+    World->GetTimerManager().SetTimer(*Timer,[World,Hero,Door,Farm,FarmWeak=TWeakObjectPtr<AWorkStation>(Farm),Definition,Timer,Finish,Mode,AvoidTest,Furnished,HouseMaterials,Phase=Mode==2?1:0,At=World->GetTimeSeconds(),Pet=RestoredPet,Previous=RestoredPet?RestoredPet->GetActorLocation():FVector::ZeroVector,Travel=0.,Continuous=true,ExpectedMaterials=0,Diagnosed=false]() mutable
     {
         auto End=[&](bool Pass)
         {
+            if(Furnished)
+            {
+                Pass &= CFDoorFarmVolumeQA::FurnishedRoom(World) && Hero->Inventory->Count(EFrontierItem::Material)==HouseMaterials;
+                UE_LOG(LogTemp,Display,TEXT("CF_FURNISHED_FARM %s stored=3 phase=%d"),Pass?TEXT("PASS"):TEXT("FAIL"),Phase);
+            }
             if(AvoidTest)
             {
                 Pass &= Phase==2 && Pet && Pet->bAvoidCombat && Pet->WorkSite==Farm;
