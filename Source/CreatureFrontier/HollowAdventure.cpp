@@ -423,9 +423,11 @@ void RunHollowAdventure(UWorld* World,ACFPlayerCharacter* Hero,int Mode)
             auto Switched=MakeShared<bool>(false);
             const bool BlockRetreat=FParse::Param(FCommandLine::Get(),TEXT("CFHollowBlockRetreat"));
             auto BlockStage=MakeShared<int32>(0);
+            const bool Phased=FParse::Param(FCommandLine::Get(),TEXT("CFHollowPhasedRecovery"));
+            auto RemovedAt=MakeShared<double>(-1.0);auto EngagedAt=MakeShared<double>(-1.0);
             auto Barrier=MakeShared<TWeakObjectPtr<AStaticMeshActor>>();
             UE_LOG(LogTemp,Display,TEXT("CF_HOLLOW_DYNAMIC_BEGIN reconstructedFocus=1 deterministicReplay=0 waitForPartner=%d"),WaitForPartner);
-            FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([World,Hero,Pet,Enemy,Movement,Goal,Started,Start,WaitForPartner,CancelRetreat,Cancelled,SwitchRetreat,Switched,BlockRetreat,BlockStage,Barrier](float)
+            FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([World,Hero,Pet,Enemy,Movement,Goal,Started,Start,WaitForPartner,CancelRetreat,Cancelled,SwitchRetreat,Switched,BlockRetreat,BlockStage,Barrier,Phased,RemovedAt,EngagedAt](float)
             {
                 if(!IsValid(Hero) || !IsValid(Pet) || !IsValid(Enemy))
                 {UE_LOG(LogTemp,Error,TEXT("CF_HOLLOW_DYNAMIC FAIL actors"));FPlatformMisc::RequestExitWithStatus(false,1);return false;}
@@ -448,6 +450,7 @@ void RunHollowAdventure(UWorld* World,ACFPlayerCharacter* Hero,int Mode)
                     UE_LOG(LogTemp,Display,TEXT("CF_RETREAT_BLOCK %s cleared=1 focusKept=%d removed=%d"),Pass?TEXT("PASS"):TEXT("FAIL"),Pet->FocusTarget==Enemy,Pass);
                     if(!Pass){FPlatformMisc::RequestExitWithStatus(false,1);return false;}
                     *BlockStage=2;
+                    *RemovedAt=FPlatformTime::Seconds();
                 }
                 if(SwitchRetreat && !*Switched && Pet->HasCombatRoute())
                 {
@@ -497,7 +500,27 @@ void RunHollowAdventure(UWorld* World,ACFPlayerCharacter* Hero,int Mode)
                 UE_LOG(LogTemp,Display,TEXT("CF_HOLLOW_DYNAMIC_SAMPLE time=%.2f hero=%s velocity=%s pet=%s petVelocity=%s activity=%d focus=%s blocker=%s petBlock=%d heroHP=%.1f petHP=%.1f enemyHP=%.1f distance=%.1f"),
                     FPlatformTime::Seconds()-Started,*Now.ToString(),*Hero->GetVelocity().ToString(),*Pet->GetActorLocation().ToString(),*Pet->GetVelocity().ToString(),
                     static_cast<int32>(Pet->Activity),*GetNameSafe(Pet->FocusTarget),*GetNameSafe(Block.GetActor()),Block.GetActor()==Pet,Hero->Health,Pet->Health,Enemy->Health,FVector::Dist2D(Now,Goal));
-                if(FPlatformTime::Seconds()-Started<15)return true;
+                if(Phased)
+                {
+                    const double Clock=FPlatformTime::Seconds();
+                    if(*BlockStage==2 && *EngagedAt<0 && Enemy->Health<Enemy->GetMaxHealth())
+                    {
+                        *EngagedAt=Clock;
+                        UE_LOG(LogTemp,Display,TEXT("CF_RETREAT_PHASE_ENGAGED seconds=%.3f"),Clock-*RemovedAt);
+                    }
+                    const bool Failed=Hero->Health<=0 || Pet->Health<=0 || !Pet->IsActorTickEnabled() || !Enemy->IsActorTickEnabled() ||
+                        Pet->GetCapsuleComponent()->GetCollisionEnabled()==ECollisionEnabled::NoCollision ||
+                        Hero->GetCapsuleComponent()->GetCollisionEnabled()==ECollisionEnabled::NoCollision ||
+                        !Hero->GetActorLocation().Equals(Start,1) || Clock-Started>30 ||
+                        (*BlockStage!=2 && Clock-Started>3) ||
+                        (*BlockStage==2 && *EngagedAt<0 && Clock-*RemovedAt>12) ||
+                        (*EngagedAt>=0 && Enemy->Health>0 && Clock-*EngagedAt>12);
+                    if(Failed){UE_LOG(LogTemp,Error,TEXT("CF_RETREAT_PHASE FAIL stage=%d engaged=%d elapsed=%.3f"),*BlockStage,*EngagedAt>=0,Clock-Started);FPlatformMisc::RequestExitWithStatus(false,1);return false;}
+                    if(Enemy->Health>0)return true;
+                    if(*BlockStage!=2 || *EngagedAt<0){UE_LOG(LogTemp,Error,TEXT("CF_RETREAT_PHASE FAIL missing-stage"));FPlatformMisc::RequestExitWithStatus(false,1);return false;}
+                    UE_LOG(LogTemp,Display,TEXT("CF_RETREAT_PHASE PASS clearSeconds=%.3f approachSeconds=%.3f battleSeconds=%.3f totalSeconds=%.3f"),*RemovedAt-Started,*EngagedAt-*RemovedAt,Clock-*EngagedAt,Clock-Started);
+                }
+                else if(FPlatformTime::Seconds()-Started<15)return true;
                 if(BlockRetreat && *BlockStage!=2)
                 {UE_LOG(LogTemp,Error,TEXT("CF_RETREAT_BLOCK FAIL incomplete"));FPlatformMisc::RequestExitWithStatus(false,1);return false;}
                 if(SwitchRetreat && !*Switched)
