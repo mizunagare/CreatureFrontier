@@ -1,5 +1,6 @@
-param([string]$BuildRoot='',[string]$EngineRoot='D:\Epic\UE_5.8',[switch]$Room,[switch]$Work,[ValidateSet('Test','Write','Read')][string]$Mode='Test')
+param([string]$BuildRoot='',[string]$EngineRoot='D:\Epic\UE_5.8',[switch]$Room,[switch]$Work,[ValidateSet('Test','Write','Read')][string]$Mode='Test',[switch]$Fence)
 $ErrorActionPreference='Stop'
+if($Fence -and ($Room -or $Work -or $Mode -ne 'Test')){throw '栅栏基础专项不能与房屋工作存读组合'}
 if($Mode -ne 'Test' -and !$Work){throw '存读模式仅用于输入建房伙伴工作链'}
 if($Work){$Room=$true}
 . (Join-Path $PSScriptRoot 'BuildFingerprint.ps1')
@@ -24,6 +25,7 @@ foreach($name in @('FrontierHomeAutomation','FrontierHomeInvalid','FrontierHomeL
 }
 $arguments=@('-CFHomeTest','-CFHomeInputOnly','-nullrhi','-nosound','-unattended','-nop4',('-abslog="'+$log+'"'))
 if($Room){$arguments+='-CFHomeRoomInput'}
+if($Fence){$arguments+='-CFHomeFenceTest'}
 if($Work){$arguments+=@('-CFHomeRoomWork','-CFFurnishedFarm')}
 if($Mode -eq 'Write'){$arguments+='-CFHomeRoomWorkWrite'}
 if($Mode -eq 'Read'){$arguments=@('-CFDoorFarmRead','-CFFurnishedFarm','-CFHomeRoomWorkRead','-nullrhi','-nosound','-unattended','-nop4',('-abslog="'+$log+'"'))}
@@ -33,7 +35,7 @@ $process=Start-Process -FilePath $exe -ArgumentList $arguments -WindowStyle Hidd
 if(!$process.WaitForExit(60000)){$process.Kill();$process.WaitForExit();throw '房屋输入绑定专项超时'}
 if($process.ExitCode -ne 0 -or !(Test-Path -LiteralPath $log)){throw '房屋输入绑定专项未正常退出'}
 $body=Get-Content -LiteralPath $log -Raw
-$completion=if($Mode -eq 'Read'){'CF_FURNISHED_RESTORE PASS identity=1 inventory=1'}elseif($Room){'CF_HOME_ROOM_INPUT PASS modules=11 material=112 noSave=1'}else{'CF_HOME_INPUT_ONLY PASS noSave=1'}
+$completion=if($Fence){'CF_HOME_FENCE PASS modules=3 material=182 collision=1 removed=1 floorGuard=1 noSave=1'}elseif($Mode -eq 'Read'){'CF_FURNISHED_RESTORE PASS identity=1 inventory=1'}elseif($Room){'CF_HOME_ROOM_INPUT PASS modules=11 material=112 noSave=1'}else{'CF_HOME_INPUT_ONLY PASS noSave=1'}
 if($body -match '\bFAIL\b|Fatal error|Assertion failed' -or !$body.Contains($completion) -or ($Mode -ne 'Read' -and !$body.Contains('CF_HOME_INPUT_BINDINGS PASS floor=1 rotated=1 cancelled=1 material=192'))){throw "房屋输入绑定专项未通过或构建不支持：$log"}
 if($Room -and $Mode -ne 'Read' -and ([regex]::Matches($body,'CF_HOME_ROOM_INPUT_PART PASS')).Count -ne 10){throw '整屋输入缺少十次新增模块的实际成功记录'}
 if($Work){$number=if($Mode -eq 'Write'){1}elseif($Mode -eq 'Read'){2}else{0};if(!$body.Contains('CF_DOOR_FARM_MODE PASS mode='+$number)){throw '未完成指定的工作存读模式'}}
@@ -41,7 +43,8 @@ if($Work){foreach($marker in @('CF_HOME_ROOM_WORK PASS noRebuild=1','CF_DOOR_FAR
 if($Work -and $Mode -ne 'Read'){foreach($marker in @('CF_HOME_FARM_INPUT PASS','CF_HOME_FARM_SEED_INPUT PASS')){if(!$body.Contains($marker)){throw "农圃预览放置或种子输入未实际通过：$marker"}}}
 if((Get-FrontierBuildFingerprint -LiteralPath $module) -ne $hash){throw '房屋输入测试期间模块发生变化'}
 [pscustomobject]@{Room=[bool]$Room;Work=[bool]$Work;Mode=$Mode;Pass=$true;BuildSHA256=$hash;Log=$log} | Export-Csv -LiteralPath (Join-Path $run 'Results.csv') -NoTypeInformation
-if($Mode -eq 'Write'){Write-Host '输入建房并保存闭门等待任务通过；仍需独立进程读取后继续工作'}
+if($Fence){Write-Host '栅栏预览放置、旋转、阻挡、拆除返还和非承重规则通过；存读与伙伴导航尚待'}
+elseif($Mode -eq 'Write'){Write-Host '输入建房并保存闭门等待任务通过；仍需独立进程读取后继续工作'}
 elseif($Mode -eq 'Read'){Write-Host '输入建房存档的身份、物资及原任务恢复通过；完整链结果由存档脚本汇总'}
 elseif($Work){Write-Host '输入建房与原房伙伴闭门等待、开门工作及物资核对通过；未验收系统鼠标或自然移动建房'}
 elseif($Room){Write-Host '双格门窗房屋及储物箱共11模块预览输入通过；不是系统鼠标或自然移动建房验收'}

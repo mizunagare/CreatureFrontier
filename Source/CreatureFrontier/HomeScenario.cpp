@@ -535,6 +535,28 @@ void RunHomeScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
     bool Input=Bindings && Rotated && FloorA && !Hero->Building->IsActive() && Hero->Inventory->Count(EFrontierItem::Material)==192;
     UE_LOG(LogTemp,Display,TEXT("CF_HOME_INPUT_BINDINGS %s floor=%d rotated=%d cancelled=%d material=%d"),Input?TEXT("PASS"):TEXT("FAIL"),FloorA!=nullptr,Rotated,!Hero->Building->IsActive(),Hero->Inventory->Count(EFrontierItem::Material));
     if(!Input) { UE_LOG(LogTemp,Error,TEXT("CF_HOME FAIL input %s"),*Hero->Feedback); FPlatformMisc::RequestExitWithStatus(false,1); return; }
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFHomeFenceTest")))
+    {
+        bool Pass=CFInputQA::Press(Hero,EKeys::B) && CFInputQA::Press(Hero,EKeys::Eight);
+        Pass &= PlaceThroughPreview(World,Hero,EHomeModuleKind::Fence,FVector(-400,-800,60),FVector(-400,-980,-30),FVector(-400,-1000,-30));
+        Pass &= PlaceThroughPreview(World,Hero,EHomeModuleKind::Fence,FVector(-400,-800,60),FVector(-400,-620,-30),FVector(-400,-600,-30));
+        Pass &= PlaceThroughPreview(World,Hero,EHomeModuleKind::Fence,FVector(-400,-800,60),FVector(-580,-800,-30),FVector(-600,-800,-30),90);
+        Pass &= CFInputQA::Action(Hero,TEXT("Capture"),EKeys::RightMouseButton);
+        const int32 Before=Hero->Inventory->Count(EFrontierItem::Material);
+        Pass &= Before==180 && !Build(Hero,EHomeModuleKind::Roof,FVector(-400,-800,280),FloorA->PersistentId) &&
+            !Build(Hero,EHomeModuleKind::Fence,FVector(-400,-1000,-30),FloorA->PersistentId) && Hero->Inventory->Count(EFrontierItem::Material)==Before;
+        auto* South=Find(World,EHomeModuleKind::Fence,FVector(-400,-1000,-30));
+        auto Blocked=[&](){FHitResult Hit;FCollisionQueryParams Query(SCENE_QUERY_STAT(FencePawn),false,Hero);
+            return World->SweepSingleByChannel(Hit,FVector(-400,-1100,60),FVector(-400,-900,60),FQuat::Identity,ECC_Pawn,FCollisionShape::MakeCapsule(34,88),Query);};
+        const bool Collision=Blocked();
+        Hero->SetActorLocation(FVector(-400,-800,60));
+        const bool Removed=South && Hero->HomeBuilding->Dismantle(South) && !Blocked();
+        const bool Support=!Hero->HomeBuilding->Dismantle(FloorA);
+        FString Reason;const auto Layout=HomeLayout::Collect(World);
+        Pass &= Collision && Removed && Support && HomeLayout::Validate(Layout,Reason) && Layout.Num()==3 && Hero->Inventory->Count(EFrontierItem::Material)==182;
+        UE_LOG(LogTemp,Display,TEXT("CF_HOME_FENCE %s modules=%d material=%d collision=%d removed=%d floorGuard=%d noSave=1"),Pass?TEXT("PASS"):TEXT("FAIL"),Layout.Num(),Hero->Inventory->Count(EFrontierItem::Material),Collision,Removed,Support);
+        FPlatformMisc::RequestExitWithStatus(false,Pass?0:1);return;
+    }
     if(FParse::Param(FCommandLine::Get(),TEXT("CFHomeRoomInput")))
     {
         bool Room=CFInputQA::Press(Hero,EKeys::B) && CFInputQA::Press(Hero,EKeys::Eight);

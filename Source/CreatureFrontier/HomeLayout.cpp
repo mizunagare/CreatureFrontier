@@ -32,7 +32,7 @@ bool HomeLayout::IsCanonical(const FHomeModuleRecord& Record)
     if(!UInventoryComponent::Validate(Record.StoredItems) || (Definition->Kind!=EHomeModuleKind::Storage && !Record.StoredItems.IsEmpty())) return false;
     if(Definition->Kind==EHomeModuleKind::Door?(Record.DoorState!=1 && Record.DoorState!=2):Record.DoorState!=0)return false;
     if(FVector::Dist2D(Position,UBaseBuildingComponent::BaseOrigin())>1200 || !FMath::IsNearlyZero(Rotation.Pitch,.01) || !FMath::IsNearlyZero(Rotation.Roll,.01)) return false;
-    if(IsWall(Definition->Kind))
+    if(IsWall(Definition->Kind) || Definition->Kind==EHomeModuleKind::Fence)
         return FMath::IsNearlyEqual(Position.Z,-30.,.01) &&
             ((FMath::IsNearlyZero(Rotation.Yaw,.01) && Grid(Position.X,400) && Grid(Position.Y-200,400)) ||
              (FMath::IsNearlyEqual(Rotation.Yaw,90.,.01) && Grid(Position.X-200,400) && Grid(Position.Y,400)));
