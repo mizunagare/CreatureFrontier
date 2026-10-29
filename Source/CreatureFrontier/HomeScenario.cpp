@@ -645,6 +645,21 @@ void RunHomeScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
         FString Reason;const auto Layout=HomeLayout::Collect(World);
         Pass &= Collision && Removed && Support && HomeLayout::Validate(Layout,Reason) && Layout.Num()==3 && Hero->Inventory->Count(EFrontierItem::Material)==182;
         UE_LOG(LogTemp,Display,TEXT("CF_HOME_FENCE %s modules=%d material=%d collision=%d removed=%d floorGuard=%d noSave=1"),Pass?TEXT("PASS"):TEXT("FAIL"),Layout.Num(),Hero->Inventory->Count(EFrontierItem::Material),Collision,Removed,Support);
+        if(Pass && FParse::Param(FCommandLine::Get(),TEXT("CFHomeFencePreview")))
+        {
+            Hero->SetActorLocation(FVector(-100,-1150,60));
+            const auto View=(FVector(-450,-800,40)-(Hero->GetActorLocation()+FVector(0,0,64))).Rotation();
+            Hero->FirstPersonCamera->SetRelativeRotation(FRotator::ZeroRotator);Hero->GetController()->SetControlRotation(View);
+            CFInputQA::Press(Hero,EKeys::B);CFInputQA::Press(Hero,EKeys::Eight);
+            Hero->Feedback=TEXT("庭院木栅栏：每段4材料，非承重；拆除返还2材料");
+            const FString Root=FPaths::ProjectSavedDir()/TEXT("FencePreview")/FGuid::NewGuid().ToString(EGuidFormats::Digits);
+            IFileManager::Get().MakeDirectory(*Root,true);UE_LOG(LogTemp,Display,TEXT("CF_HOME_FENCE_PREVIEW_ROOT %s"),*Root);
+            FTimerHandle Shot,Done;
+            World->GetTimerManager().SetTimer(Shot,[Root](){FScreenshotRequest::RequestScreenshot(Root/TEXT("Courtyard.png"),false,false);},1.f,false);
+            World->GetTimerManager().SetTimer(Done,[Root](){const bool Ready=IFileManager::Get().FileSize(*(Root/TEXT("Courtyard.png")))>1000;
+                UE_LOG(LogTemp,Display,TEXT("CF_HOME_FENCE_PREVIEW %s"),Ready?TEXT("PASS"):TEXT("FAIL"));FPlatformMisc::RequestExitWithStatus(false,Ready?0:1);},3.f,false);
+            return;
+        }
         FPlatformMisc::RequestExitWithStatus(false,Pass?0:1);return;
     }
     if(FParse::Param(FCommandLine::Get(),TEXT("CFHomeRoomInput")))

@@ -1,5 +1,6 @@
-param([string]$BuildRoot='',[string]$EngineRoot='D:\Epic\UE_5.8',[switch]$Room,[switch]$Work,[ValidateSet('Test','Write','Read')][string]$Mode='Test',[switch]$Fence,[switch]$FenceNavigation)
+param([string]$BuildRoot='',[string]$EngineRoot='D:\Epic\UE_5.8',[switch]$Room,[switch]$Work,[ValidateSet('Test','Write','Read')][string]$Mode='Test',[switch]$Fence,[switch]$FenceNavigation,[switch]$FencePreview)
 $ErrorActionPreference='Stop'
+if($FencePreview){if($Mode -ne 'Test' -or $FenceNavigation){throw '栅栏预览仅用于普通基础模式'};$Fence=$true}
 if($FenceNavigation){if($Mode -ne 'Test'){throw '栅栏导航仅支持普通模式'};$Fence=$true}
 if($Fence -and ($Room -or $Work)){throw '栅栏专项不能与房屋工作组合'}
 if($Mode -ne 'Test' -and !$Work -and !$Fence){throw '存读模式仅用于房屋工作或栅栏链'}
@@ -32,6 +33,7 @@ if($Work){$arguments+=@('-CFHomeRoomWork','-CFFurnishedFarm')}
 if($Mode -eq 'Write'){$arguments+='-CFHomeRoomWorkWrite'}
 if($Mode -eq 'Read'){$arguments=@('-CFDoorFarmRead','-CFFurnishedFarm','-CFHomeRoomWorkRead','-nullrhi','-nosound','-unattended','-nop4',('-abslog="'+$log+'"'))}
 if($Fence -and $Mode -ne 'Test'){$arguments=@('-CFHomeTest',('-CFHomeFence'+$Mode),'-CFHomeFenceTest','-nullrhi','-nosound','-unattended','-nop4',('-abslog="'+$log+'"'))}
+if($FencePreview){$arguments=@($arguments | Where-Object {$_ -ne '-nullrhi'});$arguments+=@('-CFHomeFencePreview','-RenderOffscreen','-ForceRes','-ResX=1280','-ResY=720','-norhithread','-forcerhibypass','-ExecCmds="t.MaxFPS 60"')}
 $exe=$module
 if(!$BuildRoot){$exe=Join-Path $EngineRoot 'Engine\Binaries\Win64\UnrealEditor-Cmd.exe';$arguments=@((Join-Path $projectRoot 'CreatureFrontier.uproject'),'-game')+$arguments}
 $process=Start-Process -FilePath $exe -ArgumentList $arguments -WindowStyle Hidden -PassThru
@@ -46,7 +48,19 @@ if($Work){$number=if($Mode -eq 'Write'){1}elseif($Mode -eq 'Read'){2}else{0};if(
 if($Work){foreach($marker in @('CF_HOME_ROOM_WORK PASS noRebuild=1','CF_DOOR_FARM_CLOSED PASS','CF_FURNISHED_FARM PASS','CF_DOOR_FARM PASS')){if(!$body.Contains($marker)){throw "建房后伙伴工作链缺少必要标记：$marker"}}}
 if($Work -and $Mode -ne 'Read'){foreach($marker in @('CF_HOME_FARM_INPUT PASS','CF_HOME_FARM_SEED_INPUT PASS')){if(!$body.Contains($marker)){throw "农圃预览放置或种子输入未实际通过：$marker"}}}
 if((Get-FrontierBuildFingerprint -LiteralPath $module) -ne $hash){throw '房屋输入测试期间模块发生变化'}
-[pscustomobject]@{Room=[bool]$Room;Work=[bool]$Work;Mode=$Mode;Pass=$true;BuildSHA256=$hash;Log=$log} | Export-Csv -LiteralPath (Join-Path $run 'Results.csv') -NoTypeInformation
+if($FencePreview){
+    if(!$body.Contains('CF_HOME_FENCE_PREVIEW PASS')){throw '栅栏预览未完成'}
+    $match=[regex]::Match($body,'CF_HOME_FENCE_PREVIEW_ROOT [^\r\n]*?([A-F0-9]{32})\s*\r?\n')
+    if(!$match.Success){throw '缺少栅栏独立图片目录'}
+    $savedRoot=if($BuildRoot){Join-Path $BuildRoot 'CreatureFrontier\Saved'}else{Join-Path $projectRoot 'Saved'}
+    $source=Join-Path $savedRoot ('FencePreview\'+$match.Groups[1].Value+'\Courtyard.png')
+    $png=[IO.File]::ReadAllBytes($source)
+    if($png.Length -lt 24 -or $png[0] -ne 137 -or $png[1] -ne 80){throw '栅栏图片不是有效PNG'}
+    $width=$png[16]*16777216+$png[17]*65536+$png[18]*256+$png[19];$height=$png[20]*16777216+$png[21]*65536+$png[22]*256+$png[23]
+    if($width -ne 1280 -or $height -ne 720){throw '栅栏图片尺寸不符'}
+    Copy-Item -LiteralPath $source -Destination (Join-Path $run 'Courtyard.png')
+}
+[pscustomobject]@{Room=[bool]$Room;Work=[bool]$Work;Fence=[bool]$Fence;FenceNavigation=[bool]$FenceNavigation;FencePreview=[bool]$FencePreview;Mode=$Mode;Pass=$true;BuildSHA256=$hash;Log=$log} | Export-Csv -LiteralPath (Join-Path $run 'Results.csv') -NoTypeInformation
 if($FenceNavigation){Write-Host '伙伴绕入绕出、封闭等待及拆除后恢复进入通过；不代表多伙伴或长期导航验收'}
 elseif($Fence -and $Mode -eq 'Write'){Write-Host '栅栏预览建造与保存通过；尚需独立读取'}
 elseif($Fence -and $Mode -eq 'Read'){Write-Host '栅栏身份、支撑、成本与物资恢复及伪旧版本拒绝通过'}
