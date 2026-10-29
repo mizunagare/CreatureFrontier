@@ -1,5 +1,25 @@
 # 中文开发与显示约定
 
+## 当前补漏与可重复检查（2026-10-29）
+
+README、水晶探索说明和路线图历史段落中的英文地名、装备、配方、技能名称已与实际中文资产统一；旧译名“苔跃兽／砾角兽”统一为“苔跳兽／岩角兽”。补译初始山谷脚本的英文说明及迁移错误提示，中文更新脚本纳入开放窗墙、庭院木栅栏，不重建资产或修改经济数值。
+
+新增只读 `Content/Python/audit_chinese.py`，核对20份生物／资源／家园定义、10类物品、11条配方及3个栖息地的展示字段；检查名称精确匹配、身份不重复、目录完整，说明含中文且不残留英文单词。单字母操作键保留；不扫描或覆盖玩家自定义昵称。后续新增展示内容时应同步维护核对清单。
+
+本机重复检查命令：
+
+```powershell
+& 'D:\Epic\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe' `
+  'D:\myGame\CreatureFrontier.uproject' -run=pythonscript `
+  -script='D:\myGame\Content\Python\audit_chinese.py' -nullrhi -unattended -nop4 -nosound
+```
+
+本轮实际命令行检查退出0，`Saved/ChineseAudit-20261029.log` 有 `CF_CHINESE_AUDIT PASS readonly=1 assets=20 items=10 recipes=11 regions=3`，未保存资产、地图或存档。此清单覆盖当前内容目录中的展示定义，不等于自动证明所有C++字符串、未来资产或任意输入均已验收。
+
+另在原有Windows-Fence-Navigation程序上执行 `Scripts/Test-HUDPreview.ps1 -BuildRoot E:\CreatureFrontierBuilds\Windows-Fence-Navigation -HomeMode -Resolutions @('960x540','1280x720')`。`Saved/HUDRenderQA/20261029-105912-2761c5a7/` 两个进程正常退出，八场景各有实际渲染帧／边界成功标记、PNG尺寸核对，共16张新图已逐张目视。中文伙伴、队伍、危险帮助、资源／农圃名牌、建造反馈和倒地提示可读；长反馈有既定省略，所测面板未越出窗口。固定程序SHA-256为 `FC32A3BF9C83DF9D5F6E66A9E21F0721B3512A1C673F6E8A52EA8ADADACBE07D`。
+
+本批未修改运行时C++或资产，无需把文档补译另打成游戏包；上述是既有程序的新界面抽样证据，不是本轮重新打包，也不替代菜单全尺寸、输入法、正式美术或全项目最终验收。原存档、旧包和此前未完成的开发改动保留。后续开发继续遵守根目录 `AGENTS.md` 的中文要求。
+
 ## 命名窗口与测试汇总补漏
 
 命名窗口的确认、取消按钮及操作反馈改用“回车键”“退出键”；队形矩阵测试汇总增加中文说明，并保留原始成功协议标记。根目录中文开发约定继续有效。此次未重新打包或完成窗口截图验收，不将源码补译等同于现有安装包已更新；既有存档、构建和其他未完成开发改动保持不变。

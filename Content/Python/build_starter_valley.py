@@ -1,4 +1,4 @@
-"""Idempotent, original geometric environment; updates only named CF_Valley actors."""
+"""幂等生成原创几何环境；仅更新明确命名的 CF_Valley 场景对象。"""
 import math
 import random
 import unreal
@@ -122,7 +122,7 @@ for actor in actors.get_all_level_actors():
         label = actor.get_component_by_class(unreal.TextRenderComponent)
         label.set_world_rotation(unreal.Rotator(yaw=math.degrees(math.atan2(-position.y,-450-position.x))),False,False)
 
-assert not (set(existing)-used), 'Old managed environment actors need an explicit migration, not silent deletion'
+assert not (set(existing)-used), '旧托管环境对象需要明确迁移，不能静默删除'
 world = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world()
 assert unreal.FrontierEditorLibrary.prepare_prototype_navigation(world)
 assert levels.save_current_level()
