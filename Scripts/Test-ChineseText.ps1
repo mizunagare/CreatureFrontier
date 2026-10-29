@@ -25,7 +25,7 @@ foreach($file in Get-ChildItem -LiteralPath $SourceRoot -File -Recurse | Where-O
                     }
                 }
             }elseif($file.Name -notmatch 'Scenario|Preview|HollowAdventure' -and
-                $line -match 'Feedback\s*=|DrawText\(|FText::FromString\(\s*TEXT\(' -and
+                $line -match 'Feedback\s*=|Draw(?:HUD|Wrapped)?Text\(|SetText\(|FText::FromString\(\s*TEXT\(' -and
                 $value -match '[A-Za-z]{2,}' -and $value -notmatch '^CF_'){
                 $failures+=('{0}:{1} 直接展示文字缺少中文：{2}' -f $file.FullName,$lineNumber,$value)
             }
