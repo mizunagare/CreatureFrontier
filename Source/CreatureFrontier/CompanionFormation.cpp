@@ -61,6 +61,47 @@ const ACharacter* ACreatureCharacter::FindFollowPathBlocker(const FVector& Desti
 {
     return FrontierFollowPath::Blocker(this,GetActorLocation(),Destination);
 }
+bool ACreatureCharacter::FindCombatRetreat(const FVector& Destination,const ACharacter* Obstacle,TArray<FVector>& Out) const
+{
+    auto* Nav=FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
+    if(!Nav || !IsValid(Obstacle) || GetDistanceTo(Obstacle)>150)return false;
+    const FVector Origin=GetActorLocation();const auto* Shape=GetCapsuleComponent();
+    FCollisionQueryParams Query(SCENE_QUERY_STAT(CompanionCombatRetreat),false,this);
+    Query.AddIgnoredActor(FocusTarget);
+    // 有界局部搜索：每条边都检验真实体积和同层导航面，不把导航折点当作可穿墙短段。
+    constexpr int32 Width=33,Center=16,Count=Width*Width;constexpr float Step=60;
+    TArray<int32> Parent;Parent.Init(-1,Count);TArray<int32> Queue;
+    const int32 First=Center*Width+Center;Parent[First]=First;Queue.Add(First);
+    auto Position=[Origin](int32 I){return Origin+FVector((I%Width-Center)*Step,(I/Width-Center)*Step,0);};
+    int32 Found=-1;
+    for(int32 Head=0;Head<Queue.Num() && Head<Count;++Head)
+    {
+        const int32 Current=Queue[Head];const FVector Start=Position(Current);
+        if(Current!=First && FVector::Dist2D(Start,Destination)<90){Found=Current;break;}
+        for(int32 DY=-1;DY<=1;++DY)for(int32 DX=-1;DX<=1;++DX)
+        {
+            if(!DX && !DY)continue;const int32 X=Current%Width+DX,Y=Current/Width+DY;
+            if(X<0 || X>=Width || Y<0 || Y>=Width)continue;
+            const int32 Next=Y*Width+X;if(Parent[Next]!=-1)continue;
+            const FVector End=Position(Next);bool Supported=true;
+            for(float T:{.5f,1.f})
+            {
+                const FVector Sample=FMath::Lerp(Start,End,T);FNavLocation Projected;
+                if(!Nav->ProjectPointToNavigation(Sample,Projected,FVector(20,20,120)) ||
+                    FVector::Dist2D(Sample,Projected.Location)>15 || FMath::Abs(Projected.Location.Z-(Origin.Z-Shape->GetScaledCapsuleHalfHeight()))>25)
+                {Supported=false;break;}
+            }
+            if(!Supported)continue;
+            FHitResult Hit;
+            if(GetWorld()->SweepSingleByChannel(Hit,Start,End,FQuat::Identity,ECC_Pawn,
+                FCollisionShape::MakeCapsule(Shape->GetScaledCapsuleRadius(),Shape->GetScaledCapsuleHalfHeight()),Query))continue;
+            Parent[Next]=Current;Queue.Add(Next);
+        }
+    }
+    Out.Reset();if(Found<0)return false;
+    for(int32 I=Found;I!=First;I=Parent[I])Out.Insert(Position(I),0);
+    return Out.Num()>0;
+}
 bool ACreatureCharacter::FindFollowPathDetour(const FVector& Destination,const ACharacter* Blocker,FVector& Out) const
 {
     auto* Nav=FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());

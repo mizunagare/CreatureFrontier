@@ -152,6 +152,11 @@ private:
     bool bHasFollowPathDetour=false;
     FVector FollowPathDetour=FVector::ZeroVector, FollowPathDetourGoal=FVector::ZeroVector;
     double FollowPathDetourExpires=0, NextFollowDetourSearch=0;
+    bool FindCombatRetreat(const FVector& Destination,const ACharacter* Blocker,TArray<FVector>& Out) const;
+    bool bCombatRetreatActive=false;
+    FVector CombatRetreatGoal=FVector::ZeroVector;
+    TArray<FVector> CombatRetreatRoute;
+    double CombatRetreatExpires=0,NextCombatRetreatSearch=0;
     TWeakObjectPtr<class AResourceNode> FieldResource;
     void TickGathering(float DeltaSeconds,ACFPlayerCharacter* Recipient);
     void ResetGathering();

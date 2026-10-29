@@ -160,6 +160,7 @@ float ACreatureCharacter::GetWorkEfficiency(const AWorkStation* Site) const
 
 void ACreatureCharacter::StopNavigation()
 {
+    bCombatRetreatActive=false;
     bHasFollowPathDetour=false;
     if (auto* AI = Cast<AAIController>(GetController())) AI->StopMovement();
 }
@@ -172,6 +173,31 @@ void ACreatureCharacter::NavigateTo(const FVector& Destination, float Acceptance
     auto* Nav = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
     if (!AI || !Nav) { StopNavigation(); return; }
     const double Now=GetWorld()->GetTimeSeconds();
+    const bool ExplicitCombat=Disposition==ECreatureDisposition::Tamed && Activity==ECreatureActivity::Combat && IsValid(FocusTarget);
+    if(!ExplicitCombat || Now>CombatRetreatExpires){bCombatRetreatActive=false;CombatRetreatRoute.Reset();}
+    if(bCombatRetreatActive && FVector::Dist2D(GetActorLocation(),CombatRetreatGoal)<20)
+    {
+        if(CombatRetreatRoute.Num()){CombatRetreatGoal=CombatRetreatRoute[0];CombatRetreatRoute.RemoveAt(0);}
+        else bCombatRetreatActive=false;
+    }
+    if(ExplicitCombat && !bCombatRetreatActive && Now>=NextCombatRetreatSearch && AI->GetMoveStatus()==EPathFollowingStatus::Moving)
+        if(const auto* Obstacle=FindFollowPathBlocker(AI->GetImmediateMoveDestination());Obstacle && Obstacle!=FocusTarget)
+        {
+            NextCombatRetreatSearch=Now+2;
+            if(FindCombatRetreat(Destination,Obstacle,CombatRetreatRoute))
+            {CombatRetreatGoal=CombatRetreatRoute[0];CombatRetreatRoute.RemoveAt(0);bCombatRetreatActive=true;CombatRetreatExpires=Now+12;}
+        }
+    if(bCombatRetreatActive)
+    {
+        // 短退让已经检查真实胶囊与局部导航面，直接行走以免首个导航拐点重新挤回原夹角。
+        FHitResult Hit;FCollisionQueryParams Query(SCENE_QUERY_STAT(CombatRetreatRecheck),false,this);
+        const auto* Shape=GetCapsuleComponent();
+        if(GetWorld()->SweepSingleByChannel(Hit,GetActorLocation(),CombatRetreatGoal,FQuat::Identity,ECC_Pawn,
+            FCollisionShape::MakeCapsule(Shape->GetScaledCapsuleRadius(),Shape->GetScaledCapsuleHalfHeight()),Query))
+        {bCombatRetreatActive=false;AI->StopMovement();return;}
+        AI->MoveToLocation(CombatRetreatGoal,15,false,false,false,false,nullptr,false);
+        return;
+    }
     if(Activity==ECreatureActivity::Combat && FocusTarget && Tamer && Tamer->GetPawn() &&
         FParse::Param(FCommandLine::Get(),TEXT("CFHollowDetourTrace")))
     {
