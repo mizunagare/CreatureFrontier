@@ -393,6 +393,24 @@ void RunHollowAdventure(UWorld* World,ACFPlayerCharacter* Hero,int Mode)
         {
             // 快照不保存集火与路径瞬态。此处显式重建假设，仅作受控观察，不冒充原失败重放。
             Pet->FocusTarget=Enemy;
+            if(FParse::Param(FCommandLine::Get(),TEXT("CFHollowDetourTrace")))
+            {
+                // 从实际胶囊中心检查退让短段，不用导航投影后的起点替代真实起点。
+                const FVector Origin=Pet->GetActorLocation();const auto* Shape=Pet->GetCapsuleComponent();
+                auto* Nav=FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
+                for(int32 I=0;I<32;++I)
+                {
+                    const float Angle=(I%16)*PI/8;const float Radius=I<16?120.f:240.f;
+                    const FVector End=Origin+FVector(FMath::Cos(Angle),FMath::Sin(Angle),0)*Radius;
+                    FHitResult RetreatHit;FCollisionQueryParams RetreatQuery(SCENE_QUERY_STAT(HollowRetreatProbe),false,Pet);
+                    const bool RetreatBlocked=World->SweepSingleByChannel(RetreatHit,Origin,End,FQuat::Identity,ECC_Pawn,
+                        FCollisionShape::MakeCapsule(Shape->GetScaledCapsuleRadius(),Shape->GetScaledCapsuleHalfHeight()),RetreatQuery);
+                    FNavLocation Projected;
+                    const bool OnNav=Nav && Nav->ProjectPointToNavigation(End,Projected,FVector(40,40,120));
+                    UE_LOG(LogTemp,Display,TEXT("CF_HOLLOW_RETREAT_PROBE index=%d blocked=%d actor=%s onNav=%d end=%s projected=%s"),
+                        I,RetreatBlocked,*GetNameSafe(RetreatHit.GetActor()),OnNav,*End.ToString(),OnNav?*Projected.Location.ToString():TEXT("none"));
+                }
+            }
             auto* Movement=NewObject<UHomeMovementProbe>(Hero);Movement->RegisterComponent();
             UGameplayStatics::SetGamePaused(World,false);
             const double Started=FPlatformTime::Seconds();const FVector Start=Hero->GetActorLocation();
