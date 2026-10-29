@@ -1,8 +1,21 @@
 #pragma once
 #include "CFPlayerCharacter.h"
 #include "Components/InputComponent.h"
+#include "GameFramework/InputSettings.h"
 namespace CFInputQA
 {
+// 核对实际动作映射和唯一委托后执行；这是引擎绑定验证，不是操作系统鼠标输入。
+inline bool Action(ACFPlayerCharacter* Hero,FName Name,FKey Key)
+{
+    TArray<FInputActionKeyMapping> Mappings;GetDefault<UInputSettings>()->GetActionMappingByName(Name,Mappings);
+    bool Mapped=false;for(const auto& Mapping:Mappings)
+        Mapped |= Mapping.Key==Key && !Mapping.bShift && !Mapping.bCtrl && !Mapping.bAlt && !Mapping.bCmd;
+    auto* Input=Hero->FindComponentByClass<UInputComponent>();if(!Mapped || !Input)return false;
+    const FInputActionBinding* Found=nullptr;
+    for(int32 Index=0;Index<Input->GetNumActionBindings();++Index)
+    {const auto& Binding=Input->GetActionBinding(Index);if(Binding.GetActionName()==Name && Binding.KeyEvent==IE_Pressed){if(Found)return false;Found=&Binding;}}
+    if(!Found || !Found->ActionDelegate.IsBound())return false;Found->ActionDelegate.Execute(Key);return true;
+}
 inline bool UniqueBindings(ACFPlayerCharacter* Hero)
 {
     auto* Input=Hero->FindComponentByClass<UInputComponent>();if(!Input) return false;TSet<FKey> Seen;

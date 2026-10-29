@@ -505,13 +505,18 @@ void RunHomeScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
     Hero->GetCharacterMovement()->DisableMovement(); Hero->SetActorLocation(FVector(-350,-1150,40));
     Hero->Inventory->Restore({{EFrontierItem::Material,200}});
     Hero->FirstPersonCamera->SetWorldRotation((FVector(-400,-800,-50)-Hero->FirstPersonCamera->GetComponentLocation()).Rotation());
-    Hero->Building->Toggle(); Hero->Building->SwitchCategory(); Hero->Attack();
-    Hero->Building->Cycle(); Hero->Building->RotateHome();
+    bool Bindings=CFInputQA::UniqueBindings(Hero) && CFInputQA::Press(Hero,EKeys::B) && CFInputQA::Press(Hero,EKeys::Eight) &&
+        CFInputQA::Action(Hero,TEXT("Attack"),EKeys::LeftMouseButton);
+    Bindings &= CFInputQA::Press(Hero,EKeys::V) && CFInputQA::Press(Hero,EKeys::Nine);
     const bool Rotated=Hero->HomeBuilding->GetPreview() && FMath::IsNearlyEqual(Hero->HomeBuilding->GetPreview()->GetActorRotation().Yaw,90.,.01);
-    Hero->Building->RotateHome(); Hero->Building->Cycle(); Hero->Building->Cycle(); Hero->Building->Cycle(); Hero->CaptureTarget();
+    Bindings &= CFInputQA::Press(Hero,EKeys::Nine) && CFInputQA::Press(Hero,EKeys::V) && CFInputQA::Press(Hero,EKeys::V) &&
+        CFInputQA::Press(Hero,EKeys::V) && CFInputQA::Action(Hero,TEXT("Capture"),EKeys::RightMouseButton);
     auto* FloorA=Find(World,EHomeModuleKind::Floor,FVector(-400,-800,-40));
-    bool Input=Rotated && FloorA && !Hero->Building->IsActive() && Hero->Inventory->Count(EFrontierItem::Material)==192;
+    bool Input=Bindings && Rotated && FloorA && !Hero->Building->IsActive() && Hero->Inventory->Count(EFrontierItem::Material)==192;
+    UE_LOG(LogTemp,Display,TEXT("CF_HOME_INPUT_BINDINGS %s floor=%d rotated=%d cancelled=%d material=%d"),Input?TEXT("PASS"):TEXT("FAIL"),FloorA!=nullptr,Rotated,!Hero->Building->IsActive(),Hero->Inventory->Count(EFrontierItem::Material));
     if(!Input) { UE_LOG(LogTemp,Error,TEXT("CF_HOME FAIL input %s"),*Hero->Feedback); FPlatformMisc::RequestExitWithStatus(false,1); return; }
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFHomeInputOnly")))
+    {UE_LOG(LogTemp,Display,TEXT("CF_HOME_INPUT_ONLY PASS noSave=1"));FPlatformMisc::RequestExitWithStatus(false,0);return;}
     const FGuid FloorAId=FloorA->PersistentId;
     bool Reject=!Build(Hero,EHomeModuleKind::Floor,FVector(-400,-800,-40)) &&
         !Build(Hero,EHomeModuleKind::Floor,FVector(-350,-800,-40)) &&
