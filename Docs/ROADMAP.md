@@ -1,5 +1,7 @@
 # 开发路线
 
+D417A877隔离同指纹Windows副本D3D12恢复路线1280×720八张新图已尺寸审计并逐张目视，中文提示可读、自然恢复与战斗断言通过。仍是灰盒/单尺寸有限证据，原完整回归继续运行，见 `Docs/HOLLOW_RECOVERY.md`。
+
 87B5BB1C Editor绕行中OrderAttack事务60帧通过：无效目标保留原指令、成功换目标清旧路径、切回后自然战斗完成。仅即时事务，不含持续追新目标/硬件瞄准；D417Windows原完整回归仍运行，见 `Docs/HOLLOW_RECOVERY.md`。
 
 D417A877 Windows自身30/120补充现场均自然胜利，合并此前60形成有限三帧率证据。脚本新增RequireBattle末次生命断言，实际Windows60运行及四项断言单测通过；原完整回归仍运行，稳定不升，见 `Docs/HOLLOW_RECOVERY.md`。
