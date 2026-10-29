@@ -1,5 +1,13 @@
 # 洞窟倒地与伙伴重聚（首版限定验收）
 
+## 上一Windows候选真实存档兼容：42次读取重审
+
+另建 `E:\CreatureFrontierBuilds\Windows-Combat-Local-Routes-SaveQA`，排除Saved/PDB并逐个核对47个程序资源文件，与D417A877候选一致。用上一真实构建 `Windows-Home-Replacement-Lifecycle` 的实际存档运行现有Test-LegacySaves，开启农业、昵称、回忆、旅程、窗墙和姿态范围。`Saved/CargoLegacyAudit/20261029-083755-Verified/` 已结束退出0，42次独立进程/42日志通过，覆盖20个唯一源槽（NameCross供昵称与偏好两个专项，共4次读取，其余各2次）。
+
+已按脚本中各Flag/Marker重审所有日志，无失败/致命/断言；源文件与留存输入副本哈希逐槽不变，隔离副本原为空的20个测试槽均恢复为空。初次审计汇总误将每槽都预期2次，遇NameCross停止；按脚本实际双专项定义修正汇总后重审完成，不修改游戏或重新运行来掩盖结果。该证据仅覆盖这些真实源文件，不外推所有历史版本或玩家任意存档。
+
+主完整回归与六样本恢复矩阵仍运行。矩阵30/60各两次已报告通过，120待结束；本节兼容成功不替代它们，稳定包不升级。
+
 ## Windows自身D3D12恢复预览：1280八图
 
 从D417A877候选创建独立 `E:\CreatureFrontierBuilds\Windows-Combat-Local-Routes-VisualQA`，排除Saved和PDB，47个程序/资源文件逐一哈希一致；不与原完整回归共享测试槽。现有恢复预览脚本实际D3D12运行结束退出0，目录 `Saved/HollowRecoveryQA/20261029-082957-d4c5d415/`。冒险战斗、自然倒地/复活/重聚及最终恢复断言通过，八张新PNG实际尺寸1280×720且独立布局帧检查通过。
