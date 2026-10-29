@@ -63,6 +63,7 @@ const ACharacter* ACreatureCharacter::FindFollowPathBlocker(const FVector& Desti
 }
 bool ACreatureCharacter::FindCombatRetreat(const FVector& Destination,const ACharacter* Obstacle,TArray<FVector>& Out) const
 {
+    const double SearchStarted=FPlatformTime::Seconds();
     auto* Nav=FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
     if(!Nav || !IsValid(Obstacle) || GetDistanceTo(Obstacle)>150)return false;
     const FVector Origin=GetActorLocation();const auto* Shape=GetCapsuleComponent();
@@ -98,8 +99,11 @@ bool ACreatureCharacter::FindCombatRetreat(const FVector& Destination,const ACha
             Parent[Next]=Current;Queue.Add(Next);
         }
     }
-    Out.Reset();if(Found<0)return false;
-    for(int32 I=Found;I!=First;I=Parent[I])Out.Insert(Position(I),0);
+    Out.Reset();
+    if(Found>=0)for(int32 I=Found;I!=First;I=Parent[I])Out.Insert(Position(I),0);
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFHollowDetourTrace")))
+        UE_LOG(LogTemp,Display,TEXT("CF_COMBAT_ROUTE_SEARCH elapsedMs=%.3f discovered=%d limit=%d points=%d found=%d"),
+            (FPlatformTime::Seconds()-SearchStarted)*1000,Queue.Num(),Count,Out.Num(),Found>=0);
     return Out.Num()>0;
 }
 bool ACreatureCharacter::FindFollowPathDetour(const FVector& Destination,const ACharacter* Blocker,FVector& Out) const
