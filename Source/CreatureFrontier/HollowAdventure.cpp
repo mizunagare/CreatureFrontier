@@ -415,12 +415,21 @@ void RunHollowAdventure(UWorld* World,ACFPlayerCharacter* Hero,int Mode)
             UGameplayStatics::SetGamePaused(World,false);
             const double Started=FPlatformTime::Seconds();const FVector Start=Hero->GetActorLocation();
             const bool WaitForPartner=FParse::Param(FCommandLine::Get(),TEXT("CFHollowInspectWait"));
+            const bool CancelRetreat=FParse::Param(FCommandLine::Get(),TEXT("CFHollowCancelRetreat"));
+            auto Cancelled=MakeShared<bool>(false);
             UE_LOG(LogTemp,Display,TEXT("CF_HOLLOW_DYNAMIC_BEGIN reconstructedFocus=1 deterministicReplay=0 waitForPartner=%d"),WaitForPartner);
-            FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([World,Hero,Pet,Enemy,Movement,Goal,Started,Start,WaitForPartner](float)
+            FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([World,Hero,Pet,Enemy,Movement,Goal,Started,Start,WaitForPartner,CancelRetreat,Cancelled](float)
             {
                 if(!IsValid(Hero) || !IsValid(Pet) || !IsValid(Enemy))
                 {UE_LOG(LogTemp,Error,TEXT("CF_HOLLOW_DYNAMIC FAIL actors"));FPlatformMisc::RequestExitWithStatus(false,1);return false;}
                 const FVector Now=Hero->GetActorLocation();
+                if(CancelRetreat && !*Cancelled && Pet->HasCombatRoute())
+                {
+                    const bool Pass=CFInputQA::Press(Hero,EKeys::F8) && Pet->bAvoidCombat && !Pet->FocusTarget && !Pet->HasCombatRoute();
+                    UE_LOG(LogTemp,Display,TEXT("CF_RETREAT_CANCEL %s activeBefore=1 clearedImmediately=%d"),Pass?TEXT("PASS"):TEXT("FAIL"),Pass);
+                    if(!Pass){FPlatformMisc::RequestExitWithStatus(false,1);return false;}
+                    *Cancelled=true;
+                }
                 Movement->Direction=WaitForPartner || FVector::Dist2D(Now,Goal)<70?FVector::ZeroVector:(Goal-Now).GetSafeNormal2D();
                 if(WaitForPartner)
                 {
@@ -445,6 +454,12 @@ void RunHollowAdventure(UWorld* World,ACFPlayerCharacter* Hero,int Mode)
                     FPlatformTime::Seconds()-Started,*Now.ToString(),*Hero->GetVelocity().ToString(),*Pet->GetActorLocation().ToString(),*Pet->GetVelocity().ToString(),
                     static_cast<int32>(Pet->Activity),*GetNameSafe(Pet->FocusTarget),*GetNameSafe(Block.GetActor()),Block.GetActor()==Pet,Hero->Health,Pet->Health,Enemy->Health,FVector::Dist2D(Now,Goal));
                 if(FPlatformTime::Seconds()-Started<15)return true;
+                if(CancelRetreat)
+                {
+                    const bool Pass=*Cancelled && !Pet->HasCombatRoute() && !Pet->FocusTarget && Pet->bAvoidCombat && Enemy->Health==Enemy->GetMaxHealth();
+                    UE_LOG(LogTemp,Display,TEXT("CF_RETREAT_CANCEL_FINAL %s enemyUnhurt=%d"),Pass?TEXT("PASS"):TEXT("FAIL"),Enemy->Health==Enemy->GetMaxHealth());
+                    if(!Pass){FPlatformMisc::RequestExitWithStatus(false,1);return false;}
+                }
                 Movement->Direction=FVector::ZeroVector;
                 UE_LOG(LogTemp,Display,TEXT("CF_HOLLOW_DYNAMIC OBSERVED displacement=%.1f distance=%.1f reconstructedFocus=1 deterministicReplay=0"),FVector::Dist2D(Start,Now),FVector::Dist2D(Now,Goal));
                 FPlatformMisc::RequestExitWithStatus(false,0);return false;

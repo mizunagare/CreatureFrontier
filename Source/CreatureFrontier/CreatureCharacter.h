@@ -93,6 +93,7 @@ public:
     bool OrderAttack(ACreatureCharacter* Target);
     bool RequestSpecial(ACreatureCharacter* Target);
     void ClearCombatOrders();
+    bool HasCombatRoute() const { return bCombatRetreatActive || !CombatRetreatRoute.IsEmpty(); }
     void HandlePlayerDowned(const ACFPlayerCharacter* Player);
     bool IsSpecialReady() const;
     FString GetSpecialName() const;
