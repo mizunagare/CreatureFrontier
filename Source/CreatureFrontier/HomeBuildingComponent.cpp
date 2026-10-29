@@ -210,5 +210,5 @@ FString UHomeBuildingComponent::GetHint() const
     const auto* Definition=UHomeModuleDefinition::LoadDefault(Selected);
     TMap<EFrontierItem,int32> Costs;
     if(Definition) { Costs=Definition->ExtraCosts; Costs.Add(EFrontierItem::Material,Definition->MaterialCost); }
-    return FString::Printf(TEXT("房屋 %s | %s | V/9/8 | Insert替换\n%s"),Definition?*Definition->DisplayName.ToString():TEXT("不可用"),*UCraftingCatalog::FormatItems(Costs),*Status);
+    return FString::Printf(TEXT("房屋 %s | %s\nV选择 | 9旋转 | 8设施 | Insert替换\n左键放置 | 右键/B取消 | X拆除\n%s"),Definition?*Definition->DisplayName.ToString():TEXT("不可用"),*UCraftingCatalog::FormatItems(Costs),*Status);
 }

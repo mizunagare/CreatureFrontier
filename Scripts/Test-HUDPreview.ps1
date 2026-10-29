@@ -1,6 +1,6 @@
 param([string]$BuildRoot='',
       [string[]]$Resolutions=@('960x540','1280x720','1920x1080'),[switch]$Rescue,
-      [switch]$Editor,[switch]$AvoidCombat,[string]$EngineRoot='D:\Epic\UE_5.8')
+      [switch]$Editor,[switch]$AvoidCombat,[switch]$HomeMode,[string]$EngineRoot='D:\Epic\UE_5.8')
 $ErrorActionPreference='Stop'
 if(($Editor -and $BuildRoot) -or (!$Editor -and !$BuildRoot)){throw '请只指定Editor或BuildRoot之一'}
 if(!$Resolutions.Count -or @($Resolutions | Select-Object -Unique).Count -ne $Resolutions.Count){throw '分辨率列表不能为空或重复'}
@@ -28,12 +28,14 @@ foreach($resolution in $Resolutions){
     $log=Join-Path $evidence ($resolution+'.log')
     $previewArguments=@('-CFHUDPreview','-RenderOffscreen','-ForceRes',('-ResX='+$width),('-ResY='+$height),'-nosound','-unattended','-nop4','-norhithread','-forcerhibypass','-ExecCmds="t.MaxFPS 60,r.MotionBlurQuality 0,r.DefaultFeature.MotionBlur 0,r.AntiAliasingMethod 1"',('-abslog="'+$log+'"'))
     if($Rescue){$previewArguments+='-CFHUDRescuePreview'}
+    if($HomeMode){$previewArguments+='-CFHUDHomePreview'}
     if($AvoidCombat){$previewArguments+='-CFHUDStancePreview'}
     if($Editor){$previewArguments=@((Join-Path $projectRoot 'CreatureFrontier.uproject'),'-game')+$previewArguments}
     $process=Start-Process -FilePath $exe -WorkingDirectory $working -ArgumentList $previewArguments -WindowStyle Hidden -PassThru
     if(!$process.WaitForExit(60000)){$process.Kill();$process.WaitForExit();throw "界面预览超时：$log"}
     $contents=Get-Content -LiteralPath $log -Raw
     if($process.ExitCode -ne 0 -or $contents -notmatch ('CF_HUD_PREVIEW PASS scenes='+$scenes.Count+'\b') -or $contents -match 'CF_HUD.*FAIL|Fatal error|Assertion failed'){throw "界面行为检查失败：$log"}
+    if($HomeMode -and $contents -notmatch 'CF_HUD_HOME_HINT PASS'){throw '未实际验证房屋模式的完整操作提示，请使用包含该功能的构建'}
     if($AvoidCombat -and $contents -notmatch 'CF_HUD_STANCE PASS avoid=1'){throw '缺少F8实际避战状态标记'}
     foreach($scene in $scenes){if($contents -notmatch ('CF_HUD_FRAME PASS scene='+$scene+' viewport='+$resolution+' ')){throw "缺少实际 $resolution 渲染帧：$scene"}}
     $rootMatch=[regex]::Match($contents,'CF_HUD_PREVIEW_ROOT [^\r\n]*[/\\]([A-F0-9]{32})')

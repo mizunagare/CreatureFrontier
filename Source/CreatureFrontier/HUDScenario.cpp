@@ -59,7 +59,16 @@ struct FPreview
         if(Step==2 || Step==3){AimHUD(Hero,Boss,FVector(-250,0,0));Boss->AlphaWindup=1.2f;if(Step==2)Hero->ToggleRoster();else Hero->ToggleHelp();}
         if(Step==4)AimHUD(Hero,Resource,FVector(-230,0,40));
         if(Step==5)AimHUD(Hero,Garden,FVector(0,-230,55));
-        if(Step==6){Hero->SetActorLocation(FVector(-450,-1000,40));Hero->ToggleBuilding();}
+        if(Step==6){Hero->SetActorLocation(FVector(-450,-1000,40));Hero->ToggleBuilding();
+            if(FParse::Param(FCommandLine::Get(),TEXT("CFHUDHomePreview")))
+            {
+                Hero->Building->SwitchCategory();const FString Hint=Hero->Building->GetHint();
+                const bool Complete=Hint.Contains(TEXT("房屋")) && Hint.Contains(TEXT("V选择")) && Hint.Contains(TEXT("9旋转")) &&
+                    Hint.Contains(TEXT("8设施")) && Hint.Contains(TEXT("Insert替换")) && Hint.Contains(TEXT("左键放置")) &&
+                    Hint.Contains(TEXT("右键/B取消")) && Hint.Contains(TEXT("X拆除"));
+                UE_LOG(LogTemp,Display,TEXT("CF_HUD_HOME_HINT %s"),Complete?TEXT("PASS"):TEXT("FAIL"));
+                if(!Complete)FPlatformMisc::RequestExitWithStatus(false,1);
+            }}
         if(Step==7){AimHUD(Hero,Pet,FVector(0,-200,0));Hero->Health=0;}
         // 两个新增画面只验证救助信息，不冒充自然战斗或实际用药验收。
         if(Step>=8){AimHUD(Hero,Pet,FVector(0,-200,0));Pet->Health=0;Hero->Inventory->Restore({{EFrontierItem::Material,100},{EFrontierItem::Food,3},{EFrontierItem::Medicine,Step==9?1:0}});Bag=Hero->Inventory->GetStacks();}
