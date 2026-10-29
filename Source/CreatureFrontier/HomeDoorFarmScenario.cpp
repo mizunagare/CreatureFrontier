@@ -67,6 +67,23 @@ bool FurnishedSnapshot(UWorld* World,ACFPlayerCharacter* Hero,const FString& Slo
     }
     return true;
 }
+bool CourtyardTaskSnapshot(ACFPlayerCharacter* Hero,const FString& Slot,ACreatureCharacter* Pet,AWorkStation* Farm)
+{
+    const auto* Save=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot,0));
+    if(!Save || !Pet || !Farm || Save->Facilities.Num()!=1 || Hero->Inventory->Count(EFrontierItem::Material)!=75)return false;
+    const auto* Creature=Save->Creatures.FindByPredicate([Pet](const FCreatureSaveRecord& Record){return Record.bOwned && Record.Id==Pet->PersistentId;});
+    const auto* Facility=Save->Facilities.FindByPredicate([Farm](const FFacilitySaveRecord& Record){return Record.Id==Farm->PersistentId;});
+    int32 Owned=0;for(const auto& Record:Save->Creatures)Owned+=Record.bOwned;
+    return Owned==1 && Creature && Facility && Creature->Id.IsValid() && Facility->Id.IsValid() &&
+        Creature->Definition.Get()==Pet->Definition && Creature->Nickname==Pet->Nickname && Creature->Transform.Equals(Pet->GetActorTransform(),.01) &&
+        Creature->Activity==ECreatureActivity::Work && Pet->Activity==Creature->Activity && Creature->WorkSiteId==Facility->Id &&
+        Pet->Tamer==Hero->GetController() && Pet->WorkSite==Farm && Creature->Level==Pet->Level && Creature->Experience==Pet->Experience &&
+        FMath::IsNearlyEqual(Creature->Health,Pet->Health,.01f) && FMath::IsNearlyEqual(Creature->Stamina,Pet->Stamina,.01f) &&
+        FMath::IsNearlyEqual(Creature->Nutrition,Pet->Nutrition,.01f) && Facility->Transform.Equals(Farm->GetActorTransform(),.01) &&
+        Facility->Specialty==EWorkSpecialty::Farming && Farm->RequiredSpecialty==Facility->Specialty &&
+        Facility->StoredFood==0 && Farm->StoredFood==0 && Facility->Seeds==1 && Farm->Crop->Seeds==1 &&
+        !Facility->bPlanted && !Farm->Crop->bPlanted && Facility->GrowthWork==0 && Farm->Crop->GrowthWork==0;
+}
 }
 
 void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode,bool UseExistingRoom)
@@ -75,9 +92,9 @@ void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode,b
     const bool Furnished=FParse::Param(FCommandLine::Get(),TEXT("CFFurnishedFarm"));
     const bool InputBuilt=UseExistingRoom || FParse::Param(FCommandLine::Get(),TEXT("CFHomeRoomWorkRead"));
     const bool Courtyard=FParse::Param(FCommandLine::Get(),TEXT("CFHomeCourtyardWork"));
-    if(Courtyard && (!UseExistingRoom || Mode!=0)){UE_LOG(LogTemp,Error,TEXT("CF_HOME_COURTYARD_WORK FAIL mode"));FPlatformMisc::RequestExitWithStatus(false,1);return;}
+    if(Courtyard && (!InputBuilt || !Furnished || Mode>2)){UE_LOG(LogTemp,Error,TEXT("CF_HOME_COURTYARD_WORK FAIL mode"));FPlatformMisc::RequestExitWithStatus(false,1);return;}
     if(InputBuilt && (!Furnished || Mode>2)){UE_LOG(LogTemp,Error,TEXT("CF_HOME_ROOM_WORK FAIL reuse-mode"));FPlatformMisc::RequestExitWithStatus(false,1);return;}
-    const FString Slot=InputBuilt?TEXT("HomeInputWorkBlocked"):Furnished?TEXT("FurnishedFarmBlocked"):TEXT("DoorFarmBlocked");
+    const FString Slot=Courtyard?TEXT("CourtyardHomeWorkBlocked"):InputBuilt?TEXT("HomeInputWorkBlocked"):Furnished?TEXT("FurnishedFarmBlocked"):TEXT("DoorFarmBlocked");
     if(Furnished && Mode>2){UE_LOG(LogTemp,Error,TEXT("CF_FURNISHED_FARM FAIL unsupported-mode"));FPlatformMisc::RequestExitWithStatus(false,1);return;}
     if(AvoidTest && Mode!=0){UE_LOG(LogTemp,Error,TEXT("CF_STANCE_FARM FAIL mode"));FPlatformMisc::RequestExitWithStatus(false,1);return;}
     // 固定房间只验证单伙伴工作，不替代自由放置、长期运输或自然冒险。
@@ -101,6 +118,12 @@ void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode,b
         for(TActorIterator<AWorkStation> It(World);It;++It)if(It->bPlayerBuilt && It->RequiredSpecialty==EWorkSpecialty::Farming)Farm=*It;
         if(!Door || Door->DoorState!=1 || !Farm || !RestoredPet || RestoredPet->WorkSite!=Farm || RestoredPet->Activity!=ECreatureActivity::Work ||
             Farm->Crop->Seeds!=1 || Farm->StoredFood!=0 || Farm->Crop->bPlanted || Farm->Crop->GrowthWork!=0){Finish(false);return;}
+        if(Courtyard)
+        {
+            const bool Task=CFDoorFarmVolumeQA::CourtyardTaskSnapshot(Hero,Slot,RestoredPet,Farm);
+            UE_LOG(LogTemp,Display,TEXT("CF_HOME_COURTYARD_RESTORE %s identity=1 inventory=1 task=1"),Task?TEXT("PASS"):TEXT("FAIL"));
+            if(!Task){Finish(false);return;}
+        }
         Hero->GetCharacterMovement()->DisableMovement();
     }
     else if(UseExistingRoom)
@@ -198,8 +221,16 @@ void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode,b
             if(InputBuilt)UE_LOG(LogTemp,Display,TEXT("CF_HOME_ROOM_WORK %s noRebuild=1"),Pass?TEXT("PASS"):TEXT("FAIL"));
             if(Courtyard)
             {
-                Pass &= Phase==2 && VisitedCourt && CrossedDoor && CourtClear && Pet && CFDoorFarmVolumeQA::InsideCourtyardHome(Pet->GetActorLocation());
-                UE_LOG(LogTemp,Display,TEXT("CF_HOME_COURTYARD_WORK %s courtyard=%d doorway=%d noCross=%d"),Pass?TEXT("PASS"):TEXT("FAIL"),VisitedCourt,CrossedDoor,CourtClear);
+                if(Mode==1)
+                {
+                    Pass &= Phase==1 && CourtClear && Pet && Pet->WorkSite==Farm && Pet->Activity==ECreatureActivity::Work;
+                    UE_LOG(LogTemp,Display,TEXT("CF_HOME_COURTYARD_WRITE %s modules=14 material=%d closed=%d"),Pass?TEXT("PASS"):TEXT("FAIL"),Hero->Inventory->Count(EFrontierItem::Material),Door->DoorState==1);
+                }
+                else
+                {
+                    Pass &= Phase==2 && VisitedCourt && CrossedDoor && CourtClear && Pet && CFDoorFarmVolumeQA::InsideCourtyardHome(Pet->GetActorLocation());
+                    UE_LOG(LogTemp,Display,TEXT("CF_HOME_COURTYARD_WORK %s courtyard=%d doorway=%d noCross=%d"),Pass?TEXT("PASS"):TEXT("FAIL"),VisitedCourt,CrossedDoor,CourtClear);
+                }
             }
             if(AvoidTest)
             {
@@ -323,6 +354,7 @@ void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode,b
                 Hero->SetActorLocation(FVector(-530,-900,60));
                 bool Saved=Hero->SaveProgress(Slot);
                 if(Furnished)Saved &= CFDoorFarmVolumeQA::FurnishedSnapshot(World,Hero,Slot);
+                if(Courtyard)Saved &= CFDoorFarmVolumeQA::CourtyardTaskSnapshot(Hero,Slot,Pet,Farm);
                 End(Saved);return;
             }
             if(Mode==4)
