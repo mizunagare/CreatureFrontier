@@ -19,11 +19,14 @@ struct FHomeModuleRecord
 
 namespace HomeLayout
 {
+    inline constexpr double StoreyHeight=320.0;
+    bool IsFloorHeight(double Z);
     bool IsCanonical(const FHomeModuleRecord& Record);
     bool Validate(const TArray<FHomeModuleRecord>& Records,FString& Reason);
     bool ValidateTerrain(UWorld* World,const FHomeModuleRecord& Record,FString& Reason);
     bool SupportsFacility(const FTransform& Facility,const TArray<FHomeModuleRecord>& Records);
     bool ClearsDoorReservations(const FBox& Bounds,const TArray<FHomeModuleRecord>& Records);
+    bool ClearsStairReservations(const FBox& Bounds,const TArray<FHomeModuleRecord>& Records);
     TArray<FHomeModuleRecord> Collect(UWorld* World);
-    FGuid FindFloor(const FVector& Point,const TArray<FHomeModuleRecord>& Records);
+    FGuid FindFloor(const FVector& Point,const TArray<FHomeModuleRecord>& Records,double FloorZ=-40.0);
 }

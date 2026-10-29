@@ -191,7 +191,7 @@ struct FHomeFundingTest
             Built &= CFHomeInputQA::Place(World,Hero,EHomeModuleKind::Floor,FVector(-350,-1150,40),FVector(-400,-800,-50),FVector(-400,-800,-40));
             Built &= CFHomeInputQA::Place(World,Hero,EHomeModuleKind::Floor,FVector(-450,-900,60),FVector(-800,-800,-50),FVector(-800,-800,-40));
             Built &= CFHomeInputQA::Place(World,Hero,EHomeModuleKind::Storage,FVector(-800,-850,60),FVector(-900,-900,-30),FVector(-900,-900,-30));
-            for(int32 Count=0;Hero->HomeBuilding->Selected!=EHomeModuleKind::Floor && Count<9;++Count)Built &= CFInputQA::Press(Hero,EKeys::V);
+            for(int32 Count=0;Hero->HomeBuilding->Selected!=EHomeModuleKind::Floor && Count<static_cast<int32>(EHomeModuleKind::Count);++Count)Built &= CFInputQA::Press(Hero,EKeys::V);
             Built &= CFInputQA::Action(Hero,TEXT("Capture"),EKeys::RightMouseButton);
             int32 Capital=0;for(TActorIterator<AHomeModule> It(World);It;++It)if(!It->bPreview)
             {It->Tags.AddUnique(TEXT("HomeFundingCapital"));++Capital;if(It->GetKind()==EHomeModuleKind::Storage)Crate=*It;}

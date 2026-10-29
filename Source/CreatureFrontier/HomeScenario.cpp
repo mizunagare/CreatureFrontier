@@ -547,10 +547,12 @@ bool PlaceThroughPreview(UWorld* World,ACFPlayerCharacter* Hero,EHomeModuleKind 
     Hero->SetActorLocation(Observer);
     Hero->FirstPersonCamera->SetWorldRotation((Aim-Hero->FirstPersonCamera->GetComponentLocation()).Rotation());
     bool Input=true;
-    for(int32 Step=0;Hero->HomeBuilding->Selected!=Kind && Step<8;++Step)Input &= CFInputQA::Press(Hero,EKeys::V);
+    for(int32 Step=0;Hero->HomeBuilding->Selected!=Kind && Step<static_cast<int32>(EHomeModuleKind::Count);++Step)Input &= CFInputQA::Press(Hero,EKeys::V);
     Hero->HomeBuilding->UpdatePreview();
     auto* Preview=Hero->HomeBuilding->GetPreview();
-    if(Preview && !FMath::IsNearlyEqual(Preview->GetActorRotation().Yaw,Yaw,.01))Input &= CFInputQA::Press(Hero,EKeys::Nine);
+    Yaw=FMath::UnwindDegrees(Yaw);
+    for(int32 Turn=0;Preview && !FMath::IsNearlyEqual(Preview->GetActorRotation().Yaw,Yaw,.01) && Turn<4;++Turn)
+    {Input &= CFInputQA::Press(Hero,EKeys::Nine);Preview=Hero->HomeBuilding->GetPreview();}
     Hero->HomeBuilding->UpdatePreview();Preview=Hero->HomeBuilding->GetPreview();
     const bool Matched=Preview && Preview->GetActorLocation().Equals(Expected,.01) && FMath::IsNearlyEqual(Preview->GetActorRotation().Yaw,Yaw,.01);
     const int32 Before=Hero->Inventory->Count(EFrontierItem::Material);

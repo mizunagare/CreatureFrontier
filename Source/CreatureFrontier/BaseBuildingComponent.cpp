@@ -27,7 +27,7 @@ bool UBaseBuildingComponent::IsBuildTransformValid(const FTransform& Transform)
     const FVector Position = Transform.GetLocation();
     const FRotator Rotation = Transform.Rotator();
     return !Transform.ContainsNaN() && Transform.GetScale3D().Equals(FVector(2,1,.7),.001) &&
-        FVector::Dist2D(Position, BaseOrigin()) <= 1200 && (FMath::Abs(Position.Z - (BaseOrigin().Z + 35)) <= 2 || FMath::IsNearlyEqual(Position.Z,5.,.01)) &&
+        FVector::Dist2D(Position, BaseOrigin()) <= 1200 && (FMath::Abs(Position.Z - (BaseOrigin().Z + 35)) <= 2 || HomeLayout::IsFloorHeight(Position.Z-45)) &&
         FMath::IsNearlyZero(Rotation.Pitch,.01) && FMath::IsNearlyZero(Rotation.Roll,.01) &&
         FMath::IsNearlyEqual(Rotation.Yaw, FMath::GridSnap(Rotation.Yaw,90.0),.01) &&
         FMath::IsNearlyEqual(Position.X,FMath::GridSnap(Position.X,100.0),.01) &&
@@ -105,6 +105,9 @@ bool UBaseBuildingComponent::ValidatePlacement(const FTransform& Transform, FStr
     if (Cost == 0 || Hero->Inventory->Count(EFrontierItem::Material) < Cost) { Reason = TEXT("材料不足"); return false; }
     if(!HomeLayout::ClearsDoorReservations(FBox(FVector(-112,-62,-33),FVector(112,62,35)).TransformBy(Transform.ToMatrixWithScale()),HomeLayout::Collect(GetWorld())))
     {Reason=TEXT("设施不能占用门扇活动空间");return false;}
+    // 与读档使用同一实际设施包围盒，不能把已换算的世界尺寸再次乘以缩放。
+    if(!HomeLayout::ClearsStairReservations(FBox(FVector(-50),FVector(50)).TransformBy(Transform.ToMatrixWithScale()),HomeLayout::Collect(GetWorld())))
+    {Reason=TEXT("设施不能占用楼梯踏步或通行净空");return false;}
     FCollisionQueryParams Params(SCENE_QUERY_STAT(BuildPlacement), false);
     if (IsValid(Preview)) Params.AddIgnoredActor(Preview);
     // 检查包括角色在内的完整实体体积，让支撑地面位于检测盒下方。
@@ -118,7 +121,7 @@ bool UBaseBuildingComponent::ValidatePlacement(const FTransform& Transform, FStr
         FHitResult Ground;
         if (!GetWorld()->LineTraceSingleByChannel(Ground,Corner+FVector(0,0,10),Corner-FVector(0,0,45),ECC_Visibility,Params) ||
             Ground.ImpactNormal.Z < .98 || !((FMath::Abs(Ground.ImpactPoint.Z - BaseOrigin().Z) <= 2 && FMath::Abs(Transform.GetLocation().Z+15)<=2) ||
-                (FMath::IsNearlyEqual(Transform.GetLocation().Z,5.,.01) && FMath::IsNearlyEqual(Ground.ImpactPoint.Z,-30.,.01) &&
+                (HomeLayout::IsFloorHeight(Transform.GetLocation().Z-45) && FMath::IsNearlyEqual(Ground.ImpactPoint.Z,Transform.GetLocation().Z-35,.01) &&
                  Cast<AHomeModule>(Ground.GetActor()) && CastChecked<AHomeModule>(Ground.GetActor())->GetKind()==EHomeModuleKind::Floor)))
         { Reason = TEXT("每个角下方都需要平坦支撑"); return false; }
     }

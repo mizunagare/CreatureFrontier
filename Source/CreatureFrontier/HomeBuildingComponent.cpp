@@ -10,6 +10,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "ResearchComponent.h"
 #include "CraftingCatalog.h"
+#include "Components/CapsuleComponent.h"
 
 namespace
 {
@@ -32,7 +33,7 @@ void UHomeBuildingComponent::Cycle()
 {
     Selected=static_cast<EHomeModuleKind>((static_cast<int32>(Selected)+1)%static_cast<int32>(EHomeModuleKind::Count)); StartPreview();
 }
-void UHomeBuildingComponent::Rotate() { PendingReplacement.Reset(); YawStep=1-YawStep; UpdatePreview(); }
+void UHomeBuildingComponent::Rotate() { PendingReplacement.Reset(); YawStep=(YawStep+1)%4; UpdatePreview(); }
 bool UHomeBuildingComponent::ValidatePlacement(const FTransform& Transform,FGuid FloorId,FString& Reason) const
 {
     const auto* Hero=Cast<ACFPlayerCharacter>(GetOwner()); auto* Definition=UHomeModuleDefinition::LoadDefault(Selected);
@@ -75,6 +76,15 @@ bool UHomeBuildingComponent::Dismantle(AHomeModule* Module)
 {
     auto* Hero=Cast<ACFPlayerCharacter>(GetOwner());
     if(!Hero || !Hero->HasAuthority() || Hero->Health<=0 || UGameplayStatics::IsGamePaused(this) || !IsValid(Module) || Module->IsActorBeingDestroyed() || Module->bPreview || !Module->Definition || Hero->GetDistanceTo(Module)>600) return false;
+    if(Module->GetKind()==EHomeModuleKind::Stairs)
+        for(TActorIterator<ACharacter> It(GetWorld());It;++It)
+        {
+            const auto* Shape=It->GetCapsuleComponent();if(!Shape || !It->GetActorEnableCollision())continue;
+            const auto Point=Module->GetActorTransform().InverseTransformPosition(It->GetActorLocation());
+            const double Radius=Shape->GetScaledCapsuleRadius(),Feet=Point.Z-Shape->GetScaledCapsuleHalfHeight();
+            if(FMath::Abs(Point.X)<200+Radius && FMath::Abs(Point.Y)<100+Radius && Feet>=-3 && Feet<323)
+            {Hero->Feedback=TEXT("楼梯上有生物，请全部离开踏步和出入口后再拆除");return false;}
+        }
     if(Module->GetKind()==EHomeModuleKind::Storage)
         for(const auto& Stack:Module->StorageInventory->GetStacks()) if(Stack.Value>0) { Hero->Feedback=TEXT("拆除前请清空储物箱"); return false; }
     for(const auto& Cost:Module->PaidExtraItems) if(Cost.Key==EFrontierItem::Material || Cost.Key>=EFrontierItem::Count || Cost.Value<=0 || Cost.Value>999) return false;
@@ -158,27 +168,37 @@ void UHomeBuildingComponent::UpdatePreview()
     }
     FVector Center(FMath::GridSnap(Hit.ImpactPoint.X,400.),FMath::GridSnap(Hit.ImpactPoint.Y,400.),-40);
     const auto Layout=HomeLayout::Collect(GetWorld()); SupportingFloor=FGuid();
+    auto* Aimed=Cast<AHomeModule>(Hit.GetActor());
+    // 木地板瞄准承重墙上半部，向上一层吸附；不把已存在的屋顶静默替换掉。
+    if(Selected==EHomeModuleKind::Floor && Aimed && !Aimed->bPreview &&
+        (Aimed->GetKind()==EHomeModuleKind::Wall || Aimed->GetKind()==EHomeModuleKind::Door || Aimed->GetKind()==EHomeModuleKind::Doorway || Aimed->GetKind()==EHomeModuleKind::Window || Aimed->GetKind()==EHomeModuleKind::Roof))
+    {
+        for(const auto& Record:Layout)if(Record.Id==Aimed->FloorId && Hit.ImpactPoint.Z>Record.Transform.GetLocation().Z+160)
+        {SupportingFloor=Record.Id;Center=Record.Transform.GetLocation()+FVector(0,0,HomeLayout::StoreyHeight);break;}
+    }
     if(Selected!=EHomeModuleKind::Floor)
     {
-        if(auto* Aimed=Cast<AHomeModule>(Hit.GetActor());Aimed && !Aimed->bPreview)
+        if(Aimed && !Aimed->bPreview)
         {
             SupportingFloor=Aimed->GetKind()==EHomeModuleKind::Floor?Aimed->PersistentId:Aimed->FloorId;
             for(const auto& Record:Layout) if(Record.Id==SupportingFloor) Center=Record.Transform.GetLocation();
         }
-        else SupportingFloor=HomeLayout::FindFloor(Hit.ImpactPoint,Layout);
+        else SupportingFloor=HomeLayout::FindFloor(Hit.ImpactPoint,Layout,-40+FMath::GridSnap(Hit.ImpactPoint.Z+30,HomeLayout::StoreyHeight));
+        for(const auto& Record:Layout)if(Record.Id==SupportingFloor)Center=Record.Transform.GetLocation();
         if(!SupportingFloor.IsValid()) { Status=TEXT("请瞄准可支撑的地板、墙或门框"); bValid=false; Preview->SetActorHiddenInGame(true); return; }
     }
     const bool Wall=Selected==EHomeModuleKind::Wall || Selected==EHomeModuleKind::Doorway || Selected==EHomeModuleKind::Door || Selected==EHomeModuleKind::Window || Selected==EHomeModuleKind::Fence;
     FVector Position=Center;
     if(Wall)
     {
-        if(YawStep==0) Position.Y+=Hit.ImpactPoint.Y>=Center.Y?200:-200;
+        if(YawStep%2==0) Position.Y+=Hit.ImpactPoint.Y>=Center.Y?200:-200;
         else Position.X+=Hit.ImpactPoint.X>=Center.X?200:-200;
-        Position.Z=-30;
+        Position.Z=Center.Z+10;
     }
-    else Position.Z=Selected==EHomeModuleKind::Floor?-40:280;
-    if(Selected==EHomeModuleKind::Lantern || Selected==EHomeModuleKind::Storage) Position=FVector(FMath::GridSnap(Hit.ImpactPoint.X,100.),FMath::GridSnap(Hit.ImpactPoint.Y,100.),-30);
-    Placement=FTransform(FRotator(0,Wall?YawStep*90:0,0),Position);
+    else if(Selected==EHomeModuleKind::Roof)Position.Z=Center.Z+HomeLayout::StoreyHeight;
+    else if(Selected==EHomeModuleKind::Stairs)Position.Z=Center.Z+10;
+    if(Selected==EHomeModuleKind::Lantern || Selected==EHomeModuleKind::Storage) Position=FVector(FMath::GridSnap(Hit.ImpactPoint.X,100.),FMath::GridSnap(Hit.ImpactPoint.Y,100.),Center.Z+10);
+    Placement=FTransform(FRotator(0,Selected==EHomeModuleKind::Stairs?YawStep*90:Wall?(YawStep%2)*90:0,0),Position);
     bValid=ValidatePlacement(Placement,SupportingFloor,Status);
     Preview->SetActorTransform(Placement); Preview->SetActorHiddenInGame(PendingReplacement.IsValid()); Preview->SetPreviewTint(bValid);
     if(PendingReplacement.IsValid())Status=TEXT("原位替换待确认；再按Insert确认，移开视线取消");

@@ -8,6 +8,12 @@ TArray<FHomePart> AHomeModule::PlacementParts(EHomeModuleKind Kind)
     auto Result=Parts(Kind);
     // 预留整个转动范围的保守包围盒，不允许后来把设施建进活动空间。
     if(Kind==EHomeModuleKind::Door)Result.Add({FVector(0,110,125),FVector(119,119,125)});
+    // 每级踏步上方留两米净空，放置时同时检查头顶；实体渲染仍只使用踏步本身。
+    if(Kind==EHomeModuleKind::Stairs)
+    {
+        Result.Add({FVector(-175,0,100),FVector(25,100,100)});
+        for(const auto& Step:Parts(Kind))Result.Add({Step.Center+FVector(0,0,Step.Extent.Z+100),FVector(Step.Extent.X,100,100)});
+    }
     return Result;
 }
 FBox AHomeModule::DoorReservation(const FTransform& Transform)

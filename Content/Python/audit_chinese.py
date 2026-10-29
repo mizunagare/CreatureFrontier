@@ -18,7 +18,7 @@ groups = {
                   ('Scrap', '废弃机械'), ('HollowScrap', '洞窟旧机件')],
     'Home': [('Floor', '木地板'), ('Wall', '木墙'), ('Doorway', '开放门框'),
              ('Roof', '平屋顶'), ('Lantern', '水晶灯'), ('Storage', '储物箱'),
-             ('Door', '木门'), ('Window', '开放窗墙'), ('Fence', '庭院木栅栏')],
+             ('Door', '木门'), ('Window', '开放窗墙'), ('Fence', '庭院木栅栏'), ('Stairs', '木楼梯')],
 }
 special_names = {'Mosskip': '荆棘缠绕', 'Cinderkit': '余烬爆发', 'Craglet': '岩石守护'}
 asset_count = 0

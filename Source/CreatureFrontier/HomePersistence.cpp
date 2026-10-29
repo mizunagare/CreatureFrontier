@@ -44,6 +44,9 @@ bool FHomeRestoreTransaction::Stage(UFrontierSaveGame* Save)
     for(auto& Record:Save->HomeModules) if(!Record.Definition.LoadSynchronous()) return false;
     for(auto& Record:Save->HomeModules)
     {
+        const auto Kind=Record.Definition.Get()->Kind;
+        const double OldHeight=Kind==EHomeModuleKind::Floor?-40:Kind==EHomeModuleKind::Roof?280:-30;
+        if(Save->FormatVersion<34 && (Kind==EHomeModuleKind::Stairs || Record.Transform.GetLocation().Z>OldHeight+1))return false;
         if(Save->FormatVersion<33 && Record.Definition.Get()->Kind==EHomeModuleKind::Fence)return false;
         if(Save->FormatVersion<32 && Record.Definition.Get()->Kind==EHomeModuleKind::Window)return false;
         if(Save->FormatVersion<30)
@@ -76,6 +79,8 @@ bool FHomeRestoreTransaction::Stage(UFrontierSaveGame* Save)
         if(!HomeLayout::SupportsFacility(Facility.Transform,Save->HomeModules)) return false;
     for(const auto& Facility:Save->Facilities)
         if(!HomeLayout::ClearsDoorReservations(FBox(FVector(-50),FVector(50)).TransformBy(Facility.Transform.ToMatrixWithScale()),Save->HomeModules))return false;
+    for(const auto& Facility:Save->Facilities)
+        if(!HomeLayout::ClearsStairReservations(FBox(FVector(-50),FVector(50)).TransformBy(Facility.Transform.ToMatrixWithScale()),Save->HomeModules))return false;
     // 使用存档中的设施校验存档容器，而非即将被本事务替换的旧世界。
     // 允许容器与地板接触。
     for(const auto& Record:Save->HomeModules) if(Record.Definition.Get()->Kind==EHomeModuleKind::Storage)

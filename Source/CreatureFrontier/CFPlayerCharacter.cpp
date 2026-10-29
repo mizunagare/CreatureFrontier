@@ -242,6 +242,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
     if (Save->Facilities.Num() > 20) { Feedback = TEXT("存档中的设施数量无效"); return false; }
     for (auto& Record : Save->Facilities)
     {
+        if(Save->FormatVersion<34 && Record.Transform.GetLocation().Z>7){Feedback=TEXT("旧格式不能包含二层设施");return false;}
         if(Save->FormatVersion<24) {Record.Seeds=0;Record.bPlanted=false;Record.GrowthWork=0;}
         if (!UFarmCropComponent::Validate(Record) || !Record.Id.IsValid() || FacilityIds.Contains(Record.Id) || UBaseBuildingComponent::GetCost(Record.Specialty) <= 0 ||
             !UBaseBuildingComponent::IsBuildTransformValid(Record.Transform) || Record.StoredFood < 0 || Record.StoredFood > 30 ||

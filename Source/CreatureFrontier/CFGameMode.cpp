@@ -19,6 +19,7 @@
 #include "RescueRecallScenario.h"
 #include "HUDScenario.h"
 #include "HomeScenario.h"
+#include "StairsScenario.h"
 #include "ExpeditionScenario.h"
 #include "CFPlayerCharacter.h"
 #include "CFHUD.h"
@@ -72,6 +73,8 @@ void ACFGameMode::BeginPlay()
 {
     Super::BeginPlay();
     SeedFrontierResources(GetWorld());
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFStairsTest")) || FParse::Param(FCommandLine::Get(),TEXT("CFStairsRead")) || FParse::Param(FCommandLine::Get(),TEXT("CFStairsLegacy")))
+    {const int32 Mode=FParse::Param(FCommandLine::Get(),TEXT("CFStairsLegacy"))?2:FParse::Param(FCommandLine::Get(),TEXT("CFStairsRead"))?1:0;FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this,Mode](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunStairsScenario(GetWorld(),Hero,Mode);},1.f,false);return;}
     if(FParse::Param(FCommandLine::Get(),TEXT("CFGatherHoldTest")))
     {FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunGatherHoldScenario(GetWorld(),Hero);},1.f,false);return;}
     if(FParse::Param(FCommandLine::Get(),TEXT("CFHomePaletteTest")))

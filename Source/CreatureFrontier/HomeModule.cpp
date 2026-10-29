@@ -17,6 +17,7 @@ bool UHomeModuleDefinition::IsValidDefinition() const
 UHomeModuleDefinition* UHomeModuleDefinition::LoadDefault(EHomeModuleKind Kind)
 {
     if(static_cast<uint8>(Kind)>=static_cast<uint8>(EHomeModuleKind::Count)) return nullptr;
+    if(Kind==EHomeModuleKind::Stairs) return LoadObject<UHomeModuleDefinition>(nullptr,TEXT("/Game/Home/DA_Stairs.DA_Stairs"));
     if(Kind==EHomeModuleKind::Fence) return LoadObject<UHomeModuleDefinition>(nullptr,TEXT("/Game/Home/DA_Fence.DA_Fence"));
     if(Kind==EHomeModuleKind::Window) return LoadObject<UHomeModuleDefinition>(nullptr,TEXT("/Game/Home/DA_Window.DA_Window"));
     if(Kind==EHomeModuleKind::Door) return LoadObject<UHomeModuleDefinition>(nullptr,TEXT("/Game/Home/DA_Door.DA_Door"));
@@ -26,6 +27,14 @@ UHomeModuleDefinition* UHomeModuleDefinition::LoadDefault(EHomeModuleKind Kind)
 TArray<FHomePart> AHomeModule::Parts(EHomeModuleKind Kind)
 {
     if(Kind==EHomeModuleKind::Floor || Kind==EHomeModuleKind::Roof) return {{FVector::ZeroVector,FVector(200,200,10)}};
+    if(Kind==EHomeModuleKind::Stairs)
+    {
+        // 底端先留50厘米平坦入口，分开地基与首级抬升，避免合成40厘米的导航断阶。
+        // 16级实体踏步，级高20厘米；上升320厘米后接相邻二层楼板，不使用隐形斜坡。
+        TArray<FHomePart> Steps;
+        for(int32 Index=0;Index<16;++Index)Steps.Add({FVector(-150+(Index+.5)*21.875,0,(Index+1)*10.),FVector(10.9375,100,(Index+1)*10.)});
+        return Steps;
+    }
     if(Kind==EHomeModuleKind::Wall) return {{FVector(0,0,150),FVector(200,10,150)}};
     // 两立柱和两横梁均参与实体碰撞与导航，不作为屋顶承重墙。
     if(Kind==EHomeModuleKind::Fence) return {{FVector(-190,0,65),FVector(10,10,65)}, {FVector(190,0,65),FVector(10,10,65)}, {FVector(0,0,40),FVector(180,7,10)}, {FVector(0,0,100),FVector(180,7,10)}};
@@ -62,6 +71,13 @@ void AHomeModule::OnConstruction(const FTransform& Transform)
     if(!DoorLeafPalette && Palette) DoorLeafPalette=UMaterialInstanceDynamic::Create(Palette->GetMaterial(),this);
     if(DoorLeafPalette && Definition) DoorLeafPalette->SetVectorParameterValue(TEXT("Tint"),Definition->DoorLeafColor);
     const auto Geometry=Parts(GetKind());
+    // 普通模块仍保留原四个组件，只有楼梯按实际踏步数补充组件。
+    while(Meshes.Num()<Geometry.Num())
+    {
+        auto* Mesh=NewObject<UStaticMeshComponent>(this,*FString::Printf(TEXT("StepPart%d"),Meshes.Num()));
+        Mesh->SetupAttachment(RootComponent);Mesh->SetStaticMesh(Meshes[0]->GetStaticMesh());
+        Mesh->SetMobility(EComponentMobility::Movable);Mesh->RegisterComponent();Meshes.Add(Mesh);
+    }
     LanternLight->SetIntensity(Definition?Definition->LanternLumens:0);
     LanternLight->SetVisibility(GetKind()==EHomeModuleKind::Lantern && !bPreview && !bStaged);
     for(int32 Index=0;Index<Meshes.Num();++Index)
