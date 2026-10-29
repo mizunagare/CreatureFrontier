@@ -31,6 +31,7 @@
 #include "InputKeyEventArgs.h"
 #include "GenericPlatform/GenericPlatformInputDeviceMapper.h"
 #include "PlayerEquipmentComponent.h"
+#include "WildEncounter.h"
 
 UHomeMovementProbe::UHomeMovementProbe() { PrimaryComponentTick.bCanEverTick=true; }
 
@@ -488,6 +489,57 @@ bool PathInside(UWorld* World,ACFPlayerCharacter* Hero)
     auto* Path=UNavigationSystemV1::FindPathToLocationSynchronously(World,FVector(-400,-1250,40),FVector(-400,-800,60),Hero);
     return Path && Path->IsValid() && !Path->IsPartial() && !Path->PathPoints.IsEmpty() && Path->PathPoints.Last().Z<100;
 }
+void FenceNavigation(UWorld* World,ACFPlayerCharacter* Hero,UCreatureDefinition* Definition,AHomeModule* Floor)
+{
+    for(TActorIterator<AWildEncounter> It(World);It;++It)It->SetActorTickEnabled(false);
+    Hero->SetActorLocation(FVector(-400,-720,60));Hero->GetController()->SetControlRotation(FRotator(0,90,0));Hero->FirstPersonCamera->SetRelativeRotation(FRotator::ZeroRotator);
+    const auto Timer=MakeShared<FTimerHandle>();
+    World->GetTimerManager().SetTimer(*Timer,[World,Hero,Definition,Floor,Timer,Phase=0,At=World->GetTimeSeconds(),Pet=static_cast<ACreatureCharacter*>(nullptr),Previous=FVector::ZeroVector,Travel=0.,Continuous=true,NoCross=true,Entered=false,Exited=false]() mutable
+    {
+        auto End=[&](bool Pass){UE_LOG(LogTemp,Display,TEXT("CF_HOME_FENCE_NAV %s phase=%d entered=%d exited=%d continuous=%d noCross=%d travel=%.1f pet=%s"),Pass?TEXT("PASS"):TEXT("FAIL"),Phase,Entered,Exited,Continuous,NoCross,Travel,Pet?*Pet->GetActorLocation().ToString():TEXT("无"));
+            FTimerHandle Handle=*Timer;World->GetTimerManager().ClearTimer(Handle);FPlatformMisc::RequestExitWithStatus(false,Pass?0:1);};
+        const double Elapsed=World->GetTimeSeconds()-At;
+        if(Pet)
+        {
+            const FVector Now=Pet->GetActorLocation();Travel+=FVector::Dist2D(Now,Previous);Continuous &= FVector::Dist2D(Now,Previous)<120;
+            const auto Crosses=[](double A,double B,double OtherA,double OtherB,double Plane,double Low,double High)
+            {if((A-Plane)*(B-Plane)>0 || A==B)return false;const double Other=FMath::Lerp(OtherA,OtherB,(Plane-A)/(B-A));return Other>=Low && Other<=High;};
+            if(Phase<4)NoCross &= !Crosses(Previous.Y,Now.Y,Previous.X,Now.X,-1000,-600,-200);
+            NoCross &= !Crosses(Previous.Y,Now.Y,Previous.X,Now.X,-600,-600,-200) && !Crosses(Previous.X,Now.X,Previous.Y,Now.Y,-600,-1000,-600);
+            if(Phase>=3)NoCross &= !Crosses(Previous.X,Now.X,Previous.Y,Now.Y,-200,-1000,-600);
+            Previous=Now;
+            if(!Continuous || !NoCross || Pet->Health<=0 || !Pet->IsActorTickEnabled() || !Pet->GetActorEnableCollision()){End(false);return;}
+        }
+        if(Phase==0 && Elapsed>=2)
+        {
+            const FTransform Spawn(FVector(-400,-1350,60));Pet=World->SpawnActorDeferred<ACreatureCharacter>(ACreatureCharacter::StaticClass(),Spawn,nullptr,nullptr,ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+            if(!Pet){End(false);return;}Pet->Definition=Definition;Pet->FinishSpawning(Spawn);Pet->Tame(Hero->GetController());Hero->CommandFollow();Previous=Pet->GetActorLocation();Phase=1;At=World->GetTimeSeconds();return;
+        }
+        const bool Inside=Pet && Pet->GetActorLocation().X>-560 && Pet->GetActorLocation().X<-240 && Pet->GetActorLocation().Y>-960 && Pet->GetActorLocation().Y<-640;
+        if(Phase==1)
+        {
+            if(!Inside && Elapsed<14)return;Entered=Inside;if(!Entered){End(false);return;}
+            Hero->SetActorLocation(FVector(-400,-1250,60));Phase=2;At=World->GetTimeSeconds();return;
+        }
+        if(Phase==2)
+        {
+            if(Pet->GetActorLocation().Y>-1100 && Elapsed<14)return;Exited=Pet->GetActorLocation().Y<-1100;if(!Exited){End(false);return;}
+            Hero->HomeBuilding->Selected=EHomeModuleKind::Fence;
+            if(!Hero->HomeBuilding->BuildAt(FTransform(FRotator(0,90,0),FVector(-200,-800,-30)),Floor->PersistentId)){End(false);return;}
+            Hero->SetActorLocation(FVector(-400,-720,60));Phase=3;At=World->GetTimeSeconds();return;
+        }
+        if(Phase==3)
+        {
+            if(Inside){End(false);return;}if(Elapsed<4)return;
+            auto* South=Find(World,EHomeModuleKind::Fence,FVector(-400,-1000,-30));
+            const int32 Before=Hero->Inventory->Count(EFrontierItem::Material);
+            const bool Removed=South && Hero->HomeBuilding->Dismantle(South) && Hero->Inventory->Count(EFrontierItem::Material)==Before+2;
+            UE_LOG(LogTemp,Display,TEXT("CF_HOME_FENCE_NAV_OPEN %s closedWait=1 refund=2"),Removed?TEXT("PASS"):TEXT("FAIL"));
+            if(!Removed){End(false);return;}Phase=4;At=World->GetTimeSeconds();return;
+        }
+        if(Phase==4){if(!Inside && Elapsed<14)return;End(Inside && Entered && Exited && Travel>900);}
+    },.05f,true);
+}
 bool PlaceThroughPreview(UWorld* World,ACFPlayerCharacter* Hero,EHomeModuleKind Kind,FVector Observer,FVector Aim,FVector Expected,double Yaw=0)
 {
     Hero->SetActorLocation(Observer);
@@ -572,6 +624,8 @@ void RunHomeScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode)
         Pass &= PlaceThroughPreview(World,Hero,EHomeModuleKind::Fence,FVector(-400,-800,60),FVector(-580,-800,-30),FVector(-600,-800,-30),90);
         Pass &= CFInputQA::Action(Hero,TEXT("Capture"),EKeys::RightMouseButton);
         const int32 Before=Hero->Inventory->Count(EFrontierItem::Material);
+        if(Pass && FParse::Param(FCommandLine::Get(),TEXT("CFHomeFenceNavigation")))
+        {FenceNavigation(World,Hero,Leaf,FloorA);return;}
         if(FParse::Param(FCommandLine::Get(),TEXT("CFHomeFenceWrite")))
         {
             Hero->SetActorLocation(FVector(-400,-800,60));
