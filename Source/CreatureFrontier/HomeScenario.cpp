@@ -570,6 +570,7 @@ void RunHomeScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode,bool UseG
 {
     const bool Gathered=FParse::Param(FCommandLine::Get(),TEXT("CFHomeGatheredWork"));
     const bool Carried=FParse::Param(FCommandLine::Get(),TEXT("CFHomeCarriedWork"));
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFHomeWalkingWork")) && !FParse::Param(FCommandLine::Get(),TEXT("CFHomeBefriendedWork"))){UE_LOG(LogTemp,Error,TEXT("CF_HOME_WALK FAIL mode"));FPlatformMisc::RequestExitWithStatus(false,1);return;}
     if(FParse::Param(FCommandLine::Get(),TEXT("CFHomeBefriendedWork")) && !Carried){UE_LOG(LogTemp,Error,TEXT("CF_HOME_BEFRIEND FAIL mode"));FPlatformMisc::RequestExitWithStatus(false,1);return;}
     if(Carried && !Gathered){UE_LOG(LogTemp,Error,TEXT("CF_HOME_CARGO_FUNDING FAIL mode"));FPlatformMisc::RequestExitWithStatus(false,1);return;}
     if(Gathered)

@@ -1,5 +1,6 @@
-param([string]$BuildRoot='',[string]$EngineRoot='D:\Epic\UE_5.8',[switch]$Room,[switch]$Work,[ValidateSet('Test','Write','Read')][string]$Mode='Test',[switch]$Fence,[switch]$FenceNavigation,[switch]$FencePreview,[switch]$Courtyard,[switch]$Gathered,[switch]$Carried,[switch]$Befriended)
+param([string]$BuildRoot='',[string]$EngineRoot='D:\Epic\UE_5.8',[switch]$Room,[switch]$Work,[ValidateSet('Test','Write','Read')][string]$Mode='Test',[switch]$Fence,[switch]$FenceNavigation,[switch]$FencePreview,[switch]$Courtyard,[switch]$Gathered,[switch]$Carried,[switch]$Befriended,[switch]$Walking)
 $ErrorActionPreference='Stop'
+if($Walking){$Befriended=$true}
 if($Befriended){$Carried=$true}
 if($Carried){$Gathered=$true}
 if($Gathered){if($Mode -ne 'Test'){throw '真实采集投入仅支持完整普通链'};$Courtyard=$true}
@@ -42,11 +43,12 @@ if($Courtyard){$arguments+='-CFHomeCourtyardWork'}
 if($Gathered){$arguments+='-CFHomeGatheredWork'}
 if($Carried){$arguments+='-CFHomeCarriedWork'}
 if($Befriended){$arguments+='-CFHomeBefriendedWork'}
+if($Walking){$arguments+='-CFHomeWalkingWork'}
 if($FencePreview){$arguments=@($arguments | Where-Object {$_ -ne '-nullrhi'});$arguments+=@('-CFHomeFencePreview','-RenderOffscreen','-ForceRes','-ResX=1280','-ResY=720','-norhithread','-forcerhibypass','-ExecCmds="t.MaxFPS 60"')}
 $exe=$module
 if(!$BuildRoot){$exe=Join-Path $EngineRoot 'Engine\Binaries\Win64\UnrealEditor-Cmd.exe';$arguments=@((Join-Path $projectRoot 'CreatureFrontier.uproject'),'-game')+$arguments}
 $process=Start-Process -FilePath $exe -ArgumentList $arguments -WindowStyle Hidden -PassThru
-$timeout=if($Befriended){300000}elseif($Carried){240000}elseif($Gathered){180000}else{60000}
+$timeout=if($Walking){480000}elseif($Befriended){300000}elseif($Carried){240000}elseif($Gathered){180000}else{60000}
 if(!$process.WaitForExit($timeout)){$process.Kill();$process.WaitForExit();throw '房屋输入绑定专项超时'}
 if($process.ExitCode -ne 0 -or !(Test-Path -LiteralPath $log)){throw '房屋输入绑定专项未正常退出'}
 $body=Get-Content -LiteralPath $log -Raw
@@ -71,6 +73,12 @@ if($Carried){
             if(!$found.Success -or $found.Groups[1].Value -ne $petIds[0]){throw '地图原生个体与结交、运输、存读身份不一致'}
         }
         if(!$body.Contains('food=0 bond=3')){throw '结交后最终食物与亲密状态核对缺失'}
+        if($Walking){
+            $sources=[regex]::Matches($body,'CF_HOME_WALK_SOURCE PASS id=(\d+)')
+            if($sources.Count -ne 6 -or (@($sources | ForEach-Object {$_.Groups[1].Value}) -join ',') -ne '1,2,3,4,6,8'){throw '实际步行采集缺少六处来源到达记录'}
+            $walk=[regex]::Match($body,'CF_HOME_WALK_ROUTE PASS sources=6 returned=1 continuous=1 travel=([\d.]+) petTravel=[\d.]+ material=104 fiber=13 food=1 pet=([A-F0-9]{32})')
+            if(!$walk.Success -or [double]::Parse($walk.Groups[1].Value,[Globalization.CultureInfo]::InvariantCulture) -lt 7500 -or $walk.Groups[2].Value -ne $petIds[0]){throw '实际资源往返未完成或伙伴身份不一致'}
+        }
     }
 }
 if($Room -and $Mode -ne 'Read' -and ([regex]::Matches($body,'CF_HOME_ROOM_INPUT_PART PASS')).Count -ne $(if($Carried){14}elseif($Courtyard){13}else{10})){throw '整屋输入缺少预期新增模块的实际成功记录'}
@@ -93,8 +101,9 @@ if($FencePreview){
 }
 $saveHash=''
 if($Gathered){$generated=Join-Path $saveRoot 'HomeGatheredAutomation.sav';$saveHash=(Get-FileHash -LiteralPath $generated).Hash;Copy-Item -LiteralPath $generated -Destination (Join-Path $run 'HomeGathered-generated.sav')}
-[pscustomobject]@{Room=[bool]$Room;Work=[bool]$Work;Fence=[bool]$Fence;FenceNavigation=[bool]$FenceNavigation;FencePreview=[bool]$FencePreview;Courtyard=[bool]$Courtyard;Gathered=[bool]$Gathered;Carried=[bool]$Carried;Befriended=[bool]$Befriended;Mode=$Mode;Pass=$true;BuildSHA256=$hash;GeneratedSaveSHA256=$saveHash;Log=$log} | Export-Csv -LiteralPath (Join-Path $run 'Results.csv') -NoTypeInformation
-if($Befriended){Write-Host '实际走近地图原生个体、支付食物结交、同一伙伴运输建设与农圃存读通过；后续手采建造仍固定站位，不是完整自然路线'}
+[pscustomobject]@{Room=[bool]$Room;Work=[bool]$Work;Fence=[bool]$Fence;FenceNavigation=[bool]$FenceNavigation;FencePreview=[bool]$FencePreview;Courtyard=[bool]$Courtyard;Gathered=[bool]$Gathered;Carried=[bool]$Carried;Befriended=[bool]$Befriended;Walking=[bool]$Walking;Mode=$Mode;Pass=$true;BuildSHA256=$hash;GeneratedSaveSHA256=$saveHash;Log=$log} | Export-Csv -LiteralPath (Join-Path $run 'Results.csv') -NoTypeInformation
+if($Walking){Write-Host '原生结交后六处资源实际步行采集返家、同一伙伴运输建设与农圃存读通过；建造仍固定观察站位，未验收完整自然风险或硬件操作'}
+elseif($Befriended){Write-Host '实际走近地图原生个体、支付食物结交、同一伙伴运输建设与农圃存读通过；后续手采建造仍固定站位，不是完整自然路线'}
 elseif($Carried){Write-Host '伙伴实采携带入箱、玩家取用建设与原伙伴继续农圃工作及建成存读通过；仍为固定站位和初始伙伴夹具'}
 elseif($Gathered){Write-Host '实际采集加工投入整屋、伙伴工作与建成存读通过；站位及伙伴仍为夹具，不是自然探索路线验收'}
 elseif($Courtyard){Write-Host ('组合庭院'+$Mode+'模式通过；完整冷启动链需由外层脚本汇总，不代表自然采集或硬件输入验收')}
