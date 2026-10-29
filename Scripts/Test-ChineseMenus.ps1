@@ -1,10 +1,19 @@
 param([string]$BuildRoot='', [switch]$Editor,
       [string[]]$Resolutions=@('1280x720'), [string]$EngineRoot='D:\Epic\UE_5.8',
+      [string]$LocalCachePath='',
       [ValidateSet('Backpack','Storage','Journal','Session','Name','Memory')]
       [string[]]$MenuNames=@('Backpack','Storage','Journal','Session','Name','Memory'))
 $ErrorActionPreference='Stop'
 $projectRoot=Split-Path $PSScriptRoot -Parent
 if(($Editor -and $BuildRoot) -or (!$Editor -and !$BuildRoot)){throw '请只指定编辑器模式或打包目录之一'}
+if($LocalCachePath){
+    if(!$Editor){throw '临时本地缓存路径仅用于编辑器模式'}
+    if(![IO.Path]::IsPathFullyQualified($LocalCachePath)){throw '临时本地缓存必须使用绝对路径'}
+    $LocalCachePath=[IO.Path]::GetFullPath($LocalCachePath)
+    if(!(Test-Path -LiteralPath $LocalCachePath -PathType Container)){
+        New-Item -ItemType Directory -Path $LocalCachePath -ErrorAction Stop | Out-Null
+    }
+}
 if(!$Resolutions.Count -or @($Resolutions | Select-Object -Unique).Count -ne $Resolutions.Count){throw '分辨率不能为空或重复'}
 foreach($size in $Resolutions){
     if($size -notmatch '^(\d{3,4})x(\d{3,4})$' -or [int]$Matches[1] -lt 960 -or [int]$Matches[2] -lt 540 -or [int]$Matches[1] -gt 3840 -or [int]$Matches[2] -gt 2160){throw '菜单测试分辨率须在960×540至3840×2160之间'}
@@ -57,6 +66,8 @@ foreach($case in $cases){
     $log=Join-Path $evidence ($resolution+'-'+$case.Name+'.log')
     $previewArguments=@(('-'+$case.Flag),('-'+$case.Preview),'-RenderOffscreen','-ForceRes',('-ResX='+$width),('-ResY='+$height),'-nosound','-unattended','-nop4','-norhithread','-forcerhibypass','-ExecCmds="t.MaxFPS 60,r.MotionBlurQuality 0,r.DefaultFeature.MotionBlur 0,r.AntiAliasingMethod 1"',('-abslog="'+$log+'"'))
     if($Editor){$previewArguments=@(('"'+(Join-Path $projectRoot 'CreatureFrontier.uproject')+'"'),'-game')+$previewArguments}
+    # 只给本次子进程指定文件缓存，不改全局配置，也不迁移或清理原缓存。
+    if($LocalCachePath){$previewArguments+=@('-ddc=InstalledNoZenLocalFallback',('-LocalDataCachePath="'+$LocalCachePath+'"'))}
     $process=Start-Process -FilePath $exe -WorkingDirectory $working -ArgumentList $previewArguments -WindowStyle Hidden -PassThru
     if(!$process.WaitForExit(60000)){$process.Kill();$process.WaitForExit();throw "菜单预览超时：$log"}
     if($process.ExitCode -ne 0 -or ($case.Marker -and !(Select-String -LiteralPath $log -SimpleMatch $case.Marker -Quiet)) -or (Select-String -LiteralPath $log -Pattern 'CF_\w+ FAIL|Fatal error|Assertion failed' -Quiet)){throw "菜单预览未通过：$log"}
@@ -74,7 +85,7 @@ foreach($case in $cases){
         Copy-Item -LiteralPath $source -Destination (Join-Path $evidence ($resolution+'-'+$case.Name+'-'+(Split-Path $file -Leaf)))
     }
     if((Get-FrontierBuildFingerprint -LiteralPath $module) -ne $hash){throw '测试期间程序发生改变'}
-    $results += [pscustomobject]@{Case=$case.Name;Resolution=$resolution;Editor=[bool]$Editor;Pass=$true;VisualReviewRequired=$true;BehaviorMarker=$case.Marker;Screens=$case.Files.Count;BuildSHA256=$hash;Log=$log}
+    $results += [pscustomobject]@{Case=$case.Name;Resolution=$resolution;Editor=[bool]$Editor;Pass=$true;VisualReviewRequired=$true;BehaviorMarker=$case.Marker;Screens=$case.Files.Count;BuildSHA256=$hash;LocalCachePath=$LocalCachePath;Log=$log}
     $results | Export-Csv -LiteralPath (Join-Path $evidence 'Results.csv') -NoTypeInformation
     Write-Host ($resolution+' '+$case.Label+'：预览及新截图检查通过，仍需逐图查看')
 }

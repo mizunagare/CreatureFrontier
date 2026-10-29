@@ -1,7 +1,7 @@
 {
   "FileVersion": 3,
   "EngineAssociation": "5.8",
-  "Category": "Games",
+  "Category": "游戏",
   "Description": "第一人称生物捕捉与伙伴生活角色扮演游戏原型。",
   "Modules": [
     {
