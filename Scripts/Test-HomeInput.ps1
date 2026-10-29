@@ -1,5 +1,6 @@
-param([string]$BuildRoot='',[string]$EngineRoot='D:\Epic\UE_5.8',[switch]$Room,[switch]$Work,[ValidateSet('Test','Write','Read')][string]$Mode='Test',[switch]$Fence,[switch]$FenceNavigation,[switch]$FencePreview,[switch]$Courtyard,[switch]$Gathered)
+param([string]$BuildRoot='',[string]$EngineRoot='D:\Epic\UE_5.8',[switch]$Room,[switch]$Work,[ValidateSet('Test','Write','Read')][string]$Mode='Test',[switch]$Fence,[switch]$FenceNavigation,[switch]$FencePreview,[switch]$Courtyard,[switch]$Gathered,[switch]$Carried)
 $ErrorActionPreference='Stop'
+if($Carried){$Gathered=$true}
 if($Gathered){if($Mode -ne 'Test'){throw '真实采集投入仅支持完整普通链'};$Courtyard=$true}
 if($Courtyard){if($Fence -or $FenceNavigation -or $FencePreview){throw '组合庭院不能与孤立栅栏探针混用'};$Work=$true}
 if($FencePreview){if($Mode -ne 'Test' -or $FenceNavigation){throw '栅栏预览仅用于普通基础模式'};$Fence=$true}
@@ -38,21 +39,31 @@ if($Mode -eq 'Read'){$arguments=@('-CFDoorFarmRead','-CFFurnishedFarm','-CFHomeR
 if($Fence -and $Mode -ne 'Test'){$arguments=@('-CFHomeTest',('-CFHomeFence'+$Mode),'-CFHomeFenceTest','-nullrhi','-nosound','-unattended','-nop4',('-abslog="'+$log+'"'))}
 if($Courtyard){$arguments+='-CFHomeCourtyardWork'}
 if($Gathered){$arguments+='-CFHomeGatheredWork'}
+if($Carried){$arguments+='-CFHomeCarriedWork'}
 if($FencePreview){$arguments=@($arguments | Where-Object {$_ -ne '-nullrhi'});$arguments+=@('-CFHomeFencePreview','-RenderOffscreen','-ForceRes','-ResX=1280','-ResY=720','-norhithread','-forcerhibypass','-ExecCmds="t.MaxFPS 60"')}
 $exe=$module
 if(!$BuildRoot){$exe=Join-Path $EngineRoot 'Engine\Binaries\Win64\UnrealEditor-Cmd.exe';$arguments=@((Join-Path $projectRoot 'CreatureFrontier.uproject'),'-game')+$arguments}
 $process=Start-Process -FilePath $exe -ArgumentList $arguments -WindowStyle Hidden -PassThru
-$timeout=if($Gathered){180000}else{60000}
+$timeout=if($Carried){240000}elseif($Gathered){180000}else{60000}
 if(!$process.WaitForExit($timeout)){$process.Kill();$process.WaitForExit();throw '房屋输入绑定专项超时'}
 if($process.ExitCode -ne 0 -or !(Test-Path -LiteralPath $log)){throw '房屋输入绑定专项未正常退出'}
 $body=Get-Content -LiteralPath $log -Raw
 $completion=if($Courtyard -and $Mode -eq 'Read'){'CF_HOME_COURTYARD_RESTORE PASS identity=1 inventory=1 task=1'}elseif($Courtyard){'CF_HOME_ROOM_INPUT PASS modules=14 material=96 noSave=1'}elseif($FenceNavigation){'CF_HOME_FENCE_NAV PASS phase=4 entered=1 exited=1 continuous=1 noCross=1'}elseif($Fence -and $Mode -eq 'Write'){'CF_HOME_FENCE_WRITE PASS modules=4 material=180'}elseif($Fence -and $Mode -eq 'Read'){'CF_HOME_FENCE_READ PASS identity=1 badVersion=1 material=180'}elseif($Fence){'CF_HOME_FENCE PASS modules=3 material=182 collision=1 removed=1 floorGuard=1 noSave=1'}elseif($Mode -eq 'Read'){'CF_FURNISHED_RESTORE PASS identity=1 inventory=1'}elseif($Room){'CF_HOME_ROOM_INPUT PASS modules=11 material=112 noSave=1'}else{'CF_HOME_INPUT_ONLY PASS noSave=1'}
 if($Gathered){$completion='CF_HOME_ROOM_INPUT PASS modules=14 material=21 noSave=1'}
 if($FenceNavigation -and !$body.Contains('CF_HOME_FENCE_NAV_OPEN PASS closedWait=1 refund=2')){throw '缺少封闭等待与正常拆除返还标记'}
-$initialAfterFloor=if($Gathered){117}else{192}
+$initialAfterFloor=if($Carried){103}elseif($Gathered){117}else{192}
 if($body -match '\bFAIL\b|Fatal error|Assertion failed' -or !$body.Contains($completion) -or ($Mode -ne 'Read' -and !$body.Contains('CF_HOME_INPUT_BINDINGS PASS floor=1 rotated=1 cancelled=1 material='+$initialAfterFloor))){throw "房屋输入绑定专项未通过或构建不支持：$log"}
-if($Gathered){foreach($marker in @('CF_HOME_FUNDING PASS material=125 seeds=3 food=2 raw=101 fiber=13 weave=6','CF_HOME_GATHERED_SAVE PASS modules=14 material=0 seeds=2 stored=3 task=1 source=1')){if(!$body.Contains($marker)){throw '采集投入、加工或建成存档标记缺失'}};if(([regex]::Matches($body,'CF_HOME_FUND_SOURCE PASS')).Count -ne 6){throw '缺少六处实际资源采集记录'}}
-if($Room -and $Mode -ne 'Read' -and ([regex]::Matches($body,'CF_HOME_ROOM_INPUT_PART PASS')).Count -ne $(if($Courtyard){13}else{10})){throw '整屋输入缺少预期新增模块的实际成功记录'}
+if($Gathered){$funding=if($Carried){'CF_HOME_CARGO_FUNDING PASS material=103 prepaid=22 raw=101 carried=3 seeds=3'}else{'CF_HOME_FUNDING PASS material=125 seeds=3 food=2 raw=101 fiber=13 weave=6'};foreach($marker in @($funding,'CF_HOME_GATHERED_SAVE PASS modules=14 material=0 seeds=2 stored=3 task=1 source=1')){if(!$body.Contains($marker)){throw '采集投入、加工或建成存档标记缺失'}};if(([regex]::Matches($body,'CF_HOME_FUND_SOURCE PASS')).Count -ne 6){throw '缺少六处实际资源采集记录'}}
+if($Carried){
+    foreach($marker in @('CF_HOME_CARGO_CAPITAL PASS modules=3 cost=22 material=82','CF_HOME_CARGO_DELIVER PASS source=0 cargo=0 stored=3 material=82','CF_HOME_CARGO_WITHDRAW PASS material=85 stored=0 parked=1','CF_HOME_CARGO_REUSE PASS capital=3','CF_HOME_CARGO_FARM PASS','CF_HOME_CARGO_SAVED PASS')){if(!$body.Contains($marker)){throw '伙伴材料运输、取用或原伙伴复用标记缺失'}}
+    $petIds=@(foreach($stage in @('DELIVER','WITHDRAW','REUSE','FARM','SAVED')){
+        $found=[regex]::Match($body,('CF_HOME_CARGO_'+$stage+' PASS[^\r\n]* pet=([A-F0-9]{32})'))
+        if(!$found.Success){throw '伙伴材料链缺少有效个体身份记录'}
+        $found.Groups[1].Value
+    })
+    if(@($petIds | Select-Object -Unique).Count -ne 1){throw '材料运输与农圃工作的伙伴身份不一致'}
+}
+if($Room -and $Mode -ne 'Read' -and ([regex]::Matches($body,'CF_HOME_ROOM_INPUT_PART PASS')).Count -ne $(if($Carried){14}elseif($Courtyard){13}else{10})){throw '整屋输入缺少预期新增模块的实际成功记录'}
 if($Courtyard){$marker=if($Mode -eq 'Write'){'CF_HOME_COURTYARD_WRITE PASS modules=14 material=75 closed=1'}else{'CF_HOME_COURTYARD_WORK PASS courtyard=1 doorway=1 noCross=1'};if(!$body.Contains($marker)){throw '缺少指定庭院工作／写档完成标记'}}
 if($Work){$number=if($Mode -eq 'Write'){1}elseif($Mode -eq 'Read'){2}else{0};if(!$body.Contains('CF_DOOR_FARM_MODE PASS mode='+$number)){throw '未完成指定的工作存读模式'}}
 if($Work){foreach($marker in @('CF_HOME_ROOM_WORK PASS noRebuild=1','CF_DOOR_FARM_CLOSED PASS','CF_FURNISHED_FARM PASS','CF_DOOR_FARM PASS')){if(!$body.Contains($marker)){throw "建房后伙伴工作链缺少必要标记：$marker"}}}
@@ -72,8 +83,9 @@ if($FencePreview){
 }
 $saveHash=''
 if($Gathered){$generated=Join-Path $saveRoot 'HomeGatheredAutomation.sav';$saveHash=(Get-FileHash -LiteralPath $generated).Hash;Copy-Item -LiteralPath $generated -Destination (Join-Path $run 'HomeGathered-generated.sav')}
-[pscustomobject]@{Room=[bool]$Room;Work=[bool]$Work;Fence=[bool]$Fence;FenceNavigation=[bool]$FenceNavigation;FencePreview=[bool]$FencePreview;Courtyard=[bool]$Courtyard;Gathered=[bool]$Gathered;Mode=$Mode;Pass=$true;BuildSHA256=$hash;GeneratedSaveSHA256=$saveHash;Log=$log} | Export-Csv -LiteralPath (Join-Path $run 'Results.csv') -NoTypeInformation
-if($Gathered){Write-Host '实际采集加工投入整屋、伙伴工作与建成存读通过；站位及伙伴仍为夹具，不是自然探索路线验收'}
+[pscustomobject]@{Room=[bool]$Room;Work=[bool]$Work;Fence=[bool]$Fence;FenceNavigation=[bool]$FenceNavigation;FencePreview=[bool]$FencePreview;Courtyard=[bool]$Courtyard;Gathered=[bool]$Gathered;Carried=[bool]$Carried;Mode=$Mode;Pass=$true;BuildSHA256=$hash;GeneratedSaveSHA256=$saveHash;Log=$log} | Export-Csv -LiteralPath (Join-Path $run 'Results.csv') -NoTypeInformation
+if($Carried){Write-Host '伙伴实采携带入箱、玩家取用建设与原伙伴继续农圃工作及建成存读通过；仍为固定站位和初始伙伴夹具'}
+elseif($Gathered){Write-Host '实际采集加工投入整屋、伙伴工作与建成存读通过；站位及伙伴仍为夹具，不是自然探索路线验收'}
 elseif($Courtyard){Write-Host ('组合庭院'+$Mode+'模式通过；完整冷启动链需由外层脚本汇总，不代表自然采集或硬件输入验收')}
 elseif($FenceNavigation){Write-Host '伙伴绕入绕出、封闭等待及拆除后恢复进入通过；不代表多伙伴或长期导航验收'}
 elseif($Fence -and $Mode -eq 'Write'){Write-Host '栅栏预览建造与保存通过；尚需独立读取'}

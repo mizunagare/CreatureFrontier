@@ -4,6 +4,7 @@
 #include "CFPlayerCharacter.h"
 #include "CreatureCharacter.h"
 #include "CreatureDefinition.h"
+#include "CompanionCargoComponent.h"
 #include "WorkStation.h"
 #include "FarmCropComponent.h"
 #include "BaseBuildingComponent.h"
@@ -96,7 +97,7 @@ bool GatheredEndSnapshot(UWorld* World,ACFPlayerCharacter* Hero,const FString& S
     ACreatureCharacter* Pet=nullptr;AWorkStation* Farm=nullptr;
     for(TActorIterator<ACreatureCharacter> It(World);It;++It)if(It->PersistentId==PetId && It->Tamer==Hero->GetController())Pet=*It;
     for(TActorIterator<AWorkStation> It(World);It;++It)if(It->PersistentId==FarmId && It->bPlayerBuilt)Farm=*It;
-    return Pet && Farm && Pet->Activity==ECreatureActivity::Work && Pet->WorkSite==Farm && Farm->StoredFood==1 && Farm->Crop->Seeds==0 &&
+    return Pet && Farm && Pet->Activity==ECreatureActivity::Work && Pet->WorkSite==Farm && Pet->Cargo->Count()==0 && !Pet->Cargo->HasOrder() && !Pet->GetFieldResource() && Farm->StoredFood==1 && Farm->Crop->Seeds==0 &&
         !Farm->Crop->bPlanted && Farm->Crop->GrowthWork==0;
 }
 }
@@ -107,6 +108,8 @@ void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode,b
     const bool InputBuilt=UseExistingRoom || FParse::Param(FCommandLine::Get(),TEXT("CFHomeRoomWorkRead"));
     const bool Courtyard=FParse::Param(FCommandLine::Get(),TEXT("CFHomeCourtyardWork"));
     const bool Gathered=FParse::Param(FCommandLine::Get(),TEXT("CFHomeGatheredWork"));
+    const bool Carried=FParse::Param(FCommandLine::Get(),TEXT("CFHomeCarriedWork"));
+    if(Carried && !Gathered){UE_LOG(LogTemp,Error,TEXT("CF_HOME_CARGO_FUNDING FAIL work-mode"));FPlatformMisc::RequestExitWithStatus(false,1);return;}
     if(Gathered && (!Courtyard || !UseExistingRoom || Mode!=0)){UE_LOG(LogTemp,Error,TEXT("CF_HOME_FUNDING FAIL work-mode"));FPlatformMisc::RequestExitWithStatus(false,1);return;}
     if(Courtyard && (!InputBuilt || !Furnished || Mode>2)){UE_LOG(LogTemp,Error,TEXT("CF_HOME_COURTYARD_WORK FAIL mode"));FPlatformMisc::RequestExitWithStatus(false,1);return;}
     if(InputBuilt && (!Furnished || Mode>2)){UE_LOG(LogTemp,Error,TEXT("CF_HOME_ROOM_WORK FAIL reuse-mode"));FPlatformMisc::RequestExitWithStatus(false,1);return;}
@@ -151,6 +154,17 @@ void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode,b
         const bool Stored=Crate && Hero->Storage->Open(Crate) && Hero->Storage->Transfer(EFrontierItem::Material,3,true);
         Hero->Storage->Close();Hero->SetActorLocation(FVector(-400,-1250,60));
         if(!Stored || !CFDoorFarmVolumeQA::FurnishedRoom(World)){Finish(false);return;}
+        if(Carried)
+        {
+            int32 Owned=0,Capital=0;
+            for(TActorIterator<ACreatureCharacter> It(World);It;++It)if(It->Tamer==Hero->GetController())
+            {++Owned;if(It->ActorHasTag(TEXT("HomeFundingCarrier")))RestoredPet=*It;}
+            for(TActorIterator<AHomeModule> It(World);It;++It)if(!It->bPreview && It->ActorHasTag(TEXT("HomeFundingCapital")))++Capital;
+            const bool Reused=Owned==1 && Capital==3 && RestoredPet && RestoredPet->Health>0 && RestoredPet->Activity==ECreatureActivity::Rest &&
+                RestoredPet->Cargo->Count()==0 && !RestoredPet->Cargo->HasOrder() && !RestoredPet->GetFieldResource();
+            UE_LOG(LogTemp,Display,TEXT("CF_HOME_CARGO_REUSE %s capital=%d pet=%s"),Reused?TEXT("PASS"):TEXT("FAIL"),Capital,RestoredPet?*RestoredPet->PersistentId.ToString():TEXT("无"));
+            if(!Reused){Finish(false);return;}
+        }
     }
     else Door=CFDoorNavigationQA::Room(World,Hero,0);
     if(Furnished && Door && Mode!=2 && !UseExistingRoom)
@@ -213,7 +227,7 @@ void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode,b
     {
         if(UseExistingRoom)
         {
-            // 初始种子仍是夹具物资；存入通过正常F2绑定，不能直接改农圃库存。
+            // 采集模式复用实采加工的种子；其他模式仍为夹具，均通过正常F2绑定存入。
             const auto View=(Farm->GetActorLocation()+FVector(0,0,30)-Hero->FirstPersonCamera->GetComponentLocation()).Rotation();
             Hero->GetController()->SetControlRotation(View);Hero->FirstPersonCamera->SetWorldRotation(View);
             const bool Seeded=(Gathered?Hero->Inventory->Count(EFrontierItem::Seeds)==3:Hero->Inventory->AddItem(EFrontierItem::Seeds,1)) && CFInputQA::Press(Hero,EKeys::F2) &&
@@ -225,7 +239,7 @@ void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode,b
     }
     const auto Timer=MakeShared<FTimerHandle>();
     const int32 HouseMaterials=Hero->Inventory->Count(EFrontierItem::Material);
-    World->GetTimerManager().SetTimer(*Timer,[World,Hero,Door,Farm,FarmWeak=TWeakObjectPtr<AWorkStation>(Farm),Definition,Timer,Finish,Mode,AvoidTest,Furnished,Slot,HouseMaterials,InputBuilt,Courtyard,Gathered,VisitedCourt=false,CrossedDoor=false,CourtClear=true,Phase=Mode==2?1:0,At=World->GetTimeSeconds(),Pet=RestoredPet,Previous=RestoredPet?RestoredPet->GetActorLocation():FVector::ZeroVector,Travel=0.,Continuous=true,ExpectedMaterials=0,Diagnosed=false]() mutable
+    World->GetTimerManager().SetTimer(*Timer,[World,Hero,Door,Farm,FarmWeak=TWeakObjectPtr<AWorkStation>(Farm),Definition,Timer,Finish,Mode,AvoidTest,Furnished,Slot,HouseMaterials,InputBuilt,Courtyard,Gathered,Carried,VisitedCourt=false,CrossedDoor=false,CourtClear=true,Phase=Mode==2?1:0,At=World->GetTimeSeconds(),Pet=RestoredPet,Previous=RestoredPet?RestoredPet->GetActorLocation():FVector::ZeroVector,Travel=0.,Continuous=true,ExpectedMaterials=0,Diagnosed=false]() mutable
     {
         auto End=[&](bool Pass)
         {
@@ -258,6 +272,7 @@ void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode,b
             // 清除定时器会释放捕获对象；完成回调必须先复制到当前调用栈。
             const auto Complete=Finish;
             const bool CheckGathered=Pass && Gathered;
+            const bool CheckCarried=Pass && Carried;
             const FGuid FinalPetId=Pet?Pet->PersistentId:FGuid(),FinalFarmId=LiveFarm?LiveFarm->PersistentId:FGuid();
             const bool Preview=Pass && Furnished && Mode==0 && FParse::Param(FCommandLine::Get(),TEXT("CFFurnishedFarmPreview"));
             auto* Observer=Hero;auto* PreviewWorld=World;
@@ -268,6 +283,7 @@ void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode,b
                 const bool Saved=Observer->SaveProgress(GatheredSlot) && Observer->LoadProgress(GatheredSlot) &&
                     CFDoorFarmVolumeQA::GatheredEndSnapshot(PreviewWorld,Observer,GatheredSlot,FinalPetId,FinalFarmId);
                 UE_LOG(LogTemp,Display,TEXT("CF_HOME_GATHERED_SAVE %s modules=14 material=0 seeds=2 stored=3 task=1 source=1"),Saved?TEXT("PASS"):TEXT("FAIL"));
+                if(CheckCarried){UE_LOG(LogTemp,Display,TEXT("CF_HOME_CARGO_SAVED %s pet=%s"),Saved?TEXT("PASS"):TEXT("FAIL"),*FinalPetId.ToString());}
                 Complete(Saved);return;
             }
             if(Preview)
@@ -354,14 +370,19 @@ void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode,b
         if(Phase==0 && Elapsed>=2)
         {
             Hero->SetActorLocation(FVector(-510,-730,60));
-            const FTransform Transform(Courtyard?FVector(400,-800,60):FVector(-400,-1350,60));
-            Pet=World->SpawnActorDeferred<ACreatureCharacter>(ACreatureCharacter::StaticClass(),Transform,nullptr,nullptr,ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+            if(!Carried)
+            {
+                const FTransform Transform(Courtyard?FVector(400,-800,60):FVector(-400,-1350,60));
+                Pet=World->SpawnActorDeferred<ACreatureCharacter>(ACreatureCharacter::StaticClass(),Transform,nullptr,nullptr,ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+                if(!Pet){End(false);return;}
+                Pet->Definition=Definition;Pet->FinishSpawning(Transform);Pet->Tame(Hero->GetController());Previous=Pet->GetActorLocation();
+            }
             if(!Pet){End(false);return;}
-            Pet->Definition=Definition;Pet->FinishSpawning(Transform);Pet->Tame(Hero->GetController());Previous=Pet->GetActorLocation();
             // 使用玩家现有工作命令；看向上方避免优先命中门或野外资源。
             Hero->GetController()->SetControlRotation(FRotator(70,0,0));Hero->FirstPersonCamera->SetWorldRotation(FRotator(70,0,0));
             if(InputBuilt){if(!CFInputQA::Press(Hero,EKeys::E)){End(false);return;}}else Hero->CommandWork();
             if(Pet->WorkSite!=Farm || Pet->Activity!=ECreatureActivity::Work){End(false);return;}
+            if(Carried){UE_LOG(LogTemp,Display,TEXT("CF_HOME_CARGO_FARM PASS pet=%s"),*Pet->PersistentId.ToString());}
             if(AvoidTest)
             {
                 if(!CFInputQA::Press(Hero,EKeys::F8) || !Pet->bAvoidCombat || Pet->WorkSite!=Farm || Pet->Activity!=ECreatureActivity::Work){End(false);return;}

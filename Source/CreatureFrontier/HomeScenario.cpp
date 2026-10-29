@@ -563,9 +563,14 @@ bool PlaceThroughPreview(UWorld* World,ACFPlayerCharacter* Hero,EHomeModuleKind 
 }
 }
 
+bool CFHomeInputQA::Place(UWorld* World,ACFPlayerCharacter* Hero,EHomeModuleKind Kind,FVector Observer,FVector Aim,FVector Expected,double Yaw)
+{return PlaceThroughPreview(World,Hero,Kind,Observer,Aim,Expected,Yaw);}
+
 void RunHomeScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode,bool UseGatheredStock)
 {
     const bool Gathered=FParse::Param(FCommandLine::Get(),TEXT("CFHomeGatheredWork"));
+    const bool Carried=FParse::Param(FCommandLine::Get(),TEXT("CFHomeCarriedWork"));
+    if(Carried && !Gathered){UE_LOG(LogTemp,Error,TEXT("CF_HOME_CARGO_FUNDING FAIL mode"));FPlatformMisc::RequestExitWithStatus(false,1);return;}
     if(Gathered)
     {
         if(Mode!=0 || !FParse::Param(FCommandLine::Get(),TEXT("CFHomeCourtyardWork")) || !FParse::Param(FCommandLine::Get(),TEXT("CFHomeRoomWork")))
@@ -610,20 +615,20 @@ void RunHomeScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode,bool UseG
     }
     UCreatureDefinition* Leaf=nullptr;
     for(TActorIterator<ACreatureCharacter> It(World);It;++It)
-    { if(It->Definition && It->Definition->Form==ECreatureForm::Leaf) Leaf=It->Definition; It->Destroy(); }
+    { if(It->Definition && It->Definition->Form==ECreatureForm::Leaf) Leaf=It->Definition; if(!Carried || It->Tamer!=Hero->GetController())It->Destroy(); }
     if(!Leaf || !Brush(World)) { UE_LOG(LogTemp,Error,TEXT("CF_HOME FAIL fixture")); FPlatformMisc::RequestExitWithStatus(false,1); return; }
     Hero->GetCharacterMovement()->DisableMovement(); Hero->SetActorLocation(FVector(-350,-1150,40));
     const int32 InitialMaterials=Gathered?125:200;
     if(!Gathered)Hero->Inventory->Restore({{EFrontierItem::Material,200}});
     Hero->FirstPersonCamera->SetWorldRotation((FVector(-400,-800,-50)-Hero->FirstPersonCamera->GetComponentLocation()).Rotation());
     bool Bindings=CFInputQA::UniqueBindings(Hero) && CFInputQA::Press(Hero,EKeys::B) && CFInputQA::Press(Hero,EKeys::Eight) &&
-        CFInputQA::Action(Hero,TEXT("Attack"),EKeys::LeftMouseButton);
+        (Carried || CFInputQA::Action(Hero,TEXT("Attack"),EKeys::LeftMouseButton));
     Bindings &= CFInputQA::Press(Hero,EKeys::V) && CFInputQA::Press(Hero,EKeys::Nine);
     const bool Rotated=Hero->HomeBuilding->GetPreview() && FMath::IsNearlyEqual(Hero->HomeBuilding->GetPreview()->GetActorRotation().Yaw,90.,.01);
     Bindings &= CFInputQA::Press(Hero,EKeys::Nine) && CFInputQA::Press(Hero,EKeys::V) && CFInputQA::Press(Hero,EKeys::V) &&
         CFInputQA::Press(Hero,EKeys::V) && CFInputQA::Action(Hero,TEXT("Capture"),EKeys::RightMouseButton);
     auto* FloorA=Find(World,EHomeModuleKind::Floor,FVector(-400,-800,-40));
-    bool Input=Bindings && Rotated && FloorA && !Hero->Building->IsActive() && Hero->Inventory->Count(EFrontierItem::Material)==InitialMaterials-8;
+    bool Input=Bindings && Rotated && FloorA && !Hero->Building->IsActive() && Hero->Inventory->Count(EFrontierItem::Material)==InitialMaterials-(Carried?22:8);
     UE_LOG(LogTemp,Display,TEXT("CF_HOME_INPUT_BINDINGS %s floor=%d rotated=%d cancelled=%d material=%d"),Input?TEXT("PASS"):TEXT("FAIL"),FloorA!=nullptr,Rotated,!Hero->Building->IsActive(),Hero->Inventory->Count(EFrontierItem::Material));
     if(!Input) { UE_LOG(LogTemp,Error,TEXT("CF_HOME FAIL input %s"),*Hero->Feedback); FPlatformMisc::RequestExitWithStatus(false,1); return; }
     if(FParse::Param(FCommandLine::Get(),TEXT("CFHomeFenceTest")))
@@ -677,7 +682,7 @@ void RunHomeScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode,bool UseG
         const bool Courtyard=FParse::Param(FCommandLine::Get(),TEXT("CFHomeCourtyardWork"));
         bool Room=CFInputQA::Press(Hero,EKeys::B) && CFInputQA::Press(Hero,EKeys::Eight);
         auto Place=[&](EHomeModuleKind Kind,FVector Observer,FVector Aim,FVector Expected,double Yaw=0){return PlaceThroughPreview(World,Hero,Kind,Observer,Aim,Expected,Yaw);};
-        Room &= Place(EHomeModuleKind::Floor,FVector(-450,-900,60),FVector(-800,-800,-50),FVector(-800,-800,-40));
+        Room &= Carried || Place(EHomeModuleKind::Floor,FVector(-450,-900,60),FVector(-800,-800,-50),FVector(-800,-800,-40));
         Room &= Place(Courtyard?EHomeModuleKind::Wall:EHomeModuleKind::Door,FVector(-570,-850,60),FVector(-400,-980,-30),FVector(-400,-1000,-30));
         Room &= Place(EHomeModuleKind::Wall,FVector(-400,-800,60),FVector(-400,-620,-30),FVector(-400,-600,-30));
         Room &= Place(Courtyard?EHomeModuleKind::Door:EHomeModuleKind::Wall,Courtyard?FVector(-550,-800,60):FVector(-400,-800,60),FVector(-220,-800,-30),FVector(-200,-800,-30),90);
@@ -685,7 +690,7 @@ void RunHomeScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode,bool UseG
         Room &= Place(EHomeModuleKind::Wall,FVector(-800,-800,60),FVector(-800,-620,-30),FVector(-800,-600,-30));
         Room &= Place(EHomeModuleKind::Window,FVector(-800,-800,60),FVector(-980,-800,-30),FVector(-1000,-800,-30),90);
         const FVector CratePosition=Courtyard?FVector(-900,-900,-30):FVector(-900,-700,-30);
-        Room &= Place(EHomeModuleKind::Storage,FVector(-800,-850,60),CratePosition,CratePosition);
+        Room &= Carried || Place(EHomeModuleKind::Storage,FVector(-800,-850,60),CratePosition,CratePosition);
         Room &= Place(EHomeModuleKind::Roof,FVector(-400,-800,60),FVector(-400,-800,-30),FVector(-400,-800,280));
         Room &= Place(EHomeModuleKind::Roof,FVector(-800,-800,60),FVector(-800,-800,-30),FVector(-800,-800,280));
         if(Courtyard)

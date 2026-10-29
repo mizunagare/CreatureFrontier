@@ -4,6 +4,11 @@
 #include "HomeScenario.generated.h"
 class UWorld;
 class ACFPlayerCharacter;
+enum class EHomeModuleKind : uint8;
+namespace CFHomeInputQA
+{
+bool Place(UWorld* World,ACFPlayerCharacter* Hero,EHomeModuleKind Kind,FVector Observer,FVector Aim,FVector Expected,double Yaw=0);
+}
 
 // 打包物理测试使用持续移动输入，不依赖帧率。
 UCLASS()
