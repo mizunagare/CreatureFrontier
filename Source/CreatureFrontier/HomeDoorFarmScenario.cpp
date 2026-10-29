@@ -92,12 +92,14 @@ namespace CFDoorFarmVolumeQA
 {
 bool GatheredEndSnapshot(UWorld* World,ACFPlayerCharacter* Hero,const FString& Slot,FGuid PetId,FGuid FarmId)
 {
+    const bool Befriended=FParse::Param(FCommandLine::Get(),TEXT("CFHomeBefriendedWork"));
     if(!FurnishedSnapshot(World,Hero,Slot) || !VerifyHomeFundingSources(World) || Hero->Inventory->Count(EFrontierItem::Material)!=0 ||
-        Hero->Inventory->Count(EFrontierItem::Seeds)!=2 || Hero->Inventory->Count(EFrontierItem::Food)!=2)return false;
+        Hero->Inventory->Count(EFrontierItem::Seeds)!=2 || Hero->Inventory->Count(EFrontierItem::Food)!=(Befriended?0:2))return false;
     ACreatureCharacter* Pet=nullptr;AWorkStation* Farm=nullptr;
     for(TActorIterator<ACreatureCharacter> It(World);It;++It)if(It->PersistentId==PetId && It->Tamer==Hero->GetController())Pet=*It;
     for(TActorIterator<AWorkStation> It(World);It;++It)if(It->PersistentId==FarmId && It->bPlayerBuilt)Farm=*It;
-    return Pet && Farm && Pet->Activity==ECreatureActivity::Work && Pet->WorkSite==Farm && Pet->Cargo->Count()==0 && !Pet->Cargo->HasOrder() && !Pet->GetFieldResource() && Farm->StoredFood==1 && Farm->Crop->Seeds==0 &&
+    return Pet && Farm && (!Befriended || (Pet->BondPoints==3 && Hero->HasJournalEntry(Pet->Definition,true) && Hero->Inventory->Count(EFrontierItem::CaptureDevice)==5)) &&
+        Pet->Activity==ECreatureActivity::Work && Pet->WorkSite==Farm && Pet->Cargo->Count()==0 && !Pet->Cargo->HasOrder() && !Pet->GetFieldResource() && Farm->StoredFood==1 && Farm->Crop->Seeds==0 &&
         !Farm->Crop->bPlanted && Farm->Crop->GrowthWork==0;
 }
 }
@@ -109,6 +111,8 @@ void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode,b
     const bool Courtyard=FParse::Param(FCommandLine::Get(),TEXT("CFHomeCourtyardWork"));
     const bool Gathered=FParse::Param(FCommandLine::Get(),TEXT("CFHomeGatheredWork"));
     const bool Carried=FParse::Param(FCommandLine::Get(),TEXT("CFHomeCarriedWork"));
+    const bool Befriended=FParse::Param(FCommandLine::Get(),TEXT("CFHomeBefriendedWork"));
+    if(Befriended && !Carried){UE_LOG(LogTemp,Error,TEXT("CF_HOME_BEFRIEND FAIL work-mode"));FPlatformMisc::RequestExitWithStatus(false,1);return;}
     if(Carried && !Gathered){UE_LOG(LogTemp,Error,TEXT("CF_HOME_CARGO_FUNDING FAIL work-mode"));FPlatformMisc::RequestExitWithStatus(false,1);return;}
     if(Gathered && (!Courtyard || !UseExistingRoom || Mode!=0)){UE_LOG(LogTemp,Error,TEXT("CF_HOME_FUNDING FAIL work-mode"));FPlatformMisc::RequestExitWithStatus(false,1);return;}
     if(Courtyard && (!InputBuilt || !Furnished || Mode>2)){UE_LOG(LogTemp,Error,TEXT("CF_HOME_COURTYARD_WORK FAIL mode"));FPlatformMisc::RequestExitWithStatus(false,1);return;}
@@ -239,7 +243,7 @@ void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode,b
     }
     const auto Timer=MakeShared<FTimerHandle>();
     const int32 HouseMaterials=Hero->Inventory->Count(EFrontierItem::Material);
-    World->GetTimerManager().SetTimer(*Timer,[World,Hero,Door,Farm,FarmWeak=TWeakObjectPtr<AWorkStation>(Farm),Definition,Timer,Finish,Mode,AvoidTest,Furnished,Slot,HouseMaterials,InputBuilt,Courtyard,Gathered,Carried,VisitedCourt=false,CrossedDoor=false,CourtClear=true,Phase=Mode==2?1:0,At=World->GetTimeSeconds(),Pet=RestoredPet,Previous=RestoredPet?RestoredPet->GetActorLocation():FVector::ZeroVector,Travel=0.,Continuous=true,ExpectedMaterials=0,Diagnosed=false]() mutable
+    World->GetTimerManager().SetTimer(*Timer,[World,Hero,Door,Farm,FarmWeak=TWeakObjectPtr<AWorkStation>(Farm),Definition,Timer,Finish,Mode,AvoidTest,Furnished,Slot,HouseMaterials,InputBuilt,Courtyard,Gathered,Carried,Befriended,VisitedCourt=false,CrossedDoor=false,CourtClear=true,Phase=Mode==2?1:0,At=World->GetTimeSeconds(),Pet=RestoredPet,Previous=RestoredPet?RestoredPet->GetActorLocation():FVector::ZeroVector,Travel=0.,Continuous=true,ExpectedMaterials=0,Diagnosed=false]() mutable
     {
         auto End=[&](bool Pass)
         {
@@ -273,6 +277,7 @@ void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode,b
             const auto Complete=Finish;
             const bool CheckGathered=Pass && Gathered;
             const bool CheckCarried=Pass && Carried;
+            const bool CheckBefriended=Pass && Befriended;
             const FGuid FinalPetId=Pet?Pet->PersistentId:FGuid(),FinalFarmId=LiveFarm?LiveFarm->PersistentId:FGuid();
             const bool Preview=Pass && Furnished && Mode==0 && FParse::Param(FCommandLine::Get(),TEXT("CFFurnishedFarmPreview"));
             auto* Observer=Hero;auto* PreviewWorld=World;
@@ -284,6 +289,7 @@ void RunHomeDoorFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,int32 Mode,b
                     CFDoorFarmVolumeQA::GatheredEndSnapshot(PreviewWorld,Observer,GatheredSlot,FinalPetId,FinalFarmId);
                 UE_LOG(LogTemp,Display,TEXT("CF_HOME_GATHERED_SAVE %s modules=14 material=0 seeds=2 stored=3 task=1 source=1"),Saved?TEXT("PASS"):TEXT("FAIL"));
                 if(CheckCarried){UE_LOG(LogTemp,Display,TEXT("CF_HOME_CARGO_SAVED %s pet=%s"),Saved?TEXT("PASS"):TEXT("FAIL"),*FinalPetId.ToString());}
+                if(CheckBefriended){UE_LOG(LogTemp,Display,TEXT("CF_HOME_BEFRIEND_SAVED %s pet=%s food=0 bond=3"),Saved?TEXT("PASS"):TEXT("FAIL"),*FinalPetId.ToString());}
                 Complete(Saved);return;
             }
             if(Preview)
