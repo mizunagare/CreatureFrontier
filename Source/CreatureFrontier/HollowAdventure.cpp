@@ -416,13 +416,29 @@ void RunHollowAdventure(UWorld* World,ACFPlayerCharacter* Hero,int Mode)
             const double Started=FPlatformTime::Seconds();const FVector Start=Hero->GetActorLocation();
             const bool WaitForPartner=FParse::Param(FCommandLine::Get(),TEXT("CFHollowInspectWait"));
             const bool CancelRetreat=FParse::Param(FCommandLine::Get(),TEXT("CFHollowCancelRetreat"));
+            const bool SwitchRetreat=FParse::Param(FCommandLine::Get(),TEXT("CFHollowSwitchRetreat"));
             auto Cancelled=MakeShared<bool>(false);
+            auto Switched=MakeShared<bool>(false);
             UE_LOG(LogTemp,Display,TEXT("CF_HOLLOW_DYNAMIC_BEGIN reconstructedFocus=1 deterministicReplay=0 waitForPartner=%d"),WaitForPartner);
-            FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([World,Hero,Pet,Enemy,Movement,Goal,Started,Start,WaitForPartner,CancelRetreat,Cancelled](float)
+            FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([World,Hero,Pet,Enemy,Movement,Goal,Started,Start,WaitForPartner,CancelRetreat,Cancelled,SwitchRetreat,Switched](float)
             {
                 if(!IsValid(Hero) || !IsValid(Pet) || !IsValid(Enemy))
                 {UE_LOG(LogTemp,Error,TEXT("CF_HOLLOW_DYNAMIC FAIL actors"));FPlatformMisc::RequestExitWithStatus(false,1);return false;}
                 const FVector Now=Hero->GetActorLocation();
+                if(SwitchRetreat && !*Switched && Pet->HasCombatRoute())
+                {
+                    // 只验证正式指令事务，不移动或新造敌人；立即切回原目标后继续正常战斗。
+                    ACreatureCharacter* Other=nullptr;
+                    for(TActorIterator<ACreatureCharacter> It(World);It;++It)
+                        if(*It!=Enemy && *It!=Pet && It->Health>0 && It->Disposition!=ECreatureDisposition::Tamed && It->Activity!=ECreatureActivity::ReturnHome){Other=*It;break;}
+                    const bool InvalidPreserved=!Pet->OrderAttack(nullptr) && Pet->FocusTarget==Enemy && Pet->HasCombatRoute();
+                    const bool NewCleared=Other && Pet->OrderAttack(Other) && Pet->FocusTarget==Other && !Pet->HasCombatRoute();
+                    const bool Returned=NewCleared && Pet->OrderAttack(Enemy) && Pet->FocusTarget==Enemy && !Pet->HasCombatRoute();
+                    const bool Pass=InvalidPreserved && NewCleared && Returned;
+                    UE_LOG(LogTemp,Display,TEXT("CF_RETREAT_SWITCH %s activeBefore=1 invalidPreserved=%d newTargetCleared=%d returnAccepted=%d"),Pass?TEXT("PASS"):TEXT("FAIL"),InvalidPreserved,NewCleared,Returned);
+                    if(!Pass){FPlatformMisc::RequestExitWithStatus(false,1);return false;}
+                    *Switched=true;
+                }
                 if(CancelRetreat && !*Cancelled && Pet->HasCombatRoute())
                 {
                     const bool Pass=CFInputQA::Press(Hero,EKeys::F8) && Pet->bAvoidCombat && !Pet->FocusTarget && !Pet->HasCombatRoute();
@@ -454,6 +470,8 @@ void RunHollowAdventure(UWorld* World,ACFPlayerCharacter* Hero,int Mode)
                     FPlatformTime::Seconds()-Started,*Now.ToString(),*Hero->GetVelocity().ToString(),*Pet->GetActorLocation().ToString(),*Pet->GetVelocity().ToString(),
                     static_cast<int32>(Pet->Activity),*GetNameSafe(Pet->FocusTarget),*GetNameSafe(Block.GetActor()),Block.GetActor()==Pet,Hero->Health,Pet->Health,Enemy->Health,FVector::Dist2D(Now,Goal));
                 if(FPlatformTime::Seconds()-Started<15)return true;
+                if(SwitchRetreat && !*Switched)
+                {UE_LOG(LogTemp,Error,TEXT("CF_RETREAT_SWITCH FAIL no-active-route"));FPlatformMisc::RequestExitWithStatus(false,1);return false;}
                 if(CancelRetreat)
                 {
                     const bool Pass=*Cancelled && !Pet->HasCombatRoute() && !Pet->FocusTarget && Pet->bAvoidCombat && Enemy->Health==Enemy->GetMaxHealth();

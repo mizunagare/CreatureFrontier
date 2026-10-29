@@ -1,5 +1,11 @@
 # 洞窟倒地与伙伴重聚（首版限定验收）
 
+## 绕行中目标切换事务：有限Editor证据
+
+新增显式SwitchRetreat专项，先确认绕行活动，调用正式OrderAttack接口验证空目标拒绝但原集火/路径保留、切换到场景既有另一只野生生物立即清空旧路径、立即切回原目标后恢复自然战斗。没有移动/新增敌人或关AI；新目标仅用于同一采样内的事务验证，不证明持续追逐新目标，更不是Q键瞄准端到端验收。脚本拒绝缺失动态等待或混合取消，CSV记录开关，语法及拒绝路径实际检查通过。
+
+Editor构建成功，模块 `87B5BB1CEF3884B0CC679AD701AF81674F38D3DB920E1726EAD6A014EE33086E`。`Saved/HollowFailureInspection/20261029-082811-692dcdcd/` 60帧实际运行退出0，`CF_RETREAT_SWITCH PASS activeBefore=1 invalidPreserved=1 newTargetCleared=1 returnAccepted=1`，并开启RequireBattle末次存活胜利断言通过。输入哈希不变、临时槽恢复为空。该QA不在D417Windows候选内；其原完整回归仍运行，不能混用证据，稳定包不升级。
+
 ## Windows三帧率现场与显式战斗完成断言
 
 D417A877候选新增自身30/120帧现场观察，目录 `Saved/HollowFailureInspection/20261029-082505-fcf1aef3/`、`20261029-082525-95462da2/`。均实际退出0，末次采样玩家原地18、伙伴65.2、敌人0、Follow/Focus清空；输入哈希不变。这补齐本候选三帧率受控现场证据，不是自然路线完整矩阵。

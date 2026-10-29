@@ -1,5 +1,7 @@
 # 开发路线
 
+87B5BB1C Editor绕行中OrderAttack事务60帧通过：无效目标保留原指令、成功换目标清旧路径、切回后自然战斗完成。仅即时事务，不含持续追新目标/硬件瞄准；D417Windows原完整回归仍运行，见 `Docs/HOLLOW_RECOVERY.md`。
+
 D417A877 Windows自身30/120补充现场均自然胜利，合并此前60形成有限三帧率证据。脚本新增RequireBattle末次生命断言，实际Windows60运行及四项断言单测通过；原完整回归仍运行，稳定不升，见 `Docs/HOLLOW_RECOVERY.md`。
 
 D417A877独立Windows绕行候选打包成功，自身60帧真实失败快照恢复战斗和F8中途取消两进程通过，输入不变/临时槽恢复为空。自身完整回归已启动未结束，图形/兼容/目标切换/压力仍待，稳定不升，见 `Docs/HOLLOW_RECOVERY.md`。
