@@ -77,7 +77,7 @@ void ACFHUD::DrawWorldHUD(ACFPlayerCharacter* Player)
             Rows.Add({FString::Printf(TEXT("%s | %s %.1f秒"),*Creature->GetSpecialName(),Creature->SpecialWindupRemaining>0?TEXT("蓄力"):TEXT("冷却"),Creature->SpecialWindupRemaining>0?Creature->SpecialWindupRemaining:Creature->SpecialCooldownRemaining),Yellow,2});
             FString QuietReason,PlayReason;const bool Quiet=Player->CanInteractCompanion(Creature,false,QuietReason),Play=Player->CanInteractCompanion(Creature,true,PlayReason);
             Rows.Add({Quiet?(Play?FString(TEXT("Y 安静陪伴 / F6 玩耍（安全距离2.5米）")):FString(TEXT("Y 安静陪伴 | F6 暂不可用："))+PlayReason):FString(TEXT("陪伴暂不可用："))+QuietReason,Yellow,2});
-            Rows.Add({TEXT("J 喂食 | P 治疗 | F 跟随 | T 休息"),Yellow});
+            Rows.Add({TEXT("J 喂食 | P 治疗 | F 取消/跟随 | T 休息续工"),Yellow});
             Rows.Add({FString::Printf(TEXT("F8 %s / Q 集火 / G 技能"),Creature->bAvoidCombat?TEXT("避战：不自动护主"):TEXT("自动护主")),Yellow});
             Rows.Add({TEXT("F4 命名 / F7 归家回忆（安全空闲时）"),Yellow});
             const auto Job=Creature->GetGatheringStatus();if(!Job.IsEmpty())Rows.Add({Job,Yellow,2});
@@ -116,7 +116,7 @@ void ACFHUD::DrawWorldHUD(ACFPlayerCharacter* Player)
         Rows.Add({Site->RequiredSpecialty==EWorkSpecialty::Farming?TEXT("农圃"):TEXT("工作设施"),Blue});
         if(Site->IsFoodStore())Rows.Add({FString::Printf(TEXT("食物 %d/30 | U 存入 | O 取出（6米）"),Site->StoredFood),Yellow,2});
         if(Site->RequiredSpecialty==EWorkSpecialty::Farming)Rows.Add({Site->Crop->Status(),Green,3});
-        Rows.Add({TEXT("E 指派工作 | T 休息 | F 跟随/取消"),Yellow,2});
+        Rows.Add({TEXT("E 指派工作 | T 休息后续工 | F 跟随/取消"),Yellow,2});
     }
     if(!Rows.IsEmpty())
     {

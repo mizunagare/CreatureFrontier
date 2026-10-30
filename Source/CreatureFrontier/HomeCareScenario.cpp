@@ -37,11 +37,12 @@ struct FHomeCareTest
     UWorld* World;ACFPlayerCharacter* Hero;TWeakObjectPtr<ACreatureCharacter> Pet;TWeakObjectPtr<AWorkStation> Farm;
     TWeakObjectPtr<UHomeMovementProbe> Input;TArray<FVector> Route;TArray<FHomeModuleRecord> House;TArray<FFacilitySaveRecord> Facilities;
     FGuid PetId,FarmId;FString Nickname,ImageRoot;TSet<FString> Photos;int32 Phase=0,Point=0;
-    bool Read=false,ReservedRead=false,ResumeOnly=false,Resupply=false,Supplied=false,FoodMade=false,GatherHeld=false,HungerChecked=false,Preview=false,Mid=false,Fed=false;double Deadline=0,At=0,WaitAt=-1,ShotUntil=0,ProgressAt=0,PreviousTime=0,HeroTravel=0,PetTravel=0;
+    bool Read=false,ReservedRead=false,ResumeOnly=false,Resupply=false,RestCycle=false,Supplied=false,FoodMade=false,GatherHeld=false,HungerChecked=false,Preview=false,Mid=false,Fed=false;double Deadline=0,At=0,WaitAt=-1,ShotUntil=0,ProgressAt=0,PreviousTime=0,HeroTravel=0,PetTravel=0;
+    float RestGrowth=0,RestStamina=0;bool RestRecovered=false;
     TWeakObjectPtr<AResourceNode> SupplyNode;int32 SupplyPart=0,NodeBefore=0,ItemBefore=0;
-    int32 StartXP() const{return Resupply?9:8;}
-    int32 StartBond() const{return Resupply?12:9;}
-    int32 SpareSeeds() const{return Resupply?2:0;}
+    int32 StartXP() const{return RestCycle?10:Resupply?9:8;}
+    int32 StartBond() const{return RestCycle?15:Resupply?12:9;}
+    int32 SpareSeeds() const{return RestCycle?1:Resupply?2:0;}
     float WaitStamina=0;FVector PreviousHero,PreviousPet,HeroVelocity,PetVelocity,Anchor;
     bool Bind()
     {
@@ -165,6 +166,12 @@ struct FHomeCareTest
         return FVector::Dist2D(Before,Position)<=FMath::Max(static_cast<double>(M->GetMaxSpeed()),Velocity.Size2D())*Delta+3 &&
             FMath::Abs(Position.Z-Before.Z)<=FMath::Max(FMath::Abs(Pawn->GetVelocity().Z),FMath::Abs(Velocity.Z))*Delta+.5*FMath::Abs(World->GetGravityZ())*Delta*Delta+M->MaxStepHeight+3;
     }
+    bool Finish(int32 Food)
+    {
+        const auto SavedH=Hero->GetActorLocation(),SavedP=Pet->GetActorLocation();
+        if(!Hero->SaveProgress(TEXT("HomeCareDone")) || !Hero->LoadProgress(TEXT("HomeCareDone")) || !Bind() || !Farm.IsValid() || !SameWorld() || !Hero->GetActorLocation().Equals(SavedH,.01) || !Pet->GetActorLocation().Equals(SavedP,.01) || Pet->Experience!=StartXP()+1 || Pet->BondPoints!=StartBond()+(Fed?3:0) || Pet->Activity!=ECreatureActivity::Follow || Pet->WorkSite || Hero->Inventory->Count(EFrontierItem::Seeds)!=SpareSeeds() || Hero->Inventory->Count(EFrontierItem::Food)!=Food || Farm->StoredFood!=0 || Farm->Crop->IsOccupied() || HeroTravel<1000 || (RestCycle && !RestRecovered))return End(false,TEXT("done-save"));
+        UE_LOG(LogTemp,Display,TEXT("CF_HOME_CARE_LIFE PASS version=38 modules=25 facilities=2 seeds=%d food=%d xp=%d bond=%d observe=0 positionRetained=1"),SpareSeeds(),Food,StartXP()+1,StartBond()+(Fed?3:0));return End(true,TEXT("complete"));
+    }
     bool Tick()
     {
         if(!Pet.IsValid() || (!Farm.IsValid() && Phase!=-1 && Phase!=7) || FPlatformTime::Seconds()>Deadline)return End(false,TEXT("lifetime"));
@@ -188,6 +195,23 @@ struct FHomeCareTest
             (Units!=SpareSeeds()+(Fed?0:1) || Hero->Inventory->Count(EFrontierItem::Material)!=0 || (Resupply && Hero->Inventory->Count(EFrontierItem::Fiber)!=0))) || Pet->Cargo->Count()!=0 || !SameWorld())return End(false,TEXT("conservation"));
         // 截图等待仍逐帧采样真实位移和物资，不暂停生产或伙伴。
         if(FPlatformTime::Seconds()<ShotUntil)return true;
+        if(Phase==8)
+        {
+            if(!Mid)
+            {
+                if(Pet->Activity!=ECreatureActivity::Rest || !Pet->bResumeWorkAfterRest || !Hero->SaveProgress(TEXT("HomeCareWork")))return End(false,TEXT("rest-save"));
+                Mid=true;UE_LOG(LogTemp,Display,TEXT("CF_HOME_CARE_WORK PASS planted=1 seeds=0 xp=10"));
+            }
+            if(Pet->WorkSite!=Farm.Get() || Pet->Experience!=StartXP() || Pet->BondPoints!=StartBond())return End(false,TEXT("rest-task"));
+            if(Pet->Activity==ECreatureActivity::Rest)
+            {
+                if(!Pet->bResumeWorkAfterRest || !FMath::IsNearlyEqual(Farm->Crop->GrowthWork,RestGrowth,.01f) || Pet->Stamina<RestStamina-.01f || Farm->StoredFood!=0)return End(false,TEXT("rest-progress"));
+                RestStamina=Pet->Stamina;return true;
+            }
+            if(Pet->Activity!=ECreatureActivity::Work || Pet->bResumeWorkAfterRest || Pet->Stamina<80-Delta*1.5-.02 || Pet->Nutrition<20)return End(false,TEXT("rest-resume"));
+            RestRecovered=true;Phase=1;UE_LOG(LogTemp,Display,TEXT("CF_HOME_REST_RESUME PASS taskRetained=1 stamina=%.3f xp=10"),Pet->Stamina);
+            Photo(TEXT("Resumed"),Farm->GetActorLocation()+FVector(0,0,30));return true;
+        }
         if(Phase==6)
         {
             if(World->GetTimeSeconds()-At<1)return true;
@@ -235,7 +259,16 @@ struct FHomeCareTest
         {
             if(Pet->WorkSite!=Farm.Get())return End(false,TEXT("production-task"));
             if(!Mid && Farm->Crop->bPlanted && Farm->Crop->GrowthWork>0 && Farm->Crop->GrowthWork<UFarmCropComponent::RequiredWork)
-            {if(!Hero->SaveProgress(TEXT("HomeCareWork")))return End(false,TEXT("work-save"));Mid=true;UE_LOG(LogTemp,Display,TEXT("CF_HOME_CARE_WORK PASS planted=1 seeds=0 xp=%d"),StartXP());if(ResumeOnly)Phase=5;if(Photo(TEXT("Working"),Farm->GetActorLocation()+FVector(0,0,30)) || ResumeOnly)return true;}
+            {
+                if(RestCycle)
+                {
+                    RestGrowth=Farm->Crop->GrowthWork;RestStamina=Pet->Stamina;
+                    if(!CFInputQA::Press(Hero,EKeys::T) || Pet->Activity!=ECreatureActivity::Rest || !Pet->bResumeWorkAfterRest || Pet->WorkSite!=Farm.Get() || Farm->Crop->GrowthWork!=RestGrowth)return End(false,TEXT("manual-rest-task"));
+                    Phase=8;UE_LOG(LogTemp,Display,TEXT("CF_HOME_REST_ORDER PASS input=1 taskRetained=1 growth=%.3f stamina=%.3f"),RestGrowth,RestStamina);
+                    Photo(TEXT("Resting"),Farm->GetActorLocation()+FVector(0,0,30));return true;
+                }
+                if(!Hero->SaveProgress(TEXT("HomeCareWork")))return End(false,TEXT("work-save"));Mid=true;UE_LOG(LogTemp,Display,TEXT("CF_HOME_CARE_WORK PASS planted=1 seeds=0 xp=%d"),StartXP());if(ResumeOnly)Phase=5;if(Photo(RestCycle?TEXT("Resting"):TEXT("Working"),Farm->GetActorLocation()+FVector(0,0,30)) || ResumeOnly || RestCycle)return true;
+            }
             if(Farm->StoredFood==0)return true;
             if(!Mid || Farm->StoredFood!=1 || Pet->Experience!=StartXP()+1 || Farm->Crop->Seeds!=0 || Farm->Crop->bPlanted)return End(false,TEXT("harvest-state"));
             if(WaitAt<0){WaitAt=World->GetTimeSeconds();WaitStamina=Pet->Stamina;Photo(TEXT("Harvest"),Farm->GetActorLocation()+FVector(0,0,30));return true;}
@@ -248,6 +281,7 @@ struct FHomeCareTest
         {
             const int32 Result=Move();if(Result<0)return End(false,TEXT("return-blocked"));if(!Result)return true;Face(P+FVector(0,0,20));
             if(Pet->GetDistanceTo(Hero)>250 || Hero->TraceCreature()!=Pet.Get()){if(WaitAt<0)WaitAt=World->GetTimeSeconds();if(World->GetTimeSeconds()-WaitAt>15)return End(false,TEXT("join"));return true;}
+            if(RestCycle){if(Photo(TEXT("Provisions"),P+FVector(0,0,20)))return true;return Finish(1);}
             if(Resupply && Pet->Nutrition>80)
             {
                 // 不把刚吃过的伙伴强行再喂一次；验证拒绝不耗粮后，让原需求自然更新。
@@ -266,9 +300,7 @@ struct FHomeCareTest
             Fed=true;Phase=3;Photo(TEXT("Fed"),P+FVector(0,0,20));return true;
         }
         Face(P+FVector(0,0,20));if(!CFInputQA::Press(Hero,EKeys::J) || Pet->BondPoints!=StartBond()+3 || !Hero->Feedback.Contains(TEXT("冷却")))return End(false,TEXT("feed-cooldown"));
-        const auto SavedH=Hero->GetActorLocation(),SavedP=Pet->GetActorLocation();
-        if(!Hero->SaveProgress(TEXT("HomeCareDone")) || !Hero->LoadProgress(TEXT("HomeCareDone")) || !Bind() || !Farm.IsValid() || !SameWorld() || !Hero->GetActorLocation().Equals(SavedH,.01) || !Pet->GetActorLocation().Equals(SavedP,.01) || Pet->Experience!=StartXP()+1 || Pet->BondPoints!=StartBond()+3 || Pet->Activity!=ECreatureActivity::Follow || Pet->WorkSite || Hero->Inventory->Count(EFrontierItem::Seeds)!=SpareSeeds() || Hero->Inventory->Count(EFrontierItem::Food)!=0 || Farm->StoredFood!=0 || Farm->Crop->IsOccupied() || HeroTravel<1000)return End(false,TEXT("done-save"));
-        UE_LOG(LogTemp,Display,TEXT("CF_HOME_CARE_LIFE PASS version=38 modules=25 facilities=2 seeds=%d food=0 xp=%d bond=%d observe=0 positionRetained=1"),SpareSeeds(),StartXP()+1,StartBond()+3);return End(true,TEXT("complete"));
+        return Finish(0);
     }
 };
 }
@@ -277,12 +309,14 @@ void RunHomeCareScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read)
     auto State=MakeShared<FHomeCareTest>();State->World=World;State->Hero=Hero;State->Read=Read;State->Deadline=FPlatformTime::Seconds()+150;
     State->ReservedRead=FParse::Param(FCommandLine::Get(),TEXT("CFHomeCareReservedRead"));
     State->Resupply=FParse::Param(FCommandLine::Get(),TEXT("CFHomeCareResupply"));State->Supplied=State->Resupply && Read;
+    State->RestCycle=FParse::Param(FCommandLine::Get(),TEXT("CFHomeCareRestCycle"));
+    if(State->RestCycle && (State->Resupply || State->ReservedRead)){State->End(false,TEXT("rest-cycle-mode"));return;}
     if(State->Resupply && State->ReservedRead){State->End(false,TEXT("resupply-reserved-mode"));return;}
     State->ResumeOnly=FParse::Param(FCommandLine::Get(),TEXT("CFHomeCareResumeOnly"));
     if(State->ResumeOnly && !State->ReservedRead){State->End(false,TEXT("resume-only-mode"));return;}
     if(State->ReservedRead && !Read){State->End(false,TEXT("reserved-read-mode"));return;}
     const auto* Source=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("HomeCareInput"),0));
-    if(!Source || Source->FormatVersion!=38 || Source->HomeModules.Num()!=25 || Source->Facilities.Num()!=2 || !Hero->LoadProgress(TEXT("HomeCareInput")) || !State->Bind() || State->PetId!=FGuid(0x1209AAFE,0x4D5C4544,0x1D65AF94,0x1B0435D1) || State->Pet->Experience!=State->StartXP() || State->Pet->BondPoints!=State->StartBond() || Hero->Inventory->Count(EFrontierItem::Seeds)!=(State->Resupply?(Read?2:0):(Read?0:1)) || Hero->Inventory->Count(EFrontierItem::Food)!=0 || Hero->Inventory->Count(EFrontierItem::Material)!=0 || (State->Resupply && Hero->Inventory->Count(EFrontierItem::Fiber)!=0)){State->End(false,TEXT("source"));return;}
+    if(!Source || Source->FormatVersion!=38 || Source->HomeModules.Num()!=25 || Source->Facilities.Num()!=2 || !Hero->LoadProgress(TEXT("HomeCareInput")) || !State->Bind() || State->PetId!=FGuid(0x1209AAFE,0x4D5C4544,0x1D65AF94,0x1B0435D1) || State->Pet->Experience!=State->StartXP() || State->Pet->BondPoints!=State->StartBond() || Hero->Inventory->Count(EFrontierItem::Seeds)!=(State->RestCycle?(Read?1:2):State->Resupply?(Read?2:0):(Read?0:1)) || Hero->Inventory->Count(EFrontierItem::Food)!=0 || Hero->Inventory->Count(EFrontierItem::Material)!=0 || (State->Resupply && Hero->Inventory->Count(EFrontierItem::Fiber)!=0)){State->End(false,TEXT("source"));return;}
     State->House=HomeLayout::Collect(World);State->Facilities=Source->Facilities;State->Nickname=State->Pet->Nickname;State->Input=NewObject<UHomeMovementProbe>(Hero);State->Input->RegisterComponent();
     if(Read)
     {
@@ -293,6 +327,12 @@ void RunHomeCareScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read)
         if(State->ReservedRead){State->Phase=6;State->At=World->GetTimeSeconds();}
         if(State->ReservedRead){UE_LOG(LogTemp,Display,TEXT("CF_HOME_CARE_RESTORE_RESERVED PASS version=38 planted=0 reserved=1 xp=8 positionRetained=1 nutrition=%.3f stamina=%.3f"),State->Pet->Nutrition,State->Pet->Stamina);}
         else {UE_LOG(LogTemp,Display,TEXT("CF_HOME_CARE_RESTORE PASS version=38 planted=1 seeds=0 xp=%d"),State->StartXP());}
+        if(State->RestCycle)
+        {
+            if(State->Pet->Activity!=ECreatureActivity::Rest || !State->Pet->bResumeWorkAfterRest){State->End(false,TEXT("rest-read-source"));return;}
+            State->RestGrowth=State->Farm->Crop->GrowthWork;State->RestStamina=State->Pet->Stamina;State->Phase=8;
+            UE_LOG(LogTemp,Display,TEXT("CF_HOME_REST_RESTORE PASS taskRetained=1 positionRetained=1"));
+        }
     }
     else
     {

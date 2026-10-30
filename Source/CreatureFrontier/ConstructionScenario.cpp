@@ -162,6 +162,8 @@ struct FConstructionTest
                 if(!CFInputQA::Press(Hero,EKeys::E) || Pet->Construction->GetSite()!=Site.Get())return Finish(false,TEXT("cancel-reassign"));
                 CancelledOnce=true;UE_LOG(LogTemp,Display,TEXT("CF_CONSTRUCTION_CANCEL_CARRIED PASS saved=1 held=3 recovered=3 reassigned=1"));return true;
             }
+            if(!CFInputQA::Press(Hero,EKeys::T) || Pet->Activity!=ECreatureActivity::Rest || !Pet->bResumeWorkAfterRest || Pet->Construction->GetSite()!=Site.Get() || Pet->Cargo->Count()!=3)return Finish(false,TEXT("manual-rest-carried"));
+            UE_LOG(LogTemp,Display,TEXT("CF_CONSTRUCTION_MANUAL_REST PASS input=1 carried=3 taskRetained=1"));
             if(!Hero->SaveProgress(TEXT("ConstructionMid")))return Finish(false,TEXT("mid-save"));
             const auto OldPet=PetId,OldSite=SiteId,OldBox=CrateId;const auto Pose=Pet->GetActorTransform();
             if(!Hero->LoadProgress(TEXT("ConstructionMid")) || !Rebind() || PetId!=OldPet || SiteId!=OldSite || CrateId!=OldBox || !Pose.Equals(Pet->GetActorTransform(),.01) || Pet->Construction->GetSite()!=Site.Get() || Pet->Cargo->Count()!=3)return Finish(false,TEXT("mid-restore"));

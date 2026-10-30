@@ -620,17 +620,26 @@ void ACFPlayerCharacter::CommandWork()
 
 void ACFPlayerCharacter::CommandRest()
 {
-    if (!HasAuthority() || Health <= 0) return;
+    if (!HasAuthority() || Health <= 0 || UGameplayStatics::IsGamePaused(this)) return;
     AWorkStation* Site = nullptr;
     float Best = 800;
     for (TActorIterator<AWorkStation> It(GetWorld()); It; ++It)
         if (GetDistanceTo(*It) < Best) { Best = GetDistanceTo(*It); Site = *It; }
-    if (!Site) { Feedback = TEXT("休息命令需要靠近基地工作设施（8米）"); return; }
-    int32 Count = 0;
+    int32 Count = 0, ResumeCount = 0;
     for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It)
         if (IsCommandTarget(*It) && It->Health > 0)
-        { It->CancelFieldResource(); It->bResumeWorkAfterRest = false; It->WorkSite = Site; It->SetActivity(ECreatureActivity::Rest); ++Count; }
-    Feedback = FString::Printf(TEXT("%d位伙伴正回基地恢复生命和体力"), Count);
+        {
+            // 主动休息复用已有的续工意图；不清原工地、携料、资源目标或设施。
+            const bool HasTask=It->Construction->GetSite() || It->GetFieldResource() ||
+                (IsValid(It->WorkSite) && It->WorkSite->RequiredSpecialty!=EWorkSpecialty::Feeding);
+            const bool Working=It->Activity==ECreatureActivity::Work || (It->Activity==ECreatureActivity::Rest && It->bResumeWorkAfterRest);
+            if(HasTask && Working)
+            {It->bResumeWorkAfterRest=true;It->SetActivity(ECreatureActivity::Rest);++ResumeCount;}
+            else if(Site)
+            {It->CancelFieldResource();It->bResumeWorkAfterRest=false;It->WorkSite=Site;It->SetActivity(ECreatureActivity::Rest);++Count;}
+        }
+    Feedback = ResumeCount>0?FString::Printf(TEXT("%d位伙伴休息后续工；%d位回基地休息。F取消/跟随"),ResumeCount,Count):
+        !Site?TEXT("休息命令需要靠近基地工作设施（8米）"):FString::Printf(TEXT("%d位伙伴正回基地恢复生命和体力"), Count);
 }
 
 void ACFPlayerCharacter::HealCompanion()

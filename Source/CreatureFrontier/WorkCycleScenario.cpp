@@ -4,6 +4,7 @@
 #include "CreatureDefinition.h"
 #include "WorkStation.h"
 #include "FarmCropComponent.h"
+#include "ResourceNode.h"
 #include "BaseBuildingComponent.h"
 #include "InventoryComponent.h"
 #include "FrontierSaveGame.h"
@@ -81,11 +82,27 @@ void RunWorkCycleScenario(UWorld* World, ACFPlayerCharacter* Hero)
     bool Hunger = Pet->bResumeWorkAfterRest && Pet->Activity == ECreatureActivity::Rest;
     Pet->Nutrition = 19; Pet->Tick(0); Hunger &= Pet->Activity == ECreatureActivity::Rest;
     Pet->Nutrition = 20; Pet->Tick(0); Hunger &= Pet->Activity == ECreatureActivity::Work && !Pet->bResumeWorkAfterRest;
-    Pet->Nutrition = 60; Pet->bResumeWorkAfterRest = true; Pet->SetActivity(ECreatureActivity::Rest);
+    Pet->Nutrition = 60; Pet->Stamina=20; Pet->bResumeWorkAfterRest = true; Pet->SetActivity(ECreatureActivity::Rest);
     Hero->CommandRest(); Pet->Tick(1);
-    bool Manual = !Pet->bResumeWorkAfterRest && Pet->Activity == ECreatureActivity::Rest;
+    bool Manual = Pet->bResumeWorkAfterRest && Pet->Activity == ECreatureActivity::Rest && Pet->WorkSite==Garden && FMath::IsNearlyEqual(Pet->Stamina,32.f,.01f);
+    Pet->Stamina=80;Pet->Tick(0);Manual &= Pet->Activity==ECreatureActivity::Work && !Pet->bResumeWorkAfterRest && Pet->WorkSite==Garden;
+    UGameplayStatics::SetGamePaused(World,true);Hero->CommandRest();
+    Manual &= Pet->Activity==ECreatureActivity::Work && Pet->WorkSite==Garden && !Pet->bResumeWorkAfterRest;
+    UGameplayStatics::SetGamePaused(World,false);
+    // 没有原任务时仍是普通基地休息，不凭空创建工作或恢复跟随前已取消的任务。
+    Hero->CommandFollow();Hero->CommandRest();Pet->Tick(1);
+    Manual &= !Pet->bResumeWorkAfterRest && Pet->Activity==ECreatureActivity::Rest;
     Pet->bResumeWorkAfterRest = true; Hero->CommandFollow();
     Manual &= !Pet->bResumeWorkAfterRest && !Pet->WorkSite && Pet->Activity == ECreatureActivity::Follow;
+    AResourceNode* Field=nullptr;for(TActorIterator<AResourceNode> It(World);It;++It){Field=*It;break;}
+    Manual &= Field && Pet->AssignFieldResource(Field);
+    Hero->CommandRest();Manual &= Pet->Activity==ECreatureActivity::Rest && Pet->bResumeWorkAfterRest && Pet->GetFieldResource()==Field && !Pet->WorkSite;
+    Pet->Stamina=80;Pet->Tick(0);Manual &= Pet->Activity==ECreatureActivity::Work && Pet->GetFieldResource()==Field;
+    Hero->CommandFollow();Manual &= !Pet->GetFieldResource() && !Pet->bResumeWorkAfterRest;
+    // 原运输设施和已携食物也必须保留，不能因主动休息丢失货物。
+    Garden->RequiredSpecialty=EWorkSpecialty::Transport;Pet->WorkSite=Garden;Pet->CarriedFood=2;Pet->SetActivity(ECreatureActivity::Work);
+    Hero->CommandRest();Manual &= Pet->Activity==ECreatureActivity::Rest && Pet->bResumeWorkAfterRest && Pet->WorkSite==Garden && Pet->CarriedFood==2;
+    Hero->CommandFollow();Pet->CarriedFood=0;Garden->RequiredSpecialty=EWorkSpecialty::Farming;
     Pet->WorkSite = Garden; Pet->SetActivity(ECreatureActivity::Rest); Pet->bResumeWorkAfterRest = true; Pet->Stamina = 20;
     auto* Enemy = World->SpawnActor<ACreatureCharacter>(FVector(200,-1200,40),FRotator::ZeroRotator);
     Enemy->SetActorTickEnabled(false);

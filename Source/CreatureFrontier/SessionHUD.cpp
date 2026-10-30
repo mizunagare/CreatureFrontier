@@ -47,7 +47,7 @@ void ACFHUD::DrawControlHelp(ACFPlayerCharacter* Player)
         TEXT("G 播种/照料/收获（3米）| F2/F3 存取种子"),
         TEXT("F4 给自己的空闲伙伴命名（2.5米，输入时暂停）"),
         TEXT("F7 归家回忆（水晶/脱险）：安全空闲，2.5米内"),
-        TEXT("T 休息 | P 治疗瞄准的伙伴"),
+        TEXT("T 休息后续工 | F 取消工作/跟随 | P 治疗"),
         TEXT("J 喂食伙伴/向温顺野生生物分享食物 | H 自疗"),
         TEXT("Y 安静陪伴 / F6 玩耍（安全2.5米，玩耍耗体力/饱食20）"),
         TEXT("B 建造 | V 切换设施 | X 拆除"),
