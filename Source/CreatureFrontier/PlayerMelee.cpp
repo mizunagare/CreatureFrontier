@@ -5,6 +5,8 @@
 #include "Camera/CameraComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "TimerManager.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 
 float ACFPlayerCharacter::GetPlayerMeleeRange() const { return Equipment->GetState().bSpearEquipped?320.f:180.f; }
 
@@ -49,5 +51,7 @@ void ACFPlayerCharacter::ResolveMeleeStrike()
     if(GetWorld()->LineTraceSingleByChannel(Sight,Start,Hit.ImpactPoint,ECC_Visibility,Params) && Sight.GetActor()!=Target)
     { Feedback=TEXT("近战被障碍物阻挡"); return; }
     const float Applied=UGameplayStatics::ApplyDamage(Target,PendingMeleeDamage,GetController(),this,UDamageType::StaticClass());
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFCombatTrace")))
+        UE_LOG(LogTemp,Display,TEXT("CF_PLAYER_MELEE_TRACE target=%s raw=%.2f applied=%.2f spear=%d"),*Target->PersistentId.ToString(),PendingMeleeDamage,Applied,bPendingSpear);
     Feedback=Applied>0?TEXT("近战命中！右键捕捉，削弱目标但不要击倒它"):TEXT("生物正在撤退，请等待它返回栖息地");
 }

@@ -4,6 +4,8 @@
 
 ## 探索朝向开发候选（限定验证，非最终版）
 
+共同近战整合候选：`F:\CreatureFrontierBuilds\Windows-JointMelee\CreatureFrontier.exe`。原左键长矛与Q／G伙伴技能对同一首领真实结算、撤离返家及中途恢复已在Editor／Windows分别验证，详见[共同接敌记录](Docs/JOINT_MELEE.md)。不改普通战斗规则，尚未验收主动躲避预警或击败首领；此候选共享不可变烹饪文件，不可直接改写共享文件，旧存档不会自动迁移。
+
 当前普攻冷却修复构建：`F:\CreatureFrontierBuilds\Windows-MeleeCooldown\CreatureFrontier.exe`。新档精确保留生物剩余普攻冷却，旧档采用一次原间隔兼容；Editor／Windows专项、真实接敌及自身中途恢复、原战斗和农业关联已验证，见[修复与操作记录](Docs/MELEE_COOLDOWN_PERSISTENCE.md)。F5保存／F9确认读取，正常攻击规则未改；首领未击败。F盘为逐文件哈希核对的独立复制，未自动导入旧目录存档。下方旧候选保留历史说明，不含此修复；C盘已无余量，不建议继续在那里运行存档测试。
 
 最新结算诊断候选：`E:\CreatureFrontierBuilds\Windows-CombatTrace\CreatureFrontier.exe`。新增可选技能／伤害／冷却存读追踪，确认技能可真实造成27伤害，也发现**普攻冷却读档清零尚未修复**，建议修复前脱离战斗后再保存。证据见[战斗结算追踪](Docs/COMBAT_OUTCOME_TRACE.md)。本地候选共享不可变引擎和烹饪文件，不可直接改写共享文件；不是首领战完成或稳定发布版。

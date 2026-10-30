@@ -745,6 +745,7 @@ namespace
 // 沿真实导航绕行旧烬尾兽出生点；所有敌人仍正常警戒、追击、攻击和归巢。
 struct FStarterFlank : FStarterRecovery
 {
+    bool Melee=false,MeleeSent=false,MeleeConfirmed=false;
     TWeakObjectPtr<ACreatureCharacter> Boss;TWeakObjectPtr<AWildEncounter> Region;
     int32 Leg=0;bool Hit=false,SkillStarted=false;float DamageSeen=0;double SafeAt=-1;
     FVector Goal(bool Returning,int32 Index) const
@@ -778,6 +779,7 @@ struct FStarterFlank : FStarterRecovery
         if(Pet->SpecialWindupRemaining>0)SkillStarted=true;
         if(Phase==2 && Boss->Health<Boss->GetMaxHealth()){Hit=true;DamageSeen=FMath::Max(DamageSeen,Boss->GetMaxHealth()-Boss->Health);}
         if(World->GetTimeSeconds()>=NextDiagnostic){NextDiagnostic=World->GetTimeSeconds()+3;UE_LOG(LogTemp,Display,TEXT("CF_STARTER_FLANK_STATE phase=%d leg=%d hero=%s pet=%s boss=%s heroHP=%.1f petHP=%.1f bossHP=%.1f activity=%d stamina=%.1f windup=%.2f"),Phase,Leg,*H.ToString(),*P.ToString(),*Boss->GetActorLocation().ToString(),Hero->Health,Pet->Health,Boss->Health,static_cast<int32>(Pet->Activity),Pet->Stamina,Pet->SpecialWindupRemaining);}
+        if(Phase==9){const int32 Result=Move();if(Result<0)return End(false,TEXT("player-melee-walk"));if(Result>0)Phase=2;return true;}
         if(FPlatformTime::Seconds()<ShotUntil)return true;
         if(Phase==-1)
         {
@@ -802,6 +804,30 @@ struct FStarterFlank : FStarterRecovery
         }
         if(Phase==2)
         {
+            // 此处只在北侧接敌近战专项中驱动原移动和左键绑定，不直接结算伤害。
+            if(Melee && !MeleeConfirmed)
+            {
+                if(World->GetTimeSeconds()-At>15)return End(false,TEXT("player-melee-timeout"));
+                if(!MeleeSent)
+                {
+                    if(Hero->GetDistanceTo(Boss.Get())>280)
+                    {
+                        const FVector Away=(Hero->GetActorLocation()-Boss->GetActorLocation()).GetSafeNormal2D();
+                        if(!Plan(Boss->GetActorLocation()+Away*240,9))return End(false,TEXT("player-melee-path"));
+                        CFInputQA::Release(Hero,EKeys::LeftShift);return true;
+                    }
+                    Face(Boss->GetActorLocation());
+                    if(!CFInputQA::Action(Hero,TEXT("Attack"),EKeys::LeftMouseButton) || !Hero->IsMeleePending())return End(false,TEXT("player-melee-input"));
+                    MeleeSent=true;return true;
+                }
+                if(Hero->IsMeleePending())return true;
+                if(!Hero->Feedback.Contains(TEXT("近战命中")))return End(false,TEXT("player-melee-missed"));
+                MeleeConfirmed=true;
+                UE_LOG(LogTemp,Display,TEXT("CF_STARTER_FLANK_MELEE PASS input=1 pending=1 boss=%s pet=%s"),*Boss->PersistentId.ToString(),*PetId.ToString());
+            }
+            // 玩家先命中不能替代伙伴成果；有界等待原伙伴继续原集火／技能。
+            if(Melee && (!SkillStarted || DamageSeen<=35))
+            {if(World->GetTimeSeconds()-At>15)return End(false,TEXT("joint-combat-no-partner-hit"));return true;}
             if(!Hit){if(World->GetTimeSeconds()-At>15)return End(false,TEXT("combat-no-hit"));return true;}
             if(Photo(TEXT("Engaged"),Boss->GetActorLocation()))return true;
             // 技能可以在双方尚未普攻时命中；等待真实攻击产生冷却，不伪造正值检查点。
@@ -837,7 +863,7 @@ void RunStarterFlankScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read)
 {
     auto S=MakeShared<FStarterFlank>();S->World=World;S->Hero=Hero;S->Read=Read;S->Deadline=FPlatformTime::Seconds()+150;
     // 只继承真实恢复档中既有的材料账：此前制2药、用1药，本段不再次制作。
-    S->Crafted=2;S->Used=1;
+    S->Crafted=2;S->Used=1;S->Melee=FParse::Param(FCommandLine::Get(),TEXT("CFStarterFlankMelee"));
     const auto* Source=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("StarterFlankInput"),0));
     if(!Source || Source->FormatVersion!=38 || Source->Facilities.Num()!=1 || !Source->HomeModules.IsEmpty() || !Hero->LoadProgress(TEXT("StarterFlankInput"))){S->End(false,TEXT("source"));return;}
     int32 LegacyCooldowns=0,CurrentCooldowns=0;
