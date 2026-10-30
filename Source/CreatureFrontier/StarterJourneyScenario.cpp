@@ -618,3 +618,116 @@ void RunStarterScoutScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read)
     S->Preview=FParse::Param(FCommandLine::Get(),TEXT("CFStarterScoutPreview")) || FParse::Param(FCommandLine::Get(),TEXT("CFStarterRescuePreview"));if(S->Preview){S->Root=FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir()/(S->Rescue?TEXT("StarterRescuePreview"):TEXT("StarterScoutPreview"))/FGuid::NewGuid().ToString(EGuidFormats::Digits));IFileManager::Get().MakeDirectory(*S->Root,true);UE_LOG(LogTemp,Display,TEXT("CF_STARTER_SCOUT_PREVIEW_ROOT %s"),*S->Root);}
     UE_LOG(LogTemp,Display,TEXT("CF_STARTER_SCOUT_SOURCE PASS read=%d positionRetained=1 pet=%s bossHP=%.1f heroHP=%.1f petHP=%.1f stamina=%.1f nutrition=%.1f"),Read,*S->PetId.ToString(),S->Boss->Health,Hero->Health,S->Pet->Health,S->Pet->Stamina,S->Pet->Nutrition);FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([S](float){return S->Tick();}));
 }
+
+namespace
+{
+// 从真正药品耗尽的返家档恢复；伙伴在设施休息，玩家实际采集原料制作药品。
+struct FStarterRecovery : FStarterPrep
+{
+    int32 Crafted=0,Used=0;bool Held=false;float InitialHealth=0;
+    bool End(bool Pass,const TCHAR* Reason)
+    {
+        if(Held)CFInputQA::Release(Hero,EKeys::M);if(Input.IsValid())Input->Direction=FVector::ZeroVector;CFInputQA::Release(Hero,EKeys::LeftShift);
+        const auto Feedback=Hero->Feedback;if(!Pass)Hero->SaveProgress(TEXT("StarterRecoveryBlocked"));
+        UE_LOG(LogTemp,Display,TEXT("CF_STARTER_RECOVERY %s reason=%s phase=%d heroTravel=%.1f petTravel=%.1f wildTravel=%.1f heroHP=%.1f petHP=%.1f crafted=%d used=%d feedback=%s"),Pass?TEXT("PASS"):TEXT("FAIL"),Reason,Phase,HeroTravel,PetTravel,WildTravel,Hero->Health,Pet.IsValid()?Pet->Health:-1,Crafted,Used,*Feedback);
+        FPlatformMisc::RequestExitWithStatus(false,Pass?0:1);return false;
+    }
+    bool Budget() const
+    {
+        if(!Pet.IsValid() || !Brush.IsValid() || !Garden.IsValid())return false;const int32 Harvested=14-Brush->Remaining;
+        int32 Farms=0;for(TActorIterator<AWorkStation> It(World);It;++It)if(It->bPlayerBuilt)++Farms;
+        const auto& Gear=Hero->Equipment->GetState();
+        return Harvested>=0 && Harvested<=10 && Hero->Inventory->Count(EFrontierItem::Material)+5*Crafted==Harvested && Hero->Inventory->Count(EFrontierItem::Medicine)==Crafted-Used &&
+            Hero->Inventory->Count(EFrontierItem::Food)==2 && Hero->Inventory->Count(EFrontierItem::Seeds)==1 && Hero->Inventory->Count(EFrontierItem::CaptureDevice)==7 && Hero->Inventory->Count(EFrontierItem::Fiber)==0 &&
+            Pet->Experience==12 && Pet->BondPoints==3 && Pet->Nickname==Nickname && Pet->bAvoidCombat && Gear.bSpearEquipped && Gear.bVestEquipped && Hero->GetObjectives().Claimed==4 && !Hero->GetObjectives().bAlphaResolved &&
+            Farms==1 && HomeLayout::Collect(World).IsEmpty() && Garden->PersistentId==OriginalGarden.Id && Garden->GetActorTransform().Equals(OriginalGarden.Transform,.01) && Garden->StoredFood==OriginalGarden.StoredFood && Garden->Crop->Seeds==OriginalGarden.Seeds && Garden->Crop->bPlanted==OriginalGarden.bPlanted && FMath::IsNearlyEqual(Garden->Crop->GrowthWork,OriginalGarden.GrowthWork,.01f);
+    }
+    bool Tick()
+    {
+        if(!Pet.IsValid() || !Bench.IsValid() || FPlatformTime::Seconds()>Deadline)return End(false,TEXT("lifetime"));
+        const auto H=Hero->GetActorLocation(),P=Pet->GetActorLocation();const double Delta=World->GetTimeSeconds()-LastTime;
+        if(!Motion(Hero,LastH,VelocityH,Delta) || !Motion(Pet.Get(),LastP,VelocityP,Delta) || Hero->Health<=0 || Pet->Health<=0 || !Pet->IsActorTickEnabled())return End(false,TEXT("motion-health"));
+        HeroTravel+=FVector::Dist(H,LastH);PetTravel+=FVector::Dist(P,LastP);LastH=H;LastP=P;VelocityH=Hero->GetVelocity();VelocityP=Pet->GetVelocity();LastTime=World->GetTimeSeconds();
+        int32 Ecology=0,Owned=0;for(TActorIterator<AWildEncounter> It(World);It;++It){++Ecology;if(!It->IsActorTickEnabled())return End(false,TEXT("ecology"));}
+        for(TActorIterator<ACreatureCharacter> It(World);It;++It)
+        {
+            if(It->Tamer==Hero->GetController())++Owned;
+            if(It->Disposition!=ECreatureDisposition::Tamed && It->Health>0){if(!It->IsActorTickEnabled() || !It->GetActorEnableCollision() || It->GetCharacterMovement()->MovementMode==MOVE_None)return End(false,TEXT("wild-disabled"));if(const auto* Old=WildPositions.Find(It->PersistentId))WildTravel+=FVector::Dist(*Old,It->GetActorLocation());WildPositions.Add(It->PersistentId,It->GetActorLocation());}
+        }
+        if(Ecology!=3 || Owned!=1 || !Budget())return End(false,TEXT("budget-home"));if(FPlatformTime::Seconds()<ShotUntil)return true;
+        if(Phase==-1)
+        {
+            if(World->GetTimeSeconds()-At<.2 || UNavigationSystemV1::IsNavigationBeingBuiltOrLocked(World))return true;
+            if(!Read)
+            {
+                if(!CFInputQA::Press(Hero,EKeys::T) || Pet->Activity!=ECreatureActivity::Rest || Pet->WorkSite!=Bench.Get() || !Hero->SaveProgress(TEXT("StarterRecoveryMid")))return End(false,TEXT("rest-input"));
+                UE_LOG(LogTemp,Display,TEXT("CF_STARTER_RECOVERY_REST PASS input=1 samePet=1 facility=1"));
+            }
+            Phase=8;return true;
+        }
+        if(Phase==8)
+        {
+            if(Photo(TEXT("Resting"),P))return true;
+            if(!Plan(Brush->GetActorLocation()+(H-Brush->GetActorLocation()).GetSafeNormal2D()*180,0))return End(false,TEXT("gather-path"));return true;
+        }
+        if(Phase==0 || Phase==4)
+        {
+            const int32 Result=Move();if(Result<0)return End(false,TEXT("walk-blocked"));if(!Result)return true;Phase=Phase==0?1:5;At=World->GetTimeSeconds();return true;
+        }
+        if(Phase==1)
+        {
+            Face(Brush->GetActorLocation());if(Hero->TraceResource()!=Brush.Get()){if(World->GetTimeSeconds()-At>5)return End(false,TEXT("gather-sight"));return true;}
+            if(!CFInputQA::Press(Hero,EKeys::M) || !Hero->Gathering->IsGathering())return End(false,TEXT("gather-input"));Held=true;Phase=2;At=World->GetTimeSeconds();return true;
+        }
+        if(Phase==2)
+        {
+            if(Hero->Inventory->Count(EFrontierItem::Material)<10){if(!Hero->Gathering->IsGathering() || World->GetTimeSeconds()-At>30)return End(false,TEXT("gather-interrupted"));return true;}
+            if(!CFInputQA::Release(Hero,EKeys::M) || Brush->Remaining!=4)return End(false,TEXT("gather-count"));Held=false;
+            UE_LOG(LogTemp,Display,TEXT("CF_STARTER_RECOVERY_GATHER PASS input=1 material=10 sourcePaid=10 experience=12"));Photo(TEXT("Gathered"),Brush->GetActorLocation());Phase=3;return true;
+        }
+        if(Phase==3){if(!Plan(Bench->GetActorLocation()+FVector(210,-180,40),4))return End(false,TEXT("return-path"));return true;}
+        if(Phase==5)
+        {
+            if(!CFInputQA::Press(Hero,EKeys::Two) || Hero->Inventory->Count(EFrontierItem::Medicine)!=1 || Hero->Inventory->Count(EFrontierItem::Material)!=5)return End(false,TEXT("craft-first"));++Crafted;
+            if(!CFInputQA::Press(Hero,EKeys::Two) || Hero->Inventory->Count(EFrontierItem::Medicine)!=2 || Hero->Inventory->Count(EFrontierItem::Material)!=0)return End(false,TEXT("craft-second"));++Crafted;
+            if(!CFInputQA::Press(Hero,EKeys::H) || Hero->Health!=100 || Hero->Inventory->Count(EFrontierItem::Medicine)!=1)return End(false,TEXT("heal-self"));++Used;
+            if(!CFInputQA::Press(Hero,EKeys::H) || Hero->Inventory->Count(EFrontierItem::Medicine)!=1)return End(false,TEXT("full-health-reject"));
+            UE_LOG(LogTemp,Display,TEXT("CF_STARTER_RECOVERY_MEDICINE PASS crafted=2 materialPaid=10 selfUsed=1 retained=1 fullHealthReject=1"));Photo(TEXT("Resupplied"),P);Phase=6;At=World->GetTimeSeconds();return true;
+        }
+        if(Phase==6)
+        {
+            if(Pet->Activity!=ECreatureActivity::Rest || Pet->WorkSite!=Bench.Get())return End(false,TEXT("rest-lost"));
+            if(Pet->Health<Pet->GetMaxHealth() || Pet->Stamina<99){if(World->GetTimeSeconds()-At>30)return End(false,TEXT("rest-timeout"));return true;}
+            if(!CFInputQA::Press(Hero,EKeys::F))return End(false,TEXT("follow-input"));Phase=7;At=World->GetTimeSeconds();return true;
+        }
+        if(Phase==7)
+        {
+            if(Pet->Activity!=ECreatureActivity::Follow || Pet->GetDistanceTo(Hero)>250){if(World->GetTimeSeconds()-At>20)return End(false,TEXT("regroup"));return true;}
+            if(Photo(TEXT("Recovered"),P))return true;const float HP=Pet->Health,SP=Pet->Stamina;
+            if(HeroTravel<300 || !Hero->SaveProgress(TEXT("StarterRecoveryDone")) || !Hero->LoadProgress(TEXT("StarterRecoveryDone")))return End(false,TEXT("save"));
+            Pet.Reset();Garden.Reset();Brush.Reset();for(TActorIterator<ACreatureCharacter> It(World);It;++It)if(It->PersistentId==PetId)Pet=*It;
+            for(TActorIterator<AWorkStation> It(World);It;++It)if(It->PersistentId==OriginalGarden.Id)Garden=*It;for(TActorIterator<AResourceNode> It(World);It;++It)if(It->PersistentId==FGuid(0xCF170000,0,0,1))Brush=*It;
+            if(!Pet.IsValid() || !Hero->GetActorLocation().Equals(H,.01) || !Pet->GetActorLocation().Equals(P,.01) || Hero->Health!=100 || Pet->Health!=HP || Pet->Stamina!=SP || !Budget())return End(false,TEXT("restore"));
+            UE_LOG(LogTemp,Display,TEXT("CF_STARTER_RECOVERY_LIFE PASS version=38 positionRetained=1 heroHP=100 petFull=1 medicine=1 material=0 claimed=4"));return End(true,TEXT("complete"));
+        }
+        return true;
+    }
+};
+}
+void RunStarterRecoveryScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read)
+{
+    auto S=MakeShared<FStarterRecovery>();S->World=World;S->Hero=Hero;S->Read=Read;S->Deadline=FPlatformTime::Seconds()+150;
+    const auto* Source=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("StarterRecoveryInput"),0));
+    if(!Source || Source->FormatVersion!=38 || Source->HomeModules.Num()!=0 || Source->Facilities.Num()!=1 || !Hero->LoadProgress(TEXT("StarterRecoveryInput"))){S->End(false,TEXT("source"));return;}
+    S->OriginalGarden=Source->Facilities[0];int32 Owned=0;
+    for(TActorIterator<ACreatureCharacter> It(World);It;++It)if(It->Tamer==Hero->GetController()){S->Pet=*It;++Owned;}
+    for(TActorIterator<AWorkStation> It(World);It;++It){if(It->PersistentId==S->OriginalGarden.Id)S->Garden=*It;if(!It->bPlayerBuilt && It->RequiredSpecialty==EWorkSpecialty::Gathering)S->Bench=*It;}
+    for(TActorIterator<AResourceNode> It(World);It;++It)if(It->PersistentId==FGuid(0xCF170000,0,0,1))S->Brush=*It;
+    if(Owned!=1 || !S->Pet.IsValid() || !S->Bench.IsValid() || !S->Brush.IsValid() || S->Brush->Remaining!=14 || Hero->Health>=100 || S->Pet->Health<=0 || S->Pet->Health>=S->Pet->GetMaxHealth() || (Read && (S->Pet->Activity!=ECreatureActivity::Rest || S->Pet->WorkSite!=S->Bench.Get()))){S->End(false,TEXT("source-state"));return;}
+    S->PetId=S->Pet->PersistentId;S->Nickname=S->Pet->Nickname;S->InitialHealth=Hero->Health;const auto* Partner=Source->Creatures.FindByPredicate([&](const FCreatureSaveRecord& R){return R.Id==S->PetId;});
+    const auto* Catalog=UCraftingCatalog::Load();const auto* Recipe=Catalog?Catalog->Find(TEXT("Medicine")):nullptr;
+    if(!Partner || !Hero->GetActorLocation().Equals(Source->PlayerTransform.GetLocation(),.01) || !S->Pet->GetActorLocation().Equals(Partner->Transform.GetLocation(),.01) || !Recipe || Recipe->Inputs.Num()!=1 || Recipe->Inputs.FindRef(EFrontierItem::Material)!=5 || Recipe->OutputAmount!=1 || !S->Budget()){S->End(false,TEXT("source-position-budget"));return;}
+    S->LastH=Hero->GetActorLocation();S->LastP=S->Pet->GetActorLocation();S->VelocityH=Hero->GetVelocity();S->VelocityP=S->Pet->GetVelocity();S->LastTime=S->At=World->GetTimeSeconds();S->Input=NewObject<UHomeMovementProbe>(Hero);S->Input->RegisterComponent();
+    S->Preview=FParse::Param(FCommandLine::Get(),TEXT("CFStarterRecoveryPreview"));if(S->Preview){S->Root=FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir()/TEXT("StarterRecoveryPreview")/FGuid::NewGuid().ToString(EGuidFormats::Digits));IFileManager::Get().MakeDirectory(*S->Root,true);UE_LOG(LogTemp,Display,TEXT("CF_STARTER_RECOVERY_PREVIEW_ROOT %s"),*S->Root);}
+    UE_LOG(LogTemp,Display,TEXT("CF_STARTER_RECOVERY_SOURCE PASS read=%d positionRetained=1 pet=%s"),Read,*S->PetId.ToString());FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([S](float){return S->Tick();}));
+}

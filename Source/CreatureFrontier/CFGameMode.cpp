@@ -91,6 +91,8 @@ void ACFGameMode::BeginPlay()
             if(!It->bHasHabitat){It->bHasHabitat=true;It->HabitatHome=Origin;}
         }
     SeedFrontierResources(GetWorld());
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFStarterRecoveryTest")) || FParse::Param(FCommandLine::Get(),TEXT("CFStarterRecoveryRead")))
+    {const bool Read=FParse::Param(FCommandLine::Get(),TEXT("CFStarterRecoveryRead"));FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this,Read](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunStarterRecoveryScenario(GetWorld(),Hero,Read);},1.f,false);return;}
     if(FParse::Param(FCommandLine::Get(),TEXT("CFStarterRescueTest")) || FParse::Param(FCommandLine::Get(),TEXT("CFStarterRescueRead")))
     {const bool Read=FParse::Param(FCommandLine::Get(),TEXT("CFStarterRescueRead"));FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this,Read](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunStarterScoutScenario(GetWorld(),Hero,Read);},1.f,false);return;}
     if(FParse::Param(FCommandLine::Get(),TEXT("CFStarterScoutTest")) || FParse::Param(FCommandLine::Get(),TEXT("CFStarterScoutRead")))

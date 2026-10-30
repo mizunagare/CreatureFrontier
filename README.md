@@ -4,6 +4,8 @@
 
 ## 探索朝向开发候选（限定验证，非最终版）
 
+最新返家恢复候选：`C:\CreatureFrontierBuilds\Windows-StarterRecovery\CreatureFrontier.exe`。真实受伤／药品耗尽返家档，通过原T伙伴休息、玩家M采料、2制作药品、H治疗与F归队恢复再次出行的基础补给；Editor／Windows及自身休息档恢复已验证，详情见[返家恢复](Docs/STARTER_RECOVERY.md)。仍为开发原型，未完成首领实战，旧包保留。
+
 最新归巢修复候选：`C:\CreatureFrontierBuilds\Windows-PlacedHabitat\CreatureFrontier.exe`。补齐原地图放置生物的出生锚点及当前旧档恢复，真实倒地伙伴经原药品救援、避战、安全返家和存读已在Editor／Windows分别验证，旧包保留。操作、证据和多来源身份限制见[旧放置生物归巢](Docs/PLACED_HABITATS.md)。首领仍未击败；下一主线是基地恢复和补药后再出行。
 
 探索准备候选：`C:\CreatureFrontierBuilds\Windows-StarterPrep\CreatureFrontier.exe`。第五目标会先建议原4／5制作长矛和护甲，已有未装备时提示6／7，装备后显示实际水晶高地方位／直线距离与危险提醒。真实农业来源的采料、装备消费、农圃／补给保留及中途存读已验证，见[新家园探索准备](Docs/STARTER_PREPARATION.md)。提示不强制门槛，装备也不保证战胜首领；真实首领战斗仍待。
