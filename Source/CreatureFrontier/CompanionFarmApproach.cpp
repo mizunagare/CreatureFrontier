@@ -3,6 +3,11 @@
 #include "NavigationSystem.h"
 #include "NavigationPath.h"
 #include "Components/CapsuleComponent.h"
+#include "CompanionClearance.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
+#include "GameFramework/Controller.h"
+#include "CFPlayerCharacter.h"
 
 bool ACreatureCharacter::CanReachFarm(const AWorkStation* Site) const
 {
@@ -18,7 +23,7 @@ void ACreatureCharacter::ApproachFarm(AWorkStation* Site)
     auto* Nav=FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
     if(!Nav || !IsValid(Site)){StopNavigation();NextNavigationUpdate=Now+.4;return;}
     // 设施中心不是站立点；限制垂直投影，避免选择同一水平位置上方的屋顶。
-    bool Found=false;FVector Best=FVector::ZeroVector;double BestLength=DBL_MAX;
+    bool Found=false,CharacterBlocked=false;FVector Best=FVector::ZeroVector;double BestLength=DBL_MAX;
     for(int32 Index=0;Index<8;++Index)
     {
         const double Angle=Index*PI/4;
@@ -28,12 +33,40 @@ void ACreatureCharacter::ApproachFarm(AWorkStation* Site)
         const FVector Center=Projected.Location+FVector(0,0,GetCapsuleComponent()->GetScaledCapsuleHalfHeight());
         if(FVector::Dist(Center,Site->GetActorLocation())>210)continue;
         FHitResult Hit;FCollisionQueryParams Params(SCENE_QUERY_STAT(FarmStandSight),false,this);
+        // 农圃旁的导航面不代表角色能站下，尤其不能选择主人正占据的门边位置。
+        const auto* Shape=GetCapsuleComponent();
+        if(GetWorld()->OverlapBlockingTestByChannel(Center,FQuat::Identity,ECC_Pawn,FCollisionShape::MakeCapsule(Shape->GetScaledCapsuleRadius()-1,Shape->GetScaledCapsuleHalfHeight()-1),Params))
+        {
+            if(FParse::Param(FCommandLine::Get(),TEXT("CFFarmApproachTrace")))UE_LOG(LogTemp,Display,TEXT("CF_FARM_APPROACH_REJECT reason=occupied goal=%s"),*Center.ToString());
+            continue;
+        }
         if(GetWorld()->LineTraceSingleByChannel(Hit,Center,Site->GetActorLocation()+FVector(0,0,30),ECC_Visibility,Params) && Hit.GetActor()!=Site)continue;
         const auto* Path=UNavigationSystemV1::FindPathToLocationSynchronously(GetWorld(),GetActorLocation(),Projected.Location,this);
         if(!Path || !Path->IsValid() || Path->IsPartial())continue;
+        // 最短的静态导航路径仍可能穿过玩家；复用原人物路径检查，不忽略真实碰撞。
         const double Length=Path->GetPathLength();
+        if(!FrontierFollowPath::ClearPath(this,Path))
+        {
+            CharacterBlocked=true;
+            if(FParse::Param(FCommandLine::Get(),TEXT("CFFarmApproachTrace")))UE_LOG(LogTemp,Display,TEXT("CF_FARM_APPROACH_REJECT reason=character-path goal=%s"),*Center.ToString());
+            continue;
+        }
         if(Length<BestLength){BestLength=Length;Best=Projected.Location;Found=true;}
     }
-    if(Found)NavigateTo(Best,15);
-    else {StopNavigation();NextNavigationUpdate=Now+.4;}
+    if(Found)
+    {
+        if(auto* FarmOwner=Tamer?Cast<ACFPlayerCharacter>(Tamer->GetPawn()):nullptr;FarmOwner && FarmOwner->Feedback==TEXT("农圃接近通道被角色占用，请让开通路；伙伴保留原工作"))
+            FarmOwner->Feedback=TEXT("农圃通路已恢复，伙伴继续原工作");
+        NextFarmBlockHint=0;
+        if(FParse::Param(FCommandLine::Get(),TEXT("CFFarmApproachTrace")))UE_LOG(LogTemp,Display,TEXT("CF_FARM_APPROACH_SELECT goal=%s length=%.1f"),*Best.ToString(),BestLength);
+        NavigateTo(Best,15);
+    }
+    else
+    {
+        // 无安全接近通道时明确告知玩家，保留原农业任务，让开后按原更新继续。
+        auto* FarmOwner=Tamer?Cast<ACFPlayerCharacter>(Tamer->GetPawn()):nullptr;
+        if(CharacterBlocked && FarmOwner && Now>=NextFarmBlockHint)
+        {FarmOwner->Feedback=TEXT("农圃接近通道被角色占用，请让开通路；伙伴保留原工作");NextFarmBlockHint=Now+5;}
+        StopNavigation();NextNavigationUpdate=Now+.4;
+    }
 }

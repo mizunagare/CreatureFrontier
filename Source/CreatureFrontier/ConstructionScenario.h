@@ -9,3 +9,4 @@ void RunRenovationOccupancyScenario(UWorld* World,ACFPlayerCharacter* Hero);
 void RunPlatformConstructionScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read);
 void RunUpperDeckConstructionScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read);
 void RunUpperDeckLifeScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read);
+void RunHomeCareScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read);

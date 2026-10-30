@@ -223,6 +223,7 @@ private:
     void StopNavigation();
     bool CanHit(const AActor* Target) const;
     double NextNavigationUpdate = 0.0;
+    double NextFarmBlockHint = 0.0;
     float AttackCooldown = 0.0f;
     float WorkProgress = 0.0f;
     TWeakObjectPtr<AWorkStation> ProgressSite;
