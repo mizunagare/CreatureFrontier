@@ -75,6 +75,8 @@ void ACFGameMode::BeginPlay()
 {
     Super::BeginPlay();
     SeedFrontierResources(GetWorld());
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFUpperDeckLifeTest")) || FParse::Param(FCommandLine::Get(),TEXT("CFUpperDeckLifeRead")))
+    {const bool Read=FParse::Param(FCommandLine::Get(),TEXT("CFUpperDeckLifeRead"));FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this,Read](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunUpperDeckLifeScenario(GetWorld(),Hero,Read);},1.f,false);return;}
     if(FParse::Param(FCommandLine::Get(),TEXT("CFUpperDeckTest")) || FParse::Param(FCommandLine::Get(),TEXT("CFUpperDeckRead")))
     {const bool Read=FParse::Param(FCommandLine::Get(),TEXT("CFUpperDeckRead"));FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this,Read](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunUpperDeckConstructionScenario(GetWorld(),Hero,Read);},1.f,false);return;}
     if(FParse::Param(FCommandLine::Get(),TEXT("CFPlatformTest")) || FParse::Param(FCommandLine::Get(),TEXT("CFPlatformRead")))
