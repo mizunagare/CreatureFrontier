@@ -1,6 +1,6 @@
 param([string]$BuildRoot='',
       [string[]]$Resolutions=@('960x540','1280x720','1920x1080'),[switch]$Rescue,
-      [switch]$Editor,[switch]$AvoidCombat,[switch]$HomeMode,[string]$EngineRoot='D:\Epic\UE_5.8')
+      [switch]$Editor,[switch]$AvoidCombat,[switch]$HomeMode,[switch]$Orientation,[string]$EngineRoot='D:\Epic\UE_5.8')
 $ErrorActionPreference='Stop'
 if(($Editor -and $BuildRoot) -or (!$Editor -and !$BuildRoot)){throw '请只指定Editor或BuildRoot之一'}
 if(!$Resolutions.Count -or @($Resolutions | Select-Object -Unique).Count -ne $Resolutions.Count){throw '分辨率列表不能为空或重复'}
@@ -37,6 +37,13 @@ foreach($resolution in $Resolutions){
     if($process.ExitCode -ne 0 -or $contents -notmatch ('CF_HUD_PREVIEW PASS scenes='+$scenes.Count+'\b') -or $contents -match 'CF_HUD.*FAIL|Fatal error|Assertion failed'){throw "界面行为检查失败：$log"}
     if($HomeMode -and $contents -notmatch 'CF_HUD_HOME_HINT PASS'){throw '未实际验证房屋模式的完整操作提示，请使用包含该功能的构建'}
     if($AvoidCombat -and $contents -notmatch 'CF_HUD_STANCE PASS avoid=1'){throw '缺少F8实际避战状态标记'}
+    if($Orientation){
+        if(!$contents.Contains('CF_ORIENTATION PASS headings=40 relative=16 boundary=6 height=3')){throw '缺少朝向与基地相对方向计算证据'}
+        foreach($scene in $scenes){
+            $lines=if($scene -in @('Roster','RosterDanger','HelpDanger')){0}else{2}
+            if(!$contents.Contains(('CF_ORIENTATION_FRAME PASS scene='+$scene+' compassLines='+$lines+' interface='))){throw ('方位面板实际行数不符：'+$scene)}
+        }
+    }
     foreach($scene in $scenes){if($contents -notmatch ('CF_HUD_FRAME PASS scene='+$scene+' viewport='+$resolution+' ')){throw "缺少实际 $resolution 渲染帧：$scene"}}
     $rootMatch=[regex]::Match($contents,'CF_HUD_PREVIEW_ROOT [^\r\n]*[/\\]([A-F0-9]{32})')
     if(!$rootMatch.Success){throw '未记录本次截图目录'}
@@ -54,7 +61,7 @@ foreach($resolution in $Resolutions){
         Copy-Item -LiteralPath $source -Destination (Join-Path $evidence ($resolution+'-'+$scene+'.png'))
     }
     if((Get-FrontierBuildFingerprint -LiteralPath $module) -ne $buildHash){throw '界面检查期间程序指纹变化'}
-    $results += [pscustomobject]@{Resolution=$resolution;Scenes=$scenes.Count;AvoidCombat=[bool]$AvoidCombat;Editor=[bool]$Editor;Pass=$true;BuildSHA256=$buildHash;Log=$log}
+    $results += [pscustomobject]@{Resolution=$resolution;Scenes=$scenes.Count;AvoidCombat=[bool]$AvoidCombat;Orientation=[bool]$Orientation;Editor=[bool]$Editor;Pass=$true;BuildSHA256=$buildHash;Log=$log}
     $results | Export-Csv -LiteralPath (Join-Path $evidence 'Results.csv') -NoTypeInformation
     Write-Host "$resolution : $($scenes.Count)个渲染场景通过，PNG尺寸已验证"
 }

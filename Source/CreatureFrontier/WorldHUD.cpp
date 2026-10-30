@@ -21,6 +21,8 @@
 #include "FarmCropComponent.h"
 #include "Engine/Canvas.h"
 #include "EngineUtils.h"
+#include "FrontierOrientation.h"
+#include "Camera/CameraComponent.h"
 
 void ACFHUD::DrawWorldHUD(ACFPlayerCharacter* Player)
 {
@@ -45,6 +47,11 @@ void ACFHUD::DrawWorldHUD(ACFPlayerCharacter* Player)
     else if(Creature && Creature->Activity==ECreatureActivity::ReturnHome)Alert=TEXT("正在返回栖息地\n暂不可造成伤害或捕捉");
     if(!Alert.IsEmpty()){Audit.bAlert=true;DrawHUDPanel(Layout.Alert,{{Alert,FLinearColor(1,.5f,.3f),4}});}
     if(Audit.bInterface)return;
+    const double ViewYaw=Player->FirstPersonCamera->GetComponentRotation().Yaw;
+    const int32 BeforeCompass=Audit.TextLines;
+    DrawHUDPanel(Layout.Compass,{{FString::Printf(TEXT("朝向：%s"),FrontierOrientation::Heading(ViewYaw)),Blue},
+        {FrontierOrientation::HomeHint(Player->GetActorLocation(),ViewYaw,UBaseBuildingComponent::BaseOrigin()),Yellow}});
+    Audit.CompassLines=Audit.TextLines-BeforeCompass;
     const float X=Canvas->ClipX*.5f,Y=Canvas->ClipY*.5f;DrawLine(X-6,Y,X+6,Y,FLinearColor::White);DrawLine(X,Y-6,X,Y+6,FLinearColor::White);
     DrawHUDPanel(Layout.Objective,{{Player->GetObjectiveStatus(),Green,2},{Player->GetObjectiveHint(),FLinearColor::White,2},{Player->GetObjectiveRewardText(),Yellow,2}});
     TArray<FFrontierHUDRow> Research={{Player->Research->GetHint(),Blue,2}};

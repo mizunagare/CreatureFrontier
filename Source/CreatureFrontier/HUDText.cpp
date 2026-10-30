@@ -45,7 +45,8 @@ void ACFHUD::DrawHUDPanel(const FBox2D& Rect,const TArray<FFrontierHUDRow>& Rows
     float Y=Rect.Min.Y+Layout.Padding;
     for(const auto& Row:Rows)
     {
-        const float Available=Rect.Max.Y-Layout.Padding-Y;if(Available<Layout.Line){++Audit.Elided;break;}
+        // 与文字行数计算保持相同容差，避免最后一整行因浮点相减变成略小于一行而消失。
+        const float Available=Rect.Max.Y-Layout.Padding-Y;if(Available+.01f<Layout.Line){++Audit.Elided;break;}
         Y+=DrawHUDText(Row.Text,Row.Color,FFrontierHUDLayout::Box(Rect.Min.X+Layout.Padding,Y,Rect.GetSize().X-2*Layout.Padding,Available),Row.MaxLines);
     }
 }

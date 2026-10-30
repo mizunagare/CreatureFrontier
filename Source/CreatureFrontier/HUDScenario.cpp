@@ -24,6 +24,7 @@
 #include "Misc/CommandLine.h"
 #include "Containers/Ticker.h"
 #include "UnrealClient.h"
+#include "FrontierOrientation.h"
 
 namespace CFHUDQA
 {
@@ -33,12 +34,29 @@ bool Layouts()
     for(const auto Size:TArray<FIntPoint>{{800,450},{960,540},{1024,768},{1280,720},{1600,900},{1920,1080},{2560,1440}})for(bool Interface:{false,true})
     {
         const auto L=FFrontierHUDLayout::Build(Size.X,Size.Y,Interface);
-        TArray<FBox2D> Rects={L.Vitals,L.Feedback,L.Alert};if(!Interface){Rects.Add(L.Objective);Rects.Add(L.Research);Rects.Add(L.Context);}
+        TArray<FBox2D> Rects={L.Vitals,L.Feedback,L.Alert};if(!Interface){Rects.Add(L.Objective);Rects.Add(L.Research);Rects.Add(L.Context);Rects.Add(L.Compass);}
         for(int32 A=0;A<Rects.Num();++A)
         {Pass &= L.Contains(Rects[A]) && (Interface || !FFrontierHUDLayout::Overlap(Rects[A],L.Center));for(int32 B=A+1;B<Rects.Num();++B)Pass &= !FFrontierHUDLayout::Overlap(Rects[A],Rects[B]);}
         Pass &= FFrontierHUDLayout::Overlap(L.Vitals,L.Vitals) && FFrontierHUDLayout::Overlap(L.Center,L.Center) && !L.Contains(FFrontierHUDLayout::Box(-1,0,40,40));
     }
     return Pass;
+}
+bool Orientation()
+{
+    bool Pass=true;const TCHAR* WorldNames[]={TEXT("东"),TEXT("东北"),TEXT("北"),TEXT("西北"),TEXT("西"),TEXT("西南"),TEXT("南"),TEXT("东南")};
+    const TCHAR* RelativeNames[]={TEXT("前方"),TEXT("右前"),TEXT("右侧"),TEXT("右后"),TEXT("后方"),TEXT("左后"),TEXT("左侧"),TEXT("左前")};
+    for(int32 I=0;I<8;++I)
+    {
+        for(double Offset:{-720.,-360.,0.,360.,720.})Pass &= FString(FrontierOrientation::Heading(I*45.+Offset))==WorldNames[I];
+        const double A=FMath::DegreesToRadians(I*45.);const FVector Home(FMath::Cos(A)*2000,FMath::Sin(A)*2000,0);
+        Pass &= FrontierOrientation::HomeHint(FVector::ZeroVector,0,Home).Contains(RelativeNames[I]);
+        Pass &= FrontierOrientation::HomeHint(FVector::ZeroVector,I*45.,Home).Contains(TEXT("前方"));
+    }
+    Pass &= FString(FrontierOrientation::Heading(22.4))==TEXT("东") && FString(FrontierOrientation::Heading(22.6))==TEXT("东北") && FString(FrontierOrientation::Heading(-22.4))==TEXT("东") && FString(FrontierOrientation::Heading(-22.6))==TEXT("东南");
+    Pass &= FrontierOrientation::HomeHint(FVector(800,0,0),0,FVector::ZeroVector).Contains(TEXT("附近8米")) && !FrontierOrientation::HomeHint(FVector(801,0,0),0,FVector::ZeroVector).Contains(TEXT("附近"));
+    Pass &= FrontierOrientation::HomeHint(FVector(0,0,-1000),0,FVector::ZeroVector).Contains(TEXT("上方10米")) && FrontierOrientation::HomeHint(FVector(0,0,1000),0,FVector::ZeroVector).Contains(TEXT("下方10米"));
+    Pass &= FrontierOrientation::HomeHint(FVector(500,0,1000),0,FVector::ZeroVector).Contains(TEXT("直线")) && !FrontierOrientation::HomeHint(FVector(500,0,1000),0,FVector::ZeroVector).Contains(TEXT("附近"));
+    UE_LOG(LogTemp,Display,TEXT("CF_ORIENTATION %s headings=40 relative=16 boundary=6 height=3"),Pass?TEXT("PASS"):TEXT("FAIL"));return Pass;
 }
 void AimHUD(ACFPlayerCharacter* Hero,AActor* Target,FVector Offset)
 {
@@ -88,7 +106,8 @@ struct FPreview
         const EFrontierHUDContext Expected=Step==0 || Step>=7?EFrontierHUDContext::Companion:Step<=3?EFrontierHUDContext::None:Step==4?EFrontierHUDContext::Resource:Step==5?EFrontierHUDContext::Garden:EFrontierHUDContext::Building;
         bool SameBag=true;for(int32 Item=0;Item<static_cast<int32>(EFrontierItem::Count);++Item)SameBag &= Hero->Inventory->Count(static_cast<EFrontierItem>(Item))==Bag.FindRef(static_cast<EFrontierItem>(Item));
         const bool RosterValid=(Step==1 || Step==2)?A.RosterRows>0 && A.RosterRows<8:A.RosterRows==0;
-        const bool Pass=A.bFits && A.bNoOverlap && A.bCenterClear && A.Context==Expected && A.bInterface==(Step>=1 && Step<=3) && A.bAlert==(Step==2 || Step==3 || Step==7) && A.TextLines>0 && RosterValid && SameBag && Pet->BondPoints==0 && Pet->Experience==0 && Pet->Stamina==35 && Pet->Nutrition==40 && Pet->Memory->GetMemory()==ECrystalJourneyMemory::QuietThanks;
+        const bool Pass=A.bFits && A.bNoOverlap && A.bCenterClear && A.CompassLines==(A.bInterface?0:2) && A.Context==Expected && A.bInterface==(Step>=1 && Step<=3) && A.bAlert==(Step==2 || Step==3 || Step==7) && A.TextLines>0 && RosterValid && SameBag && Pet->BondPoints==0 && Pet->Experience==0 && Pet->Stamina==35 && Pet->Nutrition==40 && Pet->Memory->GetMemory()==ECrystalJourneyMemory::QuietThanks;
+        UE_LOG(LogTemp,Display,TEXT("CF_ORIENTATION_FRAME %s scene=%s compassLines=%d interface=%d"),Pass?TEXT("PASS"):TEXT("FAIL"),Name(),A.CompassLines,A.bInterface);
         UE_LOG(LogTemp,Display,TEXT("CF_HUD_FRAME %s scene=%s viewport=%.0fx%.0f fit=%d separate=%d center=%d context=%d interface=%d alert=%d lines=%d elided=%d rows=%d"),Pass?TEXT("PASS"):TEXT("FAIL"),Name(),A.Viewport.X,A.Viewport.Y,A.bFits,A.bNoOverlap,A.bCenterClear,int32(A.Context),A.bInterface,A.bAlert,A.TextLines,A.Elided,A.RosterRows);
         if(!Pass){FPlatformMisc::RequestExitWithStatus(false,1);return false;}
         FScreenshotRequest::RequestScreenshot(Root/(FString(Name())+TEXT(".png")),true,false);AwaitShot=true;Next=Now+.25;return true;
@@ -97,7 +116,7 @@ struct FPreview
 }
 void RunHUDScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Preview)
 {
-    const bool Geometry=CFHUDQA::Layouts() && CFInputQA::UniqueBindings(Hero);UE_LOG(LogTemp,Display,TEXT("CF_HUD_LAYOUT %s configurations=14 negativeControls=1"),Geometry?TEXT("PASS"):TEXT("FAIL"));
+    const bool Geometry=CFHUDQA::Layouts() && CFInputQA::UniqueBindings(Hero) && CFHUDQA::Orientation();UE_LOG(LogTemp,Display,TEXT("CF_HUD_LAYOUT %s configurations=14 negativeControls=1"),Geometry?TEXT("PASS"):TEXT("FAIL"));
     if(!Preview || !Geometry){FPlatformMisc::RequestExitWithStatus(false,Geometry?0:1);return;}
     auto* PC=Cast<APlayerController>(Hero->GetController());auto* HUD=PC?Cast<ACFHUD>(PC->GetHUD()):nullptr;UCreatureDefinition* Leaf=nullptr;UCreatureDefinition* Stone=nullptr;
     for(TActorIterator<ACreatureCharacter> It(World);It;++It){if(It->Definition && It->Definition->Form==ECreatureForm::Leaf)Leaf=It->Definition;if(It->Definition && It->Definition->Form==ECreatureForm::Stone)Stone=It->Definition;It->Destroy();}

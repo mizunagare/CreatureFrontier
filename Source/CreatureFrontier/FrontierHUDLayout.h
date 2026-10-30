@@ -6,7 +6,7 @@ struct FFrontierHUDLayout
 {
     FVector2D Viewport;
     float Unit=1,Margin=16,Line=20,FontScale=1.12f,Padding=12;
-    FBox2D Vitals,Feedback,Objective,Research,Context,Alert,Center;
+    FBox2D Vitals,Feedback,Objective,Research,Context,Alert,Compass,Center;
     static FBox2D Box(float X,float Y,float W,float H){return FBox2D(FVector2D(X,Y),FVector2D(X+W,Y+H));}
     static FFrontierHUDLayout Build(float W,float H,bool Interface)
     {
@@ -18,6 +18,7 @@ struct FFrontierHUDLayout
         L.Research=Box(W-M-Right,M,Right,4*L.Line+2*P);
         L.Context=Box(W-M-Right,L.Research.Max.Y+M,Right,H-M-(L.Research.Max.Y+M));
         L.Alert=Interface?L.Objective:Box(L.Vitals.Max.X+M,M,L.Research.Min.X-L.Vitals.Max.X-2*M,4*L.Line+2*P);
+        L.Compass=Box(L.Vitals.Max.X+M,H-M-(2*L.Line+2*P),L.Research.Min.X-L.Vitals.Max.X-2*M,2*L.Line+2*P);
         L.Center=Box(W*.4f,H*.3f,W*.2f,H*.4f);return L;
     }
     bool Contains(const FBox2D& R) const
@@ -35,6 +36,6 @@ struct FFrontierHUDAudit
     uint64 Frame=0;FVector2D Viewport=FVector2D::ZeroVector;
     bool bInterface=false,bPaused=false,bFits=true,bNoOverlap=true,bCenterClear=true,bAlert=false;
     EFrontierHUDContext Context=EFrontierHUDContext::None;
-    int32 TextLines=0,Elided=0,RosterRows=0;
+    int32 TextLines=0,Elided=0,RosterRows=0,CompassLines=0;
     TArray<FBox2D> Panels;
 };

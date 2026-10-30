@@ -7,6 +7,7 @@
 #include "ResourceDefinition.h"
 #include "ResearchComponent.h"
 #include "EngineUtils.h"
+#include "FrontierOrientation.h"
 
 void ACFPlayerCharacter::ToggleBackpack()
 {
@@ -84,9 +85,7 @@ FString ACFPlayerCharacter::GetBackpackGatheringHint(int32 Index) const
     {
         const FVector Delta=Source->GetActorLocation()-GetActorLocation();const double Distance=Delta.Size();
         if(Distance<=300)return Budget+Source->Definition->DisplayName.ToString()+(Source->Remaining>0?TEXT("在3米内，瞄准后按住M采集"):*FString::Printf(TEXT("等待再生，约%d秒"),FMath::CeilToInt(Source->RegrowRemaining)));
-        const TCHAR* Directions[]={TEXT("东"),TEXT("东北"),TEXT("北"),TEXT("西北"),TEXT("西"),TEXT("西南"),TEXT("南"),TEXT("东南")};
-        const int32 Sector=(FMath::RoundToInt(FMath::Atan2(Delta.Y,Delta.X)/(PI/4))+8)%8;
-        const TCHAR* Direction=Delta.Size2D()<100 && FMath::Abs(Delta.Z)>300?(Delta.Z>0?TEXT("上方"):TEXT("下方")):Directions[Sector];
+        const TCHAR* Direction=Delta.Size2D()<100 && FMath::Abs(Delta.Z)>300?(Delta.Z>0?TEXT("上方"):TEXT("下方")):FrontierOrientation::Heading(FMath::RadiansToDegrees(FMath::Atan2(Delta.Y,Delta.X)));
         const FString Regen=Source->Remaining>0?FString():FString::Printf(TEXT("，再生约%d秒"),FMath::CeilToInt(Source->RegrowRemaining));
         return Budget+FString::Printf(TEXT("采集线索：%s，%s%d米（直线）%s"),*Source->Definition->DisplayName.ToString(),Direction,FMath::CeilToInt(Distance/100),*Regen);
     }
