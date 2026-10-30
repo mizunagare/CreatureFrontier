@@ -4,6 +4,8 @@
 
 ## 探索朝向开发候选（限定验证，非最终版）
 
+战后恢复整合候选：`F:\CreatureFrontierBuilds\Windows-AfterBattleRecovery\CreatureFrontier.exe`。真实战斗返家后经原T休息、M采料、2制药／H治疗、F归队恢复，再从新完成档实际共同战斗返家通过，见[战后恢复记录](Docs/AFTER_BATTLE_RECOVERY.md)。没有免费物资或新恢复规则，首领仍未击败；本地候选共享不可变文件，不可直接改写共享文件，旧存档不会自动迁移。
+
 原震地跳跃验证候选：`F:\CreatureFrontierBuilds\Windows-AlphaDodge\CreatureFrontier.exe`。原空格实际起跳在震地结算时避开伤害，随后玩家与伙伴共同攻击、返家存读及自身中途恢复在两端分别通过，详见[预警应对记录](Docs/ALPHA_DODGE.md)。普通游戏规则未改，没有自动闪避或新无敌时间；尚未击败首领。此本地候选共享不可变文件，不可直接改写共享文件，旧目录存档不会自动迁移。
 
 共同近战整合候选：`F:\CreatureFrontierBuilds\Windows-JointMelee\CreatureFrontier.exe`。原左键长矛与Q／G伙伴技能对同一首领真实结算、撤离返家及中途恢复已在Editor／Windows分别验证，详见[共同接敌记录](Docs/JOINT_MELEE.md)。不改普通战斗规则，尚未验收主动躲避预警或击败首领；此候选共享不可变烹饪文件，不可直接改写共享文件，旧存档不会自动迁移。

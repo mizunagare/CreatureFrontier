@@ -625,6 +625,8 @@ namespace
 struct FStarterRecovery : FStarterPrep
 {
     int32 Crafted=0,Used=0;bool Held=false;float InitialHealth=0;
+    bool Rearm=false;int32 HarvestStart=14,HarvestGoal=10,MedicineAtStart=0;
+    FGuid RecoveryResourceId=FGuid(0xCF170000,0,0,1);
     bool End(bool Pass,const TCHAR* Reason)
     {
         if(Held)CFInputQA::Release(Hero,EKeys::M);if(Input.IsValid())Input->Direction=FVector::ZeroVector;CFInputQA::Release(Hero,EKeys::LeftShift);
@@ -634,10 +636,10 @@ struct FStarterRecovery : FStarterPrep
     }
     bool Budget() const
     {
-        if(!Pet.IsValid() || !Brush.IsValid() || !Garden.IsValid())return false;const int32 Harvested=14-Brush->Remaining;
+        if(!Pet.IsValid() || !Brush.IsValid() || !Garden.IsValid())return false;const int32 Harvested=HarvestStart-Brush->Remaining;
         int32 Farms=0;for(TActorIterator<AWorkStation> It(World);It;++It)if(It->bPlayerBuilt)++Farms;
         const auto& Gear=Hero->Equipment->GetState();
-        return Harvested>=0 && Harvested<=10 && Hero->Inventory->Count(EFrontierItem::Material)+5*Crafted==Harvested && Hero->Inventory->Count(EFrontierItem::Medicine)==Crafted-Used &&
+        return Harvested>=0 && Harvested<=HarvestGoal && Hero->Inventory->Count(EFrontierItem::Material)+5*Crafted==Harvested && Hero->Inventory->Count(EFrontierItem::Medicine)==MedicineAtStart+Crafted-Used &&
             Hero->Inventory->Count(EFrontierItem::Food)==2 && Hero->Inventory->Count(EFrontierItem::Seeds)==1 && Hero->Inventory->Count(EFrontierItem::CaptureDevice)==7 && Hero->Inventory->Count(EFrontierItem::Fiber)==0 &&
             Pet->Experience==12 && Pet->BondPoints==3 && Pet->Nickname==Nickname && Pet->bAvoidCombat && Gear.bSpearEquipped && Gear.bVestEquipped && Hero->GetObjectives().Claimed==4 && !Hero->GetObjectives().bAlphaResolved &&
             Farms==1 && HomeLayout::Collect(World).IsEmpty() && Garden->PersistentId==OriginalGarden.Id && Garden->GetActorTransform().Equals(OriginalGarden.Transform,.01) && Garden->StoredFood==OriginalGarden.StoredFood && Garden->Crop->Seeds==OriginalGarden.Seeds && Garden->Crop->bPlanted==OriginalGarden.bPlanted && FMath::IsNearlyEqual(Garden->Crop->GrowthWork,OriginalGarden.GrowthWork,.01f);
@@ -681,15 +683,15 @@ struct FStarterRecovery : FStarterPrep
         }
         if(Phase==2)
         {
-            if(Hero->Inventory->Count(EFrontierItem::Material)<10){if(!Hero->Gathering->IsGathering() || World->GetTimeSeconds()-At>30)return End(false,TEXT("gather-interrupted"));return true;}
-            if(!CFInputQA::Release(Hero,EKeys::M) || Brush->Remaining!=4)return End(false,TEXT("gather-count"));Held=false;
-            UE_LOG(LogTemp,Display,TEXT("CF_STARTER_RECOVERY_GATHER PASS input=1 material=10 sourcePaid=10 experience=12"));Photo(TEXT("Gathered"),Brush->GetActorLocation());Phase=3;return true;
+            if(Hero->Inventory->Count(EFrontierItem::Material)<HarvestGoal){if(!Hero->Gathering->IsGathering() || World->GetTimeSeconds()-At>30)return End(false,TEXT("gather-interrupted"));return true;}
+            if(!CFInputQA::Release(Hero,EKeys::M) || Brush->Remaining!=HarvestStart-HarvestGoal)return End(false,TEXT("gather-count"));Held=false;
+            UE_LOG(LogTemp,Display,TEXT("CF_STARTER_RECOVERY_GATHER PASS input=1 material=%d sourcePaid=%d experience=12"),HarvestGoal,HarvestGoal);Photo(TEXT("Gathered"),Brush->GetActorLocation());Phase=3;return true;
         }
         if(Phase==3){if(!Plan(Bench->GetActorLocation()+FVector(210,-180,40),4))return End(false,TEXT("return-path"));return true;}
         if(Phase==5)
         {
-            if(!CFInputQA::Press(Hero,EKeys::Two) || Hero->Inventory->Count(EFrontierItem::Medicine)!=1 || Hero->Inventory->Count(EFrontierItem::Material)!=5)return End(false,TEXT("craft-first"));++Crafted;
-            if(!CFInputQA::Press(Hero,EKeys::Two) || Hero->Inventory->Count(EFrontierItem::Medicine)!=2 || Hero->Inventory->Count(EFrontierItem::Material)!=0)return End(false,TEXT("craft-second"));++Crafted;
+            for(int32 Index=0;Index<HarvestGoal/5;++Index)
+            {if(!CFInputQA::Press(Hero,EKeys::Two) || Hero->Inventory->Count(EFrontierItem::Medicine)!=MedicineAtStart+Index+1 || Hero->Inventory->Count(EFrontierItem::Material)!=HarvestGoal-5*(Index+1))return End(false,TEXT("craft-budget"));++Crafted;}
             if(!Hero->GetObjectiveHint().Contains(TEXT("H治疗自己")))return End(false,TEXT("medicine-hint"));Phase=9;return true;
         }
         if(Phase==9)
@@ -697,7 +699,7 @@ struct FStarterRecovery : FStarterPrep
             if(Photo(TEXT("MedicineReady"),P))return true;
             if(!CFInputQA::Press(Hero,EKeys::H) || Hero->Health!=100 || Hero->Inventory->Count(EFrontierItem::Medicine)!=1)return End(false,TEXT("heal-self"));++Used;
             if(!CFInputQA::Press(Hero,EKeys::H) || Hero->Inventory->Count(EFrontierItem::Medicine)!=1)return End(false,TEXT("full-health-reject"));
-            UE_LOG(LogTemp,Display,TEXT("CF_STARTER_RECOVERY_MEDICINE PASS crafted=2 materialPaid=10 selfUsed=1 retained=1 fullHealthReject=1"));Photo(TEXT("Resupplied"),P);Phase=6;At=World->GetTimeSeconds();return true;
+            UE_LOG(LogTemp,Display,TEXT("CF_STARTER_RECOVERY_MEDICINE PASS crafted=%d materialPaid=%d selfUsed=1 retained=1 fullHealthReject=1"),Crafted,HarvestGoal);Photo(TEXT("Resupplied"),P);Phase=6;At=World->GetTimeSeconds();return true;
         }
         if(Phase==6)
         {
@@ -712,9 +714,9 @@ struct FStarterRecovery : FStarterPrep
             if(Photo(TEXT("Recovered"),P))return true;const float HP=Pet->Health,SP=Pet->Stamina;
             if(HeroTravel<300 || !Hero->SaveProgress(TEXT("StarterRecoveryDone")) || !Hero->LoadProgress(TEXT("StarterRecoveryDone")))return End(false,TEXT("save"));
             Pet.Reset();Garden.Reset();Brush.Reset();for(TActorIterator<ACreatureCharacter> It(World);It;++It)if(It->PersistentId==PetId)Pet=*It;
-            for(TActorIterator<AWorkStation> It(World);It;++It)if(It->PersistentId==OriginalGarden.Id)Garden=*It;for(TActorIterator<AResourceNode> It(World);It;++It)if(It->PersistentId==FGuid(0xCF170000,0,0,1))Brush=*It;
+            for(TActorIterator<AWorkStation> It(World);It;++It)if(It->PersistentId==OriginalGarden.Id)Garden=*It;for(TActorIterator<AResourceNode> It(World);It;++It)if(It->PersistentId==RecoveryResourceId)Brush=*It;
             if(!Pet.IsValid() || !Hero->GetActorLocation().Equals(H,.01) || !Pet->GetActorLocation().Equals(P,.01) || Hero->Health!=100 || Pet->Health!=HP || Pet->Stamina!=SP || !Budget())return End(false,TEXT("restore"));
-            UE_LOG(LogTemp,Display,TEXT("CF_STARTER_RECOVERY_HINTS PASS states=3"));
+            UE_LOG(LogTemp,Display,TEXT("CF_STARTER_RECOVERY_HINTS PASS states=%d"),Rearm?2:3);
             UE_LOG(LogTemp,Display,TEXT("CF_STARTER_RECOVERY_LIFE PASS version=38 positionRetained=1 heroHP=100 petFull=1 medicine=1 material=0 claimed=4"));return End(true,TEXT("complete"));
         }
         return true;
@@ -724,17 +726,21 @@ struct FStarterRecovery : FStarterPrep
 void RunStarterRecoveryScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read)
 {
     auto S=MakeShared<FStarterRecovery>();S->World=World;S->Hero=Hero;S->Read=Read;S->Deadline=FPlatformTime::Seconds()+150;
+    S->Rearm=FParse::Param(FCommandLine::Get(),TEXT("CFStarterRecoveryRearm"));
+    // 战斗返家档保留原备用药，采原有石料补回本次治疗消耗，不重置灌木历史。
+    if(S->Rearm){S->RecoveryResourceId=FGuid(0xCF170000,0,0,2);S->HarvestGoal=5;S->MedicineAtStart=1;}
     const auto* Source=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("StarterRecoveryInput"),0));
     if(!Source || Source->FormatVersion!=38 || Source->HomeModules.Num()!=0 || Source->Facilities.Num()!=1 || !Hero->LoadProgress(TEXT("StarterRecoveryInput"))){S->End(false,TEXT("source"));return;}
     S->OriginalGarden=Source->Facilities[0];int32 Owned=0;
     for(TActorIterator<ACreatureCharacter> It(World);It;++It)if(It->Tamer==Hero->GetController()){S->Pet=*It;++Owned;}
     for(TActorIterator<AWorkStation> It(World);It;++It){if(It->PersistentId==S->OriginalGarden.Id)S->Garden=*It;if(!It->bPlayerBuilt && It->RequiredSpecialty==EWorkSpecialty::Gathering)S->Bench=*It;}
-    for(TActorIterator<AResourceNode> It(World);It;++It)if(It->PersistentId==FGuid(0xCF170000,0,0,1))S->Brush=*It;
-    if(Owned!=1 || !S->Pet.IsValid() || !S->Bench.IsValid() || !S->Brush.IsValid() || S->Brush->Remaining!=14 || Hero->Health>=100 || S->Pet->Health<=0 || S->Pet->Health>=S->Pet->GetMaxHealth() || (Read && (S->Pet->Activity!=ECreatureActivity::Rest || S->Pet->WorkSite!=S->Bench.Get()))){S->End(false,TEXT("source-state"));return;}
+    for(TActorIterator<AResourceNode> It(World);It;++It)if(It->PersistentId==S->RecoveryResourceId)S->Brush=*It;
+    if(S->Rearm && S->Brush.IsValid())S->HarvestStart=S->Brush->Remaining;
+    if(Owned!=1 || !S->Pet.IsValid() || !S->Bench.IsValid() || !S->Brush.IsValid() || (!S->Rearm && S->Brush->Remaining!=14) || S->Brush->Remaining<S->HarvestGoal || !S->Brush->Definition || S->Brush->Definition->OutputItem!=EFrontierItem::Material || Hero->Health>=100 || S->Pet->Health<=0 || (!S->Rearm && S->Pet->Health>=S->Pet->GetMaxHealth()) || (Read && (S->Pet->Activity!=ECreatureActivity::Rest || S->Pet->WorkSite!=S->Bench.Get()))){S->End(false,TEXT("source-state"));return;}
     S->PetId=S->Pet->PersistentId;S->Nickname=S->Pet->Nickname;S->InitialHealth=Hero->Health;const auto* Partner=Source->Creatures.FindByPredicate([&](const FCreatureSaveRecord& R){return R.Id==S->PetId;});
     const auto* Catalog=UCraftingCatalog::Load();const auto* Recipe=Catalog?Catalog->Find(TEXT("Medicine")):nullptr;
     if(!Partner || !Hero->GetActorLocation().Equals(Source->PlayerTransform.GetLocation(),.01) || !S->Pet->GetActorLocation().Equals(Partner->Transform.GetLocation(),.01) || !Recipe || Recipe->Inputs.Num()!=1 || Recipe->Inputs.FindRef(EFrontierItem::Material)!=5 || Recipe->OutputAmount!=1 || !S->Budget()){S->End(false,TEXT("source-position-budget"));return;}
-    if(!Hero->GetObjectiveHint().Contains(TEXT("缺药"))){S->End(false,TEXT("source-recovery-hint"));return;}
+    if(!Hero->GetObjectiveHint().Contains(S->Rearm?TEXT("H治疗自己"):TEXT("缺药"))){S->End(false,TEXT("source-recovery-hint"));return;}
     S->LastH=Hero->GetActorLocation();S->LastP=S->Pet->GetActorLocation();S->VelocityH=Hero->GetVelocity();S->VelocityP=S->Pet->GetVelocity();S->LastTime=S->At=World->GetTimeSeconds();S->Input=NewObject<UHomeMovementProbe>(Hero);S->Input->RegisterComponent();
     S->Preview=FParse::Param(FCommandLine::Get(),TEXT("CFStarterRecoveryPreview"));if(S->Preview){S->Root=FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir()/TEXT("StarterRecoveryPreview")/FGuid::NewGuid().ToString(EGuidFormats::Digits));IFileManager::Get().MakeDirectory(*S->Root,true);UE_LOG(LogTemp,Display,TEXT("CF_STARTER_RECOVERY_PREVIEW_ROOT %s"),*S->Root);}
     UE_LOG(LogTemp,Display,TEXT("CF_STARTER_RECOVERY_SOURCE PASS read=%d positionRetained=1 pet=%s"),Read,*S->PetId.ToString());FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([S](float){return S->Tick();}));

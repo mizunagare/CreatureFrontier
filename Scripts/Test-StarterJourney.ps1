@@ -1,5 +1,6 @@
-param([string]$BuildRoot='',[string]$ReadInputPath='',[switch]$Farm,[switch]$Prepare,[switch]$Scout,[switch]$Rescue,[switch]$Recovery,[switch]$Flank,[switch]$Melee,[switch]$Dodge,[switch]$CombatTrace,[switch]$Resume,[switch]$Preview,[ValidateSet('960x540','1280x720')][string]$Resolution='1280x720')
+param([string]$BuildRoot='',[string]$ReadInputPath='',[switch]$Farm,[switch]$Prepare,[switch]$Scout,[switch]$Rescue,[switch]$Recovery,[switch]$Rearm,[switch]$Flank,[switch]$Melee,[switch]$Dodge,[switch]$CombatTrace,[switch]$Resume,[switch]$Preview,[ValidateSet('960x540','1280x720')][string]$Resolution='1280x720')
 $ErrorActionPreference='Stop'
+if($Rearm -and !$Recovery){throw '战后补给必须使用原恢复流程'}
 if($Dodge -and !$Melee){throw '跳跃应对专项必须接在完整共同近战流程中'}
 if($Melee -and (!$Flank -or !$CombatTrace -or $Resume)){throw '近战整合仅用于开启追踪的完整北侧接敌链；中途恢复不重复攻击'}
 if($CombatTrace -and !$Flank){throw '战斗结算追踪仅用于真实绕行接敌或自身中途恢复'}
@@ -33,11 +34,12 @@ try{
     if($CombatTrace){$arguments+='-CFCombatTrace'}
     if($Melee){$arguments+='-CFStarterFlankMelee'}
     if($Dodge){$arguments+='-CFStarterFlankDodge'}
+    if($Rearm){$arguments+='-CFStarterRecoveryRearm'}
     if($Preview){$size=$Resolution.Split('x');$arguments=@($arguments|Where-Object {$_ -ne '-nullrhi'})+@(('-CF'+$prefix+'Preview'),'-RenderOffscreen','-ForceRes',('-ResX='+$size[0]),('-ResY='+$size[1]),'-norhithread','-forcerhibypass','-ExecCmds="t.MaxFPS 60,r.MotionBlurQuality 0,r.AntiAliasingMethod 1"')}
     $exe=if($BuildRoot){$module}elseif($Preview){'D:/Epic/UE_5.8/Engine/Binaries/Win64/UnrealEditor.exe'}else{'D:/Epic/UE_5.8/Engine/Binaries/Win64/UnrealEditor-Cmd.exe'}
     if(!$BuildRoot){$arguments=@(('"'+(Join-Path $projectRoot 'CreatureFrontier.uproject')+'"'),'-game')+$arguments}
     $started=[DateTime]::UtcNow
-    [pscustomobject]@{BuildRoot=$BuildRoot;Farm=[bool]$Farm;Prepare=[bool]$Prepare;Scout=[bool]$Scout;Rescue=[bool]$Rescue;Recovery=[bool]$Recovery;Flank=[bool]$Flank;Melee=[bool]$Melee;Dodge=[bool]$Dodge;CombatTrace=[bool]$CombatTrace;Resume=$readMode;ReadInputPath=$ReadInputPath;InputSHA256=$sourceHash;Preview=[bool]$Preview;Resolution=$Resolution;BuildSHA256=$hash}|Export-Csv (Join-Path $run 'Run.csv') -NoTypeInformation
+    [pscustomobject]@{BuildRoot=$BuildRoot;Farm=[bool]$Farm;Prepare=[bool]$Prepare;Scout=[bool]$Scout;Rescue=[bool]$Rescue;Recovery=[bool]$Recovery;Rearm=[bool]$Rearm;Flank=[bool]$Flank;Melee=[bool]$Melee;Dodge=[bool]$Dodge;CombatTrace=[bool]$CombatTrace;Resume=$readMode;ReadInputPath=$ReadInputPath;InputSHA256=$sourceHash;Preview=[bool]$Preview;Resolution=$Resolution;BuildSHA256=$hash}|Export-Csv (Join-Path $run 'Run.csv') -NoTypeInformation
     Write-Host ('正常开局伙伴旅程：'+$run)
     $p=Start-Process -FilePath $exe -ArgumentList $arguments -WindowStyle Hidden -PassThru
     $timeout=if($Farm){300000}else{240000}
@@ -62,7 +64,8 @@ try{
     }
     if($Recovery){
         $markers=@('CF_STARTER_RECOVERY_SOURCE PASS','CF_STARTER_RECOVERY_GATHER PASS input=1 material=10 sourcePaid=10 experience=12','CF_STARTER_RECOVERY_MEDICINE PASS crafted=2 materialPaid=10 selfUsed=1 retained=1 fullHealthReject=1','CF_STARTER_RECOVERY_LIFE PASS version=38 positionRetained=1 heroHP=100 petFull=1 medicine=1 material=0 claimed=4','CF_STARTER_RECOVERY PASS reason=complete')
-        $markers+='CF_STARTER_RECOVERY_HINTS PASS states=3'
+        if($Rearm){$markers=@('CF_STARTER_RECOVERY_SOURCE PASS','CF_STARTER_RECOVERY_GATHER PASS input=1 material=5 sourcePaid=5 experience=12','CF_STARTER_RECOVERY_MEDICINE PASS crafted=1 materialPaid=5 selfUsed=1 retained=1 fullHealthReject=1','CF_STARTER_RECOVERY_LIFE PASS version=38 positionRetained=1 heroHP=100 petFull=1 medicine=1 material=0 claimed=4','CF_STARTER_RECOVERY PASS reason=complete','CF_STARTER_RECOVERY_HINTS PASS states=2')}
+        else{$markers+='CF_STARTER_RECOVERY_HINTS PASS states=3'}
         if(!$readMode){$markers+='CF_STARTER_RECOVERY_REST PASS input=1 samePet=1 facility=1'}
     }
     if($Flank){
