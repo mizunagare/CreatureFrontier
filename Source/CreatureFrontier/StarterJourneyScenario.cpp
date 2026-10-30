@@ -1,5 +1,6 @@
 #include "ConstructionScenario.h"
 #include "CFPlayerCharacter.h"
+#include "CFGameMode.h"
 #include "CreatureCharacter.h"
 #include "CreatureDefinition.h"
 #include "HomeScenario.h"
@@ -459,6 +460,14 @@ struct FStarterScout : FStarterPrep
     TWeakObjectPtr<AWildEncounter> Region;TWeakObjectPtr<ACreatureCharacter> Boss;
     float BossHealth=0,InitialHeroHealth=0,InitialPetHealth=0;bool Hit=false,Warning=false;
     bool Rescue=false;int32 MedicinePaid=0;double SafeSince=-1;
+    TMap<FGuid,FVector> PlacedHomes;
+    bool CheckPlacedHomes() const
+    {
+        int32 Found=0;for(TActorIterator<ACreatureCharacter> It(World);It;++It)
+            if(const auto* Home=PlacedHomes.Find(It->PersistentId))
+            {if(!It->bHasHabitat || It->Tamer || !It->EncounterId.IsNone() || !It->HabitatHome.Equals(*Home,.01))return false;++Found;}
+        return Found==PlacedHomes.Num();
+    }
     bool Budget() const {return FStarterPrep::Budget(3-MedicinePaid);}
     bool End(bool Pass,const TCHAR* Reason)
     {
@@ -563,7 +572,8 @@ struct FStarterScout : FStarterPrep
             for(TActorIterator<ACreatureCharacter> It(World);It;++It){if(It->PersistentId==PetId)Pet=*It;if(It->EncounterId==TEXT("CrystalRise") && It->bAlpha && It->Health>0)Boss=*It;}
             for(TActorIterator<AWorkStation> It(World);It;++It)if(It->PersistentId==OriginalGarden.Id)Garden=*It;
             for(TActorIterator<AResourceNode> It(World);It;++It)if(It->PersistentId==FGuid(0xCF170000,0,0,1))Brush=*It;
-            if(!Pet.IsValid() || !Boss.IsValid() || !Hero->GetActorLocation().Equals(H,.01) || !Pet->GetActorLocation().Equals(P,.01) || Hero->Health!=HP || Pet->Health!=PHP || Boss->Health!=BHP || !Pet->bAvoidCombat || !Budget())return End(false,TEXT("restore"));
+            if(!Pet.IsValid() || !Boss.IsValid() || !Hero->GetActorLocation().Equals(H,.01) || !Pet->GetActorLocation().Equals(P,.01) || Hero->Health!=HP || Pet->Health!=PHP || Boss->Health!=BHP || !Pet->bAvoidCombat || !Budget() || !CheckPlacedHomes())return End(false,TEXT("restore"));
+            if(Rescue)UE_LOG(LogTemp,Display,TEXT("CF_PLACED_HABITAT_LIFE PASS count=%d positionRetained=1 homePersisted=1 safeSeconds=2"),PlacedHomes.Num());
             if(Rescue)UE_LOG(LogTemp,Display,TEXT("CF_STARTER_RESCUE_BUDGET PASS medicinePaid=%d medicineRemaining=%d petHP=%.1f"),MedicinePaid,Hero->Inventory->Count(EFrontierItem::Medicine),Pet->Health);
             UE_LOG(LogTemp,Display,TEXT("CF_STARTER_SCOUT_LIFE PASS version=38 positionRetained=1 homeRetained=1 suppliesRetained=1 claimed=4 bossAlive=1 avoid=1"));return End(true,TEXT("complete"));
         }
@@ -578,6 +588,20 @@ void RunStarterScoutScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read)
     const TCHAR* InputSlot=S->Rescue?TEXT("StarterRescueInput"):TEXT("StarterScoutInput");
     const auto* Source=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(InputSlot,0));
     if(!Source || Source->FormatVersion!=38 || Source->HomeModules.Num()!=0 || Source->Facilities.Num()!=1 || !Hero->LoadProgress(InputSlot)){S->End(false,TEXT("source"));return;}
+    if(S->Rescue)
+    {
+        const auto* Mode=World->GetAuthGameMode<ACFGameMode>();
+        for(const auto& Record:Source->Creatures)
+            if(!Record.bOwned && Record.EncounterId.IsNone())
+                for(TActorIterator<ACreatureCharacter> It(World);It;++It)if(It->PersistentId==Record.Id)
+                {
+                    FVector Origin;
+                    if(!Mode || !Mode->ResolvePlacedCreatureHome(It->Definition,Origin) || !It->bHasHabitat || !It->HabitatHome.Equals(Origin,.01) || !It->GetActorTransform().Equals(Record.Transform,.01) || It->Health!=Record.Health || It->Level!=Record.Level || It->Experience!=Record.Experience || It->RoamRadius!=Record.RoamRadius || It->LeashRadius!=Record.LeashRadius){S->End(false,TEXT("placed-origin"));return;}
+                    S->PlacedHomes.Add(Record.Id,Origin);
+                }
+        if(S->PlacedHomes.Num()!=2 || !S->CheckPlacedHomes()){S->End(false,TEXT("placed-count"));return;}
+        UE_LOG(LogTemp,Display,TEXT("CF_PLACED_HABITAT_SOURCE PASS count=2 positionRetained=1 healthRetained=1 originalRanges=1"));
+    }
     if(S->Rescue && Read)S->MedicinePaid=3-Hero->Inventory->Count(EFrontierItem::Medicine);
     S->OriginalGarden=Source->Facilities[0];int32 Owned=0;
     for(TActorIterator<ACreatureCharacter> It(World);It;++It){if(It->Tamer==Hero->GetController()){S->Pet=*It;++Owned;}if(It->EncounterId==TEXT("CrystalRise") && It->bAlpha && It->Health>0)S->Boss=*It;}

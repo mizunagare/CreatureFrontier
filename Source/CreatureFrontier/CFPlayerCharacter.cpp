@@ -1,4 +1,5 @@
 #include "CFPlayerCharacter.h"
+#include "CFGameMode.h"
 #include "FrontierChinese.h"
 #include "Camera/CameraComponent.h"
 #include "CaptureComponent.h"
@@ -376,6 +377,17 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
         Pet->AlphaCooldown = Record.AlphaCooldown;
         Pet->bHasHabitat = Record.bHasHabitat && !Record.bOwned;
         Pet->HabitatHome = Record.HabitatHome; Pet->RoamRadius = Record.RoamRadius; Pet->LeashRadius = Record.LeashRadius;
+        // 旧放置生物没有遭遇ID；从本关卡唯一的同物种地图锚点恢复，
+        // 绝不以已追击到的存档位置重新定义出生点，也不改现有栖息地或已结交伙伴。
+        if(!Record.bOwned && !Record.bHasHabitat && Record.EncounterId.IsNone())
+        {
+            FVector Origin;const auto* Mode=GetWorld()->GetAuthGameMode<ACFGameMode>();
+            if(Mode && Mode->ResolvePlacedCreatureHome(LoadedDefinition,Origin))
+            {
+                Pet->bHasHabitat=true;Pet->HabitatHome=Origin;
+                UE_LOG(LogTemp,Display,TEXT("CF_PLACED_HABITAT_RESTORE id=%s home=%s position=%s"),*Record.Id.ToString(),*Origin.ToString(),*Record.Transform.GetLocation().ToString());
+            }
+        }
         if (Save->FormatVersion < 8 && !Record.bOwned && !Record.EncounterId.IsNone())
             for (TActorIterator<AWildEncounter> It(GetWorld()); It; ++It)
                 if (It->EncounterId == Record.EncounterId) { Pet->bHasHabitat = true; Pet->HabitatHome = It->GetActorLocation()+FVector(0,0,90); break; }

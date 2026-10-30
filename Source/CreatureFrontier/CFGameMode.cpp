@@ -71,9 +71,25 @@ ACFGameMode::ACFGameMode()
     HUDClass = ACFHUD::StaticClass();
 }
 
+bool ACFGameMode::ResolvePlacedCreatureHome(const UCreatureDefinition* Definition,FVector& Home) const
+{
+    if(!Definition)return false;
+    const auto* Candidates=PlacedCreatureHomes.Find(FSoftObjectPath(Definition));
+    if(!Candidates || Candidates->Num()!=1 || (*Candidates)[0].ContainsNaN())return false;
+    Home=(*Candidates)[0];return true;
+}
+
 void ACFGameMode::BeginPlay()
 {
     Super::BeginPlay();
+    // 在第一帧AI移动和任何读档之前记录地图出生位置；后续读档不重建此表。
+    for(TActorIterator<ACreatureCharacter> It(GetWorld());It;++It)
+        if(It->HasAnyFlags(RF_WasLoaded) && It->Definition && !It->Tamer && It->EncounterId.IsNone())
+        {
+            const FVector Origin=It->GetActorLocation();
+            PlacedCreatureHomes.FindOrAdd(FSoftObjectPath(It->Definition.Get())).Add(Origin);
+            if(!It->bHasHabitat){It->bHasHabitat=true;It->HabitatHome=Origin;}
+        }
     SeedFrontierResources(GetWorld());
     if(FParse::Param(FCommandLine::Get(),TEXT("CFStarterRescueTest")) || FParse::Param(FCommandLine::Get(),TEXT("CFStarterRescueRead")))
     {const bool Read=FParse::Param(FCommandLine::Get(),TEXT("CFStarterRescueRead"));FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this,Read](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunStarterScoutScenario(GetWorld(),Hero,Read);},1.f,false);return;}

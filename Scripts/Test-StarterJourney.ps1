@@ -52,6 +52,7 @@ try{
         $markers=@('CF_STARTER_SCOUT_SOURCE PASS','CF_STARTER_SCOUT_LIFE PASS version=38 positionRetained=1 homeRetained=1 suppliesRetained=1 claimed=4 bossAlive=1 avoid=1','CF_STARTER_SCOUT PASS reason=complete')
         if(!$readMode -and !$Rescue){$markers+=@('CF_STARTER_SCOUT_COMMAND PASS focus=1 special=1 samePet=1','CF_STARTER_SCOUT_CONTACT PASS')}
         if($Rescue -and !$readMode){$markers+='CF_STARTER_RESCUE_HEAL PASS input=1 medicinePaid=1 restored=40 samePet=1 avoid=1'}
+        if($Rescue){$markers+=@('CF_PLACED_HABITAT_SOURCE PASS count=2 positionRetained=1 healthRetained=1 originalRanges=1','CF_PLACED_HABITAT_LIFE PASS count=2 positionRetained=1 homePersisted=1 safeSeconds=2','CF_STARTER_RESCUE_BUDGET PASS')}
     }
     foreach($marker in $markers){if(!$raw.Contains($marker)){throw ('缺少开局旅程证据：'+$marker)}}
     if($Preview){
