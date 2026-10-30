@@ -2,6 +2,10 @@
 #include "CreatureCharacter.h"
 #include "WorkStation.h"
 #include "InventoryComponent.h"
+#include "FarmCropComponent.h"
+#include "BaseBuildingComponent.h"
+#include "FrontierOrientation.h"
+#include "EngineUtils.h"
 
 namespace
 {
@@ -19,6 +23,37 @@ namespace
             case 4:return {{EFrontierItem::Material,20},{EFrontierItem::CaptureDevice,3}};
             default:return {};
         }
+    }
+    FString FarmingHint(const ACFPlayerCharacter* Hero)
+    {
+        AWorkStation* Garden=nullptr;double Distance=DBL_MAX;
+        // 优先说明伙伴正在使用的农圃，避免另一个更近的空圃把现有任务提示盖掉。
+        for(TActorIterator<ACreatureCharacter> It(Hero->GetWorld());It;++It)
+            if(It->Tamer==Hero->GetController() && It->Health>0 && IsValid(It->WorkSite) && It->WorkSite->RequiredSpecialty==EWorkSpecialty::Farming &&
+                (It->Activity==ECreatureActivity::Work || It->bResumeWorkAfterRest))
+                if(const double D=Hero->GetDistanceTo(It->WorkSite);D<Distance){Garden=It->WorkSite;Distance=D;}
+        if(!Garden)for(TActorIterator<AWorkStation> It(Hero->GetWorld());It;++It)
+            if(!It->IsActorBeingDestroyed() && It->RequiredSpecialty==EWorkSpecialty::Farming && Hero->GetDistanceTo(*It)<Distance){Garden=*It;Distance=Hero->GetDistanceTo(*It);}
+        if(!Garden)
+        {
+            const int32 Missing=FMath::Max(0,UBaseBuildingComponent::GetCost(EWorkSpecialty::Farming)-Hero->Inventory->Count(EFrontierItem::Material));
+            return Missing>0?FString::Printf(TEXT("农圃还缺%d材料；M采集，C查看配方\n备齐后B建造，V选择农圃"),Missing):TEXT("B建造、V选择农圃，需18材料\n建好后还需种子和伙伴派工");
+        }
+        if(Distance>800)
+        {
+            const auto Delta=Garden->GetActorLocation()-Hero->GetActorLocation();
+            return FString::Printf(TEXT("农圃在%s%d米（直线），先靠近\n不是可通行路线，注意绕开障碍"),FrontierOrientation::Heading(FMath::RadiansToDegrees(FMath::Atan2(Delta.Y,Delta.X))),FMath::CeilToInt(Distance/100));
+        }
+        if(Garden->StoredFood>=30)return TEXT("农圃粮仓已满，靠近6米瞄准按O取粮\n腾出空间后伙伴才能继续收获");
+        if(!Garden->Crop->bPlanted && Garden->Crop->Seeds==0)
+        {
+            if(Hero->Inventory->Count(EFrontierItem::Seeds)>0)return TEXT("靠近3米瞄农圃按F2存入种子\n再瞄农圃按E派伙伴，勿只手动收获");
+            return TEXT("缺种：基地C选择准备种子，需食物和纤维\n缺食物可按3制作；种好后让伙伴收获");
+        }
+        for(TActorIterator<ACreatureCharacter> It(Hero->GetWorld());It;++It)
+            if(It->Tamer==Hero->GetController() && It->Health>0 && It->WorkSite==Garden && (It->Activity==ECreatureActivity::Work || It->bResumeWorkAfterRest))
+                return TEXT("伙伴已派工，留出农圃接近通道\n查看伙伴饱食和体力，等待伙伴收获");
+        return TEXT("农圃已有种子或作物，瞄准按E派伙伴\n旅程只记录伙伴收获，不计手动收获");
     }
 }
 
@@ -68,7 +103,9 @@ FString ACFPlayerCharacter::GetObjectiveStatus() const
 }
 FString ACFPlayerCharacter::GetObjectiveHint() const
 {
-    return Objectives.Claimed>=5?TEXT("F5 保存 | F9 读取存档"):GetObjectiveProgress(Objectives.Claimed)>=StarterObjectiveTargets[Objectives.Claimed]?TEXT("已完成，按N领取奖励并揭晓下个目标"):StarterObjectiveHints[Objectives.Claimed];
+    if(Objectives.Claimed>=5)return TEXT("F5 保存 | F9 读取存档");
+    if(GetObjectiveProgress(Objectives.Claimed)>=StarterObjectiveTargets[Objectives.Claimed])return TEXT("已完成，按N领取奖励并揭晓下个目标");
+    return Objectives.Claimed==3?FarmingHint(this):FString(StarterObjectiveHints[Objectives.Claimed]);
 }
 FString ACFPlayerCharacter::GetObjectiveRewardText() const
 {

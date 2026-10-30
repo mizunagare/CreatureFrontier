@@ -19,6 +19,7 @@
 #include "HAL/FileManager.h"
 #include "UnrealClient.h"
 #include "TimerManager.h"
+#include "Camera/CameraComponent.h"
 
 void RunObjectiveScenario(UWorld* World,ACFPlayerCharacter* Hero)
 {
@@ -60,8 +61,13 @@ void RunObjectiveScenario(UWorld* World,ACFPlayerCharacter* Hero)
     Hero->Building->Selected=EWorkSpecialty::Farming;
     auto* Garden=Hero->Building->BuildAt(FTransform(FRotator::ZeroRotator,FVector(0,-700,-15),FVector(2,1,.7)));
     if(!Garden) { FPlatformMisc::RequestExitWithStatus(false,1); return; }
+    bool Guidance=Hero->GetObjectiveHint().Contains(TEXT("缺种"));
+    Hero->Inventory->AddItem(EFrontierItem::Seeds,1);Guidance &= Hero->GetObjectiveHint().Contains(TEXT("F2"));Hero->Inventory->Consume(EFrontierItem::Seeds,1);
     Garden->Crop->Seeds=2; // 目标进度需要真实投入两颗种子，不能依靠免费农圃产出。
+    Guidance &= Hero->GetObjectiveHint().Contains(TEXT("按E")) && Hero->GetObjectiveHint().Contains(TEXT("不计手动收获"));
+    Garden->StoredFood=30;Guidance &= Hero->GetObjectiveHint().Contains(TEXT("按O"));Garden->StoredFood=0;
     Pet->WorkSite=Garden; Pet->SetActorLocation(Garden->GetActorLocation()+FVector(0,180,55));
+    Guidance &= Hero->GetObjectiveHint().Contains(TEXT("伙伴已派工")) && Garden->Crop->Seeds==2 && Garden->StoredFood==0;
     SetStack(EFrontierItem::Food,999); Garden->StoredFood=30; Pet->Tick(4); Production &= Hero->GetObjectives().FarmFood==0;
     Garden->AdjustFoodStock(-1); Pet->Tick(0); Production &= Hero->GetObjectives().FarmFood==1;
     Garden->AdjustFoodStock(-1); Pet->Tick(4); Production &= Hero->GetObjectives().FarmFood==2;
@@ -111,7 +117,34 @@ void RunObjectiveScenario(UWorld* World,ACFPlayerCharacter* Hero)
     for(auto& Facility:OwnedLegacy->Facilities) if(Facility.Specialty==EWorkSpecialty::Farming) Facility.StoredFood=0;
     UGameplayStatics::SaveGameToSlot(OwnedLegacy,TEXT("FrontierObjectiveOwnedAlpha"),0);
     Migration &= Hero->LoadProgress(TEXT("FrontierObjectiveOwnedAlpha")) && Hero->GetObjectives().bAlphaResolved && Hero->GetObjectives().Claimed==0;
-    const bool Pass=Sequence && Production && Capacity && Life && Alpha && Snapshot && Validation && Migration;
+    const bool Pass=Sequence && Production && Capacity && Life && Alpha && Snapshot && Validation && Migration && Guidance;
+    UE_LOG(LogTemp,Display,TEXT("CF_OBJECTIVE_GUIDANCE %s cases=5 readonly=1"),Guidance?TEXT("PASS"):TEXT("FAIL"));
     UE_LOG(LogTemp,Display,TEXT("CF_OBJECTIVE %s sequence=%d production=%d capacity=%d life=%d alpha=%d snapshot=%d invalid=%d migration=%d"),Pass?TEXT("PASS"):TEXT("FAIL"),Sequence,Production,Capacity,Life,Alpha,Snapshot,Validation,Migration);
+    if(Pass && FParse::Param(FCommandLine::Get(),TEXT("CFFarmJourneyPreview")))
+    {
+        // 仅为五种引导文字取景；状态由独立测试快照构造，不当作自然种植与行走验收。
+        auto* View=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(ReadySlot,0));
+        View->Objectives.Claimed=3;View->Objectives.FarmFood=0;View->InventoryStacks.Remove(EFrontierItem::Seeds);
+        for(auto& Facility:View->Facilities)if(Facility.Specialty==EWorkSpecialty::Farming){Facility.Seeds=0;Facility.StoredFood=0;Facility.bPlanted=false;Facility.GrowthWork=0;}
+        if(!UGameplayStatics::SaveGameToSlot(View,TEXT("FrontierFarmJourneyPreview"),0) || !Hero->LoadProgress(TEXT("FrontierFarmJourneyPreview"))){FPlatformMisc::RequestExitWithStatus(false,1);return;}
+        AWorkStation* Plot=nullptr;ACreatureCharacter* Worker=nullptr;
+        for(TActorIterator<AWorkStation> It(World);It;++It)if(It->RequiredSpecialty==EWorkSpecialty::Farming)Plot=*It;
+        for(TActorIterator<ACreatureCharacter> It(World);It;++It)if(It->Tamer==Hero->GetController()){Worker=*It;It->SetActorTickEnabled(false);It->GetCharacterMovement()->DisableMovement();It->WorkSite=nullptr;}
+        if(!Plot || !Worker){FPlatformMisc::RequestExitWithStatus(false,1);return;}
+        Hero->GetCharacterMovement()->DisableMovement();const auto Aim=(Plot->GetActorLocation()-Hero->FirstPersonCamera->GetComponentLocation()).Rotation();Hero->GetController()->SetControlRotation(Aim);Hero->FirstPersonCamera->SetWorldRotation(Aim);
+        const auto Root=FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir()/TEXT("FarmJourneyPreview")/FGuid::NewGuid().ToString(EGuidFormats::Digits));IFileManager::Get().MakeDirectory(*Root,true);UE_LOG(LogTemp,Display,TEXT("CF_FARM_JOURNEY_ROOT %s"),*Root);
+        for(int32 Step=0;Step<5;++Step)
+        {
+            FTimerHandle Setup,Shot;
+            World->GetTimerManager().SetTimer(Setup,[Hero,Plot,Worker,Step](){
+                if(Step==1)Hero->Inventory->AddItem(EFrontierItem::Seeds,1);
+                if(Step==2){Hero->Inventory->Consume(EFrontierItem::Seeds,1);Plot->Crop->Seeds=2;}
+                if(Step==3)Plot->StoredFood=30;
+                if(Step==4){Plot->StoredFood=0;Worker->WorkSite=Plot;Worker->SetActivity(ECreatureActivity::Work);}
+            },1.f+Step*1.5f,false);
+            World->GetTimerManager().SetTimer(Shot,[Root,Step](){const TCHAR* Names[]={TEXT("MissingSeeds"),TEXT("BackpackSeeds"),TEXT("Ready"),TEXT("Full"),TEXT("Working")};FScreenshotRequest::RequestScreenshot(Root/(FString(Names[Step])+TEXT(".png")),false,false);},1.5f+Step*1.5f,false);
+        }
+        FTimerHandle Done;World->GetTimerManager().SetTimer(Done,[](){UE_LOG(LogTemp,Display,TEXT("CF_FARM_JOURNEY_PREVIEW PASS scenes=5"));FPlatformMisc::RequestExitWithStatus(false,0);},9.f,false);return;
+    }
     FPlatformMisc::RequestExitWithStatus(false,Pass?0:1);
 }
