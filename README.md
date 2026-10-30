@@ -4,6 +4,8 @@
 
 ## 最新施工补料通行体验包（限定验证，非最终版）
 
+连续施工开发验证候选 `E:\CreatureFrontierBuilds\Windows-Continuous-Construction\CreatureFrontier.exe` 已完成真实家园约96米连续行走与原输入施工整链，取消玩家观察位置调整，未新增普通玩法规则；详见[连续施工验证](Docs/CONTINUOUS_CONSTRUCTION.md)。固定目标与野生AI隔离边界保留，不替代下方现有体验入口。
+
 正常预览／派工整合另有开发验证候选 `E:\CreatureFrontierBuilds\Windows-Construction-Input-Chain\CreatureFrontier.exe`：原输入已接回真实家园楼板与楼梯施工整链；这是验证补强，没有新增普通玩法规则，不替代下方体验入口。边界与复验见[正常预览与派工整合](Docs/CONSTRUCTION_INPUT_CHAIN.md)。
 
 运行 `E:\CreatureFrontierBuilds\Windows-Walk-Supply\CreatureFrontier.exe`。按住M采料，E开原箱、回车存材料、E关箱；原V选箱／E派工后，缺料补箱自动继续。空手等料伙伴挡住主人正面近距离通路时，会在安全路径与真实碰撞允许的情况下让路，保留原任务。

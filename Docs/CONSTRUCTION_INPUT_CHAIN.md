@@ -1,5 +1,7 @@
 # 正常预览与派工接入施工整链
 
+后续 `-Continuous` 已将本链玩家的初始拆顶、楼板／楼梯观察点及完工会合改为实际导航衔接，截图也不再挪动玩家，原X拆顶接入；详见 `Docs/CONTINUOUS_CONSTRUCTION.md`。下文固定站位描述保留本版本含义，旧模式继续存在，不回写旧证据为连续游玩结论。
+
 ## 范围与操作
 
 本轮复用原建造、仓储、伙伴施工与存档系统，不新增独立玩法或改变经济规则。原 `Test-UpperDeckConstruction.ps1` 新增 `-BuildInput`，要求同时启用 `-WalkSupply -WalkHarvest -StairWork -SupplyPause`，不能用于中途读取。CSV增加模式字段；原模式保留。
