@@ -58,9 +58,10 @@ def path(name, start, end, width=180):
          (math.hypot(dx,dy)/100, width/100, .012), 'Path', yaw=math.degrees(math.atan2(dy,dx)))
 
 for actor in actors.get_all_level_actors():
-    if actor.get_actor_label() == 'Prototype Floor':
+    # 兼容旧地图标签；不要求为中文化重建或覆盖已有地图。
+    if actor.get_actor_label() in ('Prototype Floor', '原型地面'):
         actor.static_mesh_component.set_material(0, materials['Grass'])
-    if actor.get_actor_label().startswith('Cover Block '):
+    if actor.get_actor_label().startswith(('Cover Block ', '掩体方块 ')):
         actor.static_mesh_component.set_material(0, materials['Stone'])
         position = actor.get_actor_location()
         mesh('CoverFoot_' + actor.get_actor_label()[-1], 'Cube', (position.x,position.y,-25), (1.5,1.5,.5), 'Stone')

@@ -12,7 +12,7 @@ for key, name, asset, location, level, seconds, boss in specs:
                and str(a.get_editor_property('encounter_id')) == key]
     assert len(matches) <= 1
     site = matches[0] if matches else actors.spawn_actor_from_class(unreal.WildEncounter, unreal.Vector(*location))
-    site.set_actor_label(name + ' Encounter')
+    site.set_actor_label(name + '栖息地')
     site.set_editor_property('encounter_id', key)
     site.set_editor_property('region_name', name)
     site.set_editor_property('definition', unreal.load_asset('/Game/Creatures/' + asset))

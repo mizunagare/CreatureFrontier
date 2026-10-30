@@ -71,7 +71,7 @@ for job, position in [(unreal.WorkSpecialty.MINING, (-650, -350, 0)), (unreal.Wo
     if not any(isinstance(a, unreal.WorkStation) and a.get_editor_property('required_specialty') == job for a in actors.get_all_level_actors()):
         station = actors.spawn_actor_from_class(unreal.WorkStation, unreal.Vector(*position))
         station.set_editor_property('required_specialty', job)
-        station.set_actor_label(str(job) + ' Work Station')
+        station.set_actor_label('采矿工作台' if job == unreal.WorkSpecialty.MINING else '制作工作台')
 
 world = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world()
 assert unreal.FrontierEditorLibrary.prepare_prototype_navigation(world)

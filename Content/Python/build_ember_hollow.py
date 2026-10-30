@@ -84,7 +84,7 @@ assert len(sites)<=1
 site=sites[0] if sites else actors.spawn_actor_from_class(unreal.WildEncounter,unreal.Vector(-400,-3850,-50))
 for key,value in dict(encounter_id='EmberHollow',region_name='余烬洞窟',definition=unreal.load_asset('/Game/Creatures/DA_Cinderkit'),creature_level=3,respawn_seconds=150.0,boss=False,records_rescue_journey=True).items():
     site.set_editor_property(key,value)
-site.set_actor_label('Ember Hollow Encounter')
+site.set_actor_label('余烬洞窟栖息地')
 world=unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world()
 assert unreal.FrontierEditorLibrary.prepare_prototype_navigation(world)
 assert levels.save_current_level()
