@@ -1,6 +1,7 @@
-param([Parameter(Mandatory=$true)][string]$ReadInputPath,[string]$BuildRoot='',[switch]$Read,[switch]$Preview,[switch]$StairWork,
+param([Parameter(Mandatory=$true)][string]$ReadInputPath,[string]$BuildRoot='',[switch]$Read,[switch]$Preview,[switch]$StairWork,[switch]$SupplyPause,
       [ValidateSet('960x540','1280x720')][string]$Resolution='1280x720')
 $ErrorActionPreference='Stop'
+if($SupplyPause -and !$StairWork){throw '补料核对须同时指定楼梯伙伴施工模式'}
 $projectRoot=Split-Path $PSScriptRoot -Parent
 . (Join-Path $PSScriptRoot 'BuildFingerprint.ps1')
 $ReadInputPath=(Resolve-Path -LiteralPath $ReadInputPath).Path
@@ -23,11 +24,12 @@ try{
     Copy-Item -LiteralPath $ReadInputPath -Destination (Join-Path $slotRoot 'UpperDeckInput.sav')
     $arguments=@($(if($Read){'-CFUpperDeckRead'}else{'-CFUpperDeckTest'}),'-nullrhi','-nosound','-unattended','-nop4',('-abslog="'+$log+'"'))
     if($StairWork){$arguments+='-CFUpperDeckStairWork'}
+    if($SupplyPause){$arguments+='-CFUpperDeckSupplyPause'}
     if($Preview){$size=$Resolution.Split('x');$arguments=@($arguments|Where-Object {$_ -ne '-nullrhi'})+@('-CFUpperDeckPreview','-RenderOffscreen','-ForceRes',('-ResX='+$size[0]),('-ResY='+$size[1]),'-norhithread','-forcerhibypass','-ExecCmds="t.MaxFPS 60,r.MotionBlurQuality 0,r.AntiAliasingMethod 1"')}
     $exe=if($BuildRoot){$module}elseif($Preview){'D:/Epic/UE_5.8/Engine/Binaries/Win64/UnrealEditor.exe'}else{'D:/Epic/UE_5.8/Engine/Binaries/Win64/UnrealEditor-Cmd.exe'}
     if(!$BuildRoot){$arguments=@(('"'+(Join-Path $projectRoot 'CreatureFrontier.uproject')+'"'),'-game')+$arguments}
     $started=[DateTime]::UtcNow
-    [pscustomobject]@{Read=[bool]$Read;StairWork=[bool]$StairWork;Preview=[bool]$Preview;Resolution=$Resolution;BuildSHA256=$hash;ReadInputSHA256=$inputHash;StartedUTC=$started.ToString('o')}|Export-Csv -LiteralPath (Join-Path $run 'Run.csv') -NoTypeInformation
+    [pscustomobject]@{Read=[bool]$Read;StairWork=[bool]$StairWork;SupplyPause=[bool]$SupplyPause;Preview=[bool]$Preview;Resolution=$Resolution;BuildSHA256=$hash;ReadInputSHA256=$inputHash;StartedUTC=$started.ToString('o')}|Export-Csv -LiteralPath (Join-Path $run 'Run.csv') -NoTypeInformation
     Write-Host ('原遮棚二层楼板施工：'+$run)
     $process=Start-Process -FilePath $exe -ArgumentList $arguments -WindowStyle Hidden -PassThru
     if(!$process.WaitForExit(330000)){$process.Kill();$process.WaitForExit();throw '二层楼板施工专项超时'}
@@ -36,14 +38,17 @@ try{
     foreach($marker in @('CF_UPPER_DECK_BUILT PASS modules=25 floor=8 stairs=12 material=0','CF_UPPER_DECK_JOIN PASS outside=1','CF_UPPER_DECK_TOP PASS hero=1 pet=1 supportRetained=1 version=38','CF_UPPER_DECK_LIFE PASS version=38 retained=23 modules=25 heroUp=1 petUp=1 returned=1 material=0 seeds=1 food=0 bond=9','CF_UPPER_DECK PASS reason=complete')){
         if(!$raw.Contains($marker)){throw ('缺少二层施工／生活标记：'+$marker)}
     }
-    $stairRead=$Read -and $raw.Contains('CF_UPPER_DECK_STAIR_RESTORE PASS version=38 carried=3 material=0 retained=23')
-    [array]$required=if($stairRead){@('CF_UPPER_DECK_STAIR_RESTORE PASS version=38 carried=3 material=0 retained=23')}elseif($Read){@()}else{@('CF_UPPER_DECK_REFUND PASS roof=5 retained=23','CF_UPPER_DECK_HARVEST count=15 material=20','CF_UPPER_DECK_GUARDS PASS pendingLanding=0 material=12 crate=8 anchorBelow=1','CF_UPPER_DECK_MID PASS version=38 carried=3')}
+    $heldMaterial=if($SupplyPause){3}else{0}
+    $stairRestore='CF_UPPER_DECK_STAIR_RESTORE PASS version=38 carried=3 material='+$heldMaterial+' retained=23'
+    $stairRead=$Read -and $raw.Contains($stairRestore)
+    [array]$required=if($stairRead){@($stairRestore)}elseif($Read){@()}else{@('CF_UPPER_DECK_REFUND PASS roof=5 retained=23','CF_UPPER_DECK_HARVEST count=15 material=20','CF_UPPER_DECK_GUARDS PASS pendingLanding=0 material=12 crate=8 anchorBelow=1','CF_UPPER_DECK_MID PASS version=38 carried=3')}
     if($stairRead){$required+='CF_UPPER_DECK_STAIR_POSITION PASS preserved=1'}
     if($Read -and !$stairRead -and $raw -notmatch 'CF_UPPER_DECK_RESTORE PASS version=(37|38) carried=3 material=12 retained=23'){throw '缺少真实旧版或当前楼板在途恢复标记'}
     if($StairWork){
+        if($SupplyPause){$required+='CF_UPPER_DECK_SUPPLY_WAIT PASS noDrain=1 sameTask=1 actualRefill=3'}
         $required+='CF_UPPER_DECK_STAIR_WORK PASS paid=12 carried=0 taskCleared=1'
         $required+='CF_UPPER_DECK_STAIR_PENDING PASS lowerFloorHit=1 upperPath=0 collision=1'
-        if(!$stairRead){$required+=@('CF_UPPER_DECK_STAIR_GUARDS PASS supportRetained=1 legacy37Rejected=1 worldRetained=1','CF_UPPER_DECK_STAIR_MID PASS version=38 carried=3 material=0')}
+        if(!$stairRead){$required+=@('CF_UPPER_DECK_STAIR_GUARDS PASS supportRetained=1 legacy37Rejected=1 worldRetained=1',('CF_UPPER_DECK_STAIR_MID PASS version=38 carried=3 material='+$(if($SupplyPause){3}else{0})))}
     }
     foreach($marker in $required){if(!$raw.Contains($marker)){throw ('缺少二层施工投入／恢复标记：'+$marker)}}
     if((Get-FrontierBuildFingerprint -LiteralPath $module) -ne $hash -or (Get-FrontierBuildFingerprint -LiteralPath $ReadInputPath) -ne $inputHash){throw '程序或源输入副本改变'}
@@ -64,7 +69,7 @@ try{
     }
     $midHash=if(!$Read){Get-FrontierBuildFingerprint -LiteralPath (Join-Path $slotRoot 'UpperDeckMid.sav')}else{''}
     $stairMidHash=if($StairWork -and !$stairRead){Get-FrontierBuildFingerprint -LiteralPath (Join-Path $slotRoot 'UpperDeckStairMid.sav')}else{''}
-    [pscustomobject]@{Read=[bool]$Read;StairWork=[bool]$StairWork;StairRead=[bool]$stairRead;Preview=[bool]$Preview;Resolution=$Resolution;Pass=$true;BuildSHA256=$hash;ReadInputSHA256=$inputHash;MidSaveSHA256=$midHash;StairMidSaveSHA256=$stairMidHash;TopSaveSHA256=(Get-FrontierBuildFingerprint -LiteralPath (Join-Path $slotRoot 'UpperDeckTop.sav'));DoneSaveSHA256=(Get-FrontierBuildFingerprint -LiteralPath (Join-Path $slotRoot 'UpperDeckDone.sav'));Log=$log}|Export-Csv -LiteralPath (Join-Path $run 'Results.csv') -NoTypeInformation
+    [pscustomobject]@{Read=[bool]$Read;StairWork=[bool]$StairWork;SupplyPause=[bool]$SupplyPause;StairRead=[bool]$stairRead;Preview=[bool]$Preview;Resolution=$Resolution;Pass=$true;BuildSHA256=$hash;ReadInputSHA256=$inputHash;MidSaveSHA256=$midHash;StairMidSaveSHA256=$stairMidHash;TopSaveSHA256=(Get-FrontierBuildFingerprint -LiteralPath (Join-Path $slotRoot 'UpperDeckTop.sav'));DoneSaveSHA256=(Get-FrontierBuildFingerprint -LiteralPath (Join-Path $slotRoot 'UpperDeckDone.sav'));Log=$log}|Export-Csv -LiteralPath (Join-Path $run 'Results.csv') -NoTypeInformation
     Write-Host '原遮棚由原伙伴实际建成二层楼板、楼梯连接及双方上下楼存读通过；图形仍须逐图目视，固定夹具不作为自然建造或最终品质验收'
 }finally{
     try{

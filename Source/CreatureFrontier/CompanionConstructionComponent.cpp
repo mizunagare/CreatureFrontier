@@ -56,9 +56,19 @@ bool UCompanionConstructionComponent::TickWork(float DeltaSeconds,ACFPlayerChara
         if(Pet->Stamina>=80 && Pet->Nutrition>=20 && Pet->Health>=Pet->GetMaxHealth()*.8f){Pet->bResumeWorkAfterRest=false;Pet->SetActivity(ECreatureActivity::Work);}
         return true;
     }
-    Pet->Stamina=FMath::Max(0.f,Pet->Stamina-DeltaSeconds*1.5f);
     if(Pet->Nutrition<=0 || Pet->Stamina<=0){Pet->bResumeWorkAfterRest=true;Pet->SetActivity(ECreatureActivity::Rest);Pet->StopNavigation();return true;}
     const int32 Missing=Site->Definition->MaterialCost-Site->StorageInventory->Count(EFrontierItem::Material);
+    AHomeModule* Crate=nullptr;
+    if(Missing>0 && Pet->Cargo->Count()==0)
+    {
+        for(TActorIterator<AHomeModule> It(GetWorld());It;++It)if(It->PersistentId==Site->ConstructionCrateId && It->GetKind()==EHomeModuleKind::Storage && !It->bPreview && !It->bStaged)Crate=*It;
+        if(!Crate)Site->ConstructionCrateId.Invalidate();
+        // 无料可搬时保留原任务并停步，不空耗施工体力，也不免费恢复体力。
+        // 补料后下一次正常更新继续原任务；已有携物仍须交付，不能误判为缺料。
+        if(!Crate || Crate->StorageInventory->Count(EFrontierItem::Material)==0){Pet->StopNavigation();return true;}
+    }
+    Pet->Stamina=FMath::Max(0.f,Pet->Stamina-DeltaSeconds*1.5f);
+    if(Pet->Stamina<=0){Pet->bResumeWorkAfterRest=true;Pet->SetActivity(ECreatureActivity::Rest);Pet->StopNavigation();return true;}
     if(Pet->Cargo->Count()>0)
     {
         if(!Reach(Site)){Approach(Site);return true;}Pet->StopNavigation();
@@ -68,9 +78,6 @@ bool UCompanionConstructionComponent::TickWork(float DeltaSeconds,ACFPlayerChara
     }
     if(Missing>0)
     {
-        AHomeModule* Crate=nullptr;for(TActorIterator<AHomeModule> It(GetWorld());It;++It)if(It->PersistentId==Site->ConstructionCrateId && It->GetKind()==EHomeModuleKind::Storage && !It->bPreview && !It->bStaged)Crate=*It;
-        if(!Crate){Site->ConstructionCrateId.Invalidate();Pet->StopNavigation();return true;}
-        if(Crate->StorageInventory->Count(EFrontierItem::Material)==0){Pet->StopNavigation();return true;}
         if(!Reach(Crate)){Approach(Crate);return true;}Pet->StopNavigation();
         const int32 Amount=FMath::Min3(Missing,UCompanionCargoComponent::Capacity,Crate->StorageInventory->Count(EFrontierItem::Material));
         Crate->StorageInventory->TransferTo(Pet->CargoInventory,{{EFrontierItem::Material,Amount}});return true;

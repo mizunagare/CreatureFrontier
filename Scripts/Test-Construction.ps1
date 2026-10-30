@@ -1,5 +1,6 @@
-param([string]$BuildRoot='',[switch]$Read,[string]$ReadInputPath='',[switch]$Needs,[switch]$InputOnly,[switch]$Preview,[string]$Resolution='1280x720',[switch]$ExistingHome)
+param([string]$BuildRoot='',[switch]$Read,[string]$ReadInputPath='',[switch]$Needs,[switch]$InputOnly,[switch]$Preview,[string]$Resolution='1280x720',[switch]$ExistingHome,[switch]$WaitAudit,[switch]$WaitRead)
 $ErrorActionPreference='Stop'
+if(($WaitRead -and (!$Read -or !$WaitAudit)) -or ($WaitAudit -and ($InputOnly -or $ExistingHome))){throw '等待恢复须同时指定读取与等待核对，不能混用输入或原屋模式'}
 if([bool]($Read -or $ExistingHome) -ne [bool]$ReadInputPath){throw '恢复或原家园模式必须指定独立输入副本；其他模式不接收外部档'}
 if(($InputOnly -and ($Read -or $Needs -or $ExistingHome)) -or ($ExistingHome -and ($Needs -or $Preview))){throw '施工输入、原家园及进食预览模式不能混用'}
 if($Resolution -notmatch '^(\d{3,4})x(\d{3,4})$'){throw '施工截图分辨率须为宽x高'}
@@ -26,6 +27,8 @@ try{
     $flag=if($ExistingHome){if($Read){'-CFConstructionHomeRead'}else{'-CFConstructionHome'}}elseif($InputOnly){'-CFConstructionInput'}elseif($Read){'-CFConstructionRead'}else{'-CFConstructionTest'}
     $arguments=@($flag,'-nullrhi','-nosound','-unattended','-nop4',('-abslog="'+$log+'"'))
     if($Needs){$arguments+='-CFConstructionNeeds'}
+    if($WaitAudit){$arguments+='-CFConstructionWaitAudit'}
+    if($WaitRead){$arguments+='-CFConstructionWaitRead'}
     if($Preview){$arguments=@($arguments|Where-Object {$_ -ne '-nullrhi'})+@('-CFConstructionPreview','-RenderOffscreen','-ForceRes',('-ResX='+$width),('-ResY='+$height),'-norhithread','-forcerhibypass','-ExecCmds="t.MaxFPS 60,r.MotionBlurQuality 0,r.AntiAliasingMethod 1"')}
     $exe=if($BuildRoot){$module}elseif($Preview){'D:\Epic\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe'}else{'D:\Epic\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe'}
     if(!$BuildRoot){$arguments=@(('"'+(Join-Path $projectRoot 'CreatureFrontier.uproject')+'"'),'-game')+$arguments}
@@ -36,12 +39,13 @@ try{
     if($process.ExitCode -ne 0 -or $raw -match '\bFAIL\b|Fatal error|Assertion failed' -or !$raw.Contains('LogExit: Exiting.')){throw ('施工专项失败：'+$log)}
     $markers=@()
     $restoredVersion=0
-    if($Read){$prefix=if($ExistingHome){'CF_CONSTRUCTION_HOME_RESTORE'}else{'CF_CONSTRUCTION_COLD'};$version=[regex]::Match($raw,($prefix+' PASS version=(35|36|37|38) '));if(!$version.Success){throw '缺少受支持的实际施工恢复版本'};$restoredVersion=$version.Groups[1].Value}
+    if($Read){$prefix=if($ExistingHome){'CF_CONSTRUCTION_HOME_RESTORE'}elseif($WaitRead){'CF_CONSTRUCTION_WAIT_RESTORE'}else{'CF_CONSTRUCTION_COLD'};$version=[regex]::Match($raw,($prefix+' PASS version=(35|36|37|38) '));if(!$version.Success){throw '缺少受支持的实际施工恢复版本'};$restoredVersion=$version.Groups[1].Value}
     if($ExistingHome){$markers=@('CF_CONSTRUCTION_HOME_DONE PASS version=38 modules=19 retained=18 material=0 food=1 seeds=1 cost=4','CF_CONSTRUCTION_HOME PASS reason=complete');$markers+=if($Read){"CF_CONSTRUCTION_HOME_RESTORE PASS version=$restoredVersion carried=3 stock=1 identity=1"}else{@('CF_CONSTRUCTION_HOME_ORIGIN PASS version=34 modules=19 refund=2 originalMaterial=2 stock=4','CF_CONSTRUCTION_HOME_MID PASS version=38 carried=3 identity=1')}}
     elseif($InputOnly){$markers=@('CF_CONSTRUCTION_INPUT PASS modifier=1 mapped=1 preview=1 material=12 paid=0')}
     else{
         $markers=@('CF_CONSTRUCTION_SHORTAGE PASS supplied=3 work=0 reserved=1','CF_CONSTRUCTION_BAD PASS cases=7 retained=1 cancel=1 paused=1 sourceProtected=1','CF_CONSTRUCTION_REST PASS version=38','CF_CONSTRUCTION_DONE PASS version=38 material=66 cost=6 identity=1 actualNav=1 rest=1','CF_CONSTRUCTION PASS reason=complete')
-        $markers+=if($Read){"CF_CONSTRUCTION_COLD PASS version=$restoredVersion carried=3 intent=1"}else{@('CF_CONSTRUCTION_QUEUE PASS material=69 paid=0 support=1 input=1','CF_CONSTRUCTION_MID PASS version=38 carried=3 identity=1 intent=1')}
+        $markers+=if($WaitRead){"CF_CONSTRUCTION_WAIT_RESTORE PASS version=$restoredVersion supplied=3 carried=0 intent=1"}elseif($Read){"CF_CONSTRUCTION_COLD PASS version=$restoredVersion carried=3 intent=1"}else{@('CF_CONSTRUCTION_QUEUE PASS material=69 paid=0 support=1 input=1','CF_CONSTRUCTION_MID PASS version=38 carried=3 identity=1 intent=1')}
+        if($WaitAudit){$markers+='CF_CONSTRUCTION_WAIT PASS noDrain=1 noRecovery=1 sameTask=1'}
         $markers+='CF_CONSTRUCTION_CANCEL_CAPACITY PASS retained=2 refunded=2'
         $markers+='CF_CONSTRUCTION_PATH_RETRY PASS calls=60 searches=1 retained=1'
         if(!$Read){$markers+='CF_CONSTRUCTION_CANCEL_CARRIED PASS saved=1 held=3 recovered=3 reassigned=1'}
@@ -65,13 +69,13 @@ try{
             Copy-Item -LiteralPath $path -Destination (Join-Path $run ($scene+'.png'))
         }
     }
-    [pscustomobject]@{Read=[bool]$Read;Needs=[bool]$Needs;Home=[bool]$ExistingHome;Input=[bool]$InputOnly;Preview=[bool]$Preview;Resolution=$Resolution;Pass=$true;BuildSHA256=$hash;ReadInputSHA256=$inputHash;MidSaveSHA256=$midHash;RestSaveSHA256=$restHash;DoneSaveSHA256=$doneHash;Log=$log}|Export-Csv -LiteralPath (Join-Path $run 'Results.csv') -NoTypeInformation
+    [pscustomobject]@{Read=[bool]$Read;WaitAudit=[bool]$WaitAudit;WaitRead=[bool]$WaitRead;Needs=[bool]$Needs;Home=[bool]$ExistingHome;Input=[bool]$InputOnly;Preview=[bool]$Preview;Resolution=$Resolution;Pass=$true;BuildSHA256=$hash;ReadInputSHA256=$inputHash;MidSaveSHA256=$midHash;RestSaveSHA256=$restHash;DoneSaveSHA256=$doneHash;Log=$log}|Export-Csv -LiteralPath (Join-Path $run 'Results.csv') -NoTypeInformation
     if($InputOnly){Write-Host '施工架预览及已注册输入放置通过；不代表系统鼠标／键盘或自然建房体验验收'}
     elseif($ExistingHome){Write-Host '原家园伙伴实际搬料重建、物资／身份守恒及完成存读通过；不代表任意布局或长期生活验收'}
     else{Write-Host '伙伴实际供料、缺料等待、施工、休息及存读专项通过；独立恢复和图形以各自运行证据为准，不等同完整伙伴建设交付'}
 }finally{
     try{
-        if($started){foreach($name in @('ConstructionMid','ConstructionRest','ConstructionDone','ConstructionHomeMid','ConstructionHomeDone')){$path=Join-Path $slotRoot ($name+'.sav');if((Test-Path -LiteralPath $path) -and (Get-Item -LiteralPath $path).LastWriteTimeUtc -ge $started){Copy-Item -LiteralPath $path -Destination (Join-Path $run ($name+'-generated.sav'))}}}
+        if($started){foreach($name in @('ConstructionMid','ConstructionRest','ConstructionDone','ConstructionShortage','ConstructionHomeMid','ConstructionHomeDone')){$path=Join-Path $slotRoot ($name+'.sav');if((Test-Path -LiteralPath $path) -and (Get-Item -LiteralPath $path).LastWriteTimeUtc -ge $started){Copy-Item -LiteralPath $path -Destination (Join-Path $run ($name+'-generated.sav'))}}}
         foreach($entry in $protected){if($entry.Hash){Copy-Item -LiteralPath $entry.Backup -Destination $entry.Path;if((Get-FrontierBuildFingerprint -LiteralPath $entry.Path) -ne $entry.Hash){throw '施工原测试槽恢复失败'}}elseif(Test-Path -LiteralPath $entry.Path){Remove-Item -LiteralPath $entry.Path}}
     }finally{$mutex.ReleaseMutex();$mutex.Dispose()}
 }

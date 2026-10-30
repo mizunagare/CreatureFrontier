@@ -35,6 +35,7 @@ struct FConstructionTest
     UWorld* World;ACFPlayerCharacter* Hero;TWeakObjectPtr<ACreatureCharacter> Pet;TWeakObjectPtr<AHomeModule> Site,Crate;
     FGuid PetId,SiteId,CrateId;int32 Phase=0;double At=0,Deadline=0,Travel=0;FVector Previous;
     bool Needs=false,CancelledOnce=false,Fed=false;float FeedingWork=0;
+    bool WaitAudit=false,WaitingRestore=false,RefillCarried=false;float WaitingStamina=0;
     TWeakObjectPtr<AWorkStation> Trough;
     bool Preview=false;FString ShotRoot;TSet<FString> Shots;double ShotUntil=0;
     bool Rebind()
@@ -129,9 +130,17 @@ struct FConstructionTest
             if(!Hero->LoadProgress(TEXT("ConstructionMid")) || !Rebind() || PetId!=OldPet || SiteId!=OldSite || CrateId!=OldBox || !Pose.Equals(Pet->GetActorTransform(),.01) || Pet->Construction->GetSite()!=Site.Get() || Pet->Cargo->Count()!=3)return Finish(false,TEXT("mid-restore"));
             UE_LOG(LogTemp,Display,TEXT("CF_CONSTRUCTION_MID PASS version=%d carried=3 identity=1 intent=1 pet=%s site=%s"),FrontierCurrentSaveVersion,*PetId.ToString(),*SiteId.ToString());Phase=1;
         }
-        if(Phase==1 && Site->StorageInventory->Count(EFrontierItem::Material)==3 && Pet->Cargo->Count()==0){Phase=2;At=World->GetTimeSeconds();}
-        if(Phase==2 && World->GetTimeSeconds()-At>2)
+        if(Phase==1 && Site->StorageInventory->Count(EFrontierItem::Material)==3 && Pet->Cargo->Count()==0){Phase=2;At=World->GetTimeSeconds();WaitingStamina=Pet->Stamina;}
+        if(Phase==2 && World->GetTimeSeconds()-At>(WaitAudit?5:2))
         {
+            if(WaitAudit)
+            {
+                const float Loss=WaitingStamina-Pet->Stamina;
+                UE_LOG(LogTemp,Display,TEXT("CF_CONSTRUCTION_WAIT_OBSERVED seconds=%.3f staminaLoss=%.6f work=%.3f cargo=%d stock=%d intent=%d"),World->GetTimeSeconds()-At,Loss,Site->ConstructionWork,Pet->Cargo->Count(),Crate->StorageInventory->Count(EFrontierItem::Material),Pet->Construction->GetSite()==Site.Get());
+                if(!Hero->SaveProgress(TEXT("ConstructionShortage")))return Finish(false,TEXT("wait-save"));
+                if(!FMath::IsNearlyZero(Loss,.01f) || Site->ConstructionWork!=0 || Pet->Activity!=ECreatureActivity::Work || Pet->Construction->GetSite()!=Site.Get())return Finish(false,TEXT("wait-drain"));
+                UE_LOG(LogTemp,Display,TEXT("CF_CONSTRUCTION_WAIT PASS noDrain=1 noRecovery=1 sameTask=1"));
+            }
             if(Photo(TEXT("Shortage")))return true;
             if(Site->ConstructionWork!=0 || !Site->bUnderConstruction || Crate->StorageInventory->Count(EFrontierItem::Material)!=0)return Finish(false,TEXT("shortage"));
             UE_LOG(LogTemp,Display,TEXT("CF_CONSTRUCTION_SHORTAGE PASS supplied=3 work=0 reserved=1"));
@@ -140,6 +149,7 @@ struct FConstructionTest
             if(!Hero->Inventory->TransferTo(Crate->StorageInventory,{{EFrontierItem::Material,3}}))return Finish(false,TEXT("refill"));
             Phase=3;
         }
+        if(Phase==3 && Pet->Cargo->Count()==3)RefillCarried=true;
         if(Phase==3 && Site->ConstructionWork>1)
         {
             if(Photo(TEXT("Working")))return true;
@@ -163,7 +173,10 @@ struct FConstructionTest
         }
         if(Phase==5 && !Site->bUnderConstruction)
         {
-            if(Travel<700 || Site->PaidMaterials!=6 || Pet->Cargo->Count()!=0 || Pet->Construction->GetSite() || Pet->Activity!=ECreatureActivity::Follow || Hero->Inventory->Count(EFrontierItem::Material)!=66 ||
+            // 等待态读取时首批搬运已在上一进程完成；按原220厘米接触半径推导
+            // 本次剩余往返的最短距离，并额外要求补料后真实携带过三份材料。
+            const double MinimumTravel=WaitingRestore?FMath::Max(0.,(FVector::Dist2D(Crate->GetActorLocation(),Site->ConstructionAnchor())-440)*2):700;
+            if(Travel<MinimumTravel || (WaitAudit && !RefillCarried) || Site->PaidMaterials!=6 || Pet->Cargo->Count()!=0 || Pet->Construction->GetSite() || Pet->Activity!=ECreatureActivity::Follow || Hero->Inventory->Count(EFrontierItem::Material)!=66 ||
                 !Hero->SaveProgress(TEXT("ConstructionDone")) || !Hero->LoadProgress(TEXT("ConstructionDone")) || !Rebind() || Pet->Construction->GetSite() || Pet->Cargo->Count()!=0 || Pet->Activity!=ECreatureActivity::Follow ||
                 Hero->Inventory->Count(EFrontierItem::Material)!=66 || Crate->StorageInventory->Count(EFrontierItem::Material)!=0)return Finish(false,TEXT("done"));
             AHomeModule* Done=nullptr;for(TActorIterator<AHomeModule> It(World);It;++It)if(It->PersistentId==SiteId)Done=*It;
@@ -185,12 +198,22 @@ void RunConstructionScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read)
 {
     const auto State=MakeShared<FConstructionTest>();State->World=World;State->Hero=Hero;State->Deadline=FPlatformTime::Seconds()+150;
     State->Needs=FParse::Param(FCommandLine::Get(),TEXT("CFConstructionNeeds"));
+    State->WaitAudit=FParse::Param(FCommandLine::Get(),TEXT("CFConstructionWaitAudit"));
     State->Preview=FParse::Param(FCommandLine::Get(),TEXT("CFConstructionPreview"));
     if(State->Preview){State->ShotRoot=FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir()/TEXT("ConstructionPreview")/FGuid::NewGuid().ToString(EGuidFormats::Digits));IFileManager::Get().MakeDirectory(*State->ShotRoot,true);UE_LOG(LogTemp,Display,TEXT("CF_CONSTRUCTION_PREVIEW_ROOT %s"),*State->ShotRoot);}
     if(Read)
     {
-        if(!Hero->LoadProgress(TEXT("ConstructionInput")) || !State->Rebind() || !State->Site->bUnderConstruction || State->Pet->Construction->GetSite()!=State->Site.Get() || State->Pet->Cargo->Count()!=3){State->Finish(false,TEXT("cold-restore"));return;}
-        State->Phase=1;State->CancelledOnce=true;UE_LOG(LogTemp,Display,TEXT("CF_CONSTRUCTION_COLD PASS version=%d carried=3 intent=1"),Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("ConstructionInput"),0))->FormatVersion);
+        const bool Waiting=FParse::Param(FCommandLine::Get(),TEXT("CFConstructionWaitRead"));
+        if(!Hero->LoadProgress(TEXT("ConstructionInput")) || !State->Rebind() || !State->Site->bUnderConstruction || State->Pet->Construction->GetSite()!=State->Site.Get() || State->Pet->Cargo->Count()!=(Waiting?0:3)){State->Finish(false,TEXT("cold-restore"));return;}
+        State->Phase=Waiting?2:1;State->CancelledOnce=true;
+        if(Waiting)
+        {
+            if(!State->WaitAudit || State->Site->StorageInventory->Count(EFrontierItem::Material)!=3 || State->Crate->StorageInventory->Count(EFrontierItem::Material)!=0){State->Finish(false,TEXT("wait-restore"));return;}
+            State->At=World->GetTimeSeconds();State->WaitingStamina=State->Pet->Stamina;
+            State->WaitingRestore=true;
+            UE_LOG(LogTemp,Display,TEXT("CF_CONSTRUCTION_WAIT_RESTORE PASS version=%d supplied=3 carried=0 intent=1"),Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("ConstructionInput"),0))->FormatVersion);
+        }
+        else UE_LOG(LogTemp,Display,TEXT("CF_CONSTRUCTION_COLD PASS version=%d carried=3 intent=1"),Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("ConstructionInput"),0))->FormatVersion);
     }
     else
     {
