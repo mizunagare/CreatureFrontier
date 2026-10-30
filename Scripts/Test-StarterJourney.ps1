@@ -56,6 +56,7 @@ try{
     }
     if($Recovery){
         $markers=@('CF_STARTER_RECOVERY_SOURCE PASS','CF_STARTER_RECOVERY_GATHER PASS input=1 material=10 sourcePaid=10 experience=12','CF_STARTER_RECOVERY_MEDICINE PASS crafted=2 materialPaid=10 selfUsed=1 retained=1 fullHealthReject=1','CF_STARTER_RECOVERY_LIFE PASS version=38 positionRetained=1 heroHP=100 petFull=1 medicine=1 material=0 claimed=4','CF_STARTER_RECOVERY PASS reason=complete')
+        $markers+='CF_STARTER_RECOVERY_HINTS PASS states=3'
         if(!$readMode){$markers+='CF_STARTER_RECOVERY_REST PASS input=1 samePet=1 facility=1'}
     }
     foreach($marker in $markers){if(!$raw.Contains($marker)){throw ('缺少开局旅程证据：'+$marker)}}
@@ -68,7 +69,7 @@ try{
         if($Prepare){$scenes=if($readMode){@('VestReady','SpearOff','VestOff','Prepared')}else{@('NeedSpear','Spear','Collecting','VestReady','SpearOff','VestOff','Prepared')}}
         if($Scout){$scenes=if($readMode){@('Returned')}else{@('Departure','Contact','Engaged','Returned')}}
         if($Rescue){$scenes=@('Returned')}
-        if($Recovery){$scenes=@('Resting','Gathered','Resupplied','Recovered')}
+        if($Recovery){$scenes=@('Resting','Gathered','MedicineReady','Resupplied','Recovered')}
         foreach($name in $scenes){
             $path=Join-Path $saved ($prefix+'Preview/'+$root.Groups[1].Value+'/'+$name+'.png')
             if(!(Test-Path $path) -or (Get-Item $path).LastWriteTimeUtc -lt $started){throw '缺少本轮新图'}

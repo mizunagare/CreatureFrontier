@@ -690,6 +690,11 @@ struct FStarterRecovery : FStarterPrep
         {
             if(!CFInputQA::Press(Hero,EKeys::Two) || Hero->Inventory->Count(EFrontierItem::Medicine)!=1 || Hero->Inventory->Count(EFrontierItem::Material)!=5)return End(false,TEXT("craft-first"));++Crafted;
             if(!CFInputQA::Press(Hero,EKeys::Two) || Hero->Inventory->Count(EFrontierItem::Medicine)!=2 || Hero->Inventory->Count(EFrontierItem::Material)!=0)return End(false,TEXT("craft-second"));++Crafted;
+            if(!Hero->GetObjectiveHint().Contains(TEXT("H治疗自己")))return End(false,TEXT("medicine-hint"));Phase=9;return true;
+        }
+        if(Phase==9)
+        {
+            if(Photo(TEXT("MedicineReady"),P))return true;
             if(!CFInputQA::Press(Hero,EKeys::H) || Hero->Health!=100 || Hero->Inventory->Count(EFrontierItem::Medicine)!=1)return End(false,TEXT("heal-self"));++Used;
             if(!CFInputQA::Press(Hero,EKeys::H) || Hero->Inventory->Count(EFrontierItem::Medicine)!=1)return End(false,TEXT("full-health-reject"));
             UE_LOG(LogTemp,Display,TEXT("CF_STARTER_RECOVERY_MEDICINE PASS crafted=2 materialPaid=10 selfUsed=1 retained=1 fullHealthReject=1"));Photo(TEXT("Resupplied"),P);Phase=6;At=World->GetTimeSeconds();return true;
@@ -703,11 +708,13 @@ struct FStarterRecovery : FStarterPrep
         if(Phase==7)
         {
             if(Pet->Activity!=ECreatureActivity::Follow || Pet->GetDistanceTo(Hero)>250){if(World->GetTimeSeconds()-At>20)return End(false,TEXT("regroup"));return true;}
+            if(!Hero->GetObjectiveHint().Contains(TEXT("直线")))return End(false,TEXT("recovered-hint"));
             if(Photo(TEXT("Recovered"),P))return true;const float HP=Pet->Health,SP=Pet->Stamina;
             if(HeroTravel<300 || !Hero->SaveProgress(TEXT("StarterRecoveryDone")) || !Hero->LoadProgress(TEXT("StarterRecoveryDone")))return End(false,TEXT("save"));
             Pet.Reset();Garden.Reset();Brush.Reset();for(TActorIterator<ACreatureCharacter> It(World);It;++It)if(It->PersistentId==PetId)Pet=*It;
             for(TActorIterator<AWorkStation> It(World);It;++It)if(It->PersistentId==OriginalGarden.Id)Garden=*It;for(TActorIterator<AResourceNode> It(World);It;++It)if(It->PersistentId==FGuid(0xCF170000,0,0,1))Brush=*It;
             if(!Pet.IsValid() || !Hero->GetActorLocation().Equals(H,.01) || !Pet->GetActorLocation().Equals(P,.01) || Hero->Health!=100 || Pet->Health!=HP || Pet->Stamina!=SP || !Budget())return End(false,TEXT("restore"));
+            UE_LOG(LogTemp,Display,TEXT("CF_STARTER_RECOVERY_HINTS PASS states=3"));
             UE_LOG(LogTemp,Display,TEXT("CF_STARTER_RECOVERY_LIFE PASS version=38 positionRetained=1 heroHP=100 petFull=1 medicine=1 material=0 claimed=4"));return End(true,TEXT("complete"));
         }
         return true;
@@ -727,6 +734,7 @@ void RunStarterRecoveryScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read
     S->PetId=S->Pet->PersistentId;S->Nickname=S->Pet->Nickname;S->InitialHealth=Hero->Health;const auto* Partner=Source->Creatures.FindByPredicate([&](const FCreatureSaveRecord& R){return R.Id==S->PetId;});
     const auto* Catalog=UCraftingCatalog::Load();const auto* Recipe=Catalog?Catalog->Find(TEXT("Medicine")):nullptr;
     if(!Partner || !Hero->GetActorLocation().Equals(Source->PlayerTransform.GetLocation(),.01) || !S->Pet->GetActorLocation().Equals(Partner->Transform.GetLocation(),.01) || !Recipe || Recipe->Inputs.Num()!=1 || Recipe->Inputs.FindRef(EFrontierItem::Material)!=5 || Recipe->OutputAmount!=1 || !S->Budget()){S->End(false,TEXT("source-position-budget"));return;}
+    if(!Hero->GetObjectiveHint().Contains(TEXT("缺药"))){S->End(false,TEXT("source-recovery-hint"));return;}
     S->LastH=Hero->GetActorLocation();S->LastP=S->Pet->GetActorLocation();S->VelocityH=Hero->GetVelocity();S->VelocityP=S->Pet->GetVelocity();S->LastTime=S->At=World->GetTimeSeconds();S->Input=NewObject<UHomeMovementProbe>(Hero);S->Input->RegisterComponent();
     S->Preview=FParse::Param(FCommandLine::Get(),TEXT("CFStarterRecoveryPreview"));if(S->Preview){S->Root=FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir()/TEXT("StarterRecoveryPreview")/FGuid::NewGuid().ToString(EGuidFormats::Digits));IFileManager::Get().MakeDirectory(*S->Root,true);UE_LOG(LogTemp,Display,TEXT("CF_STARTER_RECOVERY_PREVIEW_ROOT %s"),*S->Root);}
     UE_LOG(LogTemp,Display,TEXT("CF_STARTER_RECOVERY_SOURCE PASS read=%d positionRetained=1 pet=%s"),Read,*S->PetId.ToString());FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([S](float){return S->Tick();}));

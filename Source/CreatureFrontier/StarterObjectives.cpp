@@ -8,9 +8,33 @@
 #include "EngineUtils.h"
 #include "PlayerEquipmentComponent.h"
 #include "WildEncounter.h"
+#include "CraftingCatalog.h"
 
 namespace
 {
+    // 恢复提示只读现有状态，不改变治疗许可、任务或奖励进度。
+    FString RecoveryHint(const ACFPlayerCharacter* Hero)
+    {
+        if(Hero->Health<=0)return FString();
+        bool PartnerHurt=false,PartnerResting=false;
+        for(TActorIterator<ACreatureCharacter> It(Hero->GetWorld());It;++It)
+            if(It->Tamer==Hero->GetController() && It->Health>0)
+            {
+                PartnerHurt|=It->Health<It->GetMaxHealth();
+                PartnerResting|=It->Activity==ECreatureActivity::Rest && (It->Health<It->GetMaxHealth() || It->Stamina<99);
+            }
+        if(Hero->Health<100)
+        {
+            if(Hero->Inventory->Count(EFrontierItem::Medicine)>0)
+                return TEXT("受伤先恢复：H治疗自己（消耗1药）\n伙伴可瞄准P用药，或设施附近T休息");
+            const auto* Catalog=UCraftingCatalog::Load();const auto* Recipe=Catalog?Catalog->Find(TEXT("Medicine")):nullptr;
+            if(Recipe)return FString::Printf(TEXT("先恢复：设施附近T让伙伴休息\n缺药：M采料，设施附近2制药（%d材料）"),Recipe->Inputs.FindRef(EFrontierItem::Material));
+            return TEXT("先恢复：设施附近T让伙伴休息\n缺药：C查看配方，采料后返家制药");
+        }
+        if(PartnerResting)return TEXT("伙伴在设施休息中，恢复生命和体力\n等恢复后F跟随，再准备下一次探索");
+        if(PartnerHurt)return TEXT("伙伴受伤：设施附近T休息恢复\n有药可瞄准P治疗，恢复后F跟随");
+        return FString();
+    }
     constexpr int32 StarterObjectiveTargets[]={1,1,3,2,1};
     const TCHAR* StarterObjectiveTitles[]={TEXT("发现一种生物"),TEXT("结交第一位伙伴"),TEXT("与伙伴生产3份材料"),TEXT("与伙伴种出2份食物"),TEXT("捕捉或击败水晶高地首领")};
     const TCHAR* StarterObjectiveHints[]={TEXT("瞄准12米内的活体生物 | I 图鉴"),TEXT("J 向平静苔跳兽分享3食物，或削弱野生生物后右键捕捉"),TEXT("工作台附近按E | 专长匹配工作更快"),TEXT("B / V 建造农圃（18材料），再按E指派"),TEXT("水晶高地：右前方山谷 | Q 集火 / G 技能")};
@@ -109,6 +133,7 @@ FString ACFPlayerCharacter::GetObjectiveHint() const
     if(GetObjectiveProgress(Objectives.Claimed)>=StarterObjectiveTargets[Objectives.Claimed])return TEXT("已完成，按N领取奖励并揭晓下个目标");
     if(Objectives.Claimed==4)
     {
+        const FString Recovery=RecoveryHint(this);if(!Recovery.IsEmpty())return Recovery;
         // 仅提供准备建议，不把装备变成领奖或战斗的新许可条件。
         const auto& Gear=Equipment->GetState();
         if(!Gear.bOwnSpear)return FString::Printf(TEXT("先备武器：设施附近按4制长矛（%d材料）\n缺料可M采集，或在采集台E派伙伴"),Equipment->GetSpearCost());
