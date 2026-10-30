@@ -1,13 +1,14 @@
-param([string]$BuildRoot='',[string]$ReadInputPath='',[switch]$Farm,[switch]$Prepare,[switch]$Scout,[switch]$Resume,[switch]$Preview,[ValidateSet('960x540','1280x720')][string]$Resolution='1280x720')
+param([string]$BuildRoot='',[string]$ReadInputPath='',[switch]$Farm,[switch]$Prepare,[switch]$Scout,[switch]$Rescue,[switch]$Resume,[switch]$Preview,[ValidateSet('960x540','1280x720')][string]$Resolution='1280x720')
 $ErrorActionPreference='Stop'
 $projectRoot=Split-Path $PSScriptRoot -Parent
 . (Join-Path $PSScriptRoot 'BuildFingerprint.ps1')
 if($ReadInputPath){$ReadInputPath=(Resolve-Path -LiteralPath $ReadInputPath).Path}
-if(([int][bool]$Farm+[int][bool]$Prepare+[int][bool]$Scout) -gt 1){throw '农业、装备准备与接敌撤离模式不能同时指定'}
+if(([int][bool]$Farm+[int][bool]$Prepare+[int][bool]$Scout+[int][bool]$Rescue) -gt 1){throw '农业、装备准备、接敌与倒地救援模式不能同时指定'}
+if($Rescue){$Scout=$true}
 if(($Farm -or $Prepare -or $Scout) -and !$ReadInputPath){throw '农业、装备准备或接敌撤离段必须提供真实完成档'}
 if($Resume -and !$Farm -and !$Prepare -and !$Scout){throw 'Resume仅用于农业、装备或接敌撤离中途恢复；原开局恢复仍只需ReadInputPath'}
 $readMode=if($Farm -or $Prepare -or $Scout){[bool]$Resume}else{[bool]$ReadInputPath}
-$prefix=if($Scout){'StarterScout'}elseif($Prepare){'StarterPrep'}elseif($Farm){'StarterFarm'}else{'StarterJourney'}
+$prefix=if($Rescue){'StarterRescue'}elseif($Scout){'StarterScout'}elseif($Prepare){'StarterPrep'}elseif($Farm){'StarterFarm'}else{'StarterJourney'}
 $module=if($BuildRoot){Join-Path $BuildRoot 'CreatureFrontier/Binaries/Win64/CreatureFrontier.exe'}else{Join-Path $projectRoot 'Binaries/Win64/UnrealEditor-CreatureFrontier.dll'}
 $saved=if($BuildRoot){Join-Path $BuildRoot 'CreatureFrontier/Saved'}else{Join-Path $projectRoot 'Saved'}
 $hash=Get-FrontierBuildFingerprint -LiteralPath $module;$sourceHash=if($ReadInputPath){Get-FrontierBuildFingerprint -LiteralPath $ReadInputPath}else{''}
@@ -30,7 +31,7 @@ try{
     $exe=if($BuildRoot){$module}elseif($Preview){'D:/Epic/UE_5.8/Engine/Binaries/Win64/UnrealEditor.exe'}else{'D:/Epic/UE_5.8/Engine/Binaries/Win64/UnrealEditor-Cmd.exe'}
     if(!$BuildRoot){$arguments=@(('"'+(Join-Path $projectRoot 'CreatureFrontier.uproject')+'"'),'-game')+$arguments}
     $started=[DateTime]::UtcNow
-    [pscustomobject]@{BuildRoot=$BuildRoot;Farm=[bool]$Farm;Prepare=[bool]$Prepare;Scout=[bool]$Scout;Resume=$readMode;ReadInputPath=$ReadInputPath;InputSHA256=$sourceHash;Preview=[bool]$Preview;Resolution=$Resolution;BuildSHA256=$hash}|Export-Csv (Join-Path $run 'Run.csv') -NoTypeInformation
+    [pscustomobject]@{BuildRoot=$BuildRoot;Farm=[bool]$Farm;Prepare=[bool]$Prepare;Scout=[bool]$Scout;Rescue=[bool]$Rescue;Resume=$readMode;ReadInputPath=$ReadInputPath;InputSHA256=$sourceHash;Preview=[bool]$Preview;Resolution=$Resolution;BuildSHA256=$hash}|Export-Csv (Join-Path $run 'Run.csv') -NoTypeInformation
     Write-Host ('正常开局伙伴旅程：'+$run)
     $p=Start-Process -FilePath $exe -ArgumentList $arguments -WindowStyle Hidden -PassThru
     $timeout=if($Farm){300000}else{240000}
@@ -49,7 +50,8 @@ try{
     }
     if($Scout){
         $markers=@('CF_STARTER_SCOUT_SOURCE PASS','CF_STARTER_SCOUT_LIFE PASS version=38 positionRetained=1 homeRetained=1 suppliesRetained=1 claimed=4 bossAlive=1 avoid=1','CF_STARTER_SCOUT PASS reason=complete')
-        if(!$readMode){$markers+=@('CF_STARTER_SCOUT_COMMAND PASS focus=1 special=1 samePet=1','CF_STARTER_SCOUT_CONTACT PASS')}
+        if(!$readMode -and !$Rescue){$markers+=@('CF_STARTER_SCOUT_COMMAND PASS focus=1 special=1 samePet=1','CF_STARTER_SCOUT_CONTACT PASS')}
+        if($Rescue -and !$readMode){$markers+='CF_STARTER_RESCUE_HEAL PASS input=1 medicinePaid=1 restored=40 samePet=1 avoid=1'}
     }
     foreach($marker in $markers){if(!$raw.Contains($marker)){throw ('缺少开局旅程证据：'+$marker)}}
     if($Preview){
@@ -59,6 +61,7 @@ try{
         if($Farm){$scenes=if($readMode){@('Crafting','Assigned','Harvested','Home')}else{@('Planning','Built','Fiber','Crafting','Assigned','Harvested','Home')}}
         if($Prepare){$scenes=if($readMode){@('VestReady','SpearOff','VestOff','Prepared')}else{@('NeedSpear','Spear','Collecting','VestReady','SpearOff','VestOff','Prepared')}}
         if($Scout){$scenes=if($readMode){@('Returned')}else{@('Departure','Contact','Engaged','Returned')}}
+        if($Rescue){$scenes=@('Returned')}
         foreach($name in $scenes){
             $path=Join-Path $saved ($prefix+'Preview/'+$root.Groups[1].Value+'/'+$name+'.png')
             if(!(Test-Path $path) -or (Get-Item $path).LastWriteTimeUtc -lt $started){throw '缺少本轮新图'}
@@ -69,7 +72,7 @@ try{
     }
     if((Get-FrontierBuildFingerprint -LiteralPath $module) -ne $hash -or ($ReadInputPath -and (Get-FrontierBuildFingerprint -LiteralPath $ReadInputPath) -ne $sourceHash)){throw '程序或输入源改变'}
     [pscustomobject]@{Pass=$true;BuildSHA256=$hash;DoneSHA256=(Get-FrontierBuildFingerprint -LiteralPath (Join-Path $slots ($prefix+'Done.sav')));Log=$log}|Export-Csv (Join-Path $run 'Results.csv') -NoTypeInformation
-    if($Scout){Write-Host '真实来源接敌撤离、家园补给保留与存读通过；图形仍须目视，不代表首领击败或倒地救援通过'}elseif($Prepare){Write-Host '真实农业档的装备制作、原料守恒、准备提示与存读通过；不证明首领战斗通过'}elseif($Farm -and $readMode){Write-Host '自身采纤维中途档恢复、返基地制种、伙伴两次收获及第四项领奖通过'}elseif($Farm){Write-Host '真实开局档经原预览建圃、实际采纤维、制种、伙伴两次收获及第四项领奖通过；图形仍须目视'}elseif($ReadInputPath){Write-Host '自身结交中途档独立恢复、实际返基地生产、第三项领奖和存读通过；农业段仍待继续'}else{Write-Host '正常默认补给下实际走近、结交、返基地生产和前三项奖励通过；农业段仍待继续'}
+    if($Rescue){Write-Host '真实倒地来源的药品救援、有限补给支援、避战返家及存读通过；图形仍须目视，不代表首领击败'}elseif($Scout){Write-Host '真实来源接敌撤离、家园补给保留与存读通过；图形仍须目视，不代表首领击败或倒地救援通过'}elseif($Prepare){Write-Host '真实农业档的装备制作、原料守恒、准备提示与存读通过；不证明首领战斗通过'}elseif($Farm -and $readMode){Write-Host '自身采纤维中途档恢复、返基地制种、伙伴两次收获及第四项领奖通过'}elseif($Farm){Write-Host '真实开局档经原预览建圃、实际采纤维、制种、伙伴两次收获及第四项领奖通过；图形仍须目视'}elseif($ReadInputPath){Write-Host '自身结交中途档独立恢复、实际返基地生产、第三项领奖和存读通过；农业段仍待继续'}else{Write-Host '正常默认补给下实际走近、结交、返基地生产和前三项奖励通过；农业段仍待继续'}
 }finally{
     try{
         if($started){foreach($entry in $protected){if((Test-Path $entry.Path) -and (Get-Item $entry.Path).LastWriteTimeUtc -ge $started){Copy-Item -LiteralPath $entry.Path -Destination (Join-Path $run ((Split-Path $entry.Path -LeafBase)+'-generated.sav'))}}}
