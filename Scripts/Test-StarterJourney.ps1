@@ -1,5 +1,6 @@
-param([string]$BuildRoot='',[string]$ReadInputPath='',[switch]$Farm,[switch]$Prepare,[switch]$Scout,[switch]$Rescue,[switch]$Recovery,[switch]$Flank,[switch]$Melee,[switch]$CombatTrace,[switch]$Resume,[switch]$Preview,[ValidateSet('960x540','1280x720')][string]$Resolution='1280x720')
+param([string]$BuildRoot='',[string]$ReadInputPath='',[switch]$Farm,[switch]$Prepare,[switch]$Scout,[switch]$Rescue,[switch]$Recovery,[switch]$Flank,[switch]$Melee,[switch]$Dodge,[switch]$CombatTrace,[switch]$Resume,[switch]$Preview,[ValidateSet('960x540','1280x720')][string]$Resolution='1280x720')
 $ErrorActionPreference='Stop'
+if($Dodge -and !$Melee){throw '跳跃应对专项必须接在完整共同近战流程中'}
 if($Melee -and (!$Flank -or !$CombatTrace -or $Resume)){throw '近战整合仅用于开启追踪的完整北侧接敌链；中途恢复不重复攻击'}
 if($CombatTrace -and !$Flank){throw '战斗结算追踪仅用于真实绕行接敌或自身中途恢复'}
 $projectRoot=Split-Path $PSScriptRoot -Parent
@@ -31,11 +32,12 @@ try{
     $arguments=@($flag,'-nullrhi','-nosound','-unattended','-nop4',('-abslog="'+$log+'"'))
     if($CombatTrace){$arguments+='-CFCombatTrace'}
     if($Melee){$arguments+='-CFStarterFlankMelee'}
+    if($Dodge){$arguments+='-CFStarterFlankDodge'}
     if($Preview){$size=$Resolution.Split('x');$arguments=@($arguments|Where-Object {$_ -ne '-nullrhi'})+@(('-CF'+$prefix+'Preview'),'-RenderOffscreen','-ForceRes',('-ResX='+$size[0]),('-ResY='+$size[1]),'-norhithread','-forcerhibypass','-ExecCmds="t.MaxFPS 60,r.MotionBlurQuality 0,r.AntiAliasingMethod 1"')}
     $exe=if($BuildRoot){$module}elseif($Preview){'D:/Epic/UE_5.8/Engine/Binaries/Win64/UnrealEditor.exe'}else{'D:/Epic/UE_5.8/Engine/Binaries/Win64/UnrealEditor-Cmd.exe'}
     if(!$BuildRoot){$arguments=@(('"'+(Join-Path $projectRoot 'CreatureFrontier.uproject')+'"'),'-game')+$arguments}
     $started=[DateTime]::UtcNow
-    [pscustomobject]@{BuildRoot=$BuildRoot;Farm=[bool]$Farm;Prepare=[bool]$Prepare;Scout=[bool]$Scout;Rescue=[bool]$Rescue;Recovery=[bool]$Recovery;Flank=[bool]$Flank;Melee=[bool]$Melee;CombatTrace=[bool]$CombatTrace;Resume=$readMode;ReadInputPath=$ReadInputPath;InputSHA256=$sourceHash;Preview=[bool]$Preview;Resolution=$Resolution;BuildSHA256=$hash}|Export-Csv (Join-Path $run 'Run.csv') -NoTypeInformation
+    [pscustomobject]@{BuildRoot=$BuildRoot;Farm=[bool]$Farm;Prepare=[bool]$Prepare;Scout=[bool]$Scout;Rescue=[bool]$Rescue;Recovery=[bool]$Recovery;Flank=[bool]$Flank;Melee=[bool]$Melee;Dodge=[bool]$Dodge;CombatTrace=[bool]$CombatTrace;Resume=$readMode;ReadInputPath=$ReadInputPath;InputSHA256=$sourceHash;Preview=[bool]$Preview;Resolution=$Resolution;BuildSHA256=$hash}|Export-Csv (Join-Path $run 'Run.csv') -NoTypeInformation
     Write-Host ('正常开局伙伴旅程：'+$run)
     $p=Start-Process -FilePath $exe -ArgumentList $arguments -WindowStyle Hidden -PassThru
     $timeout=if($Farm){300000}else{240000}
@@ -75,6 +77,7 @@ try{
         if(!$match.Success){throw '缺少实际左键近战结算证据'}
         $boss=$match.Groups[1].Value;$pet=$match.Groups[2].Value
         if($raw -notmatch ('CF_PLAYER_MELEE_TRACE target='+$boss+' raw=35\.00 applied=35\.00 spear=1') -or $raw -notmatch ('CF_CREATURE_DAMAGE_TRACE victim='+$boss+' attacker='+$pet+' raw=')){throw '缺少玩家长矛和原伙伴对同一首领的独立伤害来源'}
+        if($Dodge -and (!$raw.Contains('CF_STARTER_DODGE PASS input=1 inRange=1 above=1 healthRetained=1') -or $raw -notmatch ('CF_ALPHA_PLAYER_TRACE boss='+$boss+' distance=\S+ height=\S+ inRange=1 above=1 sight=1 applied=0\.00'))){throw '缺少圈内原跳跃实际避开震地伤害的结算证据'}
     }
     if($CombatTrace -and !$readMode -and (!$raw.Contains('CF_SKILL_TRACE_BEGIN') -or (!$raw.Contains('CF_SKILL_TRACE_RESOLVE') -and !$raw.Contains('CF_SKILL_TRACE_CANCEL')) -or !$raw.Contains('CF_CREATURE_DAMAGE_TRACE'))){throw '战斗追踪缺少实际蓄力、结算或取消及真实伤害记录'}
     if($Preview){

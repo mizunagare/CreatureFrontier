@@ -746,6 +746,7 @@ namespace
 struct FStarterFlank : FStarterRecovery
 {
     bool Melee=false,MeleeSent=false,MeleeConfirmed=false;
+    bool Dodge=false,JumpSent=false,JumpReleased=false,DodgeResolved=false;float JumpHP=0;
     TWeakObjectPtr<ACreatureCharacter> Boss;TWeakObjectPtr<AWildEncounter> Region;
     int32 Leg=0;bool Hit=false,SkillStarted=false;float DamageSeen=0;double SafeAt=-1;
     FVector Goal(bool Returning,int32 Index) const
@@ -778,6 +779,25 @@ struct FStarterFlank : FStarterRecovery
         if(Ecology!=3 || Owned!=1 || !Budget() || Boss->Health<=0 || !Boss->bAlpha)return End(false,TEXT("budget-home"));
         if(Pet->SpecialWindupRemaining>0)SkillStarted=true;
         if(Phase==2 && Boss->Health<Boss->GetMaxHealth()){Hit=true;DamageSeen=FMath::Max(DamageSeen,Boss->GetMaxHealth()-Boss->Health);}
+        if(Dodge && !DodgeResolved)
+        {
+            const float Distance=FVector::Dist2D(H,Boss->GetActorLocation());
+            if(!JumpSent && Boss->AlphaWindup>0 && Boss->AlphaWindup<=.45f && Distance<=380 && Hero->GetCharacterMovement()->IsMovingOnGround())
+            {
+                if(!CFInputQA::Action(Hero,TEXT("Jump"),EKeys::SpaceBar))return End(false,TEXT("dodge-input"));
+                JumpSent=true;JumpHP=Hero->Health;
+                UE_LOG(LogTemp,Display,TEXT("CF_STARTER_DODGE_INPUT PASS remaining=%.3f distance=%.2f health=%.2f"),Boss->AlphaWindup,Distance,JumpHP);
+            }
+            else if(JumpSent && !JumpReleased)
+            {if(!CFInputQA::Action(Hero,TEXT("Jump"),EKeys::SpaceBar,IE_Released))return End(false,TEXT("dodge-release"));JumpReleased=true;}
+            if(JumpSent && Boss->AlphaWindup<=0)
+            {
+                const float Height=H.Z-Boss->GetActorLocation().Z;
+                if(Distance>380 || Height<=65 || Hero->Health!=JumpHP)return End(false,TEXT("dodge-resolution"));
+                DodgeResolved=true;
+                UE_LOG(LogTemp,Display,TEXT("CF_STARTER_DODGE PASS input=1 inRange=1 above=1 healthRetained=1"));
+            }
+        }
         if(World->GetTimeSeconds()>=NextDiagnostic){NextDiagnostic=World->GetTimeSeconds()+3;UE_LOG(LogTemp,Display,TEXT("CF_STARTER_FLANK_STATE phase=%d leg=%d hero=%s pet=%s boss=%s heroHP=%.1f petHP=%.1f bossHP=%.1f activity=%d stamina=%.1f windup=%.2f"),Phase,Leg,*H.ToString(),*P.ToString(),*Boss->GetActorLocation().ToString(),Hero->Health,Pet->Health,Boss->Health,static_cast<int32>(Pet->Activity),Pet->Stamina,Pet->SpecialWindupRemaining);}
         if(Phase==9){const int32 Result=Move();if(Result<0)return End(false,TEXT("player-melee-walk"));if(Result>0)Phase=2;return true;}
         if(FPlatformTime::Seconds()<ShotUntil)return true;
@@ -828,6 +848,7 @@ struct FStarterFlank : FStarterRecovery
             // 玩家先命中不能替代伙伴成果；有界等待原伙伴继续原集火／技能。
             if(Melee && (!SkillStarted || DamageSeen<=35))
             {if(World->GetTimeSeconds()-At>15)return End(false,TEXT("joint-combat-no-partner-hit"));return true;}
+            if(Dodge && !DodgeResolved){if(World->GetTimeSeconds()-At>15)return End(false,TEXT("dodge-not-observed"));return true;}
             if(!Hit){if(World->GetTimeSeconds()-At>15)return End(false,TEXT("combat-no-hit"));return true;}
             if(Photo(TEXT("Engaged"),Boss->GetActorLocation()))return true;
             // 技能可以在双方尚未普攻时命中；等待真实攻击产生冷却，不伪造正值检查点。
@@ -864,6 +885,7 @@ void RunStarterFlankScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read)
     auto S=MakeShared<FStarterFlank>();S->World=World;S->Hero=Hero;S->Read=Read;S->Deadline=FPlatformTime::Seconds()+150;
     // 只继承真实恢复档中既有的材料账：此前制2药、用1药，本段不再次制作。
     S->Crafted=2;S->Used=1;S->Melee=FParse::Param(FCommandLine::Get(),TEXT("CFStarterFlankMelee"));
+    S->Dodge=FParse::Param(FCommandLine::Get(),TEXT("CFStarterFlankDodge"));
     const auto* Source=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("StarterFlankInput"),0));
     if(!Source || Source->FormatVersion!=38 || Source->Facilities.Num()!=1 || !Source->HomeModules.IsEmpty() || !Hero->LoadProgress(TEXT("StarterFlankInput"))){S->End(false,TEXT("source"));return;}
     int32 LegacyCooldowns=0,CurrentCooldowns=0;

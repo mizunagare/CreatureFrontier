@@ -4,6 +4,8 @@
 
 ## 探索朝向开发候选（限定验证，非最终版）
 
+原震地跳跃验证候选：`F:\CreatureFrontierBuilds\Windows-AlphaDodge\CreatureFrontier.exe`。原空格实际起跳在震地结算时避开伤害，随后玩家与伙伴共同攻击、返家存读及自身中途恢复在两端分别通过，详见[预警应对记录](Docs/ALPHA_DODGE.md)。普通游戏规则未改，没有自动闪避或新无敌时间；尚未击败首领。此本地候选共享不可变文件，不可直接改写共享文件，旧目录存档不会自动迁移。
+
 共同近战整合候选：`F:\CreatureFrontierBuilds\Windows-JointMelee\CreatureFrontier.exe`。原左键长矛与Q／G伙伴技能对同一首领真实结算、撤离返家及中途恢复已在Editor／Windows分别验证，详见[共同接敌记录](Docs/JOINT_MELEE.md)。不改普通战斗规则，尚未验收主动躲避预警或击败首领；此候选共享不可变烹饪文件，不可直接改写共享文件，旧存档不会自动迁移。
 
 当前普攻冷却修复构建：`F:\CreatureFrontierBuilds\Windows-MeleeCooldown\CreatureFrontier.exe`。新档精确保留生物剩余普攻冷却，旧档采用一次原间隔兼容；Editor／Windows专项、真实接敌及自身中途恢复、原战斗和农业关联已验证，见[修复与操作记录](Docs/MELEE_COOLDOWN_PERSISTENCE.md)。F5保存／F9确认读取，正常攻击规则未改；首领未击败。F盘为逐文件哈希核对的独立复制，未自动导入旧目录存档。下方旧候选保留历史说明，不含此修复；C盘已无余量，不建议继续在那里运行存档测试。

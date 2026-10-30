@@ -2,6 +2,8 @@
 #include "CFPlayerCharacter.h"
 #include "Kismet/GameplayStatics.h"
 #include "EngineUtils.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 
 bool ACreatureCharacter::TickAlphaAttack(float DeltaSeconds, APawn* Target)
 {
@@ -20,8 +22,12 @@ bool ACreatureCharacter::TickAlphaAttack(float DeltaSeconds, APawn* Target)
                 const bool ValidVictim = (Hero && Hero->Health > 0) ||
                     (Pet && Pet->Health > 0 && Pet->Disposition == ECreatureDisposition::Tamed);
                 const FVector Delta = It->GetActorLocation() - GetActorLocation();
+                float Applied=0;
                 if (ValidVictim && Delta.Size2D() <= 380 && FMath::Abs(Delta.Z) <= 65 && HasClearSight(*It))
-                    UGameplayStatics::ApplyDamage(*It, GetAttackDamage() * 1.5f, GetController(), this, UDamageType::StaticClass());
+                    Applied=UGameplayStatics::ApplyDamage(*It, GetAttackDamage() * 1.5f, GetController(), this, UDamageType::StaticClass());
+                // 只在显式诊断时区分高度躲避与圈外／遮挡，不改变原伤害判定。
+                if(Hero && FParse::Param(FCommandLine::Get(),TEXT("CFCombatTrace")))
+                    UE_LOG(LogTemp,Display,TEXT("CF_ALPHA_PLAYER_TRACE boss=%s distance=%.2f height=%.2f inRange=%d above=%d sight=%d applied=%.2f"),*PersistentId.ToString(),Delta.Size2D(),Delta.Z,Delta.Size2D()<=380,FMath::Abs(Delta.Z)>65,HasClearSight(Hero),Applied);
             }
         }
         return true;
