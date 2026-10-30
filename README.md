@@ -4,6 +4,8 @@
 
 ## 配方资源线索开发候选（限定验证，非最终版）
 
+后续家园成长整合候选：`C:\CreatureFrontierBuilds\Windows-Processed-Railing\CreatureFrontier.exe`。复用下方配方线索功能，并已验证真实4建材经原箱供料、原伙伴搬运施工成为二层平台西侧护栏，双方上下楼与携料存档恢复通过。该增量主要补齐跨系统证据，不新增普通建筑规则；操作与失败边界见[加工建材护栏](Docs/PROCESSED_RAILING.md)。旧包均保留。
+
 运行 `C:\CreatureFrontierBuilds\Windows-Crafting-Guidance\CreatureFrontier.exe`。按C选择配方，可看实时缺料、资源方位／直线距离与再生计时；材料齐备后仍需满足原设施和研究条件，再按回车制作。不会自动移动、发资源或缩短再生时间。已通过真实采料、自然等待、返家编织4建材及独立存档恢复，见[配方线索与探索加工](Docs/CRAFTING_GUIDANCE.md)。当前世界方位尚无完善指南针，不代表玩家自主导航或最终品质验收；旧包保留，新行为不会自动更新到旧包。
 
 ## 主动休息续工开发候选（保留）

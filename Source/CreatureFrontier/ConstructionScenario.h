@@ -11,3 +11,4 @@ void RunUpperDeckConstructionScenario(UWorld* World,ACFPlayerCharacter* Hero,boo
 void RunUpperDeckLifeScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read);
 void RunHomeCareScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read);
 void RunWildHomeTripScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read);
+void RunHomeRailingScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read);
