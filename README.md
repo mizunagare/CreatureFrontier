@@ -4,6 +4,8 @@
 
 ## 最新施工补料通行体验包（限定验证，非最终版）
 
+正常预览／派工整合另有开发验证候选 `E:\CreatureFrontierBuilds\Windows-Construction-Input-Chain\CreatureFrontier.exe`：原输入已接回真实家园楼板与楼梯施工整链；这是验证补强，没有新增普通玩法规则，不替代下方体验入口。边界与复验见[正常预览与派工整合](Docs/CONSTRUCTION_INPUT_CHAIN.md)。
+
 运行 `E:\CreatureFrontierBuilds\Windows-Walk-Supply\CreatureFrontier.exe`。按住M采料，E开原箱、回车存材料、E关箱；原V选箱／E派工后，缺料补箱自动继续。空手等料伙伴挡住主人正面近距离通路时，会在安全路径与真实碰撞允许的情况下让路，保留原任务。
 
 内部程序SHA-256 `A08E02CBF63C293F507C144ADBDB389E170564DC00217BCB6CA472A4C4A69FFC`，存档仍38。自身实际徒步采料／三次仓储输入／施工／上下楼整链、携料中途独立恢复及需求施工通过，Editor1280／Windows960各8张新图已目视；边界与失败见[徒步供料与通行](Docs/WALK_SUPPLY.md)。不是全程自然建造、任意布局或最终品质，旧包和玩家档保留。
