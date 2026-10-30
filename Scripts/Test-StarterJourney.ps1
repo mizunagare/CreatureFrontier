@@ -63,6 +63,8 @@ try{
     }
     if($Flank){
         $markers=@('CF_STARTER_FLANK_SOURCE PASS','CF_STARTER_FLANK_LIFE PASS version=38 positionRetained=1 homeRetained=1 medicine=1 claimed=4 safeSeconds=2','CF_STARTER_FLANK PASS reason=complete')
+        $markers+='CF_STARTER_FLANK_COOLDOWN_SOURCE PASS'
+        if(!$readMode){$markers+='CF_STARTER_FLANK_COOLDOWN_MID PASS revision=1 positive='}
         if(!$readMode){$markers+=@('CF_STARTER_FLANK_COMMAND PASS focus=1 specialBinding=1 samePet=1 avoid=1','CF_STARTER_FLANK_CONTACT PASS')}
     }
     foreach($marker in $markers){if(!$raw.Contains($marker)){throw ('缺少开局旅程证据：'+$marker)}}

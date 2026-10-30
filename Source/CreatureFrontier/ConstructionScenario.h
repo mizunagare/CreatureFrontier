@@ -18,3 +18,4 @@ void RunStarterPrepScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read);
 void RunStarterScoutScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read);
 void RunStarterRecoveryScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read);
 void RunStarterFlankScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read);
+void RunMeleeCooldownScenario(UWorld* World,ACFPlayerCharacter* Hero);

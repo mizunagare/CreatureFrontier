@@ -56,6 +56,9 @@ struct FCreatureSaveRecord
     UPROPERTY() float AutoFeedCooldown = 0;
     UPROPERTY() bool bResumeWorkAfterRest = false;
     UPROPERTY() float SpecialCooldown = 0.0f;
+    // 兼容带名称的旧记录：缺字段时修订为0；新写档使用1并精确保留剩余冷却。
+    UPROPERTY() uint8 CombatCooldownVersion = 0;
+    UPROPERTY() float MeleeCooldown = 0.0f;
     UPROPERTY() bool bOwned = false;
     UPROPERTY() int32 CarriedFood=0;
     UPROPERTY() int32 BondPoints=0;

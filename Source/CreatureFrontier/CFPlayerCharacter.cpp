@@ -146,6 +146,8 @@ bool ACFPlayerCharacter::SaveProgress(const FString& Slot)
         Record.AutoFeedCooldown = It->AutoFeedCooldown;
         Record.bResumeWorkAfterRest = It->bResumeWorkAfterRest;
         Record.SpecialCooldown = It->SpecialCooldownRemaining;
+        Record.CombatCooldownVersion=1;
+        Record.MeleeCooldown=It->GetAttackCooldownRemaining();
         Record.EncounterId = It->EncounterId;
         Record.bAlpha = It->bAlpha;
         Record.AlphaCooldown = It->AlphaCooldown;
@@ -325,7 +327,13 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
     {
         UClass* CreatureClass = Record.CreatureClass.LoadSynchronous();
         UCreatureDefinition* LoadedDefinition = Record.Definition.LoadSynchronous();
+        const auto* Prototype=CreatureClass?Cast<ACreatureCharacter>(CreatureClass->GetDefaultObject()):nullptr;
+        const float Interval=LoadedDefinition?LoadedDefinition->AttackSeconds:Prototype?Prototype->AttackInterval:0;
+        const bool CooldownValid=Prototype && FMath::IsFinite(Interval) && Interval>0 &&
+            ((Record.CombatCooldownVersion==0 && Record.MeleeCooldown==0) ||
+             (Record.CombatCooldownVersion==1 && FMath::IsFinite(Record.MeleeCooldown) && Record.MeleeCooldown>=0 && Record.MeleeCooldown<=Interval));
         if (!CreatureClass || CreatureClass->HasAnyClassFlags(CLASS_Abstract) ||
+            !CooldownValid ||
             (Save->FormatVersion>=15 && (Record.CarriedFood<0 || Record.CarriedFood>3 || (Record.CarriedFood>0 && (!Record.bOwned || Record.Disposition!=ECreatureDisposition::Tamed)))) ||
             (Save->FormatVersion>=16 && (Record.BondPoints<0 || Record.BondPoints>100 || !FMath::IsFinite(Record.PettingCooldown) || Record.PettingCooldown<0 || Record.PettingCooldown>30 ||
                 ((Record.BondPoints>0 || Record.PettingCooldown>0) && (!Record.bOwned || Record.Disposition!=ECreatureDisposition::Tamed)))) ||
@@ -379,6 +387,9 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
         Pet->AutoFeedCooldown = Record.AutoFeedCooldown;
         Pet->SpecialCooldownRemaining = Record.SpecialCooldown;
         Pet->AlphaCooldown = Record.AlphaCooldown;
+        // 旧档不知道原剩余值，双方均等待原间隔；不增加正常战斗中的间隔。
+        if(!Pet->RestoreAttackCooldown(Record.CombatCooldownVersion==1?Record.MeleeCooldown:Pet->AttackInterval))
+        {Pet->Destroy();for(auto* Staged:Restored)Staged->Destroy();Feedback=TEXT("存档引用的生物数据无效或不可用");return false;}
         Pet->bHasHabitat = Record.bHasHabitat && !Record.bOwned;
         Pet->HabitatHome = Record.HabitatHome; Pet->RoamRadius = Record.RoamRadius; Pet->LeashRadius = Record.LeashRadius;
         // 旧放置生物没有遭遇ID；从本关卡唯一的同物种地图锚点恢复，

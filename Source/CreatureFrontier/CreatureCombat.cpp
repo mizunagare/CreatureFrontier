@@ -16,6 +16,12 @@ bool ACreatureCharacter::HasClearSight(const AActor* Target) const
         || Hit.GetActor() == Target;
 }
 
+bool ACreatureCharacter::RestoreAttackCooldown(float Remaining)
+{
+    if(!HasAuthority() || !FMath::IsFinite(Remaining) || Remaining<0 || !FMath::IsFinite(AttackInterval) || AttackInterval<=0 || Remaining>AttackInterval)return false;
+    AttackCooldown=Remaining;return true;
+}
+
 bool ACreatureCharacter::OrderAttack(ACreatureCharacter* Target)
 {
     const bool AutoRest = Activity == ECreatureActivity::Rest && bResumeWorkAfterRest && Stamina >= 3;

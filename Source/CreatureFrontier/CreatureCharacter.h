@@ -97,6 +97,7 @@ public:
     void ClearCombatOrders();
     bool HasCombatRoute() const { return bCombatRetreatActive || !CombatRetreatRoute.IsEmpty(); }
     float GetAttackCooldownRemaining() const { return AttackCooldown; }
+    bool RestoreAttackCooldown(float Remaining);
     void HandlePlayerDowned(const ACFPlayerCharacter* Player);
     bool IsSpecialReady() const;
     FString GetSpecialName() const;

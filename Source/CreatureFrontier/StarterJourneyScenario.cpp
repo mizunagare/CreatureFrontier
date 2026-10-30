@@ -804,7 +804,16 @@ struct FStarterFlank : FStarterRecovery
         {
             if(!Hit){if(World->GetTimeSeconds()-At>15)return End(false,TEXT("combat-no-hit"));return true;}
             if(Photo(TEXT("Engaged"),Boss->GetActorLocation()))return true;
+            // 技能可以在双方尚未普攻时命中；等待真实攻击产生冷却，不伪造正值检查点。
+            bool HasMeleeCooldown=false;for(TActorIterator<ACreatureCharacter> It(World);It;++It)HasMeleeCooldown|=It->GetAttackCooldownRemaining()>0;
+            if(!HasMeleeCooldown){if(World->GetTimeSeconds()-At>15)return End(false,TEXT("combat-no-melee-cooldown"));return true;}
             if(!CFInputQA::Press(Hero,EKeys::F) || Pet->FocusTarget || !Pet->bAvoidCombat || !Hero->SaveProgress(TEXT("StarterFlankMid")))return End(false,TEXT("withdraw-input"));
+            const auto* Mid=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("StarterFlankMid"),0));int32 Positive=0,Checked=0;
+            if(!Mid)return End(false,TEXT("cooldown-mid"));
+            for(const auto& Record:Mid->Creatures)for(TActorIterator<ACreatureCharacter> It(World);It;++It)if(It->PersistentId==Record.Id)
+            {if(Record.CombatCooldownVersion!=1 || Record.MeleeCooldown!=It->GetAttackCooldownRemaining())return End(false,TEXT("cooldown-mid-value"));++Checked;if(Record.MeleeCooldown>0)++Positive;}
+            if(Checked!=Mid->Creatures.Num() || Positive==0)return End(false,TEXT("cooldown-mid-positive"));
+            UE_LOG(LogTemp,Display,TEXT("CF_STARTER_FLANK_COOLDOWN_MID PASS revision=1 positive=%d exact=1"),Positive);
             UE_LOG(LogTemp,Display,TEXT("CF_STARTER_FLANK_CONTACT PASS damage=%.1f skillStarted=%d medicineUsed=0"),DamageSeen,SkillStarted);Leg=0;Phase=3;return true;
         }
         if(Phase==3){if(!Walk(true,0))return End(false,TEXT("return-path"));return true;}
@@ -831,6 +840,15 @@ void RunStarterFlankScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read)
     S->Crafted=2;S->Used=1;
     const auto* Source=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("StarterFlankInput"),0));
     if(!Source || Source->FormatVersion!=38 || Source->Facilities.Num()!=1 || !Source->HomeModules.IsEmpty() || !Hero->LoadProgress(TEXT("StarterFlankInput"))){S->End(false,TEXT("source"));return;}
+    int32 LegacyCooldowns=0,CurrentCooldowns=0;
+    for(const auto& Record:Source->Creatures)for(TActorIterator<ACreatureCharacter> It(World);It;++It)if(It->PersistentId==Record.Id)
+    {
+        const float Expected=Record.CombatCooldownVersion==1?Record.MeleeCooldown:It->AttackInterval;
+        if(It->GetAttackCooldownRemaining()!=Expected){S->End(false,TEXT("source-cooldown"));return;}
+        if(Record.CombatCooldownVersion==1)++CurrentCooldowns;else ++LegacyCooldowns;
+    }
+    if(LegacyCooldowns+CurrentCooldowns!=Source->Creatures.Num()){S->End(false,TEXT("source-cooldown-count"));return;}
+    UE_LOG(LogTemp,Display,TEXT("CF_STARTER_FLANK_COOLDOWN_SOURCE PASS legacy=%d current=%d exact=1"),LegacyCooldowns,CurrentCooldowns);
     S->OriginalGarden=Source->Facilities[0];int32 Owned=0;
     for(TActorIterator<ACreatureCharacter> It(World);It;++It){if(It->Tamer==Hero->GetController()){S->Pet=*It;++Owned;}if(It->EncounterId==TEXT("CrystalRise") && It->bAlpha && It->Health>0)S->Boss=*It;}
     for(TActorIterator<AWildEncounter> It(World);It;++It)if(It->EncounterId==TEXT("CrystalRise") && It->bBoss)S->Region=*It;
