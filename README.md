@@ -4,6 +4,8 @@
 
 ## 探索朝向开发候选（限定验证，非最终版）
 
+最新北侧接敌候选：`E:\CreatureFrontierBuilds\Windows-StarterFlank\CreatureFrontier.exe`。真实恢复档已接通北侧绕行、伙伴实际伤害、撤离返家和存读，详见[北侧接敌记录](Docs/STARTER_FLANK.md)。尚未击败首领，技能蓄力不代表命中，部分恢复样本伙伴只剩很少生命；不是稳定必胜路线。该本地候选共享不可变引擎／烹饪文件，不能直接编辑共享文件或原地重新烹饪；Saved独立，旧包存档不自动迁移。
+
 最新恢复提示候选（完整Windows暂存，独立归档未完成）：`E:\CreatureFrontierBuilds\RecoveryGuidanceCompact\Stage\Windows\CreatureFrontier.exe`。受伤时第五目标会先说明原休息／采料／制药／治疗操作，恢复后再提示装备和探索方向。Editor／Windows真实恢复链及中途存读、中文画面、装备和奖励回归已验证，范围及磁盘处理见[恢复操作提示](Docs/RECOVERY_GUIDANCE.md)。不要运行C盘同名不完整归档目录。
 
 最新返家恢复候选：`C:\CreatureFrontierBuilds\Windows-StarterRecovery\CreatureFrontier.exe`。真实受伤／药品耗尽返家档，通过原T伙伴休息、玩家M采料、2制作药品、H治疗与F归队恢复再次出行的基础补给；Editor／Windows及自身休息档恢复已验证，详情见[返家恢复](Docs/STARTER_RECOVERY.md)。仍为开发原型，未完成首领实战，旧包保留。

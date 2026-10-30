@@ -1,14 +1,14 @@
-param([string]$BuildRoot='',[string]$ReadInputPath='',[switch]$Farm,[switch]$Prepare,[switch]$Scout,[switch]$Rescue,[switch]$Recovery,[switch]$Resume,[switch]$Preview,[ValidateSet('960x540','1280x720')][string]$Resolution='1280x720')
+param([string]$BuildRoot='',[string]$ReadInputPath='',[switch]$Farm,[switch]$Prepare,[switch]$Scout,[switch]$Rescue,[switch]$Recovery,[switch]$Flank,[switch]$Resume,[switch]$Preview,[ValidateSet('960x540','1280x720')][string]$Resolution='1280x720')
 $ErrorActionPreference='Stop'
 $projectRoot=Split-Path $PSScriptRoot -Parent
 . (Join-Path $PSScriptRoot 'BuildFingerprint.ps1')
 if($ReadInputPath){$ReadInputPath=(Resolve-Path -LiteralPath $ReadInputPath).Path}
-if(([int][bool]$Farm+[int][bool]$Prepare+[int][bool]$Scout+[int][bool]$Rescue+[int][bool]$Recovery) -gt 1){throw '农业、装备准备、接敌、倒地救援与基地恢复模式不能同时指定'}
+if(([int][bool]$Farm+[int][bool]$Prepare+[int][bool]$Scout+[int][bool]$Rescue+[int][bool]$Recovery+[int][bool]$Flank) -gt 1){throw '农业、装备、接敌、救援、恢复与绕行模式不能同时指定'}
 if($Rescue){$Scout=$true}
-if(($Farm -or $Prepare -or $Scout -or $Recovery) -and !$ReadInputPath){throw '农业、装备准备、接敌撤离或基地恢复段必须提供真实完成档'}
-if($Resume -and !$Farm -and !$Prepare -and !$Scout -and !$Recovery){throw 'Resume仅用于农业、装备、接敌撤离或基地中途恢复；原开局恢复仍只需ReadInputPath'}
-$readMode=if($Farm -or $Prepare -or $Scout -or $Recovery){[bool]$Resume}else{[bool]$ReadInputPath}
-$prefix=if($Recovery){'StarterRecovery'}elseif($Rescue){'StarterRescue'}elseif($Scout){'StarterScout'}elseif($Prepare){'StarterPrep'}elseif($Farm){'StarterFarm'}else{'StarterJourney'}
+if(($Farm -or $Prepare -or $Scout -or $Recovery -or $Flank) -and !$ReadInputPath){throw '农业、装备、接敌、恢复或绕行段必须提供真实完成档'}
+if($Resume -and !$Farm -and !$Prepare -and !$Scout -and !$Recovery -and !$Flank){throw 'Resume仅用于农业、装备、接敌、基地或绕行中途恢复；原开局恢复仍只需ReadInputPath'}
+$readMode=if($Farm -or $Prepare -or $Scout -or $Recovery -or $Flank){[bool]$Resume}else{[bool]$ReadInputPath}
+$prefix=if($Flank){'StarterFlank'}elseif($Recovery){'StarterRecovery'}elseif($Rescue){'StarterRescue'}elseif($Scout){'StarterScout'}elseif($Prepare){'StarterPrep'}elseif($Farm){'StarterFarm'}else{'StarterJourney'}
 $module=if($BuildRoot){Join-Path $BuildRoot 'CreatureFrontier/Binaries/Win64/CreatureFrontier.exe'}else{Join-Path $projectRoot 'Binaries/Win64/UnrealEditor-CreatureFrontier.dll'}
 $saved=if($BuildRoot){Join-Path $BuildRoot 'CreatureFrontier/Saved'}else{Join-Path $projectRoot 'Saved'}
 $hash=Get-FrontierBuildFingerprint -LiteralPath $module;$sourceHash=if($ReadInputPath){Get-FrontierBuildFingerprint -LiteralPath $ReadInputPath}else{''}
@@ -31,7 +31,7 @@ try{
     $exe=if($BuildRoot){$module}elseif($Preview){'D:/Epic/UE_5.8/Engine/Binaries/Win64/UnrealEditor.exe'}else{'D:/Epic/UE_5.8/Engine/Binaries/Win64/UnrealEditor-Cmd.exe'}
     if(!$BuildRoot){$arguments=@(('"'+(Join-Path $projectRoot 'CreatureFrontier.uproject')+'"'),'-game')+$arguments}
     $started=[DateTime]::UtcNow
-    [pscustomobject]@{BuildRoot=$BuildRoot;Farm=[bool]$Farm;Prepare=[bool]$Prepare;Scout=[bool]$Scout;Rescue=[bool]$Rescue;Recovery=[bool]$Recovery;Resume=$readMode;ReadInputPath=$ReadInputPath;InputSHA256=$sourceHash;Preview=[bool]$Preview;Resolution=$Resolution;BuildSHA256=$hash}|Export-Csv (Join-Path $run 'Run.csv') -NoTypeInformation
+    [pscustomobject]@{BuildRoot=$BuildRoot;Farm=[bool]$Farm;Prepare=[bool]$Prepare;Scout=[bool]$Scout;Rescue=[bool]$Rescue;Recovery=[bool]$Recovery;Flank=[bool]$Flank;Resume=$readMode;ReadInputPath=$ReadInputPath;InputSHA256=$sourceHash;Preview=[bool]$Preview;Resolution=$Resolution;BuildSHA256=$hash}|Export-Csv (Join-Path $run 'Run.csv') -NoTypeInformation
     Write-Host ('正常开局伙伴旅程：'+$run)
     $p=Start-Process -FilePath $exe -ArgumentList $arguments -WindowStyle Hidden -PassThru
     $timeout=if($Farm){300000}else{240000}
@@ -59,10 +59,15 @@ try{
         $markers+='CF_STARTER_RECOVERY_HINTS PASS states=3'
         if(!$readMode){$markers+='CF_STARTER_RECOVERY_REST PASS input=1 samePet=1 facility=1'}
     }
+    if($Flank){
+        $markers=@('CF_STARTER_FLANK_SOURCE PASS','CF_STARTER_FLANK_LIFE PASS version=38 positionRetained=1 homeRetained=1 medicine=1 claimed=4 safeSeconds=2','CF_STARTER_FLANK PASS reason=complete')
+        if(!$readMode){$markers+=@('CF_STARTER_FLANK_COMMAND PASS focus=1 specialBinding=1 samePet=1 avoid=1','CF_STARTER_FLANK_CONTACT PASS')}
+    }
     foreach($marker in $markers){if(!$raw.Contains($marker)){throw ('缺少开局旅程证据：'+$marker)}}
     if($Preview){
         $pattern=if($Scout){'CF_STARTER_SCOUT_PREVIEW_ROOT [^\r\n]*[/\\]([A-F0-9]{32})'}elseif($Prepare){'CF_STARTER_PREP_PREVIEW_ROOT [^\r\n]*[/\\]([A-F0-9]{32})'}elseif($Farm){'CF_STARTER_FARM_PREVIEW_ROOT [^\r\n]*[/\\]([A-F0-9]{32})'}else{'CF_STARTER_PREVIEW_ROOT [^\r\n]*[/\\]([A-F0-9]{32})'}
         if($Recovery){$pattern='CF_STARTER_RECOVERY_PREVIEW_ROOT [^\r\n]*[/\\]([A-F0-9]{32})'}
+        if($Flank){$pattern='CF_STARTER_FLANK_PREVIEW_ROOT [^\r\n]*[/\\]([A-F0-9]{32})'}
         $root=[regex]::Match($raw,$pattern);if(!$root.Success){throw '缺少独立截图目录'}
         $scenes=if($ReadInputPath){@('Working','ReadyForFarm')}else{@('Approach','Joined','Working','ReadyForFarm')}
         if($Farm){$scenes=if($readMode){@('Crafting','Assigned','Harvested','Home')}else{@('Planning','Built','Fiber','Crafting','Assigned','Harvested','Home')}}
@@ -70,6 +75,7 @@ try{
         if($Scout){$scenes=if($readMode){@('Returned')}else{@('Departure','Contact','Engaged','Returned')}}
         if($Rescue){$scenes=@('Returned')}
         if($Recovery){$scenes=@('Resting','Gathered','MedicineReady','Resupplied','Recovered')}
+        if($Flank){$scenes=if($readMode){@('Returned')}else{@('Departure','Contact','Engaged','Returned')}}
         foreach($name in $scenes){
             $path=Join-Path $saved ($prefix+'Preview/'+$root.Groups[1].Value+'/'+$name+'.png')
             if(!(Test-Path $path) -or (Get-Item $path).LastWriteTimeUtc -lt $started){throw '缺少本轮新图'}
@@ -80,6 +86,7 @@ try{
     }
     if((Get-FrontierBuildFingerprint -LiteralPath $module) -ne $hash -or ($ReadInputPath -and (Get-FrontierBuildFingerprint -LiteralPath $ReadInputPath) -ne $sourceHash)){throw '程序或输入源改变'}
     [pscustomobject]@{Pass=$true;BuildSHA256=$hash;DoneSHA256=(Get-FrontierBuildFingerprint -LiteralPath (Join-Path $slots ($prefix+'Done.sav')));Log=$log}|Export-Csv (Join-Path $run 'Results.csv') -NoTypeInformation
+    if($Flank){Write-Host '真实恢复档的绕行接敌、伙伴实际伤害、避战返家及存读通过；图形仍须目视，不代表首领击败';return}
     if($Recovery){Write-Host '真实返家来源的伙伴休息、实际采料、制作补药和玩家治疗存读通过；图形仍须目视，不代表再次战斗通过'}elseif($Rescue){Write-Host '真实倒地来源的药品救援、有限补给支援、避战返家及存读通过；图形仍须目视，不代表首领击败'}elseif($Scout){Write-Host '真实来源接敌撤离、家园补给保留与存读通过；图形仍须目视，不代表首领击败或倒地救援通过'}elseif($Prepare){Write-Host '真实农业档的装备制作、原料守恒、准备提示与存读通过；不证明首领战斗通过'}elseif($Farm -and $readMode){Write-Host '自身采纤维中途档恢复、返基地制种、伙伴两次收获及第四项领奖通过'}elseif($Farm){Write-Host '真实开局档经原预览建圃、实际采纤维、制种、伙伴两次收获及第四项领奖通过；图形仍须目视'}elseif($ReadInputPath){Write-Host '自身结交中途档独立恢复、实际返基地生产、第三项领奖和存读通过；农业段仍待继续'}else{Write-Host '正常默认补给下实际走近、结交、返基地生产和前三项奖励通过；农业段仍待继续'}
 }finally{
     try{
