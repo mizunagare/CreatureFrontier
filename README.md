@@ -4,6 +4,8 @@
 
 ## 主动休息续工开发候选（限定验证，非最终版）
 
+后续正常生态往返验证候选 `D:\CreatureFrontierBuilds\Windows-Wild-Home-Trip\CreatureFrontier.exe` 已在野生AI正常运行下完成草甸采2材料、伙伴随行返家制食物及独立中途恢复。它补齐原家园与正常生态的连接证据，不新增普通游戏规则或替代下方行为更新入口，详见[正常生态探索返家](Docs/WILD_HOME_TRIP.md)。
+
 运行 `D:\CreatureFrontierBuilds\Windows-Manual-Rest\CreatureFrontier.exe` 使用新的T行为：有原任务时保留目标和携料，休息达到原恢复条件后继续；F取消任务并跟随。无任务时T仍需8米内工作设施，暂停时不执行。原野外／施工休息不自动回血，需放弃任务回设施疗伤时先F再T；旧包不会自动获得本行为。
 
 本包通过真实家园休息续工／备粮／自身休息档独立恢复、施工携料休息／恢复及相关回归，说明与边界见[主动休息与续工](Docs/MANUAL_REST.md)。仍是灰盒开发候选，不是完整自由探索或长期经营验收，旧包和用户档保留。

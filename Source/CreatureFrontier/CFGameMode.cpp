@@ -75,6 +75,8 @@ void ACFGameMode::BeginPlay()
 {
     Super::BeginPlay();
     SeedFrontierResources(GetWorld());
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFWildHomeTest")) || FParse::Param(FCommandLine::Get(),TEXT("CFWildHomeRead")))
+    {const bool Read=FParse::Param(FCommandLine::Get(),TEXT("CFWildHomeRead"));FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this,Read](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunWildHomeTripScenario(GetWorld(),Hero,Read);},1.f,false);return;}
     if(FParse::Param(FCommandLine::Get(),TEXT("CFHomeCareTest")) || FParse::Param(FCommandLine::Get(),TEXT("CFHomeCareRead")))
     {const bool Read=FParse::Param(FCommandLine::Get(),TEXT("CFHomeCareRead"));FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this,Read](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunHomeCareScenario(GetWorld(),Hero,Read);},1.f,false);return;}
     if(FParse::Param(FCommandLine::Get(),TEXT("CFFarmWaitEmpty")) || FParse::Param(FCommandLine::Get(),TEXT("CFFarmWaitFull")))
