@@ -9,6 +9,8 @@
 #include "PlayerEquipmentComponent.h"
 #include "WildEncounter.h"
 #include "CraftingCatalog.h"
+#include "HomeModule.h"
+#include "HomeModuleDefinition.h"
 
 namespace
 {
@@ -129,7 +131,19 @@ FString ACFPlayerCharacter::GetObjectiveStatus() const
 }
 FString ACFPlayerCharacter::GetObjectiveHint() const
 {
-    if(Objectives.Claimed>=5)return TEXT("F5 保存 | F9 读取存档");
+    if(Objectives.Claimed>=5)
+    {
+        // 领奖结束不等于生活循环结束；复用原恢复许可和真实模块成本。
+        const FString Recovery=RecoveryHint(this);if(!Recovery.IsEmpty())return Recovery;
+        bool Floor=false,HomeStorage=false;
+        for(TActorIterator<AHomeModule> It(GetWorld());It;++It)if(!It->bPreview && !It->bStaged && !It->bUnderConstruction)
+        {Floor|=It->GetKind()==EHomeModuleKind::Floor;HomeStorage|=It->GetKind()==EHomeModuleKind::Storage;}
+        const auto* Definition=UHomeModuleDefinition::LoadDefault(Floor?EHomeModuleKind::Storage:EHomeModuleKind::Floor);
+        if(!Definition)return TEXT("F5 保存 | F9 读取存档");
+        if(!Floor)return FString::Printf(TEXT("B后按8切房屋，V选择木地板\n需%d材料；左键建造，右键取消"),Definition->MaterialCost);
+        if(!HomeStorage)return FString::Printf(TEXT("在地板上放储物箱（%d材料）\nB后按8切房屋，V选择，左键建造"),Definition->MaterialCost);
+        return TEXT("右Shift+左键放施工架\nE开箱存料；V选箱，瞄工地E派工");
+    }
     if(GetObjectiveProgress(Objectives.Claimed)>=StarterObjectiveTargets[Objectives.Claimed])return TEXT("已完成，按N领取奖励并揭晓下个目标");
     if(Objectives.Claimed==4)
     {

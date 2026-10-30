@@ -1,4 +1,5 @@
 #pragma once
+void RunHomeGrowthScenario(class UWorld* World,class ACFPlayerCharacter* Hero,bool Read);
 class UWorld;
 class ACFPlayerCharacter;
 void RunConstructionScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read);
