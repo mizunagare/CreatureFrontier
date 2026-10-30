@@ -6,6 +6,8 @@
 #include "BaseBuildingComponent.h"
 #include "FrontierOrientation.h"
 #include "EngineUtils.h"
+#include "PlayerEquipmentComponent.h"
+#include "WildEncounter.h"
 
 namespace
 {
@@ -105,6 +107,21 @@ FString ACFPlayerCharacter::GetObjectiveHint() const
 {
     if(Objectives.Claimed>=5)return TEXT("F5 保存 | F9 读取存档");
     if(GetObjectiveProgress(Objectives.Claimed)>=StarterObjectiveTargets[Objectives.Claimed])return TEXT("已完成，按N领取奖励并揭晓下个目标");
+    if(Objectives.Claimed==4)
+    {
+        // 仅提供准备建议，不把装备变成领奖或战斗的新许可条件。
+        const auto& Gear=Equipment->GetState();
+        if(!Gear.bOwnSpear)return FString::Printf(TEXT("先备武器：设施附近按4制长矛（%d材料）\n缺料可M采集，或在采集台E派伙伴"),Equipment->GetSpearCost());
+        if(!Gear.bSpearEquipped)return TEXT("按6装备已有长矛，无需重复制作\n护甲、药品和食物也需准备");
+        if(!Gear.bOwnVest)return FString::Printf(TEXT("先备护甲：设施附近按5制作（%d材料）\n缺料可M采集，或在采集台E派伙伴"),Equipment->GetVestCost());
+        if(!Gear.bVestEquipped)return TEXT("按7装备已有护甲，无需重复制作\n装备只减伤，不保证能战胜首领");
+        for(TActorIterator<AWildEncounter> It(GetWorld());It;++It)if(It->bBoss && It->EncounterId==TEXT("CrystalRise"))
+        {
+            const auto Delta=It->GetActorLocation()-GetActorLocation();
+            return FString::Printf(TEXT("水晶高地在%s%d米（直线）\n危险首领，先备补给；Q集火/G技能"),FrontierOrientation::Heading(FMath::RadiansToDegrees(FMath::Atan2(Delta.Y,Delta.X))),FMath::CeilToInt(Delta.Size()/100));
+        }
+        return TEXT("危险首领，先备药品和食物再探索\n观察水晶高地区域；Q集火/G技能");
+    }
     return Objectives.Claimed==3?FarmingHint(this):FString(StarterObjectiveHints[Objectives.Claimed]);
 }
 FString ACFPlayerCharacter::GetObjectiveRewardText() const

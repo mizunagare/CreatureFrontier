@@ -29,6 +29,7 @@
 #include "CraftingCatalog.h"
 #include "PlayerGatheringComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "PlayerEquipmentComponent.h"
 
 namespace
 {
@@ -330,4 +331,122 @@ void RunStarterFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read)
     S->LastH=Hero->GetActorLocation();S->LastP=S->Pet->GetActorLocation();S->VelocityH=Hero->GetVelocity();S->VelocityP=S->Pet->GetVelocity();S->LastTime=S->At=World->GetTimeSeconds();S->Input=NewObject<UHomeMovementProbe>(Hero);S->Input->RegisterComponent();
     S->Preview=FParse::Param(FCommandLine::Get(),TEXT("CFStarterFarmPreview"));if(S->Preview){S->Root=FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir()/TEXT("StarterFarmPreview")/FGuid::NewGuid().ToString(EGuidFormats::Digits));IFileManager::Get().MakeDirectory(*S->Root,true);UE_LOG(LogTemp,Display,TEXT("CF_STARTER_FARM_PREVIEW_ROOT %s"),*S->Root);}
     UE_LOG(LogTemp,Display,TEXT("CF_STARTER_FARM_SOURCE PASS read=%d positionRetained=1 pet=%s"),Read,*S->PetId.ToString());FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([S](float){return S->Tick();}));
+}
+
+namespace
+{
+struct FStarterPrep : FStarterJourney
+{
+    TWeakObjectPtr<AWorkStation> Garden;TWeakObjectPtr<AResourceNode> Brush;
+    FFacilitySaveRecord OriginalGarden;FString Nickname;
+    bool End(bool Pass,const TCHAR* Reason)
+    {
+        if(Input.IsValid())Input->Direction=FVector::ZeroVector;CFInputQA::Release(Hero,EKeys::LeftShift);
+        const auto Feedback=Hero->Feedback;if(!Pass)Hero->SaveProgress(TEXT("StarterPrepBlocked"));
+        UE_LOG(LogTemp,Display,TEXT("CF_STARTER_PREP %s reason=%s phase=%d heroTravel=%.1f petTravel=%.1f wildTravel=%.1f feedback=%s"),Pass?TEXT("PASS"):TEXT("FAIL"),Reason,Phase,HeroTravel,PetTravel,WildTravel,*Feedback);
+        FPlatformMisc::RequestExitWithStatus(false,Pass?0:1);return false;
+    }
+    bool Budget() const
+    {
+        if(!Garden.IsValid() || !Brush.IsValid())return false;const auto& G=Hero->Equipment->GetState();const int32 Produced=21-Brush->Remaining;
+        int32 Farms=0;for(TActorIterator<AWorkStation> It(World);It;++It)if(It->bPlayerBuilt)++Farms;
+        return Produced>=0 && Produced<=7 && Hero->Inventory->Count(EFrontierItem::Material)+(G.bOwnSpear?8:0)+(G.bOwnVest?12:0)==13+Produced &&
+            Pet->Experience==5+Produced && Pet->BondPoints==3 && Pet->Nickname==Nickname &&
+            Hero->Inventory->Count(EFrontierItem::Food)==2 && Hero->Inventory->Count(EFrontierItem::Seeds)==1 && Hero->Inventory->Count(EFrontierItem::Medicine)==3 && Hero->Inventory->Count(EFrontierItem::CaptureDevice)==7 && Hero->Inventory->Count(EFrontierItem::Fiber)==0 &&
+            Hero->GetObjectives().Claimed==4 && Hero->GetObjectives().FarmFood==2 && Hero->GetObjectives().WorkMaterials==3 && !Hero->GetObjectives().bAlphaResolved &&
+            HomeLayout::Collect(World).IsEmpty() && Farms==1 && Garden->PersistentId==OriginalGarden.Id && Garden->RequiredSpecialty==OriginalGarden.Specialty && Garden->GetActorTransform().Equals(OriginalGarden.Transform,.01) &&
+            Garden->StoredFood==OriginalGarden.StoredFood && Garden->Crop->Seeds==OriginalGarden.Seeds && Garden->Crop->bPlanted==OriginalGarden.bPlanted && FMath::IsNearlyEqual(Garden->Crop->GrowthWork,OriginalGarden.GrowthWork,.01f);
+    }
+    bool Tick()
+    {
+        if(!Pet.IsValid() || !Bench.IsValid() || FPlatformTime::Seconds()>Deadline)return End(false,TEXT("lifetime"));
+        const auto H=Hero->GetActorLocation(),P=Pet->GetActorLocation();const double Delta=World->GetTimeSeconds()-LastTime;
+        if(!Motion(Hero,LastH,VelocityH,Delta) || !Motion(Pet.Get(),LastP,VelocityP,Delta) || Hero->Health<=0 || Pet->Health<=0 || !Pet->IsActorTickEnabled())return End(false,TEXT("motion-health"));
+        HeroTravel+=FVector::Dist(H,LastH);PetTravel+=FVector::Dist(P,LastP);LastH=H;LastP=P;VelocityH=Hero->GetVelocity();VelocityP=Pet->GetVelocity();LastTime=World->GetTimeSeconds();
+        int32 Ecology=0,Owned=0;for(TActorIterator<AWildEncounter> It(World);It;++It){++Ecology;if(!It->IsActorTickEnabled())return End(false,TEXT("ecology"));}
+        for(TActorIterator<ACreatureCharacter> It(World);It;++It)
+        {
+            if(It->Tamer==Hero->GetController())++Owned;
+            if(It->Disposition!=ECreatureDisposition::Tamed && It->Health>0){if(!It->IsActorTickEnabled() || !It->GetActorEnableCollision() || It->GetCharacterMovement()->MovementMode==MOVE_None)return End(false,TEXT("wild-disabled"));if(const auto* Old=WildPositions.Find(It->PersistentId))WildTravel+=FVector::Dist(*Old,It->GetActorLocation());WildPositions.Add(It->PersistentId,It->GetActorLocation());}
+        }
+        if(Ecology!=3 || Owned!=1 || !Budget())return End(false,TEXT("budget-home"));if(FPlatformTime::Seconds()<ShotUntil)return true;
+        if(Phase==-1)
+        {
+            if(World->GetTimeSeconds()-At<.2 || UNavigationSystemV1::IsNavigationBeingBuiltOrLocked(World))return true;
+            if(Read){Phase=4;return true;}
+            if(!Hero->GetObjectiveHint().Contains(TEXT("按4")))return End(false,TEXT("spear-hint"));if(Photo(TEXT("NeedSpear"),P))return true;
+            if(!Plan(Bench->GetActorLocation()+FVector(210,-180,40),0))return End(false,TEXT("base-path"));return true;
+        }
+        if(Phase==0)
+        {
+            const int32 Result=Move();if(Result<0)return End(false,TEXT("walk-blocked"));if(!Result)return true;
+            if(!CFInputQA::Press(Hero,EKeys::Four) || !Hero->Equipment->GetState().bSpearEquipped || Hero->Inventory->Count(EFrontierItem::Material)!=5 || !Hero->GetObjectiveHint().Contains(TEXT("按5")))return End(false,TEXT("spear-craft"));
+            // 用实际不足的5材料尝试护甲，原事务必须拒绝且不扣料。
+            if(!CFInputQA::Press(Hero,EKeys::Five) || Hero->Inventory->Count(EFrontierItem::Material)!=5 || Hero->Equipment->GetState().bOwnVest)return End(false,TEXT("vest-reject"));
+            UE_LOG(LogTemp,Display,TEXT("CF_STARTER_PREP_SPEAR PASS input=1 cost=8 material=5 vestRejected=1"));Photo(TEXT("Spear"),P);Phase=1;At=World->GetTimeSeconds();return true;
+        }
+        if(Phase==1)
+        {
+            Face(Bench->GetActorLocation());if(Hero->TraceFacility()!=Bench.Get()){if(World->GetTimeSeconds()-At>5)return End(false,TEXT("bench-sight"));return true;}
+            if(!CFInputQA::Press(Hero,EKeys::E) || Pet->WorkSite!=Bench.Get())return End(false,TEXT("assign"));Phase=2;At=World->GetTimeSeconds();return true;
+        }
+        if(Phase==2)
+        {
+            if(Hero->Inventory->Count(EFrontierItem::Material)<12)
+            {if(Hero->Inventory->Count(EFrontierItem::Material)>5)Photo(TEXT("Collecting"),P);if(World->GetTimeSeconds()-At>60)return End(false,TEXT("production-timeout"));return true;}
+            if(Brush->Remaining!=14 || Pet->Experience!=12 || !CFInputQA::Press(Hero,EKeys::F) || !Hero->SaveProgress(TEXT("StarterPrepMid")))return End(false,TEXT("production"));
+            UE_LOG(LogTemp,Display,TEXT("CF_STARTER_PREP_RESOURCE PASS produced=7 sourcePaid=7 experience=12"));Phase=4;return true;
+        }
+        if(Phase==4)
+        {
+            if(!Hero->GetObjectiveHint().Contains(TEXT("按5")))return End(false,TEXT("vest-hint"));if(Photo(TEXT("VestReady"),P))return true;
+            if(!CFInputQA::Press(Hero,EKeys::Five) || !Hero->Equipment->GetState().bVestEquipped || Hero->Inventory->Count(EFrontierItem::Material)!=0 || !Hero->GetObjectiveHint().Contains(TEXT("危险首领")))return End(false,TEXT("vest-craft"));
+            UE_LOG(LogTemp,Display,TEXT("CF_STARTER_PREP_VEST PASS input=1 cost=12 material=0 advisoryOnly=1"));Phase=5;return true;
+        }
+        if(Phase==5)
+        {
+            if(!CFInputQA::Press(Hero,EKeys::Six) || Hero->Equipment->GetState().bSpearEquipped || !Hero->GetObjectiveHint().Contains(TEXT("按6装备")))return End(false,TEXT("spear-toggle"));Phase=6;return true;
+        }
+        if(Phase==6)
+        {
+            if(Photo(TEXT("SpearOff"),P))return true;
+            if(!CFInputQA::Press(Hero,EKeys::Six) || !CFInputQA::Press(Hero,EKeys::Seven) || Hero->Equipment->GetState().bVestEquipped || !Hero->GetObjectiveHint().Contains(TEXT("按7装备")))return End(false,TEXT("vest-toggle"));Phase=7;return true;
+        }
+        if(Phase==7)
+        {
+            if(Photo(TEXT("VestOff"),P))return true;
+            if(!CFInputQA::Press(Hero,EKeys::Seven) || !Hero->Equipment->GetState().bSpearEquipped || !Hero->Equipment->GetState().bVestEquipped || !Hero->GetObjectiveHint().Contains(TEXT("直线")))return End(false,TEXT("equipped"));
+            UE_LOG(LogTemp,Display,TEXT("CF_STARTER_PREP_HINTS PASS states=5 toggles=2"));Phase=8;At=World->GetTimeSeconds();return true;
+        }
+        if(Phase==8)
+        {
+            if(Pet->GetDistanceTo(Hero)>250 || Pet->Activity!=ECreatureActivity::Follow){if(World->GetTimeSeconds()-At>20)return End(false,TEXT("regroup"));return true;}
+            if(Photo(TEXT("Prepared"),P))return true;const auto HP=Hero->Health,PHP=Pet->Health;
+            if((!Read && HeroTravel<700) || Hero->GetPlayerAttackDamage()!=35 || !FMath::IsNearlyEqual(Hero->Equipment->GetDamageReduction(),.2f) || !Hero->SaveProgress(TEXT("StarterPrepDone")) || !Hero->LoadProgress(TEXT("StarterPrepDone")))return End(false,TEXT("save"));
+            Pet.Reset();Garden.Reset();Brush.Reset();for(TActorIterator<ACreatureCharacter> It(World);It;++It)if(It->PersistentId==PetId)Pet=*It;
+            for(TActorIterator<AWorkStation> It(World);It;++It)if(It->PersistentId==OriginalGarden.Id)Garden=*It;for(TActorIterator<AResourceNode> It(World);It;++It)if(It->PersistentId==FGuid(0xCF170000,0,0,1))Brush=*It;
+            const auto& Gear=Hero->Equipment->GetState();
+            if(!Pet.IsValid() || !Garden.IsValid() || !Brush.IsValid() || !Hero->GetActorLocation().Equals(H,.01) || !Pet->GetActorLocation().Equals(P,.01) || Hero->Health!=HP || Pet->Health!=PHP || !Gear.bSpearEquipped || !Gear.bVestEquipped || !Budget())return End(false,TEXT("restore"));
+            UE_LOG(LogTemp,Display,TEXT("CF_STARTER_PREP_LIFE PASS version=38 positionRetained=1 material=0 food=2 seeds=1 medicine=3 gear=2 claimed=4"));return End(true,TEXT("complete"));
+        }
+        return true;
+    }
+};
+}
+void RunStarterPrepScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read)
+{
+    auto S=MakeShared<FStarterPrep>();S->World=World;S->Hero=Hero;S->Read=Read;S->Deadline=FPlatformTime::Seconds()+150;
+    const auto* Source=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("StarterPrepInput"),0));
+    if(!Source || Source->FormatVersion!=38 || Source->HomeModules.Num()!=0 || Source->Facilities.Num()!=1 || !Hero->LoadProgress(TEXT("StarterPrepInput"))){S->End(false,TEXT("source"));return;}
+    S->OriginalGarden=Source->Facilities[0];int32 Owned=0;
+    for(TActorIterator<ACreatureCharacter> It(World);It;++It)if(It->Tamer==Hero->GetController()){S->Pet=*It;++Owned;}
+    for(TActorIterator<AWorkStation> It(World);It;++It){if(It->PersistentId==S->OriginalGarden.Id)S->Garden=*It;if(!It->bPlayerBuilt && It->RequiredSpecialty==EWorkSpecialty::Gathering)S->Bench=*It;}
+    for(TActorIterator<AResourceNode> It(World);It;++It)if(It->PersistentId==FGuid(0xCF170000,0,0,1))S->Brush=*It;
+    const auto& Gear=Hero->Equipment->GetState();
+    if(Owned!=1 || !S->Pet.IsValid() || !S->Garden.IsValid() || !S->Bench.IsValid() || !S->Brush.IsValid() || S->Brush->Remaining!=(Read?14:21) || S->Pet->Experience!=(Read?12:5) || Hero->Inventory->Count(EFrontierItem::Material)!=(Read?12:13) || Gear.bOwnSpear!=Read || Gear.bSpearEquipped!=Read || Gear.bOwnVest){S->End(false,TEXT("source-state"));return;}
+    S->PetId=S->Pet->PersistentId;S->Nickname=S->Pet->Nickname;const auto* Partner=Source->Creatures.FindByPredicate([&](const FCreatureSaveRecord& R){return R.Id==S->PetId;});
+    if(!Partner || !Hero->GetActorLocation().Equals(Source->PlayerTransform.GetLocation(),.01) || !S->Pet->GetActorLocation().Equals(Partner->Transform.GetLocation(),.01) || !S->Budget()){S->End(false,TEXT("source-position-budget"));return;}
+    S->LastH=Hero->GetActorLocation();S->LastP=S->Pet->GetActorLocation();S->VelocityH=Hero->GetVelocity();S->VelocityP=S->Pet->GetVelocity();S->LastTime=S->At=World->GetTimeSeconds();S->Input=NewObject<UHomeMovementProbe>(Hero);S->Input->RegisterComponent();
+    S->Preview=FParse::Param(FCommandLine::Get(),TEXT("CFStarterPrepPreview"));if(S->Preview){S->Root=FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir()/TEXT("StarterPrepPreview")/FGuid::NewGuid().ToString(EGuidFormats::Digits));IFileManager::Get().MakeDirectory(*S->Root,true);UE_LOG(LogTemp,Display,TEXT("CF_STARTER_PREP_PREVIEW_ROOT %s"),*S->Root);}
+    UE_LOG(LogTemp,Display,TEXT("CF_STARTER_PREP_SOURCE PASS read=%d positionRetained=1 pet=%s"),Read,*S->PetId.ToString());FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([S](float){return S->Tick();}));
 }

@@ -14,3 +14,4 @@ void RunWildHomeTripScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read);
 void RunHomeRailingScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read);
 void RunStarterJourneyScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read);
 void RunStarterFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read);
+void RunStarterPrepScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read);
