@@ -173,10 +173,10 @@ struct FRenovationTest
         if(Phase==1)
         {
             if(Photo(TEXT("Retained")))return true;
-            if(!Mid && Pet->Cargo->Count()==3){if(!Hero->SaveProgress(TEXT("RenovationMid")))return Finish(false,TEXT("mid-save"));Mid=true;UE_LOG(LogTemp,Display,TEXT("CF_RENOVATION_MID PASS version=36 material=0 stock=5 carried=3 retained=1"));}
+            if(!Mid && Pet->Cargo->Count()==3){if(!Hero->SaveProgress(TEXT("RenovationMid")))return Finish(false,TEXT("mid-save"));Mid=true;UE_LOG(LogTemp,Display,TEXT("CF_RENOVATION_MID PASS version=37 material=0 stock=5 carried=3 retained=1"));}
             if(Site->bUnderConstruction){FString Reason;if(!Site->ConstructionOriginalDefinition || Site->PaidMaterials!=10 || !HomeLayout::Validate(HomeLayout::Collect(World),Reason))return Finish(false,TEXT("support"));return true;}
             if(!Mid || Site->GetKind()!=EHomeModuleKind::Doorway || Site->PaidMaterials!=8 || Site->ConstructionOriginalDefinition || Pet->Construction->GetSite() || Pet->Cargo->Count()!=0 || Pet->Activity!=ECreatureActivity::Follow)return Finish(false,TEXT("completion"));
-            UE_LOG(LogTemp,Display,TEXT("CF_RENOVATION_COMPLETED PASS version=36 modules=19 material=5 cost=8 refund=5 sameId=1 support=1"));Phase=2;At=World->GetTimeSeconds();
+            UE_LOG(LogTemp,Display,TEXT("CF_RENOVATION_COMPLETED PASS version=37 modules=19 material=5 cost=8 refund=5 sameId=1 support=1"));Phase=2;At=World->GetTimeSeconds();
             if(Photo(TEXT("Completed")))return true;return true;
         }
         if(Phase==2)
@@ -212,7 +212,7 @@ void RunRenovationScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read)
 {
     auto State=MakeShared<FRenovationTest>();State->World=World;State->Hero=Hero;State->Deadline=FPlatformTime::Seconds()+160;
     const auto* Source=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("RenovationInput"),0));
-    if(!Source || Source->FormatVersion!=(Read?36:34) || !Hero->LoadProgress(TEXT("RenovationInput")) || !State->Bind() || Source->HomeModules.Num()!=19 || Source->Facilities.Num()!=2 || State->PetId!=FGuid(0x1209AAFE,0x4D5C4544,0x1D65AF94,0x1B0435D1)) {State->Finish(false,TEXT("source"));return;}
+    if(!Source || (Read?(Source->FormatVersion<36 || Source->FormatVersion>FrontierCurrentSaveVersion):Source->FormatVersion!=34) || !Hero->LoadProgress(TEXT("RenovationInput")) || !State->Bind() || Source->HomeModules.Num()!=19 || Source->Facilities.Num()!=2 || State->PetId!=FGuid(0x1209AAFE,0x4D5C4544,0x1D65AF94,0x1B0435D1)) {State->Finish(false,TEXT("source"));return;}
     State->Original=HomeLayout::Collect(World);State->Preview=FParse::Param(FCommandLine::Get(),TEXT("CFRenovationPreview"));
     State->ShotRoot=FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir()/TEXT("RenovationPreview")/FGuid::NewGuid().ToString(EGuidFormats::Digits));
     if(State->Preview){IFileManager::Get().MakeDirectory(*State->ShotRoot,true);UE_LOG(LogTemp,Display,TEXT("CF_RENOVATION_PREVIEW_ROOT %s"),*State->ShotRoot);}
@@ -222,9 +222,9 @@ void RunRenovationScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read)
         if(State->Site->bUnderConstruction || State->Site->GetKind()!=EHomeModuleKind::Doorway || State->Pet->Activity!=ECreatureActivity::Follow || State->Pet->BondPoints!=9 || Hero->Inventory->Count(EFrontierItem::Material)!=5 || Hero->Inventory->Count(EFrontierItem::Food)!=0){State->Finish(false,TEXT("blocked-source"));return;}
         State->Phase=5;State->Entered=true;State->PetEntered=true;State->Input=NewObject<UHomeMovementProbe>(Hero);State->Input->RegisterComponent();State->Route={FVector(-950,-800,40),FVector(-1250,-800,40)};State->ProgressAnchor=Hero->GetActorLocation();State->ProgressAt=World->GetTimeSeconds();
         // 仅复现真实失败快照的退出段，不把已设定的进入标志计为本进程重新进入的证据。
-        UE_LOG(LogTemp,Display,TEXT("CF_RENOVATION_BLOCK_RESTORE PASS version=36 phase=exitOnly hero=%s pet=%s"),*Hero->GetActorLocation().ToString(),*State->Pet->GetActorLocation().ToString());
+        UE_LOG(LogTemp,Display,TEXT("CF_RENOVATION_BLOCK_RESTORE PASS version=%d phase=exitOnly hero=%s pet=%s"),Source->FormatVersion,*Hero->GetActorLocation().ToString(),*State->Pet->GetActorLocation().ToString());
     }
-    else if(Read){if(!State->Site->ConstructionOriginalDefinition || State->Pet->Construction->GetSite()!=State->Site.Get() || State->Pet->Cargo->Count()!=3){State->Finish(false,TEXT("restore"));return;}State->Phase=1;State->Mid=true;UE_LOG(LogTemp,Display,TEXT("CF_RENOVATION_RESTORE PASS version=36 stock=5 carried=3 retained=1"));}
+    else if(Read){if(!State->Site->ConstructionOriginalDefinition || State->Pet->Construction->GetSite()!=State->Site.Get() || State->Pet->Cargo->Count()!=3){State->Finish(false,TEXT("restore"));return;}State->Phase=1;State->Mid=true;UE_LOG(LogTemp,Display,TEXT("CF_RENOVATION_RESTORE PASS version=%d stock=5 carried=3 retained=1"),Source->FormatVersion);}
     else if(State->Site->GetKind()!=EHomeModuleKind::Window || State->Site->PaidMaterials!=10 || Hero->Inventory->Count(EFrontierItem::Material)!=2 || Hero->Inventory->Count(EFrontierItem::Food)!=1 || Hero->Inventory->Count(EFrontierItem::Seeds)!=1){State->Finish(false,TEXT("origin"));return;}
     FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([State](float){return State->Tick();}));
 }

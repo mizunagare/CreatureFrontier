@@ -49,6 +49,7 @@ bool FHomeRestoreTransaction::Stage(UFrontierSaveGame* Save)
         if(Save->FormatVersion<35 && (Record.bUnderConstruction || Record.ConstructionCrateId.IsValid() || Record.ConstructionWork!=0))return false;
         if(Record.ConstructionCrateId.IsValid() && !Save->HomeModules.ContainsByPredicate([&](const FHomeModuleRecord& Source){return Source.Id==Record.ConstructionCrateId && Source.Definition.Get() && Source.Definition.Get()->Kind==EHomeModuleKind::Storage && !Source.bUnderConstruction;}))return false;
         const auto Kind=Record.Definition.Get()->Kind;
+        if(Save->FormatVersion<37 && Record.bUnderConstruction && (Kind==EHomeModuleKind::Floor || Kind==EHomeModuleKind::Roof))return false;
         const double OldHeight=Kind==EHomeModuleKind::Floor?-40:Kind==EHomeModuleKind::Roof?280:-30;
         if(Save->FormatVersion<34 && (Kind==EHomeModuleKind::Stairs || Record.Transform.GetLocation().Z>OldHeight+1))return false;
         if(Save->FormatVersion<33 && Record.Definition.Get()->Kind==EHomeModuleKind::Fence)return false;

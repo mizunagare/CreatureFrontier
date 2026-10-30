@@ -17,7 +17,7 @@ class UCreatureDefinition;
 class UResourceDefinition;
 
 // 写盘与当前版本上限共用；历史迁移边界继续使用其原始版本号。
-inline constexpr int32 FrontierCurrentSaveVersion=36;
+inline constexpr int32 FrontierCurrentSaveVersion=37;
 
 USTRUCT()
 struct FResourceSaveRecord

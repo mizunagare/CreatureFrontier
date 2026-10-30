@@ -36,12 +36,12 @@ try{
     if($process.ExitCode -ne 0 -or $raw -match '\bFAIL\b|Fatal error|Assertion failed' -or !$raw.Contains('LogExit: Exiting.')){throw ('施工专项失败：'+$log)}
     $markers=@()
     $restoredVersion=0
-    if($Read){$prefix=if($ExistingHome){'CF_CONSTRUCTION_HOME_RESTORE'}else{'CF_CONSTRUCTION_COLD'};$version=[regex]::Match($raw,($prefix+' PASS version=(35|36) '));if(!$version.Success){throw '缺少受支持的实际施工恢复版本'};$restoredVersion=$version.Groups[1].Value}
-    if($ExistingHome){$markers=@('CF_CONSTRUCTION_HOME_DONE PASS version=36 modules=19 retained=18 material=0 food=1 seeds=1 cost=4','CF_CONSTRUCTION_HOME PASS reason=complete');$markers+=if($Read){"CF_CONSTRUCTION_HOME_RESTORE PASS version=$restoredVersion carried=3 stock=1 identity=1"}else{@('CF_CONSTRUCTION_HOME_ORIGIN PASS version=34 modules=19 refund=2 originalMaterial=2 stock=4','CF_CONSTRUCTION_HOME_MID PASS version=36 carried=3 identity=1')}}
+    if($Read){$prefix=if($ExistingHome){'CF_CONSTRUCTION_HOME_RESTORE'}else{'CF_CONSTRUCTION_COLD'};$version=[regex]::Match($raw,($prefix+' PASS version=(35|36|37) '));if(!$version.Success){throw '缺少受支持的实际施工恢复版本'};$restoredVersion=$version.Groups[1].Value}
+    if($ExistingHome){$markers=@('CF_CONSTRUCTION_HOME_DONE PASS version=37 modules=19 retained=18 material=0 food=1 seeds=1 cost=4','CF_CONSTRUCTION_HOME PASS reason=complete');$markers+=if($Read){"CF_CONSTRUCTION_HOME_RESTORE PASS version=$restoredVersion carried=3 stock=1 identity=1"}else{@('CF_CONSTRUCTION_HOME_ORIGIN PASS version=34 modules=19 refund=2 originalMaterial=2 stock=4','CF_CONSTRUCTION_HOME_MID PASS version=37 carried=3 identity=1')}}
     elseif($InputOnly){$markers=@('CF_CONSTRUCTION_INPUT PASS modifier=1 mapped=1 preview=1 material=12 paid=0')}
     else{
-        $markers=@('CF_CONSTRUCTION_SHORTAGE PASS supplied=3 work=0 reserved=1','CF_CONSTRUCTION_BAD PASS cases=7 retained=1 cancel=1 paused=1 sourceProtected=1','CF_CONSTRUCTION_REST PASS version=36','CF_CONSTRUCTION_DONE PASS version=36 material=66 cost=6 identity=1 actualNav=1 rest=1','CF_CONSTRUCTION PASS reason=complete')
-        $markers+=if($Read){"CF_CONSTRUCTION_COLD PASS version=$restoredVersion carried=3 intent=1"}else{@('CF_CONSTRUCTION_QUEUE PASS material=69 paid=0 support=1 input=1','CF_CONSTRUCTION_MID PASS version=36 carried=3 identity=1 intent=1')}
+        $markers=@('CF_CONSTRUCTION_SHORTAGE PASS supplied=3 work=0 reserved=1','CF_CONSTRUCTION_BAD PASS cases=7 retained=1 cancel=1 paused=1 sourceProtected=1','CF_CONSTRUCTION_REST PASS version=37','CF_CONSTRUCTION_DONE PASS version=37 material=66 cost=6 identity=1 actualNav=1 rest=1','CF_CONSTRUCTION PASS reason=complete')
+        $markers+=if($Read){"CF_CONSTRUCTION_COLD PASS version=$restoredVersion carried=3 intent=1"}else{@('CF_CONSTRUCTION_QUEUE PASS material=69 paid=0 support=1 input=1','CF_CONSTRUCTION_MID PASS version=37 carried=3 identity=1 intent=1')}
         $markers+='CF_CONSTRUCTION_CANCEL_CAPACITY PASS retained=2 refunded=2'
         $markers+='CF_CONSTRUCTION_PATH_RETRY PASS calls=60 searches=1 retained=1'
         if(!$Read){$markers+='CF_CONSTRUCTION_CANCEL_CARRIED PASS saved=1 held=3 recovered=3 reassigned=1'}

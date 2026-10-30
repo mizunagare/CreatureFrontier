@@ -8,6 +8,7 @@
 #include "Camera/CameraComponent.h"
 #include "GameFramework/Character.h"
 #include "Components/CapsuleComponent.h"
+#include "HomeLayout.h"
 
 bool UHomeModuleDefinition::IsValidDefinition() const
 {
@@ -74,11 +75,10 @@ void AHomeModule::OnConstruction(const FTransform& Transform)
     // 从基础材质创建独立实例，避免从共享MID创建而意外改写门框。
     if(!DoorLeafPalette && Palette) DoorLeafPalette=UMaterialInstanceDynamic::Create(Palette->GetMaterial(),this);
     if(DoorLeafPalette && Definition) DoorLeafPalette->SetVectorParameterValue(TEXT("Tint"),Definition->DoorLeafColor);
-    // 待建模块使用有实体碰撞的低矮脚手架；完整墙体仅在实际施工完成后出现。
-    const TArray<FHomePart> Geometry=ConstructionOriginalDefinition?Parts(ConstructionOriginalDefinition->Kind):bUnderConstruction?TArray<FHomePart>{{FVector(-160,0,50),FVector(10,10,50)},
-        {FVector(160,0,50),FVector(10,10,50)},{FVector(0,0,90),FVector(160,10,8)},{FVector(0,0,12),FVector(35,25,12)}}:Parts(GetKind());
+    // 新工地使用有实体碰撞的脚手架；改建保留旧墙。高处模块的供料箱位于下层。
+    const TArray<FHomePart> Geometry=ConstructionOriginalDefinition?Parts(ConstructionOriginalDefinition->Kind):bUnderConstruction?ConstructionParts(GetKind(),FloorId.IsValid()):Parts(GetKind());
     if(bUnderConstruction && Palette)Palette->SetVectorParameterValue(TEXT("Tint"),FLinearColor(.65f,.38f,.08f));
-    // 普通模块仍保留原四个组件，只有楼梯按实际踏步数补充组件。
+    // 保留原组件，按楼梯踏步或施工轮廓需要补充，不销毁可复用组件。
     while(Meshes.Num()<Geometry.Num())
     {
         auto* Mesh=NewObject<UStaticMeshComponent>(this,*FString::Printf(TEXT("StepPart%d"),Meshes.Num()));
@@ -118,6 +118,35 @@ AHomeModule* AHomeModule::TraceConstruction(ACFPlayerCharacter* Hero)
     Hero->GetWorld()->LineTraceSingleByChannel(Hit,Start,Start+Hero->FirstPersonCamera->GetForwardVector()*800,ECC_Visibility,Query);
     auto* Site=Cast<AHomeModule>(Hit.GetActor());return Site && Site->bUnderConstruction && !Site->bPreview && !Site->bStaged?Site:nullptr;
 }
+bool AHomeModule::SupportsConstruction(EHomeModuleKind Kind)
+{
+    return Kind==EHomeModuleKind::Floor || Kind==EHomeModuleKind::Roof || Kind==EHomeModuleKind::Wall ||
+        Kind==EHomeModuleKind::Window || Kind==EHomeModuleKind::Doorway || Kind==EHomeModuleKind::Fence;
+}
+TArray<FHomePart> AHomeModule::ConstructionParts(EHomeModuleKind Kind,bool ElevatedFloor)
+{
+    if(Kind==EHomeModuleKind::Floor && !ElevatedFloor)
+        return {{FVector(-195,0,12),FVector(5,200,8)},{FVector(195,0,12),FVector(5,200,8)},
+            {FVector(0,-195,12),FVector(190,5,8)},{FVector(0,195,12),FVector(190,5,8)},
+            {FVector(0,0,12),FVector(35,25,12)}};
+    if(Kind==EHomeModuleKind::Roof || (Kind==EHomeModuleKind::Floor && ElevatedFloor))
+        return {{FVector(-195,0,0),FVector(5,200,8)},{FVector(195,0,0),FVector(5,200,8)},
+            {FVector(0,-195,0),FVector(190,5,8)},{FVector(0,195,0),FVector(190,5,8)},
+            {FVector(0,0,22-HomeLayout::StoreyHeight),FVector(35,25,12)}};
+    return {{FVector(-160,0,50),FVector(10,10,50)},{FVector(160,0,50),FVector(10,10,50)},
+        {FVector(0,0,90),FVector(160,10,8)},{FVector(0,0,12),FVector(35,25,12)}};
+}
+FVector AHomeModule::ConstructionAnchor() const
+{
+    return GetActorLocation()-FVector(0,0,GetKind()==EHomeModuleKind::Roof || (GetKind()==EHomeModuleKind::Floor && FloorId.IsValid())?HomeLayout::StoreyHeight-10:0);
+}
+FVector AHomeModule::ConstructionPoint(const FVector& From) const
+{
+    if(GetKind()!=EHomeModuleKind::Floor || FloorId.IsValid())return ConstructionAnchor();
+    // 地面地板从边缘施工；工人不能站在尚未出现的平台上，也不扩大施工接触距离。
+    const auto Local=GetActorTransform().InverseTransformPosition(From);
+    return GetActorTransform().TransformPosition(FVector(FMath::Clamp(Local.X,-200.,200.),FMath::Clamp(Local.Y,-200.,200.),0));
+}
 bool AHomeModule::ClearsCompletedPawn(const ACharacter* Pawn,const FVector& Center) const
 {
     if(!Pawn || !Definition)return false;const auto* Shape=Pawn->GetCapsuleComponent();if(!Shape)return false;
@@ -135,7 +164,11 @@ bool AHomeModule::ClearsCompletedPawn(const ACharacter* Pawn,const FVector& Cent
 FString AHomeModule::ConstructionStatus() const
 {
     const FString Target=ConstructionOriginalDefinition?ConstructionOriginalDefinition->DisplayName.ToString()+TEXT("→")+Definition->DisplayName.ToString():TEXT("待建")+(Definition?Definition->DisplayName.ToString():TEXT("模块"));
-    return FString::Printf(TEXT("%s | 材料%d/%d | 施工%.1f/6\n先瞄准箱子按V，再瞄准此处按E派工\n%s"),
+    const bool High=GetKind()==EHomeModuleKind::Roof || (GetKind()==EHomeModuleKind::Floor && FloorId.IsValid());
+    const TCHAR* Hint=High?TEXT("先V选料源，再瞄下层工地料箱按E派工"):TEXT("先瞄准箱子按V，再瞄准此处按E派工");
+    const TCHAR* Cancel=ConstructionOriginalDefinition?TEXT("旧墙仍承重 | X取消恢复旧墙并退料"):
+        GetKind()==EHomeModuleKind::Floor?TEXT("未完工不承重 | F取消任务 | X取消并退料"):High?TEXT("从下层施工 | F取消任务 | X取消并退料"):TEXT("F取消伙伴任务 | X取消施工并退回已交材料");
+    return FString::Printf(TEXT("%s | 材料%d/%d | 施工%.1f/6\n%s\n%s"),
         *Target,StorageInventory->Count(EFrontierItem::Material),Definition?Definition->MaterialCost:0,ConstructionWork,
-        ConstructionOriginalDefinition?TEXT("旧墙仍承重 | X取消恢复旧墙并退料"):TEXT("F取消伙伴任务 | X取消施工并退回已交材料"));
+        Hint,Cancel);
 }

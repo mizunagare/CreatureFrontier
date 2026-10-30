@@ -25,9 +25,11 @@ bool UCompanionConstructionComponent::Assign(AHomeModule* Site,AHomeModule* Crat
 }
 bool UCompanionConstructionComponent::Reach(AActor* Target) const
 {
-    auto* Pet=Cast<ACreatureCharacter>(GetOwner());if(!Pet || !IsValid(Target) || Pet->GetDistanceTo(Target)>220)return false;
+    auto* Pet=Cast<ACreatureCharacter>(GetOwner());if(!Pet || !IsValid(Target))return false;
+    const auto* Site=Cast<AHomeModule>(Target);const auto Point=Site && Site->bUnderConstruction?Site->ConstructionPoint(Pet->GetActorLocation()):Target->GetActorLocation();
+    if(FVector::Dist(Pet->GetActorLocation(),Point)>220)return false;
     FHitResult Hit;FCollisionQueryParams Query(SCENE_QUERY_STAT(ConstructionReach),false,Pet);
-    return !GetWorld()->LineTraceSingleByChannel(Hit,Pet->GetActorLocation(),Target->GetActorLocation()+FVector(0,0,40),ECC_Visibility,Query) || Hit.GetActor()==Target;
+    return !GetWorld()->LineTraceSingleByChannel(Hit,Pet->GetActorLocation(),Point+FVector(0,0,40),ECC_Visibility,Query) || Hit.GetActor()==Target;
 }
 void UCompanionConstructionComponent::Approach(AActor* Target)
 {

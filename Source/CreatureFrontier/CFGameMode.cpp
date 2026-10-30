@@ -75,6 +75,8 @@ void ACFGameMode::BeginPlay()
 {
     Super::BeginPlay();
     SeedFrontierResources(GetWorld());
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFPlatformTest")) || FParse::Param(FCommandLine::Get(),TEXT("CFPlatformRead")))
+    {const bool Read=FParse::Param(FCommandLine::Get(),TEXT("CFPlatformRead"));FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this,Read](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunPlatformConstructionScenario(GetWorld(),Hero,Read);},1.f,false);return;}
     if(FParse::Param(FCommandLine::Get(),TEXT("CFRenovationOccupancy")))
     {FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunRenovationOccupancyScenario(GetWorld(),Hero);},1.f,false);return;}
     if(FParse::Param(FCommandLine::Get(),TEXT("CFRenovationTest")) || FParse::Param(FCommandLine::Get(),TEXT("CFRenovationRead")) || FParse::Param(FCommandLine::Get(),TEXT("CFRenovationBlockedRead")))

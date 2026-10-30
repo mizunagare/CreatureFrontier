@@ -42,20 +42,25 @@ bool UHomeBuildingComponent::ValidatePlacement(const FTransform& Transform,FGuid
     if(!Hero || !Hero->HasAuthority() || Hero->Health<=0 || UGameplayStatics::IsGamePaused(this)) { Reason=TEXT("需要玩家存活且世界未暂停"); return false; }
     if(!Definition || !Definition->IsValidDefinition() || (!Plan && Hero->Inventory->Count(EFrontierItem::Material)<Definition->MaterialCost))
     { Reason=TEXT("定义缺失或材料不足"); return false; }
-    if(Plan && Selected!=EHomeModuleKind::Wall && Selected!=EHomeModuleKind::Window && Selected!=EHomeModuleKind::Doorway && Selected!=EHomeModuleKind::Fence)
-    {Reason=TEXT("伙伴施工首版仅支持墙、窗墙、门框和栅栏；松开右Shift可直接建造其他模块");return false;}
+    if(Plan && !AHomeModule::SupportsConstruction(Selected))
+    {Reason=TEXT("伙伴施工支持地板、屋顶、墙类和栅栏；其他模块松开右Shift直接建造");return false;}
     if(!Hero->Research->Has(Definition->RequiredResearch)) { Reason=TEXT("尚未解锁，请在基地研究实际采集的水晶样本"); return false; }
     for(const auto& Cost:Definition->ExtraCosts) if(Hero->Inventory->Count(Cost.Key)<Cost.Value) { Reason=TEXT("需要")+UCraftingCatalog::FormatItems(Definition->ExtraCosts); return false; }
     if(!Completing && FVector::Dist(Hero->GetActorLocation(),Transform.GetLocation())>800) { Reason=TEXT("距离过远（限8米）"); return false; }
     auto Layout=HomeLayout::Collect(GetWorld());if(Completing)Layout.RemoveAll([Completing](const FHomeModuleRecord& R){return R.Id==Completing->PersistentId;});
-    const auto Proposed=Candidate(Definition,Transform,FloorId); Layout.Add(Proposed);
+    auto Proposed=Candidate(Definition,Transform,FloorId);
+    // 规划与保存使用同一待建记录，门扇／楼梯预留空间也必须看到实际脚手架。
+    if(Plan && !Completing){Proposed.bUnderConstruction=true;Proposed.PaidMaterials=0;}
+    Layout.Add(Proposed);
     if(!HomeLayout::Validate(Layout,Reason)) return false;
     FCollisionQueryParams Params(SCENE_QUERY_STAT(HomePlacement),false);
     // 规范吸附点允许地板与墙接触，以及垂直转角连接。
     // 其他碰撞仍然生效，尤其是角色、设施及预设掩体。
     for(TActorIterator<AHomeModule> It(GetWorld());It;++It) Params.AddIgnoredActor(*It);
     const auto Objects=FCollisionObjectQueryParams(FCollisionObjectQueryParams::AllObjects);
-    for(const auto& Part:AHomeModule::PlacementParts(Selected))
+    auto Geometry=AHomeModule::PlacementParts(Selected);
+    if(Plan && !Completing)Geometry.Append(AHomeModule::ConstructionParts(Selected,FloorId.IsValid()));
+    for(const auto& Part:Geometry)
     {
         const FVector Position=Transform.GetLocation()+Transform.GetRotation().RotateVector(Part.Center);
         if(GetWorld()->OverlapAnyTestByObjectType(Position,Transform.GetRotation(),Objects,FCollisionShape::MakeBox(Part.Extent-FVector(1)),Params))
@@ -80,8 +85,8 @@ AHomeModule* UHomeBuildingComponent::BuildAt(const FTransform& Transform,FGuid F
 AHomeModule* UHomeBuildingComponent::QueueAt(const FTransform& Transform,FGuid FloorId)
 {
     auto* Hero=Cast<ACFPlayerCharacter>(GetOwner());FString Reason;
-    if(Selected!=EHomeModuleKind::Wall && Selected!=EHomeModuleKind::Window && Selected!=EHomeModuleKind::Doorway && Selected!=EHomeModuleKind::Fence)
-    {if(Hero)Hero->Feedback=TEXT("首版伙伴施工支持木墙、开放窗墙、门框和栅栏；其他模块仍直接建造");return nullptr;}
+    if(!AHomeModule::SupportsConstruction(Selected))
+    {if(Hero)Hero->Feedback=TEXT("伙伴施工支持地板、屋顶、木墙、开放窗墙、门框和栅栏；其他模块仍直接建造");return nullptr;}
     if(!ValidatePlacement(Transform,FloorId,Reason,true)){if(Hero)Hero->Feedback=Reason;return nullptr;}
     auto* Module=GetWorld()->SpawnActorDeferred<AHomeModule>(AHomeModule::StaticClass(),Transform,nullptr,nullptr,ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
     if(!Module)return nullptr;Module->Definition=UHomeModuleDefinition::LoadDefault(Selected);Module->PersistentId=FGuid::NewGuid();Module->FloorId=FloorId;Module->bUnderConstruction=true;Module->FinishSpawning(Transform);

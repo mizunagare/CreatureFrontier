@@ -6,3 +6,4 @@ void RunConstructionInputScenario(UWorld* World,ACFPlayerCharacter* Hero);
 void RunConstructionHomeScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read);
 void RunRenovationScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read);
 void RunRenovationOccupancyScenario(UWorld* World,ACFPlayerCharacter* Hero);
+void RunPlatformConstructionScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read);

@@ -34,6 +34,10 @@ public:
     UPROPERTY() TObjectPtr<UHomeModuleDefinition> ConstructionOriginalDefinition;
     static AHomeModule* TraceConstruction(class ACFPlayerCharacter* Hero);
     FString ConstructionStatus() const;
+    static bool SupportsConstruction(EHomeModuleKind Kind);
+    static TArray<FHomePart> ConstructionParts(EHomeModuleKind Kind,bool ElevatedFloor=false);
+    FVector ConstructionAnchor() const;
+    FVector ConstructionPoint(const FVector& From) const;
     bool ClearsCompletedPawn(const class ACharacter* Pawn,const FVector& Center) const;
     EHomeModuleKind GetKind() const { return Definition?Definition->Kind:EHomeModuleKind::Floor; }
     static TArray<FHomePart> Parts(EHomeModuleKind Kind);

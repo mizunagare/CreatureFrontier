@@ -18,6 +18,7 @@ TArray<FHomePart> RecordParts(const FHomeModuleRecord& Record)
 {
     auto Result=AHomeModule::Parts(Record.Definition.Get()->Kind);
     if(const auto* Original=Record.ConstructionOriginalDefinition.Get())Result.Append(AHomeModule::Parts(Original->Kind));
+    else if(Record.bUnderConstruction)Result.Append(AHomeModule::ConstructionParts(Record.Definition.Get()->Kind,Record.FloorId.IsValid()));
     return Result;
 }
 bool At(const FHomeModuleRecord& Record,const FVector& Position,double Yaw)
@@ -48,7 +49,7 @@ bool HomeLayout::IsCanonical(const FHomeModuleRecord& Record)
     if(!UInventoryComponent::Validate(Record.StoredItems))return false;
     if(Record.bUnderConstruction)
     {
-        if((Definition->Kind!=EHomeModuleKind::Wall && Definition->Kind!=EHomeModuleKind::Window && Definition->Kind!=EHomeModuleKind::Doorway && Definition->Kind!=EHomeModuleKind::Fence) ||
+        if(!AHomeModule::SupportsConstruction(Definition->Kind) ||
             !Record.PaidExtraItems.IsEmpty() || !Definition->ExtraCosts.IsEmpty() || !FMath::IsFinite(Record.ConstructionWork) || Record.ConstructionWork<0 || Record.ConstructionWork>6)return false;
         for(const auto& Item:Record.StoredItems)if(Item.Key!=EFrontierItem::Material || Item.Value>Definition->MaterialCost)return false;
         if(Record.ConstructionWork>0 && Record.StoredItems.FindRef(EFrontierItem::Material)!=Definition->MaterialCost)return false;
@@ -95,7 +96,7 @@ bool HomeLayout::Validate(const TArray<FHomeModuleRecord>& Records,FString& Reas
         {
             const FVector Landing=Center+Record.Transform.GetRotation().RotateVector(FVector(400,0,0))+FVector(0,0,StoreyHeight);
             if(!Position.Equals(Center+FVector(0,0,10),.01) || !Records.ContainsByPredicate([Landing](const FHomeModuleRecord& Other)
-                {return Other.Definition.Get() && Other.Definition.Get()->Kind==EHomeModuleKind::Floor && Other.Transform.GetLocation().Equals(Landing,.01);}))
+                {return !Other.bUnderConstruction && Other.Definition.Get() && Other.Definition.Get()->Kind==EHomeModuleKind::Floor && Other.Transform.GetLocation().Equals(Landing,.01);}))
             {Reason=TEXT("楼梯需要下层地板，以及上升方向相邻的二层地板平台");return false;}
         }
         else if(Kind==EHomeModuleKind::Lantern || Kind==EHomeModuleKind::Storage)
@@ -136,7 +137,7 @@ bool HomeLayout::Validate(const TArray<FHomeModuleRecord>& Records,FString& Reas
 FGuid HomeLayout::FindFloor(const FVector& Point,const TArray<FHomeModuleRecord>& Records,double FloorZ)
 {
     for(const auto& Record:Records)
-        if(Record.Definition.Get() && Record.Definition.Get()->Kind==EHomeModuleKind::Floor && FMath::IsNearlyEqual(Record.Transform.GetLocation().Z,FloorZ,.01) &&
+        if(!Record.bUnderConstruction && Record.Definition.Get() && Record.Definition.Get()->Kind==EHomeModuleKind::Floor && FMath::IsNearlyEqual(Record.Transform.GetLocation().Z,FloorZ,.01) &&
             FMath::Abs(Point.X-Record.Transform.GetLocation().X)<=200.01 && FMath::Abs(Point.Y-Record.Transform.GetLocation().Y)<=200.01) return Record.Id;
     return FGuid();
 }
@@ -178,6 +179,7 @@ bool HomeLayout::ValidateTerrain(UWorld* World,const FHomeModuleRecord& Record,F
     const auto Objects=FCollisionObjectQueryParams(ECC_WorldStatic);
     auto Geometry=AHomeModule::PlacementParts(Record.Definition.Get()->Kind);
     if(const auto* Original=Record.ConstructionOriginalDefinition.Get())Geometry.Append(AHomeModule::Parts(Original->Kind));
+    else if(Record.bUnderConstruction)Geometry.Append(AHomeModule::ConstructionParts(Record.Definition.Get()->Kind,Record.FloorId.IsValid()));
     for(const auto& Part:Geometry)
         if(World->OverlapAnyTestByObjectType(Record.Transform.GetLocation()+Record.Transform.GetRotation().RotateVector(Part.Center),Record.Transform.GetRotation(),Objects,
             FCollisionShape::MakeBox(Part.Extent-FVector(1)),Params))

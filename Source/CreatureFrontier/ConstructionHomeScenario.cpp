@@ -59,7 +59,7 @@ void RunConstructionHomeScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Rea
         const double Step=FVector::Dist(Pet->GetActorLocation(),*Previous);*Previous=Pet->GetActorLocation();*Travel+=Step;
         if(Step>120 || !Pet->IsActorTickEnabled() || !Pet->GetActorEnableCollision() || Pet->Health<=0 || Hero->Health<=0 ||
             Crate->StorageInventory->Count(EFrontierItem::Material)+Fence->StorageInventory->Count(EFrontierItem::Material)+Pet->Cargo->Count()+(Fence->bUnderConstruction?0:Fence->PaidMaterials)!=4)return End(false,TEXT("conservation"));
-        if(!*SavedMid && Pet->Cargo->Count()==3){if(!Hero->SaveProgress(TEXT("ConstructionHomeMid")))return End(false,TEXT("mid"));*SavedMid=true;UE_LOG(LogTemp,Display,TEXT("CF_CONSTRUCTION_HOME_MID PASS version=36 carried=3 identity=1"));}
+        if(!*SavedMid && Pet->Cargo->Count()==3){if(!Hero->SaveProgress(TEXT("ConstructionHomeMid")))return End(false,TEXT("mid"));*SavedMid=true;UE_LOG(LogTemp,Display,TEXT("CF_CONSTRUCTION_HOME_MID PASS version=37 carried=3 identity=1"));}
         if(Fence->bUnderConstruction)return true;
         if(!*SavedMid || *Travel<600 || Fence->PersistentId!=SiteId || Pet->Experience!=8 || Pet->BondPoints!=6 || Pet->Cargo->Count()!=0 || Pet->Construction->GetSite() ||
             !Bag.OrderIndependentCompareEqual(Hero->Inventory->GetStacks()) || !Hero->SaveProgress(TEXT("ConstructionHomeDone")) || !Hero->LoadProgress(TEXT("ConstructionHomeDone")))return End(false,TEXT("done"));
@@ -75,6 +75,6 @@ void RunConstructionHomeScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Rea
         const auto* Built=Done->HomeModules.FindByPredicate([&](const FHomeModuleRecord& R){return R.Id==SiteId;});
         const auto* Box=Done->HomeModules.FindByPredicate([&](const FHomeModuleRecord& R){return R.Id==BoxId;});
         if(!Worker || Worker->Experience!=8 || Worker->BondPoints!=6 || Worker->ConstructionModuleId.IsValid() || Worker->Activity!=ECreatureActivity::Follow || !Built || Built->bUnderConstruction || Built->PaidMaterials!=4 || !Box || Box->StoredItems.FindRef(EFrontierItem::Material)!=0)return End(false,TEXT("identity-done"));
-        UE_LOG(LogTemp,Display,TEXT("CF_CONSTRUCTION_HOME_DONE PASS version=36 modules=19 retained=18 material=0 food=1 seeds=1 cost=4 travel=%.1f pet=%s site=%s"),*Travel,*PetId.ToString(),*SiteId.ToString());return End(true,TEXT("complete"));
+        UE_LOG(LogTemp,Display,TEXT("CF_CONSTRUCTION_HOME_DONE PASS version=37 modules=19 retained=18 material=0 food=1 seeds=1 cost=4 travel=%.1f pet=%s site=%s"),*Travel,*PetId.ToString(),*SiteId.ToString());return End(true,TEXT("complete"));
     }));
 }
