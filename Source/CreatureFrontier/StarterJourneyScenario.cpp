@@ -28,6 +28,7 @@
 #include "BaseBuildingComponent.h"
 #include "FarmCropComponent.h"
 #include "CraftingCatalog.h"
+#include "WorldLoot.h"
 #include "PlayerGatheringComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "PlayerEquipmentComponent.h"
@@ -626,6 +627,7 @@ struct FStarterRecovery : FStarterPrep
 {
     int32 Crafted=0,Used=0;bool Held=false;float InitialHealth=0;
     bool Rearm=false;int32 HarvestStart=14,HarvestGoal=10,MedicineAtStart=0;
+    int32 RewardMaterials=0,RewardCaptures=0,RewardMedicine=0,ExpectedClaimed=4,ExpectedExperience=12,ExpectedLevel=1;bool ExpectAlphaResolved=false;
     FGuid RecoveryResourceId=FGuid(0xCF170000,0,0,1);
     bool End(bool Pass,const TCHAR* Reason)
     {
@@ -639,9 +641,9 @@ struct FStarterRecovery : FStarterPrep
         if(!Pet.IsValid() || !Brush.IsValid() || !Garden.IsValid())return false;const int32 Harvested=HarvestStart-Brush->Remaining;
         int32 Farms=0;for(TActorIterator<AWorkStation> It(World);It;++It)if(It->bPlayerBuilt)++Farms;
         const auto& Gear=Hero->Equipment->GetState();
-        return Harvested>=0 && Harvested<=HarvestGoal && Hero->Inventory->Count(EFrontierItem::Material)+5*Crafted==Harvested && Hero->Inventory->Count(EFrontierItem::Medicine)==MedicineAtStart+Crafted-Used &&
-            Hero->Inventory->Count(EFrontierItem::Food)==2 && Hero->Inventory->Count(EFrontierItem::Seeds)==1 && Hero->Inventory->Count(EFrontierItem::CaptureDevice)==7 && Hero->Inventory->Count(EFrontierItem::Fiber)==0 &&
-            Pet->Experience==12 && Pet->BondPoints==3 && Pet->Nickname==Nickname && Pet->bAvoidCombat && Gear.bSpearEquipped && Gear.bVestEquipped && Hero->GetObjectives().Claimed==4 && !Hero->GetObjectives().bAlphaResolved &&
+        return Harvested>=0 && Harvested<=HarvestGoal && Hero->Inventory->Count(EFrontierItem::Material)+5*Crafted==Harvested+RewardMaterials && Hero->Inventory->Count(EFrontierItem::Medicine)==MedicineAtStart+Crafted-Used+RewardMedicine &&
+            Hero->Inventory->Count(EFrontierItem::Food)==2 && Hero->Inventory->Count(EFrontierItem::Seeds)==1 && Hero->Inventory->Count(EFrontierItem::CaptureDevice)==7+RewardCaptures && Hero->Inventory->Count(EFrontierItem::Fiber)==0 &&
+            Pet->Experience==ExpectedExperience && Pet->Level==ExpectedLevel && Pet->BondPoints==3 && Pet->Nickname==Nickname && Pet->bAvoidCombat && Gear.bSpearEquipped && Gear.bVestEquipped && Hero->GetObjectives().Claimed==ExpectedClaimed && Hero->GetObjectives().bAlphaResolved==ExpectAlphaResolved &&
             Farms==1 && HomeLayout::Collect(World).IsEmpty() && Garden->PersistentId==OriginalGarden.Id && Garden->GetActorTransform().Equals(OriginalGarden.Transform,.01) && Garden->StoredFood==OriginalGarden.StoredFood && Garden->Crop->Seeds==OriginalGarden.Seeds && Garden->Crop->bPlanted==OriginalGarden.bPlanted && FMath::IsNearlyEqual(Garden->Crop->GrowthWork,OriginalGarden.GrowthWork,.01f);
     }
     bool Tick()
@@ -752,6 +754,7 @@ namespace
 struct FStarterFlank : FStarterRecovery
 {
     bool Melee=false,MeleeSent=false,MeleeConfirmed=false;
+    bool Defeat=false,Victory=false;double NextStrike=0;int32 Strikes=1;
     bool Dodge=false,JumpSent=false,JumpReleased=false,DodgeResolved=false;float JumpHP=0;
     TWeakObjectPtr<ACreatureCharacter> Boss;TWeakObjectPtr<AWildEncounter> Region;
     int32 Leg=0;bool Hit=false,SkillStarted=false;float DamageSeen=0;double SafeAt=-1;
@@ -782,7 +785,21 @@ struct FStarterFlank : FStarterRecovery
             if(It->Disposition!=ECreatureDisposition::Tamed && It->Health>0)
             {if(!It->IsActorTickEnabled() || !It->GetActorEnableCollision() || It->GetCharacterMovement()->MovementMode==MOVE_None)return End(false,TEXT("wild-disabled"));if(const auto* Old=WildPositions.Find(It->PersistentId))WildTravel+=FVector::Dist(*Old,It->GetActorLocation());WildPositions.Add(It->PersistentId,It->GetActorLocation());}
         }
-        if(Ecology!=3 || Owned!=1 || !Budget() || Boss->Health<=0 || !Boss->bAlpha)return End(false,TEXT("budget-home"));
+        if(Defeat && Boss->Health<=0 && !Victory)
+        {
+            // 只接受原首领击败的两种经验分配；不写入生命、经验或目标状态。
+            if(!Hero->GetObjectives().bAlphaResolved || Pet->Level!=2 || (Pet->Experience!=37 && Pet->Experience!=162))return End(false,TEXT("victory-experience"));
+            ExpectedLevel=2;ExpectedExperience=Pet->Experience;ExpectAlphaResolved=true;
+            int32 Drops=0,Materials=0,Medicine=0;for(TActorIterator<AWorldLoot> It(World);It;++It){++Drops;Materials+=It->Materials;Medicine+=It->Medicine;}
+            if(Drops>1 || Materials+Hero->Inventory->Count(EFrontierItem::Material)!=8 || Medicine+Hero->Inventory->Count(EFrontierItem::Medicine)!=2)return End(false,TEXT("victory-loot"));
+            // 站在原220厘米拾取范围内等普通物资包更新，不能直接调用收取或改库存。
+            if(Drops){if(World->GetTimeSeconds()-At>15)return End(false,TEXT("victory-loot-timeout"));return true;}
+            if(!CFInputQA::Press(Hero,EKeys::N) || Hero->GetObjectives().Claimed!=5 || Hero->Inventory->Count(EFrontierItem::Material)!=28 || Hero->Inventory->Count(EFrontierItem::CaptureDevice)!=10)return End(false,TEXT("victory-reward"));
+            RewardMaterials=28;RewardMedicine=1;RewardCaptures=3;ExpectedClaimed=5;Victory=true;
+            if(!CFInputQA::Press(Hero,EKeys::N) || Hero->Inventory->Count(EFrontierItem::Material)!=28 || Hero->Inventory->Count(EFrontierItem::CaptureDevice)!=10)return End(false,TEXT("victory-duplicate"));
+            UE_LOG(LogTemp,Display,TEXT("CF_STARTER_VICTORY PASS bossDown=1 claimed=5 materialReward=20 captureReward=3 duplicateReject=1 loot=1 experience=%d strikes=%d"),ExpectedExperience,Strikes);
+        }
+        if(Ecology!=3 || Owned!=1 || !Budget() || (Boss->Health<=0 && !Defeat) || !Boss->bAlpha)return End(false,TEXT("budget-home"));
         if(Pet->SpecialWindupRemaining>0)SkillStarted=true;
         if(Phase==2 && Boss->Health<Boss->GetMaxHealth()){Hit=true;DamageSeen=FMath::Max(DamageSeen,Boss->GetMaxHealth()-Boss->Health);}
         if(Dodge && !DodgeResolved)
@@ -849,23 +866,32 @@ struct FStarterFlank : FStarterRecovery
                 if(Hero->IsMeleePending())return true;
                 if(!Hero->Feedback.Contains(TEXT("近战命中")))return End(false,TEXT("player-melee-missed"));
                 MeleeConfirmed=true;
+                NextStrike=World->GetTimeSeconds()+.6;
                 UE_LOG(LogTemp,Display,TEXT("CF_STARTER_FLANK_MELEE PASS input=1 pending=1 boss=%s pet=%s"),*Boss->PersistentId.ToString(),*PetId.ToString());
             }
             // 玩家先命中不能替代伙伴成果；有界等待原伙伴继续原集火／技能。
             if(Melee && (!SkillStarted || DamageSeen<=35))
             {if(World->GetTimeSeconds()-At>15)return End(false,TEXT("joint-combat-no-partner-hit"));return true;}
             if(Dodge && !DodgeResolved){if(World->GetTimeSeconds()-At>15)return End(false,TEXT("dodge-not-observed"));return true;}
+            if(Defeat && !Victory)
+            {
+                if(World->GetTimeSeconds()-At>15)return End(false,TEXT("victory-timeout"));
+                Face(Boss->GetActorLocation());
+                if(!Hero->IsMeleePending() && World->GetTimeSeconds()>=NextStrike)
+                {if(!CFInputQA::Action(Hero,TEXT("Attack"),EKeys::LeftMouseButton) || !Hero->IsMeleePending())return End(false,TEXT("victory-strike"));++Strikes;NextStrike=World->GetTimeSeconds()+.6;}
+                return true;
+            }
             if(!Hit){if(World->GetTimeSeconds()-At>15)return End(false,TEXT("combat-no-hit"));return true;}
             if(Photo(TEXT("Engaged"),Boss->GetActorLocation()))return true;
             // 技能可以在双方尚未普攻时命中；等待真实攻击产生冷却，不伪造正值检查点。
             bool HasMeleeCooldown=false;for(TActorIterator<ACreatureCharacter> It(World);It;++It)HasMeleeCooldown|=It->GetAttackCooldownRemaining()>0;
-            if(!HasMeleeCooldown){if(World->GetTimeSeconds()-At>15)return End(false,TEXT("combat-no-melee-cooldown"));return true;}
+            if(!Defeat && !HasMeleeCooldown){if(World->GetTimeSeconds()-At>15)return End(false,TEXT("combat-no-melee-cooldown"));return true;}
             if(!CFInputQA::Press(Hero,EKeys::F) || Pet->FocusTarget || !Pet->bAvoidCombat || !Hero->SaveProgress(TEXT("StarterFlankMid")))return End(false,TEXT("withdraw-input"));
             const auto* Mid=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("StarterFlankMid"),0));int32 Positive=0,Checked=0;
             if(!Mid)return End(false,TEXT("cooldown-mid"));
             for(const auto& Record:Mid->Creatures)for(TActorIterator<ACreatureCharacter> It(World);It;++It)if(It->PersistentId==Record.Id)
             {if(Record.CombatCooldownVersion!=1 || Record.MeleeCooldown!=It->GetAttackCooldownRemaining())return End(false,TEXT("cooldown-mid-value"));++Checked;if(Record.MeleeCooldown>0)++Positive;}
-            if(Checked!=Mid->Creatures.Num() || Positive==0)return End(false,TEXT("cooldown-mid-positive"));
+            if(Checked!=Mid->Creatures.Num() || (!Defeat && Positive==0))return End(false,TEXT("cooldown-mid-positive"));
             UE_LOG(LogTemp,Display,TEXT("CF_STARTER_FLANK_COOLDOWN_MID PASS revision=1 positive=%d exact=1"),Positive);
             UE_LOG(LogTemp,Display,TEXT("CF_STARTER_FLANK_CONTACT PASS damage=%.1f skillStarted=%d medicineUsed=0"),DamageSeen,SkillStarted);Leg=0;Phase=3;return true;
         }
@@ -877,10 +903,10 @@ struct FStarterFlank : FStarterRecovery
             if(SafeAt<0)SafeAt=World->GetTimeSeconds();if(World->GetTimeSeconds()-SafeAt<2)return true;
             if(Photo(TEXT("Returned"),P))return true;const float HP=Hero->Health,PHP=Pet->Health,BHP=Boss->Health;
             if(!Hit || (!Read && (HeroTravel<5000 || !SkillStarted)) || !Hero->SaveProgress(TEXT("StarterFlankDone")) || !Hero->LoadProgress(TEXT("StarterFlankDone")))return End(false,TEXT("save"));
-            Pet.Reset();Garden.Reset();Brush.Reset();Boss.Reset();for(TActorIterator<ACreatureCharacter> It(World);It;++It){if(It->PersistentId==PetId)Pet=*It;if(It->EncounterId==TEXT("CrystalRise") && It->bAlpha && It->Health>0)Boss=*It;}
+            Pet.Reset();Garden.Reset();Brush.Reset();Boss.Reset();for(TActorIterator<ACreatureCharacter> It(World);It;++It){if(It->PersistentId==PetId)Pet=*It;if(It->EncounterId==TEXT("CrystalRise") && It->bAlpha && (It->Health>0 || Defeat))Boss=*It;}
             for(TActorIterator<AWorkStation> It(World);It;++It)if(It->PersistentId==OriginalGarden.Id)Garden=*It;for(TActorIterator<AResourceNode> It(World);It;++It)if(It->PersistentId==FGuid(0xCF170000,0,0,1))Brush=*It;
             if(!Pet.IsValid() || !Boss.IsValid() || Boss->Health!=BHP || !Hero->GetActorLocation().Equals(H,.01) || !Pet->GetActorLocation().Equals(P,.01) || Hero->Health!=HP || Pet->Health!=PHP || !Budget())return End(false,TEXT("restore"));
-            UE_LOG(LogTemp,Display,TEXT("CF_STARTER_FLANK_LIFE PASS version=38 positionRetained=1 homeRetained=1 medicine=1 claimed=4 safeSeconds=2"));return End(true,TEXT("complete"));
+            UE_LOG(LogTemp,Display,TEXT("CF_STARTER_FLANK_LIFE PASS version=38 positionRetained=1 homeRetained=1 medicine=%d claimed=%d safeSeconds=2"),1+RewardMedicine,ExpectedClaimed);return End(true,TEXT("complete"));
         }
         return true;
     }
@@ -888,10 +914,31 @@ struct FStarterFlank : FStarterRecovery
 }
 void RunStarterFlankScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read)
 {
+    if(Read && FParse::Param(FCommandLine::Get(),TEXT("CFStarterFlankDefeat")))
+    {
+        // 冷启动验收已完成的真实胜利档，不重新生成敌人或重打战斗。
+        auto End=[](bool Pass){UE_LOG(LogTemp,Display,TEXT("CF_STARTER_VICTORY_READ %s version=38 claimed=5 alpha=1 duplicateReject=1 positionRetained=1"),Pass?TEXT("PASS"):TEXT("FAIL"));FPlatformMisc::RequestExitWithStatus(false,Pass?0:1);};
+        const auto* Source=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("StarterFlankInput"),0));
+        if(!Source || Source->FormatVersion!=38 || !Hero->LoadProgress(TEXT("StarterFlankInput"))){End(false);return;}
+        bool Pass=Hero->Health>0 && Hero->GetActorTransform().Equals(Source->PlayerTransform,.01) && Hero->GetObjectives().Claimed==5 && Hero->GetObjectives().bAlphaResolved && Hero->Inventory->Count(EFrontierItem::Material)==28 && Hero->Inventory->Count(EFrontierItem::Medicine)==2 && Hero->Inventory->Count(EFrontierItem::CaptureDevice)==10;
+        int32 Matched=0,Owned=0,Bosses=0;
+        for(const auto& Record:Source->Creatures)for(TActorIterator<ACreatureCharacter> It(World);It;++It)if(It->PersistentId==Record.Id)
+        {
+            ++Matched;Pass &= It->GetActorTransform().Equals(Record.Transform,.01) && It->Health==Record.Health;
+            if(It->Tamer==Hero->GetController()){++Owned;Pass &= It->Level==2 && (It->Experience==37 || It->Experience==162) && It->Health>0;}
+            if(It->bAlpha && It->EncounterId==TEXT("CrystalRise")){++Bosses;Pass &= It->Health==0;}
+        }
+        int32 Drops=0;for(TActorIterator<AWorldLoot> It(World);It;++It)++Drops;
+        Pass &= Matched==Source->Creatures.Num() && Owned==1 && Bosses==1 && Drops==0;
+        const auto Items=Hero->Inventory->GetStacks();
+        Pass &= CFInputQA::Press(Hero,EKeys::N) && Hero->Inventory->GetStacks().OrderIndependentCompareEqual(Items) && Hero->SaveProgress(TEXT("StarterFlankDone")) && Hero->LoadProgress(TEXT("StarterFlankDone")) && Hero->GetObjectives().Claimed==5 && Hero->GetObjectives().bAlphaResolved && Hero->Inventory->GetStacks().OrderIndependentCompareEqual(Items);
+        End(Pass);return;
+    }
     auto S=MakeShared<FStarterFlank>();S->World=World;S->Hero=Hero;S->Read=Read;S->Deadline=FPlatformTime::Seconds()+150;
     // 只继承真实恢复档中既有的材料账：此前制2药、用1药，本段不再次制作。
     S->Crafted=2;S->Used=1;S->Melee=FParse::Param(FCommandLine::Get(),TEXT("CFStarterFlankMelee"));
     S->Dodge=FParse::Param(FCommandLine::Get(),TEXT("CFStarterFlankDodge"));
+    S->Defeat=FParse::Param(FCommandLine::Get(),TEXT("CFStarterFlankDefeat"));
     const auto* Source=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("StarterFlankInput"),0));
     if(!Source || Source->FormatVersion!=38 || Source->Facilities.Num()!=1 || !Source->HomeModules.IsEmpty() || !Hero->LoadProgress(TEXT("StarterFlankInput"))){S->End(false,TEXT("source"));return;}
     int32 LegacyCooldowns=0,CurrentCooldowns=0;

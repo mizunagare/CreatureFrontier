@@ -1,5 +1,6 @@
-param([string]$BuildRoot='',[string]$ReadInputPath='',[switch]$Farm,[switch]$Prepare,[switch]$Scout,[switch]$Rescue,[switch]$Recovery,[switch]$Rearm,[switch]$Flank,[switch]$Melee,[switch]$Dodge,[switch]$CombatTrace,[switch]$Resume,[switch]$Preview,[ValidateSet('960x540','1280x720')][string]$Resolution='1280x720')
+param([string]$BuildRoot='',[string]$ReadInputPath='',[switch]$Farm,[switch]$Prepare,[switch]$Scout,[switch]$Rescue,[switch]$Recovery,[switch]$Rearm,[switch]$Flank,[switch]$Melee,[switch]$Dodge,[switch]$Defeat,[switch]$CombatTrace,[switch]$Resume,[switch]$Preview,[ValidateSet('960x540','1280x720')][string]$Resolution='1280x720')
 $ErrorActionPreference='Stop'
+if($Defeat -and (!$Flank -or (!$Resume -and (!$Melee -or !$Dodge)))){throw '完整击败验证须接在共同近战／跳跃流程中；恢复只读胜利完成档'}
 if($Rearm -and !$Recovery){throw '战后补给必须使用原恢复流程'}
 if($Dodge -and !$Melee){throw '跳跃应对专项必须接在完整共同近战流程中'}
 if($Melee -and (!$Flank -or !$CombatTrace -or $Resume)){throw '近战整合仅用于开启追踪的完整北侧接敌链；中途恢复不重复攻击'}
@@ -35,11 +36,12 @@ try{
     if($Melee){$arguments+='-CFStarterFlankMelee'}
     if($Dodge){$arguments+='-CFStarterFlankDodge'}
     if($Rearm){$arguments+='-CFStarterRecoveryRearm'}
+    if($Defeat){$arguments+='-CFStarterFlankDefeat'}
     if($Preview){$size=$Resolution.Split('x');$arguments=@($arguments|Where-Object {$_ -ne '-nullrhi'})+@(('-CF'+$prefix+'Preview'),'-RenderOffscreen','-ForceRes',('-ResX='+$size[0]),('-ResY='+$size[1]),'-norhithread','-forcerhibypass','-ExecCmds="t.MaxFPS 60,r.MotionBlurQuality 0,r.AntiAliasingMethod 1"')}
     $exe=if($BuildRoot){$module}elseif($Preview){'D:/Epic/UE_5.8/Engine/Binaries/Win64/UnrealEditor.exe'}else{'D:/Epic/UE_5.8/Engine/Binaries/Win64/UnrealEditor-Cmd.exe'}
     if(!$BuildRoot){$arguments=@(('"'+(Join-Path $projectRoot 'CreatureFrontier.uproject')+'"'),'-game')+$arguments}
     $started=[DateTime]::UtcNow
-    [pscustomobject]@{BuildRoot=$BuildRoot;Farm=[bool]$Farm;Prepare=[bool]$Prepare;Scout=[bool]$Scout;Rescue=[bool]$Rescue;Recovery=[bool]$Recovery;Rearm=[bool]$Rearm;Flank=[bool]$Flank;Melee=[bool]$Melee;Dodge=[bool]$Dodge;CombatTrace=[bool]$CombatTrace;Resume=$readMode;ReadInputPath=$ReadInputPath;InputSHA256=$sourceHash;Preview=[bool]$Preview;Resolution=$Resolution;BuildSHA256=$hash}|Export-Csv (Join-Path $run 'Run.csv') -NoTypeInformation
+    [pscustomobject]@{BuildRoot=$BuildRoot;Farm=[bool]$Farm;Prepare=[bool]$Prepare;Scout=[bool]$Scout;Rescue=[bool]$Rescue;Recovery=[bool]$Recovery;Rearm=[bool]$Rearm;Flank=[bool]$Flank;Melee=[bool]$Melee;Dodge=[bool]$Dodge;Defeat=[bool]$Defeat;CombatTrace=[bool]$CombatTrace;Resume=$readMode;ReadInputPath=$ReadInputPath;InputSHA256=$sourceHash;Preview=[bool]$Preview;Resolution=$Resolution;BuildSHA256=$hash}|Export-Csv (Join-Path $run 'Run.csv') -NoTypeInformation
     Write-Host ('正常开局伙伴旅程：'+$run)
     $p=Start-Process -FilePath $exe -ArgumentList $arguments -WindowStyle Hidden -PassThru
     $timeout=if($Farm){300000}else{240000}
@@ -69,17 +71,22 @@ try{
         if(!$readMode){$markers+='CF_STARTER_RECOVERY_REST PASS input=1 samePet=1 facility=1'}
     }
     if($Flank){
-        $markers=@('CF_STARTER_FLANK_SOURCE PASS','CF_STARTER_FLANK_LIFE PASS version=38 positionRetained=1 homeRetained=1 medicine=1 claimed=4 safeSeconds=2','CF_STARTER_FLANK PASS reason=complete')
+        $claimed=if($Defeat){5}else{4}
+        $medicine=if($Defeat){2}else{1}
+        $markers=@('CF_STARTER_FLANK_SOURCE PASS',('CF_STARTER_FLANK_LIFE PASS version=38 positionRetained=1 homeRetained=1 medicine='+$medicine+' claimed='+$claimed+' safeSeconds=2'),'CF_STARTER_FLANK PASS reason=complete')
+        if($Defeat){$markers+='CF_STARTER_VICTORY PASS bossDown=1 claimed=5 materialReward=20 captureReward=3 duplicateReject=1 loot=1'}
         $markers+='CF_STARTER_FLANK_COOLDOWN_SOURCE PASS'
         if(!$readMode){$markers+='CF_STARTER_FLANK_COOLDOWN_MID PASS revision=1 positive='}
         if(!$readMode){$markers+=@('CF_STARTER_FLANK_COMMAND PASS focus=1 specialBinding=1 samePet=1 avoid=1','CF_STARTER_FLANK_CONTACT PASS')}
     }
+    if($Defeat -and $Resume){$markers=@('CF_STARTER_VICTORY_READ PASS version=38 claimed=5 alpha=1 duplicateReject=1 positionRetained=1')}
     foreach($marker in $markers){if(!$raw.Contains($marker)){throw ('缺少开局旅程证据：'+$marker)}}
     if($Melee){
         $match=[regex]::Match($raw,'CF_STARTER_FLANK_MELEE PASS input=1 pending=1 boss=([A-F0-9]+) pet=([A-F0-9]+)')
         if(!$match.Success){throw '缺少实际左键近战结算证据'}
         $boss=$match.Groups[1].Value;$pet=$match.Groups[2].Value
         if($raw -notmatch ('CF_PLAYER_MELEE_TRACE target='+$boss+' raw=35\.00 applied=35\.00 spear=1') -or $raw -notmatch ('CF_CREATURE_DAMAGE_TRACE victim='+$boss+' attacker='+$pet+' raw=')){throw '缺少玩家长矛和原伙伴对同一首领的独立伤害来源'}
+        if($Defeat -and [regex]::Matches($raw,('CF_PLAYER_MELEE_TRACE target='+$boss+' raw=35\.00 applied=35\.00 spear=1')).Count -lt 2){throw '缺少连续多次实际长矛命中，不能只算攻击请求'}
         if($Dodge -and (!$raw.Contains('CF_STARTER_DODGE PASS input=1 inRange=1 above=1 healthRetained=1') -or $raw -notmatch ('CF_ALPHA_PLAYER_TRACE boss='+$boss+' distance=\S+ height=\S+ inRange=1 above=1 sight=1 applied=0\.00'))){throw '缺少圈内原跳跃实际避开震地伤害的结算证据'}
     }
     if($CombatTrace -and !$readMode -and (!$raw.Contains('CF_SKILL_TRACE_BEGIN') -or (!$raw.Contains('CF_SKILL_TRACE_RESOLVE') -and !$raw.Contains('CF_SKILL_TRACE_CANCEL')) -or !$raw.Contains('CF_CREATURE_DAMAGE_TRACE'))){throw '战斗追踪缺少实际蓄力、结算或取消及真实伤害记录'}
@@ -105,6 +112,8 @@ try{
     }
     if((Get-FrontierBuildFingerprint -LiteralPath $module) -ne $hash -or ($ReadInputPath -and (Get-FrontierBuildFingerprint -LiteralPath $ReadInputPath) -ne $sourceHash)){throw '程序或输入源改变'}
     [pscustomobject]@{Pass=$true;BuildSHA256=$hash;DoneSHA256=(Get-FrontierBuildFingerprint -LiteralPath (Join-Path $slots ($prefix+'Done.sav')));Log=$log}|Export-Csv (Join-Path $run 'Results.csv') -NoTypeInformation
+    if($Defeat -and $Resume){Write-Host '真实胜利完成档冷启动恢复、位置／奖励保持与重复领奖拒绝通过';return}
+    if($Defeat){Write-Host '真实持续共同战斗、首领击败、掉落／第五项领奖及返家存读通过；图形仍须目视';return}
     if($Flank){Write-Host '真实恢复档的绕行接敌、伙伴实际伤害、避战返家及存读通过；图形仍须目视，不代表首领击败';return}
     if($Recovery){Write-Host '真实返家来源的伙伴休息、实际采料、制作补药和玩家治疗存读通过；图形仍须目视，不代表再次战斗通过'}elseif($Rescue){Write-Host '真实倒地来源的药品救援、有限补给支援、避战返家及存读通过；图形仍须目视，不代表首领击败'}elseif($Scout){Write-Host '真实来源接敌撤离、家园补给保留与存读通过；图形仍须目视，不代表首领击败或倒地救援通过'}elseif($Prepare){Write-Host '真实农业档的装备制作、原料守恒、准备提示与存读通过；不证明首领战斗通过'}elseif($Farm -and $readMode){Write-Host '自身采纤维中途档恢复、返基地制种、伙伴两次收获及第四项领奖通过'}elseif($Farm){Write-Host '真实开局档经原预览建圃、实际采纤维、制种、伙伴两次收获及第四项领奖通过；图形仍须目视'}elseif($ReadInputPath){Write-Host '自身结交中途档独立恢复、实际返基地生产、第三项领奖和存读通过；农业段仍待继续'}else{Write-Host '正常默认补给下实际走近、结交、返基地生产和前三项奖励通过；农业段仍待继续'}
 }finally{
