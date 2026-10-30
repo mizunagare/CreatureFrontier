@@ -13,6 +13,8 @@
 #include "Misc/Parse.h"
 #include "Misc/Paths.h"
 #include "TimerManager.h"
+#include "ResourceNode.h"
+#include "ResourceDefinition.h"
 #include "Kismet/GameplayStatics.h"
 
 void RunBackpackScenario(UWorld* World,ACFPlayerCharacter* Hero)
@@ -49,6 +51,19 @@ void RunBackpackScenario(UWorld* World,ACFPlayerCharacter* Hero)
     Hero->ToggleBackpack(); Hero->ToggleBackpack();
     Hero->Inventory->Restore({{EFrontierItem::Material,1}}); Hero->ConfirmInterfaceAction();
     Reject &= Hero->Inventory->Count(EFrontierItem::Material)==1 && Hero->GetBackpackRecipeStatus(0).Contains(TEXT("还需要2份"));
+    const auto Hint=Hero->GetBackpackGatheringHint(0);auto* HintSource=Hero->GetBackpackGatheringSource(0);
+    bool Guidance=HintSource && Hint.Contains(TEXT("材料2")) && Hint.Contains(HintSource->Definition->DisplayName.ToString()) && HintSource->Remaining>0 && HintSource->Definition->OutputItem==EFrontierItem::Material;
+    const auto BeforePosition=Hero->GetActorLocation();const auto BeforeMaterials=Hero->Inventory->Count(EFrontierItem::Material);
+    Hero->GetBackpackGatheringHint(0);Guidance &= Hero->Inventory->Count(EFrontierItem::Material)==BeforeMaterials && Hero->GetActorLocation()==BeforePosition;
+    Guidance &= Hero->GetBackpackGatheringHint(7).Contains(TEXT("纤维2")) && Hero->GetBackpackGatheringHint(10).Contains(TEXT("食物")) && Hero->GetBackpackGatheringHint(10).Contains(TEXT("按3制作"));
+    Guidance &= !Hero->GetBackpackGatheringSource(-1) && !Hero->GetBackpackGatheringSource(999) && Hero->GetBackpackGatheringHint(3).Contains(TEXT("已拥有")) && !Hero->GetBackpackGatheringSource(3);
+    TMap<AResourceNode*,int32> Stocks;AResourceNode* Renewable=nullptr;
+    for(TActorIterator<AResourceNode> It(World);It;++It){Stocks.Add(*It,It->Remaining);It->Remaining=0;if(It->Definition && It->Definition->OutputItem==EFrontierItem::Material && It->Definition->RegrowSeconds>0)Renewable=*It;}
+    Guidance &= !Hero->GetBackpackGatheringSource(0) && Hero->GetBackpackGatheringHint(0).Contains(TEXT("无可采来源"));
+    if(Renewable)
+    {const float Regrow=Renewable->RegrowRemaining;Renewable->RegrowRemaining=10;Guidance &= Hero->GetBackpackGatheringSource(0)==Renewable && Hero->GetBackpackGatheringHint(0).Contains(TEXT("再生"));Renewable->RegrowRemaining=Regrow;}
+    else Guidance=false;
+    for(const auto& Stock:Stocks)Stock.Key->Remaining=Stock.Value;
     Hero->Inventory->Restore({{EFrontierItem::Material,100},{EFrontierItem::CaptureDevice,999}}); Hero->ConfirmInterfaceAction();
     Reject &= Hero->Inventory->Count(EFrontierItem::Material)==100 && Hero->Inventory->Count(EFrontierItem::CaptureDevice)==999 && Hero->GetBackpackRecipeStatus(0).StartsWith(TEXT("产物已满"));
     Hero->Inventory->Restore({{EFrontierItem::Material,100}}); Hero->SetActorLocation(FVector(0,-3000,40));
@@ -68,7 +83,8 @@ void RunBackpackScenario(UWorld* World,ACFPlayerCharacter* Hero)
     Hero->ToggleBackpack(); Hero->Inventory->Restore({}); Hero->Equipment->Restore({});
     const bool Loaded=Hero->LoadProgress(TEXT("FrontierBackpackAutomation"));
     const bool Persistence=Saved && Loaded && !Hero->IsBackpackOpen() && Hero->GetBackpackRecipe()==0 && Hero->Inventory->Count(EFrontierItem::Material)==70 && Hero->Equipment->GetState().bOwnSpear && Hero->Equipment->GetState().bOwnVest;
-    const bool Passed=Craft && Reject && Panels && Persistence;
+    const bool Passed=Craft && Reject && Panels && Persistence && Guidance;
+    UE_LOG(LogTemp,Display,TEXT("CF_BACKPACK_GUIDANCE %s cases=7"),Guidance?TEXT("PASS"):TEXT("FAIL"));
     UE_LOG(LogTemp,Display,TEXT("CF_BACKPACK %s craft=%d reject=%d panels=%d persistence=%d"),Passed?TEXT("PASS"):TEXT("FAIL"),Craft,Reject,Panels,Persistence);
     if(Passed && FParse::Param(FCommandLine::Get(),TEXT("CFBackpackPreview")))
     {

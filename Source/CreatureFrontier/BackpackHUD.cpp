@@ -11,10 +11,11 @@ void ACFHUD::DrawBackpack(ACFPlayerCharacter* Player)
     const auto* Catalog=UCraftingCatalog::Load(); if(!Catalog || !Catalog->Validate()) return;
     // 小窗口减少每页配方数，不缩小汉字；方向键仍可遍历全部配方。
     const float Extra=FMath::Max(0,(Catalog->Items.Num()+1)/2-3)*27;
-    const int32 PageSize=FMath::Clamp(5-FMath::CeilToInt(FMath::Max(0.f,666.f+Extra-Canvas->ClipY)/56.f),1,5);
+    const float Guidance=42;
+    const int32 PageSize=FMath::Clamp(5-FMath::CeilToInt(FMath::Max(0.f,666.f+Extra+Guidance-Canvas->ClipY)/56.f),1,5);
     const int32 Start=(Player->GetBackpackRecipe()/PageSize)*PageSize;
     const float Compact=(5-PageSize)*56.f;
-    DrawRect(FLinearColor(.015f,.025f,.04f,.97f),Left,18,470,630+Extra-Compact);
+    DrawRect(FLinearColor(.015f,.025f,.04f,.97f),Left,18,470,630+Extra+Guidance-Compact);
     DrawRect(FLinearColor(.08f,.26f,.32f,1),Left+10,232+Extra+(Player->GetBackpackRecipe()-Start)*56,450,52);
     DrawText(TEXT("背包与制作 | C 关闭"),FLinearColor::White,Left+14,30);
     DrawText(TEXT("世界仍在运行 | 退出键打开暂停菜单"),FLinearColor::Yellow,Left+14,56);
@@ -30,6 +31,7 @@ void ACFHUD::DrawBackpack(ACFPlayerCharacter* Player)
         DrawWrappedText(Player->GetBackpackRecipeStatus(Index),Color,Left+22,260+Extra+(Index-Start)*56,430,1);
     }
     if(Catalog->Recipes.IsValidIndex(Player->GetBackpackRecipe())) DrawWrappedText(Catalog->Recipes[Player->GetBackpackRecipe()].Description.ToString(),FLinearColor::Green,Left+14,536+Extra-Compact,440,2);
-    DrawText(TEXT("1-5 快捷制作 | 6 / 7 切换已有装备"),FLinearColor::White,Left+14,586+Extra-Compact);
-    DrawText(TEXT("不会自动保存，按 F5 保存物品和装备。"),FLinearColor::White,Left+14,612+Extra-Compact);
+    DrawWrappedText(Player->GetBackpackGatheringHint(Player->GetBackpackRecipe()),FLinearColor(.5f,.85f,1),Left+14,576+Extra-Compact,440,2);
+    DrawText(TEXT("1-5 快捷制作 | 6 / 7 切换已有装备"),FLinearColor::White,Left+14,586+Extra+Guidance-Compact);
+    DrawText(TEXT("不会自动保存，按 F5 保存物品和装备。"),FLinearColor::White,Left+14,612+Extra+Guidance-Compact);
 }

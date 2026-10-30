@@ -136,6 +136,8 @@ public:
     int32 GetBackpackRecipe() const { return BackpackRecipe; }
     int32 GetBackpackRecipeCost(int32 Index) const;
     FString GetBackpackRecipeStatus(int32 Index) const;
+    FString GetBackpackGatheringHint(int32 Index) const;
+    AResourceNode* GetBackpackGatheringSource(int32 Index) const;
     bool IsPauseMenuOpen() const { return bPauseMenu; }
     bool IsPauseConfirmationPending() const { return bPauseConfirmation; }
     int32 GetPauseSelection() const { return PauseSelection; }
