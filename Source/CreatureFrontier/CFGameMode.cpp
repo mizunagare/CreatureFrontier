@@ -75,6 +75,8 @@ void ACFGameMode::BeginPlay()
 {
     Super::BeginPlay();
     SeedFrontierResources(GetWorld());
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFFarmWaitEmpty")) || FParse::Param(FCommandLine::Get(),TEXT("CFFarmWaitFull")))
+    {const bool Full=FParse::Param(FCommandLine::Get(),TEXT("CFFarmWaitFull")),Read=FParse::Param(FCommandLine::Get(),TEXT("CFFarmWaitRead"));FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this,Full,Read](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunFarmWaitingScenario(GetWorld(),Hero,Full,Read);},1.f,false);return;}
     if(FParse::Param(FCommandLine::Get(),TEXT("CFUpperDeckLifeTest")) || FParse::Param(FCommandLine::Get(),TEXT("CFUpperDeckLifeRead")))
     {const bool Read=FParse::Param(FCommandLine::Get(),TEXT("CFUpperDeckLifeRead"));FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this,Read](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunUpperDeckLifeScenario(GetWorld(),Hero,Read);},1.f,false);return;}
     if(FParse::Param(FCommandLine::Get(),TEXT("CFUpperDeckTest")) || FParse::Param(FCommandLine::Get(),TEXT("CFUpperDeckRead")))

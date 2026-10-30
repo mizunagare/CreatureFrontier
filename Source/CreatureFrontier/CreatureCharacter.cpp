@@ -340,7 +340,8 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
             else
             {
                 StopNavigation();
-                Stamina = FMath::Max(0.0f, Stamina - DeltaSeconds * 1.5f);
+                const bool Tending=WorkSite->Crop->NeedsTending();
+                if(Tending)Stamina = FMath::Max(0.0f, Stamina - DeltaSeconds * 1.5f);
                 if (Stamina <= 0.0f)
                 {
                     bResumeWorkAfterRest = true;
@@ -349,7 +350,8 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
                     OwnerPlayer->Feedback = TEXT("伙伴休息中，体力80、饱食20、生命80%后复工");
                     return;
                 }
-                if(WorkSite->Crop->Work(this,OwnerPlayer,DeltaSeconds*GetWorkEfficiency(WorkSite)*(Nutrition<20?.5f:1.f)))
+                // 等待保留原任务；零工作量只能收获，不能播种或推进生长，经验仅在实际收获时增加。
+                if(WorkSite->Crop->Work(this,OwnerPlayer,Tending?DeltaSeconds*GetWorkEfficiency(WorkSite)*(Nutrition<20?.5f:1.f):0.f))
                 { OwnerPlayer->RecordCompanionProduction(this,EFrontierItem::Food); AddExperience(1); }
             }
             return;

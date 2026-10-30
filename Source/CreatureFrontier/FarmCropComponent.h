@@ -16,6 +16,8 @@ public:
     UPROPERTY(BlueprintReadOnly) bool bPlanted=false;
     UPROPERTY(BlueprintReadOnly) float GrowthWork=0;
     int32 Stage() const;
+    // 缺种空圃和成熟作物不再需要生长劳动；成熟收获仍可按原容量事务结算。
+    bool NeedsTending() const { return bPlanted?GrowthWork<RequiredWork:Seeds>0; }
     FString Status() const;
     bool Interact(ACFPlayerCharacter* Hero,int32 Mode);
     bool Work(ACreatureCharacter* Pet,ACFPlayerCharacter* Hero,float Amount);

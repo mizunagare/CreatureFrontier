@@ -11,7 +11,9 @@ int32 UFarmCropComponent::Stage() const
 { return !bPlanted?-1:GrowthWork>=RequiredWork?3:GrowthWork>=RequiredWork*2/3?2:GrowthWork>=RequiredWork/3?1:0; }
 FString UFarmCropComponent::Status() const
 {
-    const TCHAR* State=Stage()<0?TEXT("空地"):Stage()==0?TEXT("幼苗"):Stage()==1?TEXT("生长中"):Stage()==2?TEXT("开花中"):TEXT("已成熟");
+    const auto* Site=Cast<AWorkStation>(GetOwner());const int32 Current=Stage();
+    const TCHAR* State=Current<0?(Seeds==0?TEXT("缺种等待"):TEXT("空地")):Current==0?TEXT("幼苗"):Current==1?TEXT("生长中"):Current==2?TEXT("开花中"):
+        Site && Site->StoredFood>=30?TEXT("满粮待取"):TEXT("已成熟");
     return FString::Printf(TEXT("%s %.1f/6 | 种子 %d/30\nG 播种/照料/收获 | F2 存入种子 F3 取出种子"),State,GrowthWork,Seeds);
 }
 void UFarmCropComponent::Refresh()
