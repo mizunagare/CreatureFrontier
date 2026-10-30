@@ -4,6 +4,8 @@
 
 ## 探索朝向开发候选（限定验证，非最终版）
 
+正常开局连续验证候选：`C:\CreatureFrontierBuilds\Windows-StarterJourney\CreatureFrontier.exe`。原6材料／3食物经J结交、N领奖、返基地E派工生产3材料，再N领取第三项，已验证可连续获得33材料并存读，为农业段留下正常来源；不新增普通规则。原有朝向与农业提示仍在，操作、真实完成档及边界见[正常开局伙伴旅程](Docs/STARTER_JOURNEY.md)，尚未完成农业及人类自主新手体验验收。
+
 农业旅程提示后续候选：`C:\CreatureFrontierBuilds\Windows-FarmJourney\CreatureFrontier.exe`。第四项旅程会提示准备种子、F2入圃、E派伙伴与O取粮腾空间，明确手动收获不计伙伴目标。原旅程行为和五状态显示回归通过，尚非完整自然新手流程验收，详见[农业旅程引导](Docs/FARM_JOURNEY_GUIDANCE.md)。
 
 运行 `C:\CreatureFrontierBuilds\Windows-Orientation\CreatureFrontier.exe`。画面下方中央显示当前朝向和基地中心相对方向／距离；按C查看配方资源世界方位，关闭背包后转动视角对照朝向。返家时参考基地提示，但直线方向不保证可通行或安全，仍需自行绕开障碍。打开菜单时隐藏方位面板，不新增按键或改动存档38。两尺寸HUD和真实返家加工关联验证见[探索朝向与基地识别](Docs/EXPLORATION_ORIENTATION.md)，尚非人类自主导航验收；下方旧包均保留，不会自动更新。
