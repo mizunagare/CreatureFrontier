@@ -127,7 +127,7 @@ struct FConstructionTest
             if(!Hero->SaveProgress(TEXT("ConstructionMid")))return Finish(false,TEXT("mid-save"));
             const auto OldPet=PetId,OldSite=SiteId,OldBox=CrateId;const auto Pose=Pet->GetActorTransform();
             if(!Hero->LoadProgress(TEXT("ConstructionMid")) || !Rebind() || PetId!=OldPet || SiteId!=OldSite || CrateId!=OldBox || !Pose.Equals(Pet->GetActorTransform(),.01) || Pet->Construction->GetSite()!=Site.Get() || Pet->Cargo->Count()!=3)return Finish(false,TEXT("mid-restore"));
-            UE_LOG(LogTemp,Display,TEXT("CF_CONSTRUCTION_MID PASS version=37 carried=3 identity=1 intent=1 pet=%s site=%s"),*PetId.ToString(),*SiteId.ToString());Phase=1;
+            UE_LOG(LogTemp,Display,TEXT("CF_CONSTRUCTION_MID PASS version=%d carried=3 identity=1 intent=1 pet=%s site=%s"),FrontierCurrentSaveVersion,*PetId.ToString(),*SiteId.ToString());Phase=1;
         }
         if(Phase==1 && Site->StorageInventory->Count(EFrontierItem::Material)==3 && Pet->Cargo->Count()==0){Phase=2;At=World->GetTimeSeconds();}
         if(Phase==2 && World->GetTimeSeconds()-At>2)
@@ -159,7 +159,7 @@ struct FConstructionTest
             const float Work=Site->ConstructionWork;
             if(!Pet->bResumeWorkAfterRest || !Hero->SaveProgress(TEXT("ConstructionRest")) || !Hero->LoadProgress(TEXT("ConstructionRest")) || !Rebind() ||
                 Pet->Activity!=ECreatureActivity::Rest || !Pet->bResumeWorkAfterRest || Pet->Construction->GetSite()!=Site.Get() || !FMath::IsNearlyEqual(Work,Site->ConstructionWork,.001f))return Finish(false,TEXT("rest-save"));
-            UE_LOG(LogTemp,Display,TEXT("CF_CONSTRUCTION_REST PASS version=37 work=%.3f intent=1 pet=%s site=%s"),Work,*PetId.ToString(),*SiteId.ToString());Phase=5;
+            UE_LOG(LogTemp,Display,TEXT("CF_CONSTRUCTION_REST PASS version=%d work=%.3f intent=1 pet=%s site=%s"),FrontierCurrentSaveVersion,Work,*PetId.ToString(),*SiteId.ToString());Phase=5;
         }
         if(Phase==5 && !Site->bUnderConstruction)
         {
@@ -169,7 +169,7 @@ struct FConstructionTest
             AHomeModule* Done=nullptr;for(TActorIterator<AHomeModule> It(World);It;++It)if(It->PersistentId==SiteId)Done=*It;
             if(!Done || Done->bUnderConstruction || Done->PaidMaterials!=6 || Done->ConstructionWork!=0 || Done->ConstructionCrateId.IsValid())return Finish(false,TEXT("done-restore"));
             if(Needs && (!Fed || !Trough.IsValid() || Trough->StoredFood!=0 || Hero->Inventory->Count(EFrontierItem::Food)!=0))return Finish(false,TEXT("food-restore"));
-            UE_LOG(LogTemp,Display,TEXT("CF_CONSTRUCTION_DONE PASS version=37 material=66 cost=6 identity=1 actualNav=1 rest=1"));Phase=8;
+            UE_LOG(LogTemp,Display,TEXT("CF_CONSTRUCTION_DONE PASS version=%d material=66 cost=6 identity=1 actualNav=1 rest=1"),FrontierCurrentSaveVersion);Phase=8;
             if(Photo(TEXT("Done")))return true;return Finish(true,TEXT("complete"));
         }
         if(Phase==8)

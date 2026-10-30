@@ -101,7 +101,7 @@ struct FFarmWaitTest
         }
         if(!Hero->SaveProgress(TEXT("FarmWaitingDone")) || !Hero->LoadProgress(TEXT("FarmWaitingDone")) || !Bind() || Pet->WorkSite!=Farm.Get() || Pet->Experience!=ExpectedXp ||
             Farm->StoredFood!=(Full?30:1) || Hero->Inventory->Count(EFrontierItem::Food)!=(Full?2:0) || Hero->Inventory->Count(EFrontierItem::Seeds)!=0 || Hero->Inventory->Count(EFrontierItem::Material)!=0)return End(false,TEXT("done-save"));
-        UE_LOG(LogTemp,Display,TEXT("CF_FARM_WAIT_SAVED PASS version=37 mode=%s modules=25 sameTask=1 food=%d seeds=0 xp=%d"),Full?TEXT("full"):TEXT("empty"),Full?32:1,ExpectedXp);return End(true,TEXT("complete"));
+        UE_LOG(LogTemp,Display,TEXT("CF_FARM_WAIT_SAVED PASS version=%d mode=%s modules=25 sameTask=1 food=%d seeds=0 xp=%d"),FrontierCurrentSaveVersion,Full?TEXT("full"):TEXT("empty"),Full?32:1,ExpectedXp);return End(true,TEXT("complete"));
     }
 };
 }
@@ -109,14 +109,14 @@ void RunFarmWaitingScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Full,boo
 {
     auto State=MakeShared<FFarmWaitTest>();State->World=World;State->Hero=Hero;State->Full=Full;State->Read=Read;State->Deadline=FPlatformTime::Seconds()+100;
     const auto* Source=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("FarmWaitingInput"),0));
-    if(!Source || Source->FormatVersion!=37 || Source->HomeModules.Num()!=25 || Source->Facilities.Num()!=3 || !Hero->LoadProgress(TEXT("FarmWaitingInput")) || !State->Bind() ||
+    if(!Source || Source->FormatVersion<37 || Source->FormatVersion>FrontierCurrentSaveVersion || Source->HomeModules.Num()!=25 || Source->Facilities.Num()!=3 || !Hero->LoadProgress(TEXT("FarmWaitingInput")) || !State->Bind() ||
         State->Pet->Experience!=9 || State->Pet->BondPoints!=12){State->End(false,TEXT("source"));return;}
     State->Preview=FParse::Param(FCommandLine::Get(),TEXT("CFFarmWaitPreview"));
     if(State->Preview){State->ImageRoot=FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir()/TEXT("FarmWaitingPreview")/FGuid::NewGuid().ToString(EGuidFormats::Digits));IFileManager::Get().MakeDirectory(*State->ImageRoot,true);UE_LOG(LogTemp,Display,TEXT("CF_FARM_WAIT_PREVIEW_ROOT %s"),*State->ImageRoot);}
     if(Read)
     {
         if(State->Pet->WorkSite!=State->Farm.Get() || State->Farm->StoredFood!=(Full?30:0) || State->Farm->Crop->Seeds!=0 || (Full?State->Farm->Crop->Stage()!=3:State->Farm->Crop->bPlanted)){State->End(false,TEXT("restore"));return;}
-        UE_LOG(LogTemp,Display,TEXT("CF_FARM_WAIT_RESTORE PASS version=37 mode=%s sameTask=1"),Full?TEXT("full"):TEXT("empty"));
+        UE_LOG(LogTemp,Display,TEXT("CF_FARM_WAIT_RESTORE PASS version=%d mode=%s sameTask=1"),Source->FormatVersion,Full?TEXT("full"):TEXT("empty"));
     }
     else
     {

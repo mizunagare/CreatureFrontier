@@ -93,7 +93,7 @@ struct FDeckLifeTest
         Observe(FVector(-1200,200,40.15));Face(FarmPosition+FVector(0,0,30));
         if(Pet->GetActorLocation().Z>100 || !CFInputQA::Press(Hero,EKeys::E) || Pet->WorkSite!=Farm.Get() || Pet->Activity!=ECreatureActivity::Work || !Hero->Feedback.Contains(TEXT("瞄准设施")))return false;
         if(!Hero->SaveProgress(TEXT("UpperDeckLifeWork")))return false;
-        UE_LOG(LogTemp,Display,TEXT("CF_DECK_LIFE_ORDER PASS version=37 downstairs=1 aimed=1 material=0 seeds=0 reserved=1 facilities=3 farm=%s"),*FarmId.ToString());
+        UE_LOG(LogTemp,Display,TEXT("CF_DECK_LIFE_ORDER PASS version=%d downstairs=1 aimed=1 material=0 seeds=0 reserved=1 facilities=3 farm=%s"),FrontierCurrentSaveVersion,*FarmId.ToString());
         ProductionAt=World->GetTimeSeconds();return true;
     }
     void Walk(TArray<FVector> Points,int32 Next)
@@ -113,7 +113,7 @@ struct FDeckLifeTest
     {
         if(!Hero->SaveProgress(TEXT("UpperDeckLifeDone")) || !Hero->LoadProgress(TEXT("UpperDeckLifeDone")) || !Bind(true) || !SameHouse())return false;
         const auto* Save=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("UpperDeckLifeDone"),0));
-        if(!Save || Save->FormatVersion!=37 || Save->Facilities.Num()!=3 || Pet->Experience!=9 || Pet->BondPoints!=12 || Pet->Nickname!=Nickname || Pet->WorkSite ||
+        if(!Save || Save->FormatVersion!=FrontierCurrentSaveVersion || Save->Facilities.Num()!=3 || Pet->Experience!=9 || Pet->BondPoints!=12 || Pet->Nickname!=Nickname || Pet->WorkSite ||
             Pet->Activity!=ECreatureActivity::Follow || Pet->Cargo->Count()!=0 || Pet->CarriedFood!=0 || Farm->StoredFood!=0 || Farm->Crop->Seeds!=0 || Farm->Crop->bPlanted || Farm->Crop->GrowthWork!=0)return false;
         for(const auto& Old:OriginalFacilities){const auto* Now=Save->Facilities.FindByPredicate([&](const FFacilitySaveRecord& R){return R.Id==Old.Id;});
             if(!Now || Now->Specialty!=Old.Specialty || !Now->Transform.Equals(Old.Transform,.01) || Now->StoredFood!=Old.StoredFood || Now->Seeds!=Old.Seeds || Now->bPlanted!=Old.bPlanted || Now->GrowthWork!=Old.GrowthWork)return false;}
@@ -176,7 +176,7 @@ struct FDeckLifeTest
         if(World->GetTimeSeconds()-ProgressAt>20)return End(false,TEXT("rejoin"));
         if(P.Z>100 || Pet->GetDistanceTo(Hero)>250)return true;
         if(H.Z>100 || !Descended || HeroTravel<3000 || PetTravel<1500 || !FinishSave())return End(false,TEXT("done-save"));
-        UE_LOG(LogTemp,Display,TEXT("CF_DECK_LIFE_SAVED PASS version=37 modules=25 retainedFacilities=2 facilities=3 material=0 seeds=0 food=0 xp=9 bond=12"));return End(true,TEXT("complete"));
+        UE_LOG(LogTemp,Display,TEXT("CF_DECK_LIFE_SAVED PASS version=%d modules=25 retainedFacilities=2 facilities=3 material=0 seeds=0 food=0 xp=9 bond=12"),FrontierCurrentSaveVersion);return End(true,TEXT("complete"));
     }
 };
 }
@@ -184,7 +184,7 @@ void RunUpperDeckLifeScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read)
 {
     auto State=MakeShared<FDeckLifeTest>();State->World=World;State->Hero=Hero;State->Deadline=FPlatformTime::Seconds()+300;
     const auto* Source=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("UpperDeckLifeInput"),0));
-    if(!Source || Source->FormatVersion!=37 || Source->HomeModules.Num()!=25 || Source->Facilities.Num()!=(Read?3:2) || !Hero->LoadProgress(TEXT("UpperDeckLifeInput")) || !State->Bind(Read)) {State->End(false,TEXT("source"));return;}
+    if(!Source || Source->FormatVersion<37 || Source->FormatVersion>FrontierCurrentSaveVersion || Source->HomeModules.Num()!=25 || Source->Facilities.Num()!=(Read?3:2) || !Hero->LoadProgress(TEXT("UpperDeckLifeInput")) || !State->Bind(Read)) {State->End(false,TEXT("source"));return;}
     State->House=HomeLayout::Collect(World);State->Nickname=State->Pet->Nickname;State->OriginalFacilities=Source->Facilities;
     State->Preview=FParse::Param(FCommandLine::Get(),TEXT("CFUpperDeckLifePreview"));
     if(State->Preview){State->ImageRoot=FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir()/TEXT("UpperDeckLifePreview")/FGuid::NewGuid().ToString(EGuidFormats::Digits));IFileManager::Get().MakeDirectory(*State->ImageRoot,true);UE_LOG(LogTemp,Display,TEXT("CF_DECK_LIFE_PREVIEW_ROOT %s"),*State->ImageRoot);}
@@ -194,7 +194,7 @@ void RunUpperDeckLifeScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read)
     if(Read)
     {
         if(State->Pet->WorkSite!=State->Farm.Get() || State->Farm->Crop->Seeds!=1 || State->Farm->Crop->bPlanted || State->Farm->StoredFood!=0){State->End(false,TEXT("restore"));return;}
-        State->Phase=1;State->ProductionAt=World->GetTimeSeconds();UE_LOG(LogTemp,Display,TEXT("CF_DECK_LIFE_RESTORE PASS version=37 downstairs=1 task=1 reserved=1 retained=25"));
+        State->Phase=1;State->ProductionAt=World->GetTimeSeconds();UE_LOG(LogTemp,Display,TEXT("CF_DECK_LIFE_RESTORE PASS version=%d downstairs=1 task=1 reserved=1 retained=25"),Source->FormatVersion);
     }
     FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([State](float){return State->Tick();}));
 }

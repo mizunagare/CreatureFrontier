@@ -32,10 +32,11 @@ try{
     if(!$process.WaitForExit(330000)){$process.Kill();$process.WaitForExit();throw '二层生产与照料专项超时'}
     $raw=Get-Content -LiteralPath $log -Raw
     if($process.ExitCode -ne 0 -or $raw -match '\bFAIL\b|Fatal error|Assertion failed' -or !$raw.Contains('LogExit: Exiting.')){throw ('二层生产与照料专项失败：'+$log)}
-    foreach($marker in @('CF_DECK_LIFE_PRODUCED PASS upstairs=1 actualSteps=1 seed=0 food=1 xp=9','CF_DECK_LIFE_FEED PASS upstairs=1 food=0 bond=12','CF_DECK_LIFE_SAVED PASS version=37 modules=25 retainedFacilities=2 facilities=3 material=0 seeds=0 food=0 xp=9 bond=12','CF_DECK_LIFE PASS reason=complete')){
+    foreach($marker in @('CF_DECK_LIFE_PRODUCED PASS upstairs=1 actualSteps=1 seed=0 food=1 xp=9','CF_DECK_LIFE_FEED PASS upstairs=1 food=0 bond=12','CF_DECK_LIFE_SAVED PASS version=38 modules=25 retainedFacilities=2 facilities=3 material=0 seeds=0 food=0 xp=9 bond=12','CF_DECK_LIFE PASS reason=complete')){
         if(!$raw.Contains($marker)){throw ('缺少二层生产／照料标记：'+$marker)}
     }
-    $required=if($Read){@('CF_DECK_LIFE_RESTORE PASS version=37 downstairs=1 task=1 reserved=1 retained=25')}else{@('CF_DECK_LIFE_HARVEST count=18 material=18','CF_DECK_LIFE_ORDER PASS version=37 downstairs=1 aimed=1 material=0 seeds=0 reserved=1 facilities=3')}
+    $required=if($Read){@()}else{@('CF_DECK_LIFE_HARVEST count=18 material=18','CF_DECK_LIFE_ORDER PASS version=38 downstairs=1 aimed=1 material=0 seeds=0 reserved=1 facilities=3')}
+    if($Read -and $raw -notmatch 'CF_DECK_LIFE_RESTORE PASS version=(?:37|38) downstairs=1 task=1 reserved=1 retained=25'){throw '缺少平台生活工作态真实版本恢复标记'}
     foreach($marker in $required){if(!$raw.Contains($marker)){throw ('缺少生产投入／恢复标记：'+$marker)}}
     if((Get-FrontierBuildFingerprint -LiteralPath $module) -ne $hash -or (Get-FrontierBuildFingerprint -LiteralPath $ReadInputPath) -ne $inputHash){throw '程序或源输入副本改变'}
     if($Preview){

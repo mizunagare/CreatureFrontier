@@ -121,10 +121,15 @@ AHomeModule* AHomeModule::TraceConstruction(ACFPlayerCharacter* Hero)
 bool AHomeModule::SupportsConstruction(EHomeModuleKind Kind)
 {
     return Kind==EHomeModuleKind::Floor || Kind==EHomeModuleKind::Roof || Kind==EHomeModuleKind::Wall ||
-        Kind==EHomeModuleKind::Window || Kind==EHomeModuleKind::Doorway || Kind==EHomeModuleKind::Fence;
+        Kind==EHomeModuleKind::Window || Kind==EHomeModuleKind::Doorway || Kind==EHomeModuleKind::Fence || Kind==EHomeModuleKind::Stairs;
 }
 TArray<FHomePart> AHomeModule::ConstructionParts(EHomeModuleKind Kind,bool ElevatedFloor)
 {
+    // 楼梯工地只有低矮实体边框和料箱，不提前生成可通往上层的踏步。
+    if(Kind==EHomeModuleKind::Stairs)
+        return {{FVector(-195,0,12),FVector(5,100,8)},{FVector(195,0,12),FVector(5,100,8)},
+            {FVector(0,-95,12),FVector(190,5,8)},{FVector(0,95,12),FVector(190,5,8)},
+            {FVector(0,0,12),FVector(35,25,12)}};
     if(Kind==EHomeModuleKind::Floor && !ElevatedFloor)
         return {{FVector(-195,0,12),FVector(5,200,8)},{FVector(195,0,12),FVector(5,200,8)},
             {FVector(0,-195,12),FVector(190,5,8)},{FVector(0,195,12),FVector(190,5,8)},
@@ -167,7 +172,7 @@ FString AHomeModule::ConstructionStatus() const
     const bool High=GetKind()==EHomeModuleKind::Roof || (GetKind()==EHomeModuleKind::Floor && FloorId.IsValid());
     const TCHAR* Hint=High?TEXT("先V选料源，再瞄下层工地料箱按E派工"):TEXT("先瞄准箱子按V，再瞄准此处按E派工");
     const TCHAR* Cancel=ConstructionOriginalDefinition?TEXT("旧墙仍承重 | X取消恢复旧墙并退料"):
-        GetKind()==EHomeModuleKind::Floor?TEXT("未完工不承重 | F取消任务 | X取消并退料"):High?TEXT("从下层施工 | F取消任务 | X取消并退料"):TEXT("F取消伙伴任务 | X取消施工并退回已交材料");
+        GetKind()==EHomeModuleKind::Floor?TEXT("未完工不承重 | F取消任务 | X取消并退料"):GetKind()==EHomeModuleKind::Stairs?TEXT("未完工不能通行 | F取消任务 | X取消并退料"):High?TEXT("从下层施工 | F取消任务 | X取消并退料"):TEXT("F取消伙伴任务 | X取消施工并退回已交材料");
     return FString::Printf(TEXT("%s | 材料%d/%d | 施工%.1f/6\n%s\n%s"),
         *Target,StorageInventory->Count(EFrontierItem::Material),Definition?Definition->MaterialCost:0,ConstructionWork,
         Hint,Cancel);

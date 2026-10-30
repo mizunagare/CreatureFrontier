@@ -32,10 +32,10 @@ try{
     if(!$process.WaitForExit(330000)){$process.Kill();$process.WaitForExit();throw '地板屋顶施工专项超时'}
     $raw=Get-Content -LiteralPath $log -Raw
     if($process.ExitCode -ne 0 -or $raw -match '\bFAIL\b|Fatal error|Assertion failed' -or !$raw.Contains('LogExit: Exiting.')){throw ('地板屋顶施工专项失败：'+$log)}
-    foreach($marker in @('CF_PLATFORM_MOTION_GUARDS PASS longFrame=1 horizontalJump=0 verticalJump=0 zeroTimeJump=0','CF_PLATFORM_JOIN PASS outside=1 continuous=1','CF_PLATFORM_LIFE PASS version=37 modules=24 retained=19 floor=1 roof=1 hero=1 pet=1 home=1 petHome=1 material=0 seeds=1 food=0 bond=9','CF_PLATFORM_BUILD PASS reason=complete')){if(!$raw.Contains($marker)){throw ('缺少施工行为标记：'+$marker)}}
+    foreach($marker in @('CF_PLATFORM_MOTION_GUARDS PASS longFrame=1 horizontalJump=0 verticalJump=0 zeroTimeJump=0','CF_PLATFORM_JOIN PASS outside=1 continuous=1','CF_PLATFORM_LIFE PASS version=38 modules=24 retained=19 floor=1 roof=1 hero=1 pet=1 home=1 petHome=1 material=0 seeds=1 food=0 bond=9','CF_PLATFORM_BUILD PASS reason=complete')){if(!$raw.Contains($marker)){throw ('缺少施工行为标记：'+$marker)}}
     $part=0
-    if($Read){$match=[regex]::Match($raw,'CF_PLATFORM_RESTORE PASS version=37 part=([04]) carried=3 retained=19');if(!$match.Success){throw '缺少地板或屋顶在途恢复标记'};$part=[int]$match.Groups[1].Value}
-    else{foreach($marker in @('CF_PLATFORM_HARVEST count=33 material=38','CF_PLATFORM_GUARDS PASS pendingSupport=0 facilitySupport=0 bad36Rejected=1 retained=1','CF_PLATFORM_MID PASS version=37 part=0 carried=3 paid=0','CF_PLATFORM_MID PASS version=37 part=4 carried=3 paid=0')){if(!$raw.Contains($marker)){throw ('缺少原屋施工投入或保护标记：'+$marker)}}}
+    if($Read){$match=[regex]::Match($raw,'CF_PLATFORM_RESTORE PASS version=(?:37|38) part=([04]) carried=3 retained=19');if(!$match.Success){throw '缺少地板或屋顶在途恢复标记'};$part=[int]$match.Groups[1].Value}
+    else{foreach($marker in @('CF_PLATFORM_HARVEST count=33 material=38','CF_PLATFORM_GUARDS PASS pendingSupport=0 facilitySupport=0 bad36Rejected=1 retained=1','CF_PLATFORM_MID PASS version=38 part=0 carried=3 paid=0','CF_PLATFORM_MID PASS version=38 part=4 carried=3 paid=0')){if(!$raw.Contains($marker)){throw ('缺少原屋施工投入或保护标记：'+$marker)}}}
     if(!$Read -or $part -eq 0){if(!$raw.Contains('CF_PLATFORM_ROOF_SUPPORT PASS retained=1 refund=0')){throw '待建屋顶的承重墙拒拆标记缺失'}}
     for($index=$part;$index -le 4;$index++){if(!$raw.Contains('CF_PLATFORM_PART PASS part='+$index+' ')){throw '有模块没有实际施工完工'}}
     if((Get-FrontierBuildFingerprint -LiteralPath $module) -ne $hash -or (Get-FrontierBuildFingerprint -LiteralPath $ReadInputPath) -ne $inputHash){throw '程序或源输入副本发生变化'}

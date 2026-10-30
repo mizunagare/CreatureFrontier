@@ -34,9 +34,9 @@ try{
     $raw=Get-Content -LiteralPath $log -Raw
     if($process.ExitCode -ne 0 -or $raw -match '\bFAIL\b|Fatal error|Assertion failed' -or !$raw.Contains('LogExit: Exiting.')){throw ('农业等待专项失败：'+$log)}
     $label=$Mode.ToLowerInvariant()
-    foreach($marker in @(('CF_FARM_WAIT_RESUME PASS mode='+$label+' cycle=1 originalTask=1'),('CF_FARM_WAIT_SAVED PASS version=37 mode='+$label+' modules=25 sameTask=1'),('CF_FARM_WAIT PASS mode='+$label+' reason=complete'))){if(!$raw.Contains($marker)){throw ('缺少等待复工标记：'+$marker)}}
+    foreach($marker in @(('CF_FARM_WAIT_RESUME PASS mode='+$label+' cycle=1 originalTask=1'),('CF_FARM_WAIT_SAVED PASS version=38 mode='+$label+' modules=25 sameTask=1'),('CF_FARM_WAIT PASS mode='+$label+' reason=complete'))){if(!$raw.Contains($marker)){throw ('缺少等待复工标记：'+$marker)}}
     if($Mode -eq 'Full' -and !$raw.Contains('CF_FARM_WAIT_RESUME PASS mode=full cycle=2 originalTask=1')){throw '第二次满粮成熟等待及取粮后结算缺失'}
-    if($Read -and !$raw.Contains('CF_FARM_WAIT_RESTORE PASS version=37 mode='+$label+' sameTask=1')){throw '缺少等待态冷恢复标记'}
+    if($Read -and $raw -notmatch ('CF_FARM_WAIT_RESTORE PASS version=(?:37|38) mode='+$label+' sameTask=1')){throw '缺少等待态冷恢复标记'}
     if((Get-FrontierBuildFingerprint -LiteralPath $module) -ne $hash -or (Get-FrontierBuildFingerprint -LiteralPath $ReadInputPath) -ne $inputHash){throw '程序或源副本改变'}
     if($Preview){
         $root=[regex]::Match($raw,'CF_FARM_WAIT_PREVIEW_ROOT [^\r\n]*[/\\]([A-F0-9]{32})');if(!$root.Success){throw '缺少等待提示截图目录'}

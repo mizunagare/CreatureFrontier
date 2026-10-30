@@ -349,7 +349,13 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
         if (Save->FormatVersion < 6 && !Record.EncounterId.IsNone())
             for (TActorIterator<AWildEncounter> It(GetWorld()); It; ++It)
                 if (It->EncounterId == Record.EncounterId) { Pet->bAlpha = It->bBoss; break; }
+        // 暂存阶段的新房屋尚未启用碰撞。此时自动生成控制器会进入行走模式，
+        // 按旧世界的地面调整高度，提交新房屋后便可能穿入地板并被碰撞推出。
+        // 保留自动接管策略，等事务提交且旧伙伴移除后再创建控制器。
+        const auto RestorePossession=Pet->AutoPossessAI;
+        Pet->AutoPossessAI=EAutoPossessAI::Disabled;
         Pet->FinishSpawning(Record.Transform);
+        Pet->AutoPossessAI=RestorePossession;
         Pet->Health = FMath::Min(Pet->GetMaxHealth(), Record.Health);
         Pet->Experience = Record.Experience;
         Pet->Stamina = Record.Stamina;
@@ -432,6 +438,9 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
     for (auto* Site : OldBuilt) Site->Destroy();
     for (auto* Drop : OldLoot) Drop->Destroy();
     for (auto* Pet : OldCreatures) Pet->Destroy();
+    for(auto* Pet:Restored)
+        if(Pet->AutoPossessAI==EAutoPossessAI::PlacedInWorldOrSpawned || Pet->AutoPossessAI==EAutoPossessAI::Spawned)
+            Pet->SpawnDefaultController();
     for (TActorIterator<AWildEncounter> It(GetWorld()); It; ++It)
         It->RestorePopulation(Save->EncounterTimers.FindRef(It->EncounterId));
     SetActorTransform(Save->PlayerTransform, false, nullptr, ETeleportType::TeleportPhysics);

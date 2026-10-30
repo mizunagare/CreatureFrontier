@@ -173,10 +173,10 @@ struct FRenovationTest
         if(Phase==1)
         {
             if(Photo(TEXT("Retained")))return true;
-            if(!Mid && Pet->Cargo->Count()==3){if(!Hero->SaveProgress(TEXT("RenovationMid")))return Finish(false,TEXT("mid-save"));Mid=true;UE_LOG(LogTemp,Display,TEXT("CF_RENOVATION_MID PASS version=37 material=0 stock=5 carried=3 retained=1"));}
+            if(!Mid && Pet->Cargo->Count()==3){if(!Hero->SaveProgress(TEXT("RenovationMid")))return Finish(false,TEXT("mid-save"));Mid=true;UE_LOG(LogTemp,Display,TEXT("CF_RENOVATION_MID PASS version=%d material=0 stock=5 carried=3 retained=1"),FrontierCurrentSaveVersion);}
             if(Site->bUnderConstruction){FString Reason;if(!Site->ConstructionOriginalDefinition || Site->PaidMaterials!=10 || !HomeLayout::Validate(HomeLayout::Collect(World),Reason))return Finish(false,TEXT("support"));return true;}
             if(!Mid || Site->GetKind()!=EHomeModuleKind::Doorway || Site->PaidMaterials!=8 || Site->ConstructionOriginalDefinition || Pet->Construction->GetSite() || Pet->Cargo->Count()!=0 || Pet->Activity!=ECreatureActivity::Follow)return Finish(false,TEXT("completion"));
-            UE_LOG(LogTemp,Display,TEXT("CF_RENOVATION_COMPLETED PASS version=37 modules=19 material=5 cost=8 refund=5 sameId=1 support=1"));Phase=2;At=World->GetTimeSeconds();
+            UE_LOG(LogTemp,Display,TEXT("CF_RENOVATION_COMPLETED PASS version=%d modules=19 material=5 cost=8 refund=5 sameId=1 support=1"),FrontierCurrentSaveVersion);Phase=2;At=World->GetTimeSeconds();
             if(Photo(TEXT("Completed")))return true;return true;
         }
         if(Phase==2)

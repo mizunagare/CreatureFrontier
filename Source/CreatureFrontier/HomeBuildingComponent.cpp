@@ -43,7 +43,7 @@ bool UHomeBuildingComponent::ValidatePlacement(const FTransform& Transform,FGuid
     if(!Definition || !Definition->IsValidDefinition() || (!Plan && Hero->Inventory->Count(EFrontierItem::Material)<Definition->MaterialCost))
     { Reason=TEXT("定义缺失或材料不足"); return false; }
     if(Plan && !AHomeModule::SupportsConstruction(Selected))
-    {Reason=TEXT("伙伴施工支持地板、屋顶、墙类和栅栏；其他模块松开右Shift直接建造");return false;}
+    {Reason=TEXT("伙伴施工支持地板、屋顶、楼梯、墙类和栅栏；其他模块松开右Shift直接建造");return false;}
     if(!Hero->Research->Has(Definition->RequiredResearch)) { Reason=TEXT("尚未解锁，请在基地研究实际采集的水晶样本"); return false; }
     for(const auto& Cost:Definition->ExtraCosts) if(Hero->Inventory->Count(Cost.Key)<Cost.Value) { Reason=TEXT("需要")+UCraftingCatalog::FormatItems(Definition->ExtraCosts); return false; }
     if(!Completing && FVector::Dist(Hero->GetActorLocation(),Transform.GetLocation())>800) { Reason=TEXT("距离过远（限8米）"); return false; }
@@ -86,7 +86,7 @@ AHomeModule* UHomeBuildingComponent::QueueAt(const FTransform& Transform,FGuid F
 {
     auto* Hero=Cast<ACFPlayerCharacter>(GetOwner());FString Reason;
     if(!AHomeModule::SupportsConstruction(Selected))
-    {if(Hero)Hero->Feedback=TEXT("伙伴施工支持地板、屋顶、木墙、开放窗墙、门框和栅栏；其他模块仍直接建造");return nullptr;}
+    {if(Hero)Hero->Feedback=TEXT("伙伴施工支持地板、屋顶、楼梯、木墙、开放窗墙、门框和栅栏；其他模块仍直接建造");return nullptr;}
     if(!ValidatePlacement(Transform,FloorId,Reason,true)){if(Hero)Hero->Feedback=Reason;return nullptr;}
     auto* Module=GetWorld()->SpawnActorDeferred<AHomeModule>(AHomeModule::StaticClass(),Transform,nullptr,nullptr,ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
     if(!Module)return nullptr;Module->Definition=UHomeModuleDefinition::LoadDefault(Selected);Module->PersistentId=FGuid::NewGuid();Module->FloorId=FloorId;Module->bUnderConstruction=true;Module->FinishSpawning(Transform);
