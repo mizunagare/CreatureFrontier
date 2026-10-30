@@ -7,3 +7,4 @@ void RunConstructionHomeScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Rea
 void RunRenovationScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read);
 void RunRenovationOccupancyScenario(UWorld* World,ACFPlayerCharacter* Hero);
 void RunPlatformConstructionScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read);
+void RunUpperDeckConstructionScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read);

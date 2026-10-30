@@ -226,3 +226,191 @@ void RunPlatformConstructionScenario(UWorld* World,ACFPlayerCharacter* Hero,bool
     }
     FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([State](float){return State->Tick();}));
 }
+
+namespace
+{
+// 从已交付遮棚继续成长；沿用同一伙伴、箱子、资源、楼板和实体楼梯。
+struct FUpperDeckBuildTest
+{
+    UWorld* World;ACFPlayerCharacter* Hero;TWeakObjectPtr<ACreatureCharacter> Pet;
+    TWeakObjectPtr<AHomeModule> Box,Site,Base,StairBase;TWeakObjectPtr<UHomeMovementProbe> Input;
+    TArray<FHomeModuleRecord> Original;FGuid PetId,BoxId;int32 Phase=0,Harvested=0,Point=0;bool Mid=false,HeroUp=false,PetUp=false,Preview=false,StairWaiting=false,StairBlocked=false;
+    double Deadline=0,PreviousTime=0,Travel=0,HeroTravel=0,ProgressAt=0,NextPhoto=0;FVector PreviousPet,PreviousHero,PetVelocity,HeroVelocity,Anchor;
+    FString ImageRoot;TSet<FString> Photos;
+    const FVector Upper=FVector(-1200,-400,280);
+    // 下楼连续走到平地再会合，不把正常阶梯队形的三维间隔误当作卡路。
+    const TArray<FVector> Route={FVector(-1200,-1080,40),FVector(-1200,-900,40),FVector(-1200,-350,360),FVector(-1200,-1080,40),FVector(-1500,-1080,40)};
+    AHomeModule* Find(EHomeModuleKind Kind,FVector Position) const
+    {for(TActorIterator<AHomeModule> It(World);It;++It)if(!It->bPreview && It->GetKind()==Kind && It->GetActorLocation().Equals(Position,.01))return *It;return nullptr;}
+    bool Bind()
+    {
+        for(TActorIterator<ACreatureCharacter> It(World);It;++It)if(It->Tamer==Hero->GetController())Pet=*It;
+        Box=Find(EHomeModuleKind::Storage,FVector(-900,-900,-30));Base=Find(EHomeModuleKind::Floor,FVector(-1200,-400,-40));StairBase=Find(EHomeModuleKind::Floor,FVector(-1200,-800,-40));
+        if(!Pet.IsValid() || !Box.IsValid() || !Base.IsValid() || !StairBase.IsValid() || Pet->Experience!=8 || Pet->BondPoints!=9 ||
+            Pet->PersistentId!=FGuid(0x1209AAFE,0x4D5C4544,0x1D65AF94,0x1B0435D1) || Box->PersistentId!=FGuid(0x835350A5,0x417C7BE7,0x7C965A90,0x5CD6402F))return false;
+        PetId=Pet->PersistentId;BoxId=Box->PersistentId;PreviousPet=Pet->GetActorLocation();PreviousHero=Hero->GetActorLocation();
+        PetVelocity=Pet->GetVelocity();HeroVelocity=Hero->GetVelocity();PreviousTime=World->GetTimeSeconds();
+        for(TActorIterator<AWildEncounter> It(World);It;++It)It->SetActorTickEnabled(false);
+        for(TActorIterator<ACreatureCharacter> It(World);It;++It)if(*It!=Pet.Get()){It->SetActorTickEnabled(false);It->GetCharacterMovement()->DisableMovement();}
+        return true;
+    }
+    void Observe(FVector Position){Hero->SetActorLocation(Position);PreviousHero=Position;}
+    bool Photo(const TCHAR* Name,FVector Target)
+    {
+        if(!Preview || Photos.Contains(Name))return false;Photos.Add(Name);
+        const auto Rotation=(Target-Hero->FirstPersonCamera->GetComponentLocation()).Rotation();
+        Hero->GetController()->SetControlRotation(Rotation);Hero->FirstPersonCamera->SetWorldRotation(Rotation);
+        FScreenshotRequest::RequestScreenshot(ImageRoot/(FString(Name)+TEXT(".png")),false,false);NextPhoto=FPlatformTime::Seconds()+.2;return true;
+    }
+    bool End(bool Pass,const TCHAR* Reason)
+    {
+        if(Input.IsValid())Input->Direction=FVector::ZeroVector;
+        const FString Feedback=Hero->Feedback;
+        if(!Pass)Hero->SaveProgress(TEXT("UpperDeckBlocked"));
+        UE_LOG(LogTemp,Display,TEXT("CF_UPPER_DECK %s reason=%s phase=%d point=%d heroTravel=%.1f petTravel=%.1f hero=%s pet=%s feedback=%s"),
+            Pass?TEXT("PASS"):TEXT("FAIL"),Reason,Phase,Point,HeroTravel,Travel,*Hero->GetActorLocation().ToString(),Pet.IsValid()?*Pet->GetActorLocation().ToString():TEXT("无"),*Feedback);
+        FPlatformMisc::RequestExitWithStatus(false,Pass?0:1);return false;
+    }
+    bool Queue()
+    {
+        Observe(FVector(-1200,-750,60.15));Hero->HomeBuilding->Selected=EHomeModuleKind::Floor;
+        Site=Hero->HomeBuilding->QueueAt(FTransform(Upper),Base->PersistentId);
+        if(!Site.IsValid() || Site->ConstructionAnchor()!=FVector(-1200,-400,-30))return false;
+        Hero->HomeBuilding->Selected=EHomeModuleKind::Stairs;
+        const auto Before=Hero->Inventory->GetStacks();
+        if(Hero->HomeBuilding->BuildAt(FTransform(FRotator(0,90,0),FVector(-1200,-800,-30)),StairBase->PersistentId) ||
+            !Before.OrderIndependentCompareEqual(Hero->Inventory->GetStacks()) || HomeLayout::FindFloor(Upper,HomeLayout::Collect(World),280).IsValid())return false;
+        if(!Hero->Inventory->TransferTo(Box->StorageInventory,{{EFrontierItem::Material,8}}) || !Pet->Construction->Assign(Site.Get(),Box.Get(),Hero))return false;
+        UE_LOG(LogTemp,Display,TEXT("CF_UPPER_DECK_GUARDS PASS pendingLanding=0 material=12 crate=8 anchorBelow=1"));return true;
+    }
+    bool Tick()
+    {
+        if(!Pet.IsValid() || !Box.IsValid() || FPlatformTime::Seconds()>Deadline)return End(false,TEXT("lifetime"));
+        const auto P=Pet->GetActorLocation(),H=Hero->GetActorLocation();const double Delta=World->GetTimeSeconds()-PreviousTime;
+        PreviousTime=World->GetTimeSeconds();Travel+=FVector::Dist(P,PreviousPet);
+        const bool Continuous=MovementContinuous(Pet.Get(),PreviousPet,P,PetVelocity,Delta);PreviousPet=P;PetVelocity=Pet->GetVelocity();
+        if(!Continuous || !Pet->GetActorEnableCollision() || !Pet->IsActorTickEnabled() || Pet->GetCharacterMovement()->MovementMode==MOVE_None || Pet->Health<=0 || Hero->Health<=0)return End(false,TEXT("continuity"));
+        if(Phase==3)
+        {
+            HeroTravel+=FVector::Dist(H,PreviousHero);const bool HeroContinuous=MovementContinuous(Hero,PreviousHero,H,HeroVelocity,Delta);PreviousHero=H;HeroVelocity=Hero->GetVelocity();
+            if(!HeroContinuous)return End(false,TEXT("hero-continuity"));
+        }
+        // 截图等待只延迟场景动作，仍采样双方的每帧真实位移。
+        if(FPlatformTime::Seconds()<NextPhoto)return true;
+        if(Phase==0)
+        {
+            if(Harvested==15){if(Hero->Inventory->Count(EFrontierItem::Material)!=20 || !Queue())return End(false,TEXT("queue"));Phase=1;return true;}
+            for(TActorIterator<AResourceNode> It(World);It;++It)if(It->Definition && It->Definition->OutputItem==EFrontierItem::Material && It->Remaining>0 && It->HarvestCooldown<=0)
+            {Observe(It->GetActorLocation()+FVector(0,-180,60));if(It->TryHarvest(Hero,Hero)){++Harvested;UE_LOG(LogTemp,Display,TEXT("CF_UPPER_DECK_HARVEST count=%d material=%d"),Harvested,Hero->Inventory->Count(EFrontierItem::Material));return true;}}
+            return true;
+        }
+        if(Phase==1)
+        {
+            if(!Site.IsValid())return End(false,TEXT("site"));
+            if(Preview && Site->bUnderConstruction && !Photos.Contains(TEXT("Pending")))
+            {
+                Photo(TEXT("Pending"),Site->ConstructionAnchor()+FVector(0,0,12));
+                if(AHomeModule::TraceConstruction(Hero)!=Site.Get())return End(false,TEXT("preview-aim"));
+                UE_LOG(LogTemp,Display,TEXT("CF_UPPER_DECK_PREVIEW_AIM PASS target=1"));return true;
+            }
+            const int32 Total=Hero->Inventory->Count(EFrontierItem::Material)+Box->StorageInventory->Count(EFrontierItem::Material)+Site->StorageInventory->Count(EFrontierItem::Material)+Pet->Cargo->Count();
+            if(Total!=(Site->bUnderConstruction?20:12))return End(false,TEXT("conservation"));
+            if(!Mid && Pet->Cargo->Count()==3)
+            {if(!Hero->SaveProgress(TEXT("UpperDeckMid")))return End(false,TEXT("mid-save"));Mid=true;UE_LOG(LogTemp,Display,TEXT("CF_UPPER_DECK_MID PASS version=37 carried=3"));}
+            if(Site->bUnderConstruction)return true;
+            if(!Mid || Site->PaidMaterials!=8 || Pet->Cargo->Count()!=0 || Pet->Construction->GetSite())return End(false,TEXT("completion"));
+            Phase=4;Photo(TEXT("FloorDone"),Upper);return true;
+        }
+        if(Phase==4)
+        {
+            // 完工后工人仍可能经过楼梯安装位；玩家在外等它正常归队，不能绕过角色占位。
+            if(!StairWaiting){Observe(FVector(-1700,-800,40.15));Hero->HomeBuilding->Selected=EHomeModuleKind::Stairs;ProgressAt=World->GetTimeSeconds();StairWaiting=true;}
+            FString Reason;
+            if(!Hero->HomeBuilding->ValidatePlacement(FTransform(FRotator(0,90,0),FVector(-1200,-800,-30)),StairBase->PersistentId,Reason))
+            {
+                Hero->Feedback=Reason;
+                if(!StairBlocked){StairBlocked=true;UE_LOG(LogTemp,Display,TEXT("CF_UPPER_DECK_WAIT reason=%s pet=%s"),*Reason,*P.ToString());}
+                if(World->GetTimeSeconds()-ProgressAt>15)return End(false,TEXT("stairs-clearance"));return true;
+            }
+            if(!Hero->HomeBuilding->BuildAt(FTransform(FRotator(0,90,0),FVector(-1200,-800,-30)),StairBase->PersistentId))return End(false,TEXT("stairs"));
+            UE_LOG(LogTemp,Display,TEXT("CF_UPPER_DECK_BUILT PASS modules=25 floor=8 stairs=12 material=0"));
+            Phase=5;Photo(TEXT("Stairs"),FVector(-1200,-650,180));return true;
+        }
+        if(Phase==5)
+        {
+            Observe(FVector(-1500,-1080,40.15));ProgressAt=World->GetTimeSeconds();Phase=2;return true;
+        }
+        if(Phase==2)
+        {
+            if(World->GetTimeSeconds()-ProgressAt>20)return End(false,TEXT("join"));
+            if(P.X>-1440 || Pet->GetDistanceTo(Hero)>250)return true;
+            Input=NewObject<UHomeMovementProbe>(Hero);Input->RegisterComponent();PreviousHero=H;HeroVelocity=Hero->GetVelocity();Anchor=H;ProgressAt=World->GetTimeSeconds();Phase=3;
+            UE_LOG(LogTemp,Display,TEXT("CF_UPPER_DECK_JOIN PASS outside=1"));return true;
+        }
+        if(Phase==3)
+        {
+            HeroUp|=H.Z>350 && FMath::Abs(H.X+1200)<150 && H.Y>-550 && H.Y<-200;
+            PetUp|=P.Z>350 && FMath::Abs(P.X+1200)<150 && P.Y>-550 && P.Y<-200;
+            if(FVector::Dist2D(H,Anchor)>10){Anchor=H;ProgressAt=World->GetTimeSeconds();}
+            if(Point<Route.Num() && FVector::Dist2D(H,Route[Point])<15)
+            {
+                Input->Direction=FVector::ZeroVector;
+                if(Pet->GetDistanceTo(Hero)<250 && (Point!=2 || (H.Z>350 && P.Z>350)))
+                {
+                    if(Point==2)
+                    {
+                        const auto Before=Hero->Inventory->GetStacks();
+                        if(Hero->HomeBuilding->Dismantle(Site.Get()) || !Site.IsValid() || !Before.OrderIndependentCompareEqual(Hero->Inventory->GetStacks()) || !Hero->SaveProgress(TEXT("UpperDeckTop")))return End(false,TEXT("top-support"));
+                        UE_LOG(LogTemp,Display,TEXT("CF_UPPER_DECK_TOP PASS hero=1 pet=1 supportRetained=1 version=37"));
+                    }
+                    ++Point;ProgressAt=World->GetTimeSeconds();
+                    if(Point==3 && Photo(TEXT("Occupied"),P+FVector(0,0,35)))return true;
+                }
+            }
+            if(Point<Route.Num())
+            {
+                if(World->GetTimeSeconds()-ProgressAt>15)return End(false,TEXT("walk-blocked"));
+                Input->Direction=FVector::Dist2D(H,Route[Point])<15?FVector::ZeroVector:(Route[Point]-H).GetSafeNormal2D();
+                if(!Input->Direction.IsNearlyZero())
+                {
+                    const auto Rotation=(H+Input->Direction*500+FVector(0,0,64)-Hero->FirstPersonCamera->GetComponentLocation()).Rotation();
+                    Hero->GetController()->SetControlRotation(Rotation);Hero->FirstPersonCamera->SetWorldRotation(Rotation);
+                }
+                return true;
+            }
+            Input->Direction=FVector::ZeroVector;
+            if(!HeroUp || !PetUp || HeroTravel<1800 || Travel<1800 || H.Z>100 || P.Z>100 || !Hero->SaveProgress(TEXT("UpperDeckDone")) || !Hero->LoadProgress(TEXT("UpperDeckDone")) || !Bind())return End(false,TEXT("life-save"));
+            const auto Records=HomeLayout::Collect(World);
+            if(Records.Num()!=25 || Hero->Inventory->Count(EFrontierItem::Material)!=0 || Box->StorageInventory->Count(EFrontierItem::Material)!=0 || Hero->Inventory->Count(EFrontierItem::Seeds)!=1 || Hero->Inventory->Count(EFrontierItem::Food)!=0)return End(false,TEXT("done-state"));
+            for(const auto& Old:Original){const auto* Now=Records.FindByPredicate([&](const FHomeModuleRecord& R){return R.Id==Old.Id;});if(!Now || Now->Definition!=Old.Definition || Now->FloorId!=Old.FloorId || !Now->Transform.Equals(Old.Transform,.01) || Now->PaidMaterials!=Old.PaidMaterials)return End(false,TEXT("retained"));}
+            UE_LOG(LogTemp,Display,TEXT("CF_UPPER_DECK_LIFE PASS version=37 retained=23 modules=25 heroUp=1 petUp=1 returned=1 material=0 seeds=1 food=0 bond=9"));return End(true,TEXT("complete"));
+        }
+        return true;
+    }
+};
+}
+void RunUpperDeckConstructionScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read)
+{
+    auto State=MakeShared<FUpperDeckBuildTest>();State->World=World;State->Hero=Hero;State->Deadline=FPlatformTime::Seconds()+300;
+    const auto* Source=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("UpperDeckInput"),0));
+    if(!Source || Source->FormatVersion!=37 || Source->HomeModules.Num()!=24 || !Hero->LoadProgress(TEXT("UpperDeckInput")) || !State->Bind()) {State->End(false,TEXT("source"));return;}
+    State->Original=HomeLayout::Collect(World);
+    State->Original.RemoveAll([State](const FHomeModuleRecord& R){return R.Transform.GetLocation().Equals(State->Upper,.01);});
+    if(State->Original.Num()!=23 || Source->Facilities.Num()!=2 || Hero->Inventory->Count(EFrontierItem::Material)!=(Read?12:0)){State->End(false,TEXT("original"));return;}
+    State->Preview=FParse::Param(FCommandLine::Get(),TEXT("CFUpperDeckPreview"));
+    if(State->Preview){State->ImageRoot=FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir()/TEXT("UpperDeckPreview")/FGuid::NewGuid().ToString(EGuidFormats::Digits));IFileManager::Get().MakeDirectory(*State->ImageRoot,true);UE_LOG(LogTemp,Display,TEXT("CF_UPPER_DECK_PREVIEW_ROOT %s"),*State->ImageRoot);}
+    if(Read)
+    {
+        State->Site=State->Find(EHomeModuleKind::Floor,State->Upper);
+        if(!State->Site.IsValid() || !State->Site->bUnderConstruction || State->Pet->Construction->GetSite()!=State->Site.Get() || State->Pet->Cargo->Count()!=3){State->End(false,TEXT("restore"));return;}
+        State->Mid=true;State->Phase=1;UE_LOG(LogTemp,Display,TEXT("CF_UPPER_DECK_RESTORE PASS version=37 carried=3 material=12 retained=23"));
+        if(State->Preview)State->Observe(FVector(-1200,-750,60.15));
+    }
+    else
+    {
+        State->Observe(FVector(-1500,-800,40.15));auto* Roof=State->Find(EHomeModuleKind::Roof,State->Upper);
+        if(!Roof || !Hero->HomeBuilding->Dismantle(Roof) || Hero->Inventory->Count(EFrontierItem::Material)!=5){State->End(false,TEXT("roof-refund"));return;}
+        UE_LOG(LogTemp,Display,TEXT("CF_UPPER_DECK_REFUND PASS roof=5 retained=23"));
+    }
+    FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([State](float){return State->Tick();}));
+}
