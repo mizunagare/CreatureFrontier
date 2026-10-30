@@ -1,6 +1,7 @@
-param([Parameter(Mandatory=$true)][string]$ReadInputPath,[string]$BuildRoot='',[switch]$Read,[switch]$ReservedRead,[switch]$ResumeOnly,[switch]$Preview,
+param([Parameter(Mandatory=$true)][string]$ReadInputPath,[string]$BuildRoot='',[switch]$Read,[switch]$ReservedRead,[switch]$ResumeOnly,[switch]$Resupply,[switch]$Preview,
       [ValidateSet('960x540','1280x720')][string]$Resolution='1280x720')
 $ErrorActionPreference='Stop'
+if($Resupply -and $ReservedRead){throw '实际采集补种模式不能与预留阻塞档恢复混用'}
 if($ReservedRead -and !$Read){throw '预留种子阻塞档恢复须同时指定读取模式'}
 if($ResumeOnly -and !$ReservedRead){throw '仅复工验证须同时指定预留种子阻塞档恢复；不代表完整照料验收'}
 $projectRoot=Split-Path $PSScriptRoot -Parent
@@ -26,11 +27,12 @@ try{
     $arguments=@($(if($Read){'-CFHomeCareRead'}else{'-CFHomeCareTest'}),'-CFFarmApproachTrace','-nullrhi','-nosound','-unattended','-nop4',('-abslog="'+$log+'"'))
     if($ReservedRead){$arguments+='-CFHomeCareReservedRead'}
     if($ResumeOnly){$arguments+='-CFHomeCareResumeOnly'}
+    if($Resupply){$arguments+='-CFHomeCareResupply'}
     if($Preview){$size=$Resolution.Split('x');$arguments=@($arguments|Where-Object {$_ -ne '-nullrhi'})+@('-CFHomeCarePreview','-RenderOffscreen','-ForceRes',('-ResX='+$size[0]),('-ResY='+$size[1]),'-norhithread','-forcerhibypass','-ExecCmds="t.MaxFPS 60,r.MotionBlurQuality 0,r.AntiAliasingMethod 1"')}
     $exe=if($BuildRoot){$module}elseif($Preview){'D:/Epic/UE_5.8/Engine/Binaries/Win64/UnrealEditor.exe'}else{'D:/Epic/UE_5.8/Engine/Binaries/Win64/UnrealEditor-Cmd.exe'}
     if(!$BuildRoot){$arguments=@(('"'+(Join-Path $projectRoot 'CreatureFrontier.uproject')+'"'),'-game')+$arguments}
     $started=[DateTime]::UtcNow
-    [pscustomobject]@{Read=[bool]$Read;ReservedRead=[bool]$ReservedRead;ResumeOnly=[bool]$ResumeOnly;Preview=[bool]$Preview;Resolution=$Resolution;BuildSHA256=$hash;InputSHA256=$inputHash;StartedUTC=$started.ToString('o')}|Export-Csv (Join-Path $run 'Run.csv') -NoTypeInformation
+    [pscustomobject]@{Read=[bool]$Read;ReservedRead=[bool]$ReservedRead;ResumeOnly=[bool]$ResumeOnly;Resupply=[bool]$Resupply;Preview=[bool]$Preview;Resolution=$Resolution;BuildSHA256=$hash;InputSHA256=$inputHash;StartedUTC=$started.ToString('o')}|Export-Csv (Join-Path $run 'Run.csv') -NoTypeInformation
     Write-Host ('原家园生产与照料：'+$run)
     $process=Start-Process -FilePath $exe -ArgumentList $arguments -WindowStyle Hidden -PassThru
     if(!$process.WaitForExit(180000)){$process.Kill();$process.WaitForExit();throw '家园生产照料专项超时'}
@@ -39,11 +41,17 @@ try{
     $markers=@('CF_HOME_CARE_HARVEST PASS food=1 xp=9 noDrain=1 duplicate=0','CF_HOME_CARE_LIFE PASS version=38 modules=25 facilities=2 seeds=0 food=0 xp=9 bond=12 observe=0 positionRetained=1','CF_HOME_CARE PASS reason=complete')
     if($ResumeOnly){$markers=@('CF_HOME_CARE_BLOCKED_HINT PASS taskRetained=1 reserved=1','CF_HOME_CARE_RESUME PASS taskRetained=1 planted=1 walked=1 xp=8','CF_HOME_CARE PASS reason=resume')}
     $markers+=if($ReservedRead){@('CF_HOME_CARE_RESTORE_RESERVED PASS version=38 planted=0 reserved=1 xp=8 positionRetained=1','CF_HOME_CARE_WORK PASS planted=1 seeds=0 xp=8')}elseif($Read){'CF_HOME_CARE_RESTORE PASS version=38 planted=1 seeds=0 xp=8'}else{@('CF_HOME_CARE_ORDER PASS seeds=0 reserved=1 aimed=1','CF_HOME_CARE_WORK PASS planted=1 seeds=0 xp=8')}
+    if($Resupply){
+        $markers=@('CF_HOME_CARE_HARVEST PASS food=1 xp=10 noDrain=1 duplicate=0','CF_HOME_CARE_LIFE PASS version=38 modules=25 facilities=2 seeds=2 food=0 xp=10 bond=15 observe=0 positionRetained=1','CF_HOME_CARE PASS reason=complete')
+        $markers+=if($Read){'CF_HOME_CARE_RESTORE PASS version=38 planted=1 seeds=0 xp=9'}else{@('CF_HOME_RESUPPLY_GATHER PASS part=0 gained=2','CF_HOME_RESUPPLY_GATHER PASS part=1 gained=1','CF_HOME_RESUPPLY_CRAFT PASS material=0 fiber=0 food=0 seeds=3 menuInput=1','CF_HOME_CARE_ORDER PASS seeds=2 reserved=1 aimed=1','CF_HOME_CARE_WORK PASS planted=1 seeds=0 xp=9')}
+    }
     foreach($marker in $markers){if(!$raw.Contains($marker)){throw ('缺少生产照料证据：'+$marker)}}
     if((Get-FrontierBuildFingerprint -LiteralPath $module) -ne $hash -or (Get-FrontierBuildFingerprint -LiteralPath $ReadInputPath) -ne $inputHash){throw '程序或输入副本改变'}
     if($Preview){
         $root=[regex]::Match($raw,'CF_HOME_CARE_PREVIEW_ROOT [^\r\n]*[/\\]([A-F0-9]{32})');if(!$root.Success){throw '缺少独立截图目录'}
         $scenes=if($ResumeOnly){@('Blocked','Working')}elseif($ReservedRead){@('Blocked','Working','Harvest','Fed')}elseif($Read){@('Harvest','Fed')}else{@('Farm','Working','Harvest','Fed')}
+        if($Resupply -and !$Read){$scenes=@('Material','Fiber','Recipe')+$scenes}
+        if($Resupply -and $raw.Contains('CF_HOME_RESUPPLY_HUNGER_GATE PASS')){$scenes+=@('NotHungry')}
         foreach($name in $scenes){
             $source=Join-Path $saved ('HomeCarePreview/'+$root.Groups[1].Value+'/'+$name+'.png')
             if(!(Test-Path $source) -or (Get-Item $source).LastWriteTimeUtc -lt $started){throw '生产照料截图缺失或不是本轮生成'}
@@ -53,7 +61,7 @@ try{
             Copy-Item -LiteralPath $source -Destination (Join-Path $run ($name+'.png'))
         }
     }
-    [pscustomobject]@{Read=[bool]$Read;ReservedRead=[bool]$ReservedRead;ResumeOnly=[bool]$ResumeOnly;Preview=[bool]$Preview;Resolution=$Resolution;Pass=$true;BuildSHA256=$hash;InputSHA256=$inputHash;WorkSaveSHA256=$(if($Read -and !$ReservedRead){''}else{Get-FrontierBuildFingerprint -LiteralPath (Join-Path $slotRoot 'HomeCareWork.sav')});DoneSaveSHA256=$(if($ResumeOnly){''}else{Get-FrontierBuildFingerprint -LiteralPath (Join-Path $slotRoot 'HomeCareDone.sav')});Log=$log}|Export-Csv (Join-Path $run 'Results.csv') -NoTypeInformation
+    [pscustomobject]@{Read=[bool]$Read;ReservedRead=[bool]$ReservedRead;ResumeOnly=[bool]$ResumeOnly;Resupply=[bool]$Resupply;Preview=[bool]$Preview;Resolution=$Resolution;Pass=$true;BuildSHA256=$hash;InputSHA256=$inputHash;WorkSaveSHA256=$(if($Read -and !$ReservedRead){''}else{Get-FrontierBuildFingerprint -LiteralPath (Join-Path $slotRoot 'HomeCareWork.sav')});DoneSaveSHA256=$(if($ResumeOnly){''}else{Get-FrontierBuildFingerprint -LiteralPath (Join-Path $slotRoot 'HomeCareDone.sav')});Log=$log}|Export-Csv (Join-Path $run 'Results.csv') -NoTypeInformation
     if($ResumeOnly){Write-Host '让开通路后原任务复工通过；仅为复工范围，不代表完整产粮照料验收'}else{Write-Host '原种子产粮、取粮照料、实际往返与存读通过；受控路线及图形目视边界保留'}
 }finally{
     try{

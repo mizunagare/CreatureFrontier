@@ -4,6 +4,8 @@
 
 ## 最新施工补料通行体验包（限定验证，非最终版）
 
+家园种子补给验证候选 `D:\CreatureFrontierBuilds\Windows-Home-Resupply\CreatureFrontier.exe` 已完成“零种出发→M采2材料／1纤维→返家3制食物→C选准备种子并回车制3种→F2存1留2→伙伴产粮／取粮照料／存读”，含自身生长档独立恢复；不饿时请保留食物，不要强喂。它补强原玩法整合证据，不增加普通入口赠送物资或自动经营能力，不替换下方体验入口，详见[家园实际补给](Docs/HOME_RESUPPLY.md)。
+
 施工后生产／照料新增验证候选 `D:\CreatureFrontierBuilds\Windows-Home-Care-Access\CreatureFrontier.exe`：原种子产粮、取粮喂养、自身生长档恢复及让路复工已在独立Windows验证。普通操作为走近原农圃瞄准后F2存种、E派工，若提示通道被占用请实际走开，产粮后O取出、F归队、J喂养。不会在普通入口赠送测试房屋或物资；仍不是自然长期经营，详见[施工后生产与照料](Docs/HOME_CARE.md)，不替换下方现有体验入口。
 
 连续施工开发验证候选 `E:\CreatureFrontierBuilds\Windows-Continuous-Construction\CreatureFrontier.exe` 已完成真实家园约96米连续行走与原输入施工整链，取消玩家观察位置调整，未新增普通玩法规则；详见[连续施工验证](Docs/CONTINUOUS_CONSTRUCTION.md)。固定目标与野生AI隔离边界保留，不替代下方现有体验入口。
