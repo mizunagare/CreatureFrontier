@@ -1,7 +1,8 @@
-param([Parameter(Mandatory=$true)][string]$ReadInputPath,[string]$BuildRoot='',[switch]$Read,[switch]$Preview,[switch]$StairWork,[switch]$SupplyPause,
+param([Parameter(Mandatory=$true)][string]$ReadInputPath,[string]$BuildRoot='',[switch]$Read,[switch]$Preview,[switch]$StairWork,[switch]$SupplyPause,[switch]$WalkHarvest,
       [ValidateSet('960x540','1280x720')][string]$Resolution='1280x720')
 $ErrorActionPreference='Stop'
 if($SupplyPause -and !$StairWork){throw '补料核对须同时指定楼梯伙伴施工模式'}
+if($WalkHarvest -and $Read){throw '徒步采料只用于开始施工前的完整流程，不能与中途读取组合'}
 $projectRoot=Split-Path $PSScriptRoot -Parent
 . (Join-Path $PSScriptRoot 'BuildFingerprint.ps1')
 $ReadInputPath=(Resolve-Path -LiteralPath $ReadInputPath).Path
@@ -25,15 +26,17 @@ try{
     $arguments=@($(if($Read){'-CFUpperDeckRead'}else{'-CFUpperDeckTest'}),'-nullrhi','-nosound','-unattended','-nop4',('-abslog="'+$log+'"'))
     if($StairWork){$arguments+='-CFUpperDeckStairWork'}
     if($SupplyPause){$arguments+='-CFUpperDeckSupplyPause'}
+    if($WalkHarvest){$arguments+='-CFUpperDeckWalkHarvest'}
     if($Preview){$size=$Resolution.Split('x');$arguments=@($arguments|Where-Object {$_ -ne '-nullrhi'})+@('-CFUpperDeckPreview','-RenderOffscreen','-ForceRes',('-ResX='+$size[0]),('-ResY='+$size[1]),'-norhithread','-forcerhibypass','-ExecCmds="t.MaxFPS 60,r.MotionBlurQuality 0,r.AntiAliasingMethod 1"')}
     $exe=if($BuildRoot){$module}elseif($Preview){'D:/Epic/UE_5.8/Engine/Binaries/Win64/UnrealEditor.exe'}else{'D:/Epic/UE_5.8/Engine/Binaries/Win64/UnrealEditor-Cmd.exe'}
     if(!$BuildRoot){$arguments=@(('"'+(Join-Path $projectRoot 'CreatureFrontier.uproject')+'"'),'-game')+$arguments}
     $started=[DateTime]::UtcNow
-    [pscustomobject]@{Read=[bool]$Read;StairWork=[bool]$StairWork;SupplyPause=[bool]$SupplyPause;Preview=[bool]$Preview;Resolution=$Resolution;BuildSHA256=$hash;ReadInputSHA256=$inputHash;StartedUTC=$started.ToString('o')}|Export-Csv -LiteralPath (Join-Path $run 'Run.csv') -NoTypeInformation
+    [pscustomobject]@{Read=[bool]$Read;StairWork=[bool]$StairWork;SupplyPause=[bool]$SupplyPause;WalkHarvest=[bool]$WalkHarvest;Preview=[bool]$Preview;Resolution=$Resolution;BuildSHA256=$hash;ReadInputSHA256=$inputHash;StartedUTC=$started.ToString('o')}|Export-Csv -LiteralPath (Join-Path $run 'Run.csv') -NoTypeInformation
     Write-Host ('原遮棚二层楼板施工：'+$run)
     $process=Start-Process -FilePath $exe -ArgumentList $arguments -WindowStyle Hidden -PassThru
-    if(!$process.WaitForExit(330000)){$process.Kill();$process.WaitForExit();throw '二层楼板施工专项超时'}
+    if(!$process.WaitForExit($(if($WalkHarvest){450000}else{330000}))){$process.Kill();$process.WaitForExit();throw '二层楼板施工专项超时'}
     $raw=Get-Content -LiteralPath $log -Raw
+    if($WalkHarvest -and !$raw.Contains('CF_UPPER_DECK_WALK_HARVEST PASS count=15 material=20')){throw '缺少原输入徒步采料及返家守恒标记'}
     if($process.ExitCode -ne 0 -or $raw -match '\bFAIL\b|Fatal error|Assertion failed' -or !$raw.Contains('LogExit: Exiting.')){throw ('二层楼板施工专项失败：'+$log)}
     foreach($marker in @('CF_UPPER_DECK_BUILT PASS modules=25 floor=8 stairs=12 material=0','CF_UPPER_DECK_JOIN PASS outside=1','CF_UPPER_DECK_TOP PASS hero=1 pet=1 supportRetained=1 version=38','CF_UPPER_DECK_LIFE PASS version=38 retained=23 modules=25 heroUp=1 petUp=1 returned=1 material=0 seeds=1 food=0 bond=9','CF_UPPER_DECK PASS reason=complete')){
         if(!$raw.Contains($marker)){throw ('缺少二层施工／生活标记：'+$marker)}
@@ -69,7 +72,7 @@ try{
     }
     $midHash=if(!$Read){Get-FrontierBuildFingerprint -LiteralPath (Join-Path $slotRoot 'UpperDeckMid.sav')}else{''}
     $stairMidHash=if($StairWork -and !$stairRead){Get-FrontierBuildFingerprint -LiteralPath (Join-Path $slotRoot 'UpperDeckStairMid.sav')}else{''}
-    [pscustomobject]@{Read=[bool]$Read;StairWork=[bool]$StairWork;SupplyPause=[bool]$SupplyPause;StairRead=[bool]$stairRead;Preview=[bool]$Preview;Resolution=$Resolution;Pass=$true;BuildSHA256=$hash;ReadInputSHA256=$inputHash;MidSaveSHA256=$midHash;StairMidSaveSHA256=$stairMidHash;TopSaveSHA256=(Get-FrontierBuildFingerprint -LiteralPath (Join-Path $slotRoot 'UpperDeckTop.sav'));DoneSaveSHA256=(Get-FrontierBuildFingerprint -LiteralPath (Join-Path $slotRoot 'UpperDeckDone.sav'));Log=$log}|Export-Csv -LiteralPath (Join-Path $run 'Results.csv') -NoTypeInformation
+    [pscustomobject]@{Read=[bool]$Read;StairWork=[bool]$StairWork;SupplyPause=[bool]$SupplyPause;WalkHarvest=[bool]$WalkHarvest;StairRead=[bool]$stairRead;Preview=[bool]$Preview;Resolution=$Resolution;Pass=$true;BuildSHA256=$hash;ReadInputSHA256=$inputHash;MidSaveSHA256=$midHash;StairMidSaveSHA256=$stairMidHash;TopSaveSHA256=(Get-FrontierBuildFingerprint -LiteralPath (Join-Path $slotRoot 'UpperDeckTop.sav'));DoneSaveSHA256=(Get-FrontierBuildFingerprint -LiteralPath (Join-Path $slotRoot 'UpperDeckDone.sav'));Log=$log}|Export-Csv -LiteralPath (Join-Path $run 'Results.csv') -NoTypeInformation
     Write-Host '原遮棚由原伙伴实际建成二层楼板、楼梯连接及双方上下楼存读通过；图形仍须逐图目视，固定夹具不作为自然建造或最终品质验收'
 }finally{
     try{

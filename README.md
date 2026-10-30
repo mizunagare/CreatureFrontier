@@ -4,6 +4,8 @@
 
 ## 最新施工交互体验包（限定首版，非最终版）
 
+开发验证新增徒步采料候选 `E:\CreatureFrontierBuilds\Windows-Walk-Harvest\CreatureFrontier.exe`：原M输入采料及返家已接入伙伴施工整链，详见[徒步采料整合](Docs/WALK_HARVEST.md)。未做本候选新图形验收，不替代下方已有图形证据的交互体验入口。
+
 运行 `E:\CreatureFrontierBuilds\Windows-Construction-Interaction\CreatureFrontier.exe`。设置工地后B退出建造，瞄材料箱V、再瞄工地E派伙伴；左侧显示所选箱材料数，工地明确区分未派工、携料和缺料等待。缺料时E开原箱、选择材料、回车存入，E关箱，原任务自动继续。原运输、费用和需求规则保留，普通启动不赠送测试资源或房屋。
 
 内部程序SHA-256 `40F58F0DD732B7458997A6085DD57EA6017A03E86349DD424C3A6A99CA4F5C09`，格式仍38。自身七进程及普通入口冒烟通过，等待态恢复、进食休息、楼梯／运输／仓储关联有本包证据，两尺寸18张新图已目视；具体操作、引擎绑定而非系统键鼠验证及剩余边界见[施工交互说明](Docs/CONSTRUCTION_INTERACTION.md)。
