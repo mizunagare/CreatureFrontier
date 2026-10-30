@@ -63,9 +63,15 @@ bool UCompanionConstructionComponent::TickWork(float DeltaSeconds,ACFPlayerChara
     {
         for(TActorIterator<AHomeModule> It(GetWorld());It;++It)if(It->PersistentId==Site->ConstructionCrateId && It->GetKind()==EHomeModuleKind::Storage && !It->bPreview && !It->bStaged)Crate=*It;
         if(!Crate)Site->ConstructionCrateId.Invalidate();
-        // 无料可搬时保留原任务并停步，不空耗施工体力，也不免费恢复体力。
+        // 无料可搬时保留原任务，不空耗施工体力，也不免费恢复体力。
         // 补料后下一次正常更新继续原任务；已有携物仍须交付，不能误判为缺料。
-        if(!Crate || Crate->StorageInventory->Count(EFrontierItem::Material)==0){Pet->StopNavigation();return true;}
+        if(!Crate || Crate->StorageInventory->Count(EFrontierItem::Material)==0)
+        {
+            // 主人正面近距离通行时复用原胶囊扫掠与完整路径让路，不把缺料等待变成路障。
+            // 只在空手缺料分支允许；休息、携料、施工和需求优先级均不改变。
+            FVector Yield;if(Pet->FindOwnerYield(Yield,true))Pet->NavigateTo(Yield,12);else Pet->StopNavigation();
+            return true;
+        }
     }
     Pet->Stamina=FMath::Max(0.f,Pet->Stamina-DeltaSeconds*1.5f);
     if(Pet->Stamina<=0){Pet->bResumeWorkAfterRest=true;Pet->SetActivity(ECreatureActivity::Rest);Pet->StopNavigation();return true;}

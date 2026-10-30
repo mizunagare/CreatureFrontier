@@ -151,7 +151,7 @@ protected:
     void OnRep_Activity();
 
 private:
-    bool FindOwnerYield(FVector& Out);
+    bool FindOwnerYield(FVector& Out,bool WaitingForSupply=false);
     FVector OwnerYieldGoal=FVector::ZeroVector;
     double OwnerYieldUntil=0,NextOwnerYieldSearch=0;
     const ACharacter* FindFollowPathBlocker(const FVector& Destination) const;

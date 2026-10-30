@@ -28,6 +28,7 @@
 #include "PlayerGatheringComponent.h"
 #include "InputRoutingQA.h"
 #include "Components/CapsuleComponent.h"
+#include "StorageInteractionComponent.h"
 
 namespace
 {
@@ -246,6 +247,7 @@ struct FUpperDeckBuildTest
     bool SupplyPause=false,SupplyResumed=false;double SupplyAt=-1;float SupplyStamina=0;
     bool WalkHarvest=false,HarvestHeld=false,HarvestReturning=false;int32 HarvestBefore=0,HarvestNodeBefore=0,HarvestPoint=0;
     TWeakObjectPtr<AResourceNode> HarvestNode;TArray<FVector> HarvestRoute;double HarvestProgressAt=0,HarvestDistance=0;FVector HarvestAnchor;
+    bool WalkSupply=false,StoreReturning=false;int32 StoreAmount=0,StoreNext=0,StoreTrips=0;FVector StoreReturn;double StoreDistance=0;
     const FVector Upper=FVector(-1200,-400,280);
     // 下楼连续走到平地再会合，不把正常阶梯队形的三维间隔误当作卡路。
     const TArray<FVector> Route={FVector(-1200,-1080,40),FVector(-1200,-900,40),FVector(-1200,-350,360),FVector(-1200,-1080,40),FVector(-1500,-1080,40)};
@@ -310,7 +312,9 @@ struct FUpperDeckBuildTest
                 if(Harvested!=15 || Hero->Inventory->Count(EFrontierItem::Material)!=20 || HarvestDistance<1000)return End(false,TEXT("harvest-return-budget"));
                 CFInputQA::Release(Hero,EKeys::LeftShift);
                 UE_LOG(LogTemp,Display,TEXT("CF_UPPER_DECK_WALK_HARVEST PASS count=15 material=20 distance=%.1f input=1 returned=1"),HarvestDistance);
-                if(!Queue())return End(false,TEXT("queue"));Phase=1;return true;
+                if(!Queue())return End(false,TEXT("queue"));
+                if(WalkSupply)return BeginStore(8,1);
+                Phase=1;return true;
             }
         }
         if(HarvestHeld)
@@ -341,6 +345,75 @@ struct FUpperDeckBuildTest
         if(Hero->TraceResource()!=Node || !Node->CanReach(Hero,300) || !CFInputQA::Press(Hero,EKeys::M) || !Hero->Gathering->IsGathering())return End(false,TEXT("harvest-input-start"));
         HarvestHeld=true;return true;
     }
+    bool BeginStore(int32 Amount,int32 Next)
+    {
+        if(Pet->Construction->GetSite()!=(Next==1?Site.Get():Stair.Get()))return End(false,TEXT("store-start-task"));
+        StoreAmount=Amount;StoreNext=Next;StoreReturn=Hero->GetActorLocation();StoreReturning=false;
+        // 初始工地观察点比地面高20厘米；返回点使用导航地面，不重设玩家位置。
+        auto* Nav=FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);if(!Nav)return End(false,TEXT("store-nav"));
+        TArray<FVector> Best;double Length=DBL_MAX;
+        for(int32 I=0;I<8;++I)
+        {
+            const double Angle=I*PI/4;FNavLocation Floor;
+            if(!Nav->ProjectPointToNavigation(Box->GetActorLocation()+FVector(FMath::Cos(Angle)*190,FMath::Sin(Angle)*190,0),Floor,FVector(60,60,160)))continue;
+            const auto* Capsule=Hero->GetCapsuleComponent();const FVector Goal=Floor.Location+FVector(0,0,Capsule->GetScaledCapsuleHalfHeight());
+            if(FVector::Dist(Goal,Box->GetActorLocation())>280)continue;
+            FCollisionQueryParams Q(SCENE_QUERY_STAT(UpperStoreStand),false,Hero);FHitResult Hit;
+            if(World->OverlapBlockingTestByChannel(Goal,FQuat::Identity,ECC_Pawn,FCollisionShape::MakeCapsule(Capsule->GetScaledCapsuleRadius()-1,Capsule->GetScaledCapsuleHalfHeight()-1),Q))continue;
+            if(World->LineTraceSingleByChannel(Hit,Goal+FVector(0,0,64),Box->GetActorLocation()+FVector(0,0,40),ECC_Visibility,Q) && Hit.GetActor()!=Box.Get())continue;
+            auto* Path=UNavigationSystemV1::FindPathToLocationSynchronously(World,Hero->GetActorLocation(),Floor.Location,Hero);
+            if(Path && Path->IsValid() && !Path->IsPartial() && Path->PathPoints.Num()>1 && Path->GetPathLength()<Length){Length=Path->GetPathLength();Best=Path->PathPoints;}
+        }
+        if(Best.IsEmpty())return End(false,TEXT("store-box-path"));
+        HarvestRoute=MoveTemp(Best);HarvestPoint=1;HarvestAnchor=Hero->GetActorLocation();HarvestProgressAt=World->GetTimeSeconds();
+        if(!CFInputQA::Press(Hero,EKeys::LeftShift))return End(false,TEXT("store-pace"));Phase=7;return true;
+    }
+    bool TickStore()
+    {
+        auto* Expected=StoreNext==1?Site.Get():Stair.Get();
+        if(!Expected || (Expected->bUnderConstruction?Pet->Construction->GetSite()!=Expected:Pet->Construction->GetSite()!=nullptr) || Box->PersistentId!=BoxId)return End(false,TEXT("store-original-task"));
+        const int32 Budget=Hero->Inventory->Count(EFrontierItem::Material)+Box->StorageInventory->Count(EFrontierItem::Material)+
+            Pet->Cargo->Count()+(Site->bUnderConstruction?Site->StorageInventory->Count(EFrontierItem::Material):0)+
+            (Stair.IsValid()?(Stair->bUnderConstruction?Stair->StorageInventory->Count(EFrontierItem::Material):Stair->PaidMaterials):0);
+        if(Budget!=(Site->bUnderConstruction?20:12))return End(false,TEXT("store-budget"));
+        const auto Here=Hero->GetActorLocation();
+        while(HarvestPoint<HarvestRoute.Num() && FVector::Dist2D(Here,HarvestRoute[HarvestPoint])<16)++HarvestPoint;
+        if(HarvestPoint<HarvestRoute.Num())
+        {
+            const auto Direction=(HarvestRoute[HarvestPoint]-Here).GetSafeNormal2D();Input->Direction=Direction;FaceHarvest(Here+Direction*500+FVector(0,0,64));
+            if(FVector::Dist2D(Here,HarvestAnchor)>20){HarvestAnchor=Here;HarvestProgressAt=World->GetTimeSeconds();}
+            if(World->GetTimeSeconds()-HarvestProgressAt>5)return End(false,TEXT("store-path-blocked"));return true;
+        }
+        Input->Direction=FVector::ZeroVector;if(Hero->GetVelocity().Size2D()>3)return true;
+        if(StoreReturning)
+        {
+            CFInputQA::Release(Hero,EKeys::LeftShift);Phase=StoreNext;ProgressAt=World->GetTimeSeconds();
+            UE_LOG(LogTemp,Display,TEXT("CF_UPPER_DECK_STORE_RETURN PASS trip=%d distance=%.1f sameTask=1"),StoreTrips,StoreDistance);return true;
+        }
+        FaceHarvest(Box->GetActorLocation()+FVector(0,0,40));
+        if(Hero->Storage->TraceCrate()!=Box.Get())return End(false,TEXT("store-aim"));
+        if(!Hero->Storage->IsOpen())
+        {
+            if(!CFInputQA::Press(Hero,EKeys::E) || Hero->Storage->GetCrate()!=Box.Get())return End(false,TEXT("store-open-input"));
+            if(Photo(*FString::Printf(TEXT("Store%d"),StoreTrips+1),Box->GetActorLocation()+FVector(0,0,40)))return true;
+        }
+        if(Hero->Storage->GetCrate()!=Box.Get() || Hero->Storage->GetSelection()!=static_cast<int32>(EFrontierItem::Material))return End(false,TEXT("store-selection"));
+        if(StoreTrips==2 && !FMath::IsNearlyZero(SupplyStamina-Pet->Stamina,.01f))return End(false,TEXT("store-wait-stamina"));
+        const int32 Before=Hero->Inventory->Count(EFrontierItem::Material),Stock=Box->StorageInventory->Count(EFrontierItem::Material);
+        auto* Task=Pet->Construction->GetSite();
+        for(int32 I=0;I<StoreAmount;++I)if(!CFInputQA::Press(Hero,EKeys::Enter))return End(false,TEXT("store-deposit-input"));
+        if(Hero->Inventory->Count(EFrontierItem::Material)!=Before-StoreAmount || Box->StorageInventory->Count(EFrontierItem::Material)!=Stock+StoreAmount ||
+            Pet->Construction->GetSite()!=Task || !CFInputQA::Press(Hero,EKeys::E) || Hero->Storage->IsOpen())return End(false,TEXT("store-input-budget"));
+        ++StoreTrips;
+        if(StoreTrips==1)UE_LOG(LogTemp,Display,TEXT("CF_UPPER_DECK_GUARDS PASS pendingLanding=0 material=12 crate=8 anchorBelow=1"));
+        if(StoreTrips==3){SupplyResumed=true;UE_LOG(LogTemp,Display,TEXT("CF_UPPER_DECK_SUPPLY_WAIT PASS noDrain=1 sameTask=1 actualRefill=3 seconds=%.3f"),World->GetTimeSeconds()-SupplyAt);}
+        UE_LOG(LogTemp,Display,TEXT("CF_UPPER_DECK_STORE_INPUT PASS trip=%d amount=%d sameTask=1 open=1 closed=1"),StoreTrips,StoreAmount);
+        auto* Nav=FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);FNavLocation Floor;
+        if(!Nav || !Nav->ProjectPointToNavigation(StoreReturn,Floor,FVector(60,60,160)))return End(false,TEXT("store-return-projection"));
+        auto* Path=UNavigationSystemV1::FindPathToLocationSynchronously(World,Here,Floor.Location,Hero);
+        if(!Path || !Path->IsValid() || Path->IsPartial() || Path->PathPoints.Num()<2)return End(false,TEXT("store-return-path"));
+        HarvestRoute=Path->PathPoints;HarvestPoint=1;HarvestAnchor=Here;HarvestProgressAt=World->GetTimeSeconds();StoreReturning=true;return true;
+    }
     bool Photo(const TCHAR* Name,FVector Target)
     {
         if(!Preview || Photos.Contains(Name))return false;Photos.Add(Name);
@@ -367,8 +440,8 @@ struct FUpperDeckBuildTest
         const auto Before=Hero->Inventory->GetStacks();
         if(Hero->HomeBuilding->BuildAt(FTransform(FRotator(0,90,0),FVector(-1200,-800,-30)),StairBase->PersistentId) ||
             !Before.OrderIndependentCompareEqual(Hero->Inventory->GetStacks()) || HomeLayout::FindFloor(Upper,HomeLayout::Collect(World),280).IsValid())return false;
-        if(!Hero->Inventory->TransferTo(Box->StorageInventory,{{EFrontierItem::Material,8}}) || !Pet->Construction->Assign(Site.Get(),Box.Get(),Hero))return false;
-        UE_LOG(LogTemp,Display,TEXT("CF_UPPER_DECK_GUARDS PASS pendingLanding=0 material=12 crate=8 anchorBelow=1"));return true;
+        if((!WalkSupply && !Hero->Inventory->TransferTo(Box->StorageInventory,{{EFrontierItem::Material,8}})) || !Pet->Construction->Assign(Site.Get(),Box.Get(),Hero))return false;
+        if(!WalkSupply)UE_LOG(LogTemp,Display,TEXT("CF_UPPER_DECK_GUARDS PASS pendingLanding=0 material=12 crate=8 anchorBelow=1"));return true;
     }
     bool Tick()
     {
@@ -381,14 +454,23 @@ struct FUpperDeckBuildTest
             UE_LOG(LogTemp,Display,TEXT("CF_UPPER_DECK_MOTION_DIAG delta=%.6f velocity=%s speed=%.1f step=%.1f collision=%d tick=%d mode=%d"),Delta,*PetVelocity.ToString(),Pet->GetCharacterMovement()->GetMaxSpeed(),Pet->GetCharacterMovement()->MaxStepHeight,Pet->GetActorEnableCollision(),Pet->IsActorTickEnabled(),static_cast<int32>(Pet->GetCharacterMovement()->MovementMode));
             return End(false,TEXT("continuity"));
         }
-        if(Phase==3 || (WalkHarvest && Phase==0))
+        if(Phase==3 || Phase==7 || (WalkHarvest && Phase==0))
         {
             if(WalkHarvest && Phase==0)HarvestDistance+=FVector::Dist(H,PreviousHero);
+            if(Phase==7)StoreDistance+=FVector::Dist(H,PreviousHero);
             HeroTravel+=FVector::Dist(H,PreviousHero);const bool HeroContinuous=MovementContinuous(Hero,PreviousHero,H,HeroVelocity,Delta);PreviousHero=H;HeroVelocity=Hero->GetVelocity();
             if(!HeroContinuous)return End(false,TEXT("hero-continuity"));
         }
         // 截图等待只延迟场景动作，仍采样双方的每帧真实位移。
         if(FPlatformTime::Seconds()<NextPhoto)return true;
+        if(WalkSupply && Phase==7)
+        {
+            if(!Mid && Site.IsValid() && Pet->Construction->GetSite()==Site.Get() && Pet->Cargo->Count()==3)
+            {if(!Hero->SaveProgress(TEXT("UpperDeckMid")))return End(false,TEXT("mid-save"));Mid=true;UE_LOG(LogTemp,Display,TEXT("CF_UPPER_DECK_MID PASS version=%d carried=3"),FrontierCurrentSaveVersion);}
+            if(!StairMid && Stair.IsValid() && Pet->Construction->GetSite()==Stair.Get() && Pet->Cargo->Count()==3)
+            {if(!Hero->SaveProgress(TEXT("UpperDeckStairMid")))return End(false,TEXT("stairs-mid-save"));StairMid=true;UE_LOG(LogTemp,Display,TEXT("CF_UPPER_DECK_STAIR_MID PASS version=%d carried=3 material=%d"),FrontierCurrentSaveVersion,Hero->Inventory->Count(EFrontierItem::Material));}
+            return TickStore();
+        }
         if(Phase==0)
         {
             if(WalkHarvest)return TickWalkHarvest();
@@ -428,7 +510,7 @@ struct FUpperDeckBuildTest
             if(StairWork)
             {
                 Stair=Hero->HomeBuilding->QueueAt(FTransform(FRotator(0,90,0),FVector(-1200,-800,-30)),StairBase->PersistentId);
-                if(!Stair.IsValid() || !Hero->Inventory->TransferTo(Box->StorageInventory,{{EFrontierItem::Material,SupplyPause?9:12}}) || !Pet->Construction->Assign(Stair.Get(),Box.Get(),Hero))return End(false,TEXT("stairs-queue"));
+                if(!Stair.IsValid() || (!WalkSupply && !Hero->Inventory->TransferTo(Box->StorageInventory,{{EFrontierItem::Material,SupplyPause?9:12}})) || !Pet->Construction->Assign(Stair.Get(),Box.Get(),Hero))return End(false,TEXT("stairs-queue"));
                 const auto Before=Hero->Inventory->GetStacks();
                 if(Hero->HomeBuilding->Dismantle(StairBase.Get()) || !StairBase.IsValid() || !Before.OrderIndependentCompareEqual(Hero->Inventory->GetStacks()))return End(false,TEXT("stairs-support"));
                 // 用真实写盘副本验证旧格式拒绝新施工语义，不修改输入档或当前世界。
@@ -438,6 +520,7 @@ struct FUpperDeckBuildTest
                 if(!UGameplayStatics::SaveGameToSlot(Legacy,TEXT("UpperDeckStairCheck"),0) || Hero->LoadProgress(TEXT("UpperDeckStairCheck")) || Pet->Construction->GetSite()!=Stair.Get())return End(false,TEXT("stairs-legacy-guard"));
                 UE_LOG(LogTemp,Display,TEXT("CF_UPPER_DECK_STAIR_GUARDS PASS supportRetained=1 legacy37Rejected=1 worldRetained=1"));
                 Hero->Feedback=TEXT("楼梯工地已设置，伙伴正从原箱搬料");
+                if(WalkSupply)return BeginStore(9,6);
                 ProgressAt=World->GetTimeSeconds();Phase=6;return true;
             }
             if(!Hero->HomeBuilding->BuildAt(FTransform(FRotator(0,90,0),FVector(-1200,-800,-30)),StairBase->PersistentId))return End(false,TEXT("stairs"));
@@ -471,7 +554,9 @@ struct FUpperDeckBuildTest
                 if(SupplyAt<0){SupplyAt=World->GetTimeSeconds();SupplyStamina=Pet->Stamina;}
                 if(World->GetTimeSeconds()-SupplyAt<5)return true;
                 const float Loss=SupplyStamina-Pet->Stamina;
-                if(!FMath::IsNearlyZero(Loss,.01f) || Pet->Construction->GetSite()!=Stair.Get() || Stair->ConstructionWork!=0 || Box->StorageInventory->Count(EFrontierItem::Material)!=0 || Hero->Inventory->Count(EFrontierItem::Material)!=3 || !Hero->Inventory->TransferTo(Box->StorageInventory,{{EFrontierItem::Material,3}}))return End(false,TEXT("stairs-supply-wait"));
+                if(!FMath::IsNearlyZero(Loss,.01f) || Pet->Construction->GetSite()!=Stair.Get() || Stair->ConstructionWork!=0 || Box->StorageInventory->Count(EFrontierItem::Material)!=0 || Hero->Inventory->Count(EFrontierItem::Material)!=3)return End(false,TEXT("stairs-supply-wait"));
+                if(WalkSupply)return BeginStore(3,6);
+                if(!Hero->Inventory->TransferTo(Box->StorageInventory,{{EFrontierItem::Material,3}}))return End(false,TEXT("stairs-supply-transfer"));
                 SupplyResumed=true;UE_LOG(LogTemp,Display,TEXT("CF_UPPER_DECK_SUPPLY_WAIT PASS noDrain=1 sameTask=1 actualRefill=3 seconds=%.3f"),World->GetTimeSeconds()-SupplyAt);
             }
             if(!StairMid && Pet->Cargo->Count()==3)
@@ -487,7 +572,10 @@ struct FUpperDeckBuildTest
         }
         if(Phase==5)
         {
-            Observe(FVector(-1500,-1080,40.15));ProgressAt=World->GetTimeSeconds();Phase=2;return true;
+            Observe(FVector(-1500,-1080,40.15));
+            // 后续会合断言要求伙伴在西侧；明确玩家朝东，避免前一段行走朝向改变合法跟随队位。
+            FaceHarvest(Hero->GetActorLocation()+FVector(500,0,64));
+            ProgressAt=World->GetTimeSeconds();Phase=2;return true;
         }
         if(Phase==2)
         {
@@ -545,6 +633,8 @@ void RunUpperDeckConstructionScenario(UWorld* World,ACFPlayerCharacter* Hero,boo
     State->StairWork=FParse::Param(FCommandLine::Get(),TEXT("CFUpperDeckStairWork"));
     State->SupplyPause=FParse::Param(FCommandLine::Get(),TEXT("CFUpperDeckSupplyPause"));
     State->WalkHarvest=FParse::Param(FCommandLine::Get(),TEXT("CFUpperDeckWalkHarvest"));
+    State->WalkSupply=FParse::Param(FCommandLine::Get(),TEXT("CFUpperDeckWalkSupply"));
+    if(State->WalkSupply && (!State->WalkHarvest || !State->StairWork || !State->SupplyPause || Read)){State->End(false,TEXT("walk-supply-mode"));return;}
     if(State->WalkHarvest && Read){State->End(false,TEXT("walk-harvest-read-mode"));return;}
     const auto* Source=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("UpperDeckInput"),0));
     const bool StairRead=Read && State->StairWork && Source && Source->HomeModules.Num()==25;

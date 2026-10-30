@@ -78,9 +78,10 @@ const ACharacter* ACreatureCharacter::FindFollowPathBlocker(const FVector& Desti
     return FrontierFollowPath::Blocker(this,GetActorLocation(),Destination);
 }
 
-bool ACreatureCharacter::FindOwnerYield(FVector& Out)
+bool ACreatureCharacter::FindOwnerYield(FVector& Out,bool WaitingForSupply)
 {
-    const auto* Hero=Tamer?Cast<ACFPlayerCharacter>(Tamer->GetPawn()):nullptr;if(!Hero || Activity!=ECreatureActivity::Follow)return false;
+    const auto* Hero=Tamer?Cast<ACFPlayerCharacter>(Tamer->GetPawn()):nullptr;
+    if(!Hero || (Activity!=ECreatureActivity::Follow && !(WaitingForSupply && Activity==ECreatureActivity::Work)))return false;
     const double Now=GetWorld()->GetTimeSeconds();
     if(Now<OwnerYieldUntil && FVector::Dist2D(GetActorLocation(),OwnerYieldGoal)>12){Out=OwnerYieldGoal;return true;}
     const FVector Intent=Hero->GetLastMovementInputVector().GetSafeNormal2D(),Offset=GetActorLocation()-Hero->GetActorLocation();
