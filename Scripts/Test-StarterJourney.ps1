@@ -1,5 +1,6 @@
-param([string]$BuildRoot='',[string]$ReadInputPath='',[switch]$Farm,[switch]$Prepare,[switch]$Scout,[switch]$Rescue,[switch]$Recovery,[switch]$Flank,[switch]$Resume,[switch]$Preview,[ValidateSet('960x540','1280x720')][string]$Resolution='1280x720')
+param([string]$BuildRoot='',[string]$ReadInputPath='',[switch]$Farm,[switch]$Prepare,[switch]$Scout,[switch]$Rescue,[switch]$Recovery,[switch]$Flank,[switch]$CombatTrace,[switch]$Resume,[switch]$Preview,[ValidateSet('960x540','1280x720')][string]$Resolution='1280x720')
 $ErrorActionPreference='Stop'
+if($CombatTrace -and !$Flank){throw '战斗结算追踪仅用于真实绕行接敌或自身中途恢复'}
 $projectRoot=Split-Path $PSScriptRoot -Parent
 . (Join-Path $PSScriptRoot 'BuildFingerprint.ps1')
 if($ReadInputPath){$ReadInputPath=(Resolve-Path -LiteralPath $ReadInputPath).Path}
@@ -27,11 +28,12 @@ try{
     if($ReadInputPath){Copy-Item -LiteralPath $ReadInputPath -Destination (Join-Path $slots ($prefix+'Input.sav'))}
     $flag='-CF'+$prefix+$(if($readMode){'Read'}else{'Test'})
     $arguments=@($flag,'-nullrhi','-nosound','-unattended','-nop4',('-abslog="'+$log+'"'))
+    if($CombatTrace){$arguments+='-CFCombatTrace'}
     if($Preview){$size=$Resolution.Split('x');$arguments=@($arguments|Where-Object {$_ -ne '-nullrhi'})+@(('-CF'+$prefix+'Preview'),'-RenderOffscreen','-ForceRes',('-ResX='+$size[0]),('-ResY='+$size[1]),'-norhithread','-forcerhibypass','-ExecCmds="t.MaxFPS 60,r.MotionBlurQuality 0,r.AntiAliasingMethod 1"')}
     $exe=if($BuildRoot){$module}elseif($Preview){'D:/Epic/UE_5.8/Engine/Binaries/Win64/UnrealEditor.exe'}else{'D:/Epic/UE_5.8/Engine/Binaries/Win64/UnrealEditor-Cmd.exe'}
     if(!$BuildRoot){$arguments=@(('"'+(Join-Path $projectRoot 'CreatureFrontier.uproject')+'"'),'-game')+$arguments}
     $started=[DateTime]::UtcNow
-    [pscustomobject]@{BuildRoot=$BuildRoot;Farm=[bool]$Farm;Prepare=[bool]$Prepare;Scout=[bool]$Scout;Rescue=[bool]$Rescue;Recovery=[bool]$Recovery;Flank=[bool]$Flank;Resume=$readMode;ReadInputPath=$ReadInputPath;InputSHA256=$sourceHash;Preview=[bool]$Preview;Resolution=$Resolution;BuildSHA256=$hash}|Export-Csv (Join-Path $run 'Run.csv') -NoTypeInformation
+    [pscustomobject]@{BuildRoot=$BuildRoot;Farm=[bool]$Farm;Prepare=[bool]$Prepare;Scout=[bool]$Scout;Rescue=[bool]$Rescue;Recovery=[bool]$Recovery;Flank=[bool]$Flank;CombatTrace=[bool]$CombatTrace;Resume=$readMode;ReadInputPath=$ReadInputPath;InputSHA256=$sourceHash;Preview=[bool]$Preview;Resolution=$Resolution;BuildSHA256=$hash}|Export-Csv (Join-Path $run 'Run.csv') -NoTypeInformation
     Write-Host ('正常开局伙伴旅程：'+$run)
     $p=Start-Process -FilePath $exe -ArgumentList $arguments -WindowStyle Hidden -PassThru
     $timeout=if($Farm){300000}else{240000}
@@ -64,6 +66,7 @@ try{
         if(!$readMode){$markers+=@('CF_STARTER_FLANK_COMMAND PASS focus=1 specialBinding=1 samePet=1 avoid=1','CF_STARTER_FLANK_CONTACT PASS')}
     }
     foreach($marker in $markers){if(!$raw.Contains($marker)){throw ('缺少开局旅程证据：'+$marker)}}
+    if($CombatTrace -and !$readMode -and (!$raw.Contains('CF_SKILL_TRACE_BEGIN') -or (!$raw.Contains('CF_SKILL_TRACE_RESOLVE') -and !$raw.Contains('CF_SKILL_TRACE_CANCEL')) -or !$raw.Contains('CF_CREATURE_DAMAGE_TRACE'))){throw '战斗追踪缺少实际蓄力、结算或取消及真实伤害记录'}
     if($Preview){
         $pattern=if($Scout){'CF_STARTER_SCOUT_PREVIEW_ROOT [^\r\n]*[/\\]([A-F0-9]{32})'}elseif($Prepare){'CF_STARTER_PREP_PREVIEW_ROOT [^\r\n]*[/\\]([A-F0-9]{32})'}elseif($Farm){'CF_STARTER_FARM_PREVIEW_ROOT [^\r\n]*[/\\]([A-F0-9]{32})'}else{'CF_STARTER_PREVIEW_ROOT [^\r\n]*[/\\]([A-F0-9]{32})'}
         if($Recovery){$pattern='CF_STARTER_RECOVERY_PREVIEW_ROOT [^\r\n]*[/\\]([A-F0-9]{32})'}

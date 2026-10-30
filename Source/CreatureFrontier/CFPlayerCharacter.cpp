@@ -1,4 +1,6 @@
 #include "CFPlayerCharacter.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 #include "CFGameMode.h"
 #include "FrontierChinese.h"
 #include "Camera/CameraComponent.h"
@@ -147,6 +149,8 @@ bool ACFPlayerCharacter::SaveProgress(const FString& Slot)
         Record.EncounterId = It->EncounterId;
         Record.bAlpha = It->bAlpha;
         Record.AlphaCooldown = It->AlphaCooldown;
+        if(FParse::Param(FCommandLine::Get(),TEXT("CFCombatTrace")))
+            UE_LOG(LogTemp,Display,TEXT("CF_COMBAT_SAVE_TRACE slot=%s actor=%s meleeObserved=%.3f specialSerialized=%.3f alphaSerialized=%.3f health=%.2f"),*Slot,*Record.Id.ToString(),It->GetAttackCooldownRemaining(),Record.SpecialCooldown,Record.AlphaCooldown,Record.Health);
         Record.bHasHabitat = It->bHasHabitat; Record.HabitatHome = It->HabitatHome;
         Record.RoamRadius = It->RoamRadius; Record.LeashRadius = It->LeashRadius;
         Record.bOwned = It->Tamer == GetController();
@@ -397,6 +401,8 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
         Pet->BondPoints=Save->FormatVersion>=16?Record.BondPoints:0;
         Pet->PettingCooldown=Save->FormatVersion>=16?Record.PettingCooldown:0;
         Pet->Activity = Record.Activity;
+        if(FParse::Param(FCommandLine::Get(),TEXT("CFCombatTrace")))
+            UE_LOG(LogTemp,Display,TEXT("CF_COMBAT_LOAD_TRACE slot=%s actor=%s meleeRestored=%.3f specialRestored=%.3f alphaRestored=%.3f health=%.2f"),*Slot,*Record.Id.ToString(),Pet->GetAttackCooldownRemaining(),Pet->SpecialCooldownRemaining,Pet->AlphaCooldown,Pet->Health);
         Pet->bAvoidCombat=Record.CombatStance==1;
         for (TActorIterator<AWorkStation> It(GetWorld()); It; ++It)
             if (!Record.WorkSiteId.IsValid() && !It->bPlayerBuilt && It->GetFName() == Record.WorkSiteName) { Pet->WorkSite = *It; break; }

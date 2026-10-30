@@ -1,4 +1,6 @@
 #include "CreatureCharacter.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 #include "CompanionConstructionComponent.h"
 #include "CreatureDefinition.h"
 #include "CompanionCargoComponent.h"
@@ -490,7 +492,10 @@ float ACreatureCharacter::TakeDamage(float DamageAmount, FDamageEvent const& Dam
     const float Applied = FMath::Min(Health, FMath::Max(0.0f, DamageAmount) * Affinity * (GuardRemaining > 0 ? 0.5f : 1.0f));
     if (HasAuthority() && Applied > 0)
     {
+        const float Before=Health;
         Health = FMath::Max(0.0f, Health - Applied);
+        if(FParse::Param(FCommandLine::Get(),TEXT("CFCombatTrace")))
+            UE_LOG(LogTemp,Display,TEXT("CF_CREATURE_DAMAGE_TRACE victim=%s attacker=%s raw=%.2f affinity=%.2f guard=%.2f applied=%.2f before=%.2f after=%.2f"),*PersistentId.ToString(),Attacker?*Attacker->PersistentId.ToString():*GetNameSafe(DamageCauser),DamageAmount,Affinity,GuardRemaining,Applied,Before,Health);
         HitPoseRemaining=.2f;
         AffectionPoseRemaining=0;
         if(Attacker)

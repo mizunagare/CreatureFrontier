@@ -4,6 +4,8 @@
 #include "Kismet/GameplayStatics.h"
 #include "EngineUtils.h"
 #include "CompanionSkillTrail.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 
 bool ACreatureCharacter::HasClearSight(const AActor* Target) const
 {
@@ -60,6 +62,8 @@ bool ACreatureCharacter::RequestSpecial(ACreatureCharacter* Target)
 
 void ACreatureCharacter::ClearCombatOrders()
 {
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFCombatTrace")) && (SpecialWindupRemaining>0 || bSpecialRequested))
+        UE_LOG(LogTemp,Display,TEXT("CF_SKILL_TRACE_CANCEL actor=%s target=%s requested=%d windup=%.3f"),*PersistentId.ToString(),*GetNameSafe(FocusTarget),bSpecialRequested,SpecialWindupRemaining);
     if(bCombatRetreatActive)StopNavigation();
     CombatRetreatRoute.Reset();
     SeenThreat.Reset();SeenThreatRemaining=0;LastSeenThreatLocation=FVector::ZeroVector;
@@ -129,6 +133,8 @@ bool ACreatureCharacter::TickSpecial(float DeltaSeconds)
     SpecialWindupRemaining = 0.65f;
     SpecialCooldownRemaining = Definition ? Definition->SpecialCooldownSeconds : 8.0f;
     bSpecialRequested = false;
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFCombatTrace")))
+        UE_LOG(LogTemp,Display,TEXT("CF_SKILL_TRACE_BEGIN actor=%s target=%s distance=%.2f range=%.2f damage=%.2f scale=%.2f stamina=%.2f"),*PersistentId.ToString(),*FocusTarget->PersistentId.ToString(),GetDistanceTo(FocusTarget),Range,GetAttackDamage(),Definition?Definition->SpecialDamageScale:2.f,Stamina);
     if (auto* Hero = Tamer ? Cast<ACFPlayerCharacter>(Tamer->GetPawn()) : nullptr)
         Hero->Feedback = GetCreatureName() + TEXT(": ") + GetSpecialName();
     return true;
@@ -140,9 +146,22 @@ void ACreatureCharacter::ResolveSpecial()
     SpecialTarget.Reset();
     const float Range = Definition ? Definition->SpecialRange : 600.0f;
     if (!Target || Target->Health <= 0 || Target->Disposition == ECreatureDisposition::Tamed || Target->Activity == ECreatureActivity::ReturnHome ||
-        GetDistanceTo(Target) > Range || !HasClearSight(Target)) return;
+        GetDistanceTo(Target) > Range || !HasClearSight(Target))
+    {
+        if(FParse::Param(FCommandLine::Get(),TEXT("CFCombatTrace")))
+        {
+            FHitResult Hit;FCollisionQueryParams Params(SCENE_QUERY_STAT(SkillOutcomeTrace),false,this);
+            if(Target)GetWorld()->LineTraceSingleByChannel(Hit,GetActorLocation(),Target->GetActorLocation(),ECC_Visibility,Params);
+            const TCHAR* Reason=!Target?TEXT("target-invalid"):Target->Health<=0?TEXT("target-downed"):Target->Disposition==ECreatureDisposition::Tamed?TEXT("target-tamed"):Target->Activity==ECreatureActivity::ReturnHome?TEXT("target-returning"):GetDistanceTo(Target)>Range?TEXT("range"):TEXT("sight");
+            UE_LOG(LogTemp,Display,TEXT("CF_SKILL_TRACE_RESOLVE actor=%s target=%s outcome=miss reason=%s distance=%.2f range=%.2f blocker=%s impact=%s"),*PersistentId.ToString(),Target?*Target->PersistentId.ToString():TEXT("none"),Reason,Target?GetDistanceTo(Target):-1.f,Range,*GetNameSafe(Hit.GetActor()),*Hit.ImpactPoint.ToString());
+        }
+        return;
+    }
     const float Damage = GetAttackDamage() * (Definition ? Definition->SpecialDamageScale : 2.0f);
-    UGameplayStatics::ApplyDamage(Target, Damage, Tamer, this, UDamageType::StaticClass());
+    const float Before=Target->Health;
+    const float Applied=UGameplayStatics::ApplyDamage(Target, Damage, Tamer, this, UDamageType::StaticClass());
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFCombatTrace")))
+        UE_LOG(LogTemp,Display,TEXT("CF_SKILL_TRACE_RESOLVE actor=%s target=%s outcome=hit raw=%.2f applied=%.2f before=%.2f after=%.2f distance=%.2f range=%.2f"),*PersistentId.ToString(),*Target->PersistentId.ToString(),Damage,Applied,Before,Target->Health,GetDistanceTo(Target),Range);
     // 在已通过距离/视线检查的真实结算点生成，不把表现当作第二次攻击。
     if(auto* Trail=GetWorld()->SpawnActor<ACompanionSkillTrail>())
     {
