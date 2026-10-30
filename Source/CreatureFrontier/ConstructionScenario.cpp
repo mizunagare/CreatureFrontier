@@ -18,6 +18,7 @@
 #include "InputRoutingQA.h"
 #include "BaseBuildingComponent.h"
 #include "WorkStation.h"
+#include "StorageInteractionComponent.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
 #include "GameFramework/PlayerController.h"
@@ -30,12 +31,22 @@
 
 namespace
 {
+bool ConstructionMotion(const ACreatureCharacter* Pet,FVector Before,FVector Now,FVector Velocity,double Delta)
+{
+    if(!Pet || !FMath::IsFinite(Delta) || Delta<0 || Now.ContainsNaN())return false;
+    const auto* Movement=Pet->GetCharacterMovement();
+    const double Horizontal=FMath::Max(static_cast<double>(Movement->GetMaxSpeed()),Velocity.Size2D())*Delta+3;
+    const double Vertical=FMath::Max(FMath::Abs(Pet->GetVelocity().Z),FMath::Abs(Velocity.Z))*Delta+.5*FMath::Abs(Pet->GetWorld()->GetGravityZ())*Delta*Delta+Movement->MaxStepHeight+3;
+    return FVector::Dist2D(Before,Now)<=Horizontal && FMath::Abs(Now.Z-Before.Z)<=Vertical;
+}
 struct FConstructionTest
 {
     UWorld* World;ACFPlayerCharacter* Hero;TWeakObjectPtr<ACreatureCharacter> Pet;TWeakObjectPtr<AHomeModule> Site,Crate;
     FGuid PetId,SiteId,CrateId;int32 Phase=0;double At=0,Deadline=0,Travel=0;FVector Previous;
     bool Needs=false,CancelledOnce=false,Fed=false;float FeedingWork=0;
     bool WaitAudit=false,WaitingRestore=false,RefillCarried=false;float WaitingStamina=0;
+    bool InteractiveRefill=false;
+    double PreviousTime=0;FVector PreviousVelocity;
     TWeakObjectPtr<AWorkStation> Trough;
     bool Preview=false;FString ShotRoot;TSet<FString> Shots;double ShotUntil=0;
     bool Rebind()
@@ -47,12 +58,12 @@ struct FConstructionTest
         if(Needs && !Trough.IsValid())return false;
         for(TActorIterator<AWildEncounter> It(World);It;++It)It->SetActorTickEnabled(false);
         for(TActorIterator<ACreatureCharacter> It(World);It;++It)if(*It!=Pet.Get()){It->SetActorTickEnabled(false);It->GetCharacterMovement()->DisableMovement();}
-        Previous=Pet->GetActorLocation();return true;
+        Previous=Pet->GetActorLocation();PreviousTime=World->GetTimeSeconds();PreviousVelocity=Pet->GetVelocity();return true;
     }
     void Face(AActor* Actor){const auto* Module=Cast<AHomeModule>(Actor);const auto R=(Actor->GetActorLocation()+FVector(0,0,Module && Module->bUnderConstruction?12:30)-Hero->FirstPersonCamera->GetComponentLocation()).Rotation();Hero->GetController()->SetControlRotation(R);Hero->FirstPersonCamera->SetWorldRotation(R);}
-    bool Photo(const TCHAR* Scene)
+    bool Photo(const TCHAR* Scene,AActor* Target=nullptr)
     {
-        if(!Preview || Shots.Contains(Scene))return false;Shots.Add(Scene);Face(Site.Get());
+        if(!Preview || Shots.Contains(Scene))return false;Shots.Add(Scene);Face(Target?Target:Site.Get());
         FScreenshotRequest::RequestScreenshot(ShotRoot/(FString(Scene)+TEXT(".png")),false,false);ShotUntil=FPlatformTime::Seconds()+.15;
         UE_LOG(LogTemp,Display,TEXT("CF_CONSTRUCTION_SHOT scene=%s requested=1 frame=%llu"),Scene,static_cast<uint64>(GFrameCounter));return true;
     }
@@ -107,16 +118,42 @@ struct FConstructionTest
     }
     bool Tick()
     {
-        if(FPlatformTime::Seconds()<ShotUntil)return true;
         if(!Pet.IsValid() || !Site.IsValid() || !Crate.IsValid() || FPlatformTime::Seconds()>Deadline)return Finish(false,TEXT("lifetime"));
-        const auto Position=Pet->GetActorLocation();const double Step=FVector::Dist(Position,Previous);Travel+=Step;Previous=Position;
-        if(Step>120 || !Pet->IsActorTickEnabled() || !Pet->GetActorEnableCollision() || Pet->Health<=0 || Pet->GetCharacterMovement()->MovementMode==MOVE_None)return Finish(false,TEXT("continuous"));
+        const auto Position=Pet->GetActorLocation();const double Step=FVector::Dist(Position,Previous),Delta=World->GetTimeSeconds()-PreviousTime;
+        const bool Continuous=ConstructionMotion(Pet.Get(),Previous,Position,PreviousVelocity,Delta);
+        Travel+=Step;Previous=Position;PreviousTime=World->GetTimeSeconds();PreviousVelocity=Pet->GetVelocity();
+        if(!Continuous || !Pet->IsActorTickEnabled() || !Pet->GetActorEnableCollision() || Pet->Health<=0 || Pet->GetCharacterMovement()->MovementMode==MOVE_None)
+        {UE_LOG(LogTemp,Display,TEXT("CF_CONSTRUCTION_MOTION_DIAG step=%.3f delta=%.6f velocity=%s"),Step,Delta,*PreviousVelocity.ToString());return Finish(false,TEXT("continuous"));}
+        // 截图等待只延迟场景动作，每帧运动检查仍执行。
+        if(FPlatformTime::Seconds()<ShotUntil)return true;
         const int32 Budget=Hero->Inventory->Count(EFrontierItem::Material)+Crate->StorageInventory->Count(EFrontierItem::Material)+Site->StorageInventory->Count(EFrontierItem::Material)+Pet->Cargo->Count()+(Site->bUnderConstruction?0:Site->PaidMaterials);
         if(Budget!=72)return Finish(false,TEXT("conservation"));
+        if(Phase==-2)
+        {
+            // 初始观察站位比地面高20厘米，先让玩家自然落地，避免截图时射线下移。
+            if(World->GetTimeSeconds()-At<.3)return true;
+            Face(Site.Get());if(AHomeModule::TraceConstruction(Hero)!=Site.Get())return Finish(false,TEXT("ui-unassigned-aim"));
+            if(!Site->ConstructionStatus().Contains(TEXT("尚未派工")))return Finish(false,TEXT("ui-unassigned"));
+            if(Photo(TEXT("Unassigned")))return true;
+            Face(Crate.Get());if(!CFInputQA::Press(Hero,EKeys::V) || Hero->GetDeliveryCrate()!=Crate.Get() || !Hero->GetDeliverySelectionStatus().Contains(TEXT("材料3")))return Finish(false,TEXT("ui-source"));
+            Phase=-1;Photo(TEXT("SelectedBox"),Crate.Get());return true;
+        }
+        if(Phase==-1)
+        {
+            Face(Site.Get());if(!CFInputQA::Press(Hero,EKeys::E) || Pet->Construction->GetSite()!=Site.Get())return Finish(false,TEXT("ui-assign"));
+            UE_LOG(LogTemp,Display,TEXT("CF_CONSTRUCTION_UI_SOURCE PASS noSourceRejected=1 selected=1 liveStock=3 assigned=1"));
+            UE_LOG(LogTemp,Display,TEXT("CF_CONSTRUCTION_QUEUE PASS material=69 paid=0 support=1 input=1 pet=%s site=%s"),*PetId.ToString(),*SiteId.ToString());Phase=0;return true;
+        }
         if(Phase==0 && Pet->Cargo->Count()>0)
         {
             if(!CancelledOnce)
             {
+                if(InteractiveRefill)
+                {
+                    if(!Hero->GetDeliverySelectionStatus().Contains(TEXT("材料0")) || !Site->ConstructionStatus().Contains(TEXT("伙伴携料3")) || Site->ConstructionStatus().Contains(TEXT("缺料等待")))return Finish(false,TEXT("ui-carry"));
+                    if(Photo(TEXT("Carrying")))return true;
+                    UE_LOG(LogTemp,Display,TEXT("CF_CONSTRUCTION_UI_CARRY PASS liveStock=0 carried=3 waiting=0"));
+                }
                 if(!CFInputQA::Press(Hero,EKeys::F) || Pet->Construction->GetSite() || Pet->Cargo->Count()!=3 ||
                     !Hero->SaveProgress(TEXT("ConstructionCancelled")) || !Hero->LoadProgress(TEXT("ConstructionCancelled")) || !Rebind() || Pet->Construction->GetSite() || Pet->Activity!=ECreatureActivity::Follow || Pet->Cargo->Count()!=3)return Finish(false,TEXT("cancel-carried"));
                 Face(Pet.Get());if(!CFInputQA::Press(Hero,EKeys::Z) || Pet->Cargo->Count()!=0 || Hero->Inventory->Count(EFrontierItem::Material)!=72 ||
@@ -144,10 +181,24 @@ struct FConstructionTest
             if(Photo(TEXT("Shortage")))return true;
             if(Site->ConstructionWork!=0 || !Site->bUnderConstruction || Crate->StorageInventory->Count(EFrontierItem::Material)!=0)return Finish(false,TEXT("shortage"));
             UE_LOG(LogTemp,Display,TEXT("CF_CONSTRUCTION_SHORTAGE PASS supplied=3 work=0 reserved=1"));
+            if(InteractiveRefill && !Site->ConstructionStatus().Contains(TEXT("缺料等待")))return Finish(false,TEXT("ui-shortage"));
             if(!Failures())return Finish(false,TEXT("failure-paths"));
+            if(InteractiveRefill)
+            {
+                // 不直接调用库存转移：由真实距离／视线检查、E开箱和回车绑定完成补料。
+                Face(Crate.Get());if(!CFInputQA::Press(Hero,EKeys::E) || Hero->Storage->GetCrate()!=Crate.Get() || Hero->Storage->GetSelection()!=static_cast<int32>(EFrontierItem::Material) || Pet->Construction->GetSite()!=Site.Get())return Finish(false,TEXT("ui-open"));
+                Phase=9;return true;
+            }
             // 通过原库存事务补入已在玩家背包的三份材料，不修改工地或工人携带量。
             if(!Hero->Inventory->TransferTo(Crate->StorageInventory,{{EFrontierItem::Material,3}}))return Finish(false,TEXT("refill"));
             Phase=3;
+        }
+        if(Phase==9)
+        {
+            if(Photo(TEXT("StorageRefill"),Crate.Get()))return true;
+            for(int32 Count=0;Count<3;++Count)if(!CFInputQA::Press(Hero,EKeys::Enter))return Finish(false,TEXT("ui-deposit"));
+            if(Hero->Inventory->Count(EFrontierItem::Material)!=66 || Crate->StorageInventory->Count(EFrontierItem::Material)!=3 || !CFInputQA::Press(Hero,EKeys::E) || Hero->Storage->IsOpen() || Pet->Construction->GetSite()!=Site.Get())return Finish(false,TEXT("ui-refill"));
+            UE_LOG(LogTemp,Display,TEXT("CF_CONSTRUCTION_UI_REFILL PASS open=1 enters=3 closed=1 sameTask=1"));Phase=3;
         }
         if(Phase==3 && Pet->Cargo->Count()==3)RefillCarried=true;
         if(Phase==3 && Site->ConstructionWork>1)
@@ -199,6 +250,7 @@ void RunConstructionScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read)
     const auto State=MakeShared<FConstructionTest>();State->World=World;State->Hero=Hero;State->Deadline=FPlatformTime::Seconds()+150;
     State->Needs=FParse::Param(FCommandLine::Get(),TEXT("CFConstructionNeeds"));
     State->WaitAudit=FParse::Param(FCommandLine::Get(),TEXT("CFConstructionWaitAudit"));
+    State->InteractiveRefill=FParse::Param(FCommandLine::Get(),TEXT("CFConstructionInteractiveRefill"));
     State->Preview=FParse::Param(FCommandLine::Get(),TEXT("CFConstructionPreview"));
     if(State->Preview){State->ShotRoot=FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir()/TEXT("ConstructionPreview")/FGuid::NewGuid().ToString(EGuidFormats::Digits));IFileManager::Get().MakeDirectory(*State->ShotRoot,true);UE_LOG(LogTemp,Display,TEXT("CF_CONSTRUCTION_PREVIEW_ROOT %s"),*State->ShotRoot);}
     if(Read)
@@ -239,10 +291,22 @@ void RunConstructionScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read)
         const FTransform Start(FVector(-1100,-800,40));auto* Pet=World->SpawnActorDeferred<ACreatureCharacter>(ACreatureCharacter::StaticClass(),Start,nullptr,nullptr,ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
         Pet->Definition=LoadObject<UCreatureDefinition>(nullptr,TEXT("/Game/Creatures/DA_Mosskip.DA_Mosskip"));Pet->FinishSpawning(Start);Pet->Tame(Hero->GetController());
         if(!State->Rebind()){State->Finish(false,TEXT("bind"));return;}
+        const FVector Origin=Pet->GetActorLocation();const double Speed=Pet->GetCharacterMovement()->GetMaxSpeed();
+        if(!ConstructionMotion(Pet,Origin,Origin+FVector(Speed*.5,0,0),FVector::ZeroVector,.5) || ConstructionMotion(Pet,Origin,Origin+FVector(Speed*.5+10,0,0),FVector::ZeroVector,.5) || ConstructionMotion(Pet,Origin,Origin+FVector(10,0,0),FVector::ZeroVector,0) || ConstructionMotion(Pet,Origin,Origin+FVector(0,0,200),FVector::ZeroVector,0)){State->Finish(false,TEXT("motion-guards"));return;}
+        UE_LOG(LogTemp,Display,TEXT("CF_CONSTRUCTION_MOTION_GUARDS PASS longFrame=1 horizontalJump=0 zeroTimeJump=0 verticalJump=0"));
         Hero->SetActorLocation(FVector(-1050,-950,60));State->Face(State->Crate.Get());
-        if(!CFInputQA::Press(Hero,EKeys::V)){State->Finish(false,TEXT("select"));return;}State->Face(State->Site.Get());
-        if(!CFInputQA::Press(Hero,EKeys::E) || Pet->Construction->GetSite()!=State->Site.Get()){State->Finish(false,TEXT("assign"));return;}
-        UE_LOG(LogTemp,Display,TEXT("CF_CONSTRUCTION_QUEUE PASS material=69 paid=0 support=1 input=1 pet=%s site=%s"),*State->PetId.ToString(),*State->SiteId.ToString());
+        if(State->InteractiveRefill)
+        {
+            State->Face(State->Site.Get());
+            if(!CFInputQA::Press(Hero,EKeys::E) || Pet->Construction->GetSite() || !Hero->Feedback.Contains(TEXT("尚未派工"))){State->Finish(false,TEXT("ui-no-source"));return;}
+            State->Phase=-2;State->At=World->GetTimeSeconds();
+        }
+        else
+        {
+            if(!CFInputQA::Press(Hero,EKeys::V)){State->Finish(false,TEXT("select"));return;}State->Face(State->Site.Get());
+            if(!CFInputQA::Press(Hero,EKeys::E) || Pet->Construction->GetSite()!=State->Site.Get()){State->Finish(false,TEXT("assign"));return;}
+            UE_LOG(LogTemp,Display,TEXT("CF_CONSTRUCTION_QUEUE PASS material=69 paid=0 support=1 input=1 pet=%s site=%s"),*State->PetId.ToString(),*State->SiteId.ToString());
+        }
     }
     for(TActorIterator<AWildEncounter> It(World);It;++It)It->SetActorTickEnabled(false);
     for(TActorIterator<ACreatureCharacter> It(World);It;++It)if(*It!=State->Pet.Get()){It->SetActorTickEnabled(false);It->GetCharacterMovement()->DisableMovement();}

@@ -34,8 +34,8 @@ void ACFHUD::DrawWorldHUD(ACFPlayerCharacter* Player)
         {FString::Printf(TEXT("%s | 攻击 %.0f | 距离 %.1f米 | 护甲 %.0f%%"),Player->Equipment->GetState().bSpearEquipped?TEXT("长矛"):TEXT("徒手"),Player->GetPlayerAttackDamage(),Player->GetPlayerMeleeRange()/100,Player->Equipment->GetDamageReduction()*100)},
         {Player->Health<=0?FString(TEXT("已倒下：R 基地复活 | F9 读档")):FString::Printf(TEXT("右键 %s | 共鸣器 %d | 0 切换"),Player->CaptureComponent->UsesResonance()?TEXT("共鸣捕捉"):TEXT("普通捕捉"),Player->Inventory->Count(EFrontierItem::ResonanceDevice)),Yellow},
         {TEXT("F1 帮助 | C 背包 | Tab 队伍 | I 图鉴 | 退出键暂停")}});
-    TArray<FFrontierHUDRow> Feedback={{Player->Feedback,Yellow,Player->HasDeliverySelection()?2:3}};
-    if(Player->HasDeliverySelection())Feedback.Add({TEXT("已选运输箱 | E 指派资源 | 对空按 V 清除"),Green,1});
+    TArray<FFrontierHUDRow> Feedback={{Player->Feedback,Yellow,Player->HasDeliverySelection()?1:3}};
+    if(Player->HasDeliverySelection())Feedback.Add({Player->GetDeliverySelectionStatus(),Green,2});
     DrawHUDPanel(Layout.Feedback,Feedback);
     auto* Creature=Player->TraceCreature();FString Alert;
     if(Player->Health<=0)Alert=TEXT("已倒下\nR 基地复活 | F9 读取存档");
@@ -100,9 +100,14 @@ void ACFHUD::DrawWorldHUD(ACFPlayerCharacter* Player)
         Rows.Add({Tamed?CreatureAffinity::Describe(Creature->Definition):Player->GetGroupMatchupText(Creature),Blue,2});
     }
     else if(auto* Construction=AHomeModule::TraceConstruction(Player))
-    {Audit.Context=EFrontierHUDContext::Facility;Rows.Add({TEXT("伙伴施工"),Blue});Rows.Add({Construction->ConstructionStatus(),Yellow,4});}
+    {Audit.Context=EFrontierHUDContext::Facility;Rows.Add({TEXT("伙伴施工"),Blue});Rows.Add({Construction->ConstructionStatus(),Yellow,6});}
     else if(auto* Node=Player->TraceResource()){Audit.Context=EFrontierHUDContext::Resource;Rows.Add({TEXT("资源"),Blue});Rows.Add({Node->GetStatus(),Yellow,4});}
-    else if(Player->Storage->TraceCrate()){Audit.Context=EFrontierHUDContext::Storage;Rows.Add({TEXT("仓储"),Blue});Rows.Add({TEXT("E 打开（3米）| V 设为运输目标 | X 拆除前需清空"),Yellow,3});}
+    else if(auto* Crate=Player->Storage->TraceCrate())
+    {
+        Audit.Context=EFrontierHUDContext::Storage;Rows.Add({Player->GetDeliveryCrate()==Crate?TEXT("当前料箱"):TEXT("储物箱"),Blue});
+        Rows.Add({FString::Printf(TEXT("材料%d | E开箱补料（3米）"),Crate->StorageInventory->Count(EFrontierItem::Material)),Yellow});
+        Rows.Add({TEXT("V选择料源／运输目标 | X拆除前清空"),Yellow,2});
+    }
     else if(auto* Door=AHomeModule::TraceDoor(Player))
     {Audit.Context=EFrontierHUDContext::Door;Rows.Add({Door->DoorState==2?TEXT("木门 | 已开启"):TEXT("木门 | 已关闭"),Blue});Rows.Add({TEXT("E 开关（3米）| X 拆除 | 活动范围需无生物和障碍"),Yellow,3});}
     else if(auto* Site=Player->TraceFacility())

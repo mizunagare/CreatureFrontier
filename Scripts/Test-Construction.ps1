@@ -1,5 +1,6 @@
-param([string]$BuildRoot='',[switch]$Read,[string]$ReadInputPath='',[switch]$Needs,[switch]$InputOnly,[switch]$Preview,[string]$Resolution='1280x720',[switch]$ExistingHome,[switch]$WaitAudit,[switch]$WaitRead)
+param([string]$BuildRoot='',[switch]$Read,[string]$ReadInputPath='',[switch]$Needs,[switch]$InputOnly,[switch]$Preview,[string]$Resolution='1280x720',[switch]$ExistingHome,[switch]$WaitAudit,[switch]$WaitRead,[switch]$InteractiveRefill)
 $ErrorActionPreference='Stop'
+if($InteractiveRefill -and (!$WaitAudit -or $InputOnly -or $ExistingHome)){throw '交互补料核对须使用等待专项，不能混用输入或原屋模式'}
 if(($WaitRead -and (!$Read -or !$WaitAudit)) -or ($WaitAudit -and ($InputOnly -or $ExistingHome))){throw '等待恢复须同时指定读取与等待核对，不能混用输入或原屋模式'}
 if([bool]($Read -or $ExistingHome) -ne [bool]$ReadInputPath){throw '恢复或原家园模式必须指定独立输入副本；其他模式不接收外部档'}
 if(($InputOnly -and ($Read -or $Needs -or $ExistingHome)) -or ($ExistingHome -and ($Needs -or $Preview))){throw '施工输入、原家园及进食预览模式不能混用'}
@@ -29,6 +30,7 @@ try{
     if($Needs){$arguments+='-CFConstructionNeeds'}
     if($WaitAudit){$arguments+='-CFConstructionWaitAudit'}
     if($WaitRead){$arguments+='-CFConstructionWaitRead'}
+    if($InteractiveRefill){$arguments+='-CFConstructionInteractiveRefill'}
     if($Preview){$arguments=@($arguments|Where-Object {$_ -ne '-nullrhi'})+@('-CFConstructionPreview','-RenderOffscreen','-ForceRes',('-ResX='+$width),('-ResY='+$height),'-norhithread','-forcerhibypass','-ExecCmds="t.MaxFPS 60,r.MotionBlurQuality 0,r.AntiAliasingMethod 1"')}
     $exe=if($BuildRoot){$module}elseif($Preview){'D:\Epic\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe'}else{'D:\Epic\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe'}
     if(!$BuildRoot){$arguments=@(('"'+(Join-Path $projectRoot 'CreatureFrontier.uproject')+'"'),'-game')+$arguments}
@@ -46,6 +48,8 @@ try{
         $markers=@('CF_CONSTRUCTION_SHORTAGE PASS supplied=3 work=0 reserved=1','CF_CONSTRUCTION_BAD PASS cases=7 retained=1 cancel=1 paused=1 sourceProtected=1','CF_CONSTRUCTION_REST PASS version=38','CF_CONSTRUCTION_DONE PASS version=38 material=66 cost=6 identity=1 actualNav=1 rest=1','CF_CONSTRUCTION PASS reason=complete')
         $markers+=if($WaitRead){"CF_CONSTRUCTION_WAIT_RESTORE PASS version=$restoredVersion supplied=3 carried=0 intent=1"}elseif($Read){"CF_CONSTRUCTION_COLD PASS version=$restoredVersion carried=3 intent=1"}else{@('CF_CONSTRUCTION_QUEUE PASS material=69 paid=0 support=1 input=1','CF_CONSTRUCTION_MID PASS version=38 carried=3 identity=1 intent=1')}
         if($WaitAudit){$markers+='CF_CONSTRUCTION_WAIT PASS noDrain=1 noRecovery=1 sameTask=1'}
+        if(!$Read){$markers+='CF_CONSTRUCTION_MOTION_GUARDS PASS longFrame=1 horizontalJump=0 zeroTimeJump=0 verticalJump=0'}
+        if($InteractiveRefill){$markers+='CF_CONSTRUCTION_UI_REFILL PASS open=1 enters=3 closed=1 sameTask=1';if(!$Read){$markers+=@('CF_CONSTRUCTION_UI_SOURCE PASS noSourceRejected=1 selected=1 liveStock=3 assigned=1','CF_CONSTRUCTION_UI_CARRY PASS liveStock=0 carried=3 waiting=0')}}
         $markers+='CF_CONSTRUCTION_CANCEL_CAPACITY PASS retained=2 refunded=2'
         $markers+='CF_CONSTRUCTION_PATH_RETRY PASS calls=60 searches=1 retained=1'
         if(!$Read){$markers+='CF_CONSTRUCTION_CANCEL_CARRIED PASS saved=1 held=3 recovered=3 reassigned=1'}
@@ -60,6 +64,7 @@ try{
         $rootMatch=[regex]::Match($raw,'CF_CONSTRUCTION_PREVIEW_ROOT [^\r\n]*[/\\]([A-F0-9]{32})')
         if(!$rootMatch.Success){throw '缺少施工截图独立目录'}
         $scenes=if($InputOnly){@('Planning','Scaffold')}else{@('Shortage','Working','Done')}
+        if($InteractiveRefill){$scenes+='StorageRefill';if(!$Read){$scenes+=@('Unassigned','SelectedBox','Carrying')}}
         foreach($scene in $scenes){
             $path=Join-Path $saved ('ConstructionPreview\'+$rootMatch.Groups[1].Value+'\'+$scene+'.png')
             if(!(Test-Path -LiteralPath $path) -or (Get-Item -LiteralPath $path).LastWriteTimeUtc -lt $started){throw '施工截图缺失或不是本轮生成'}
@@ -69,7 +74,7 @@ try{
             Copy-Item -LiteralPath $path -Destination (Join-Path $run ($scene+'.png'))
         }
     }
-    [pscustomobject]@{Read=[bool]$Read;WaitAudit=[bool]$WaitAudit;WaitRead=[bool]$WaitRead;Needs=[bool]$Needs;Home=[bool]$ExistingHome;Input=[bool]$InputOnly;Preview=[bool]$Preview;Resolution=$Resolution;Pass=$true;BuildSHA256=$hash;ReadInputSHA256=$inputHash;MidSaveSHA256=$midHash;RestSaveSHA256=$restHash;DoneSaveSHA256=$doneHash;Log=$log}|Export-Csv -LiteralPath (Join-Path $run 'Results.csv') -NoTypeInformation
+    [pscustomobject]@{Read=[bool]$Read;WaitAudit=[bool]$WaitAudit;InteractiveRefill=[bool]$InteractiveRefill;WaitRead=[bool]$WaitRead;Needs=[bool]$Needs;Home=[bool]$ExistingHome;Input=[bool]$InputOnly;Preview=[bool]$Preview;Resolution=$Resolution;Pass=$true;BuildSHA256=$hash;ReadInputSHA256=$inputHash;MidSaveSHA256=$midHash;RestSaveSHA256=$restHash;DoneSaveSHA256=$doneHash;Log=$log}|Export-Csv -LiteralPath (Join-Path $run 'Results.csv') -NoTypeInformation
     if($InputOnly){Write-Host '施工架预览及已注册输入放置通过；不代表系统鼠标／键盘或自然建房体验验收'}
     elseif($ExistingHome){Write-Host '原家园伙伴实际搬料重建、物资／身份守恒及完成存读通过；不代表任意布局或长期生活验收'}
     else{Write-Host '伙伴实际供料、缺料等待、施工、休息及存读专项通过；独立恢复和图形以各自运行证据为准，不等同完整伙伴建设交付'}

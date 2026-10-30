@@ -49,6 +49,17 @@ void ACFPlayerCharacter::ToggleVest() { Equipment->ToggleVest(); }
 float ACFPlayerCharacter::GetPlayerAttackDamage() const { return AttackDamage+Equipment->GetAttackBonus(); }
 
 void ACFPlayerCharacter::ToggleBuilding() { Building->Toggle(); }
+AHomeModule* ACFPlayerCharacter::GetDeliveryCrate() const
+{
+    auto* Crate=DeliverySelection.Get();
+    return bDeliverySelection && IsValid(Crate) && !Crate->IsActorBeingDestroyed() && !Crate->bPreview && !Crate->bStaged && Crate->GetKind()==EHomeModuleKind::Storage?Crate:nullptr;
+}
+FString ACFPlayerCharacter::GetDeliverySelectionStatus() const
+{
+    if(!bDeliverySelection)return FString();
+    if(const auto* Crate=GetDeliveryCrate())return FString::Printf(TEXT("已选料箱：材料%d\n工地E派工 | 对空V清除"),Crate->StorageInventory->Count(EFrontierItem::Material));
+    return TEXT("所选料箱已失效\n瞄准其他箱子按V重选");
+}
 void ACFPlayerCharacter::CycleBuilding()
 {
     if(Building->IsActive()) { Building->Cycle(); return; }
@@ -57,7 +68,7 @@ void ACFPlayerCharacter::CycleBuilding()
     {
         DeliverySelection=Crate; bDeliverySelection=true; int32 Applied=0;
         for(TActorIterator<ACreatureCharacter> It(GetWorld());It;++It) if(IsCommandTarget(*It) && It->Cargo->Assign(Crate,this)) ++Applied;
-        Feedback=FString::Printf(TEXT("已选运输目标；E 指派的资源将运到这里 | 已关联%d项工作 | 对空按V清除后续目标"),Applied);
+        Feedback=FString::Printf(TEXT("已选施工料源／运输箱 | 已关联%d项资源工作"),Applied);
     }
     else { DeliverySelection.Reset(); bDeliverySelection=false; Feedback=TEXT("后续采集直接放入背包；F 取消已有运输工作"); }
 }
@@ -560,9 +571,10 @@ void ACFPlayerCharacter::CommandWork()
     if(Storage->IsOpen()){Storage->Close();return;}
     if(auto* ConstructionSite=AHomeModule::TraceConstruction(this))
     {
+        if(!GetDeliveryCrate()){Feedback=TEXT("尚未派工：先瞄准材料箱按V，再瞄工地按E");return;}
         for(TActorIterator<ACreatureCharacter> It(GetWorld());It;++It)if(IsCommandTarget(*It) && It->Construction->Assign(ConstructionSite,DeliverySelection.Get(),this))
-        {Feedback=TEXT("已指派伙伴搬运箱内材料并施工；缺料时等待，F取消伙伴任务，X取消施工架");return;}
-        Feedback=TEXT("请先瞄准材料箱按V，选择存活且无其他携物的伙伴；每个施工架限一位工人");return;
+        {Feedback=TEXT("已派工：缺料等原箱补料，无需重新派工 | F取消");return;}
+        Feedback=TEXT("未派工：需存活且无其他携物的伙伴；每处限一位工人");return;
     }
     if(Storage->TryOpenAimed()) return;
     if(auto* Door=AHomeModule::TraceDoor(this)){Door->ToggleDoor(this);return;}

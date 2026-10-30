@@ -9,6 +9,10 @@
 #include "GameFramework/Character.h"
 #include "Components/CapsuleComponent.h"
 #include "HomeLayout.h"
+#include "CreatureCharacter.h"
+#include "CompanionConstructionComponent.h"
+#include "CompanionCargoComponent.h"
+#include "EngineUtils.h"
 
 bool UHomeModuleDefinition::IsValidDefinition() const
 {
@@ -173,7 +177,24 @@ FString AHomeModule::ConstructionStatus() const
     const TCHAR* Hint=High?TEXT("先V选料源，再瞄下层工地料箱按E派工"):TEXT("先瞄准箱子按V，再瞄准此处按E派工");
     const TCHAR* Cancel=ConstructionOriginalDefinition?TEXT("旧墙仍承重 | X取消恢复旧墙并退料"):
         GetKind()==EHomeModuleKind::Floor?TEXT("未完工不承重 | F取消任务 | X取消并退料"):GetKind()==EHomeModuleKind::Stairs?TEXT("未完工不能通行 | F取消任务 | X取消并退料"):High?TEXT("从下层施工 | F取消任务 | X取消并退料"):TEXT("F取消伙伴任务 | X取消施工并退回已交材料");
-    return FString::Printf(TEXT("%s | 材料%d/%d | 施工%.1f/6\n%s\n%s"),
+    const ACreatureCharacter* Worker=nullptr;const AHomeModule* Crate=nullptr;
+    for(TActorIterator<ACreatureCharacter> It(GetWorld());It;++It)if(It->Construction->GetSite()==this){Worker=*It;break;}
+    for(TActorIterator<AHomeModule> It(GetWorld());It;++It)if(It->PersistentId==ConstructionCrateId && !It->IsActorBeingDestroyed() && !It->bPreview && !It->bStaged && It->GetKind()==EHomeModuleKind::Storage){Crate=*It;break;}
+    const int32 Stock=Crate?Crate->StorageInventory->Count(EFrontierItem::Material):0;
+    FString State=TEXT("尚未派工"),Action=Hint;
+    // 提示只读取真实任务、携物、需求与箱内库存，不维护另一套施工状态。
+    if(Worker)
+    {
+        if(Worker->FeedingSite.IsValid()){State=TEXT("伙伴进食中，保留施工任务");Action=TEXT("可向原箱补料，无需重新派工");}
+        else if(Worker->Activity==ECreatureActivity::Rest){State=TEXT("伙伴休息中，满足需求后复工");Action=TEXT("J喂食 | P治疗 | 原任务保留");}
+        else if(Worker->Cargo->Count()>0){State=FString::Printf(TEXT("伙伴携料%d | 箱内材料%d"),Worker->Cargo->Count(),Stock);Action=TEXT("等待伙伴实际交付材料");}
+        else if(Definition && StorageInventory->Count(EFrontierItem::Material)>=Definition->MaterialCost)
+        {State=Worker->Construction->IsWorking()?TEXT("伙伴正在施工"):TEXT("材料已齐，等待施工站位");Action=TEXT("无需补料，保持工地净空");}
+        else if(!Crate){State=TEXT("未指定有效料箱");Action=TEXT("瞄准新箱V，再瞄工地E改派");}
+        else if(Definition && StorageInventory->Count(EFrontierItem::Material)<Definition->MaterialCost && Stock==0){State=TEXT("缺料等待 | 原箱材料0");Action=TEXT("E开原箱存材料，自动继续");}
+        else {State=FString::Printf(TEXT("施工任务进行中 | 箱内材料%d"),Stock);Action=TEXT("等待伙伴靠近，保持工地净空");}
+    }
+    return FString::Printf(TEXT("%s | 材料%d/%d | 施工%.1f/6\n%s\n%s\n%s"),
         *Target,StorageInventory->Count(EFrontierItem::Material),Definition?Definition->MaterialCost:0,ConstructionWork,
-        Hint,Cancel);
+        *State,*Action,Cancel);
 }

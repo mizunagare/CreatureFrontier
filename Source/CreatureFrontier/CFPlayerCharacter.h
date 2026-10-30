@@ -47,6 +47,8 @@ public:
     void ToggleBuilding();
     void CycleBuilding();
     bool HasDeliverySelection() const { return bDeliverySelection; }
+    class AHomeModule* GetDeliveryCrate() const;
+    FString GetDeliverySelectionStatus() const;
     void DismantleBuilding();
     void CraftCaptureDevice();
     void CraftMedicine();
