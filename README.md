@@ -4,6 +4,8 @@
 
 ## 探索朝向开发候选（限定验证，非最终版）
 
+正常开局农业连续段候选：`C:\CreatureFrontierBuilds\Windows-StarterFarm\CreatureFrontier.exe`。原前三项真实存档已通过预览建农圃、采纤维、制种、原伙伴收获两次及领取第四项，留下2份食物和1粒备用种子。整链与自身中途恢复、中文图形和存读证据见[正常来源农业闭环](Docs/STARTER_FARM.md)，普通规则不变；第五项首领探索、完整人类新手体验和长期经营仍未验收。
+
 正常开局连续验证候选：`C:\CreatureFrontierBuilds\Windows-StarterJourney\CreatureFrontier.exe`。原6材料／3食物经J结交、N领奖、返基地E派工生产3材料，再N领取第三项，已验证可连续获得33材料并存读，为农业段留下正常来源；不新增普通规则。原有朝向与农业提示仍在，操作、真实完成档及边界见[正常开局伙伴旅程](Docs/STARTER_JOURNEY.md)，尚未完成农业及人类自主新手体验验收。
 
 农业旅程提示后续候选：`C:\CreatureFrontierBuilds\Windows-FarmJourney\CreatureFrontier.exe`。第四项旅程会提示准备种子、F2入圃、E派伙伴与O取粮腾空间，明确手动收获不计伙伴目标。原旅程行为和五状态显示回归通过，尚非完整自然新手流程验收，详见[农业旅程引导](Docs/FARM_JOURNEY_GUIDANCE.md)。

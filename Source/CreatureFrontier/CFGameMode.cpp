@@ -75,6 +75,8 @@ void ACFGameMode::BeginPlay()
 {
     Super::BeginPlay();
     SeedFrontierResources(GetWorld());
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFStarterFarmTest")) || FParse::Param(FCommandLine::Get(),TEXT("CFStarterFarmRead")))
+    {const bool Read=FParse::Param(FCommandLine::Get(),TEXT("CFStarterFarmRead"));FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this,Read](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunStarterFarmScenario(GetWorld(),Hero,Read);},1.f,false);return;}
     if(FParse::Param(FCommandLine::Get(),TEXT("CFStarterJourneyTest")) || FParse::Param(FCommandLine::Get(),TEXT("CFStarterJourneyRead")))
     {const bool Read=FParse::Param(FCommandLine::Get(),TEXT("CFStarterJourneyRead"));FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this,Read](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunStarterJourneyScenario(GetWorld(),Hero,Read);},1.f,false);return;}
     if(FParse::Param(FCommandLine::Get(),TEXT("CFHomeRailingTest")) || FParse::Param(FCommandLine::Get(),TEXT("CFHomeRailingRead")))
