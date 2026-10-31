@@ -1073,10 +1073,15 @@ struct FStarterShelter : FStarterJourney
             const bool Inside=FMath::Abs(H.X)<180 && FMath::Abs(H.Y+400)<180 && FMath::Abs(P.X)<180 && FMath::Abs(P.Y+400)<180 && H.Z>50 && P.Z>50;
             if(!Inside || Pet->Activity!=ECreatureActivity::Follow){if(World->GetTimeSeconds()-At>20)return End(false,TEXT("enter-pair"));return true;}
             if(Photo(TEXT("Inside"),P))return true;
-            FString Reason;auto Layout=HomeLayout::Collect(World);if(Layout.Num()!=5 || !HomeLayout::Validate(Layout,Reason) || Hero->HomeBuilding->Dismantle(Floor.Get()))return End(false,TEXT("support"));
+            // 新来源不仅核对模块记录，还检查两墙和屋顶实际阻挡射线，拆支撑不能改变库存。
+            int32 Walls=0,Roofs=0;for(TActorIterator<AHomeModule> It(World);It;++It)if(!It->bPreview && !It->bStaged){Walls+=It->GetKind()==EHomeModuleKind::Wall;Roofs+=It->GetKind()==EHomeModuleKind::Roof;}
+            FCollisionQueryParams Q(SCENE_QUERY_STAT(StarterShelterGeometry),false,Hero);Q.AddIgnoredActor(Pet.Get());
+            auto Blocked=[&](FVector Start,FVector Finish,EHomeModuleKind Kind){FHitResult Hit;if(!World->LineTraceSingleByChannel(Hit,Start,Finish,ECC_Visibility,Q))return false;const auto* Module=Cast<AHomeModule>(Hit.GetActor());return Module && !Module->bUnderConstruction && Module->GetKind()==Kind;};
+            if(Walls!=2 || Roofs!=1 || !Blocked(FVector(0,-400,120),FVector(0,-100,120),EHomeModuleKind::Wall) || !Blocked(FVector(0,-400,120),FVector(0,-700,120),EHomeModuleKind::Wall) || !Blocked(FVector(0,-400,180),FVector(0,-400,400),EHomeModuleKind::Roof))return End(false,TEXT("geometry"));
+            const auto Before=Hero->Inventory->GetStacks();FString Reason;auto Layout=HomeLayout::Collect(World);if(Layout.Num()!=5 || !HomeLayout::Validate(Layout,Reason) || Hero->HomeBuilding->Dismantle(Floor.Get()) || !Hero->Inventory->GetStacks().OrderIndependentCompareEqual(Before))return End(false,TEXT("support"));
             const auto HBefore=Hero->GetActorLocation(),PBefore=Pet->GetActorLocation();if(!Hero->SaveProgress(TEXT("StarterShelterDone")) || !Hero->LoadProgress(TEXT("StarterShelterDone")))return End(false,TEXT("save"));FindActors();
             if(!Budget() || !Hero->GetActorLocation().Equals(HBefore,.01) || !Pet->GetActorLocation().Equals(PBefore,.01) || Box->StorageInventory->Count(EFrontierItem::Material)!=0 || HomeLayout::Collect(World).Num()!=5)return End(false,TEXT("restore"));
-            UE_LOG(LogTemp,Display,TEXT("CF_STARTER_SHELTER_LIFE PASS version=38 modules=5 paid=36 stored=0 entered=1 identity=1"));return End(true,TEXT("complete"));
+            UE_LOG(LogTemp,Display,TEXT("CF_STARTER_SHELTER_LIFE PASS version=38 modules=5 paid=36 stored=0 entered=1 identity=1 collision=3 supportReject=1"));return End(true,TEXT("complete"));
         }
         return true;
     }

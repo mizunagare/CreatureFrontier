@@ -11,10 +11,16 @@
 ## H盘验证
 
 - 重新生成工程文件退出0：`ProjectFiles-Console.log`。
-- 从H盘工程重新编译Editor退出0：`Build-H-Console.log`，82.53秒；没有继续使用D盘工程文件构建。
+- 初次Editor构建退出0：`Build-H-Console.log`，82.53秒，但后续核验发现迁移的Makefile缓存仍包含D盘绝对输出路径，因此该记录不能证明H盘模块已更新。
 - H盘 `-CFSmokeTest` 启动与捕捉／工作／跟随／死亡检查通过，退出0：`Smoke-H.log`；这是无图形基础验证，不替代完整玩家体验或Windows打包验收。
 - 中文静态检查818条文字、27条资产脚本提示通过；未新增玩家文案。
 - 原3047份 `.sav` 全部与迁移前SHA-256一致；自动测试没有覆盖普通玩家存档。
+
+### 构建缓存路径纠正
+
+纠正后Editor构建退出0，90.00秒；日志没有旧项目路径，H盘模块SHA-256为 `712ABA1348791E11D7D5800F53BDD8DB1BA43CA4A2520EB7828D0DF903D53A1B`。新进程 `Saved/StarterShelterQA/20261031-111225-16109061` 完整链通过，明确包含 `collision=3 supportReject=1`；六张1280×720截图已逐张目视，中文可读、箱内22→16→10→0及开放棚屋可见。长提示仍使用既有省略，灰盒不代表最终品质。Windows该版本尚未验证。
+
+后续墙顶测试的 `Saved/Build-StarterShelter-Geometry-20261031.log` 明确记录输出仍在D盘，H盘模块指纹仍为旧的129160B3；该轮旧模块的行为通过不能证明新增碰撞门槛通过。已将H盘Editor的 `Intermediate/Build/Win64/x64/CreatureFrontierEditor/Development/Makefile.bin` 原地改名保留为 `.migration-backup-20261031`，再使用显式 `-Project=H:\myGame\CreatureFrontier.uproject` 重新生成构建缓存。新日志为 `Saved/Build-H-CacheRepair-20261031.log`；构建与新模块运行结果须单独核验。没有删除D盘内容。Game目标的迁移缓存也须在首次新构建前检查，不能仅凭工作目录或退出0认定迁移成功。
 
 ## D盘清理未执行
 
