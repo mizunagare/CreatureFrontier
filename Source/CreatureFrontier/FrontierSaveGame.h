@@ -101,6 +101,10 @@ struct FFacilitySaveRecord
     UPROPERTY() int32 Seeds=0;
     UPROPERTY() bool bPlanted=false;
     UPROPERTY() float GrowthWork=0;
+    // 独立记录修订：旧设施默认没有加工委托，不补发任何材料或产物。
+    UPROPERTY() int32 CraftRevision=0;
+    UPROPERTY() FName CraftRecipe;
+    UPROPERTY() float CraftWork=0;
 };
 
 UCLASS()

@@ -24,7 +24,15 @@ public:
     bool ServeFood(class ACreatureCharacter* Pet);
     bool IsFoodStore() const { return RequiredSpecialty==EWorkSpecialty::Feeding || RequiredSpecialty==EWorkSpecialty::Farming; }
     bool AdjustFoodStock(int32 Delta);
+    static constexpr float RequiredCraftWork=8;
+    FName CraftRecipeId;
+    float CraftWork=0;
+    bool ToggleCraftOrder(class ACFPlayerCharacter* Hero,FName Recipe);
+    bool WorkCraft(class ACreatureCharacter* Pet,class ACFPlayerCharacter* Hero,float Amount);
+    FString CraftStatus() const;
+    static bool ValidateCraft(const struct FFacilitySaveRecord& Record);
 private:
+    TWeakObjectPtr<class ACreatureCharacter> CraftWorker;
     void RefreshLabel();
     UPROPERTY() TObjectPtr<class UTextRenderComponent> Label;
     UPROPERTY() TArray<TObjectPtr<class UStaticMeshComponent>> FarmPlants;

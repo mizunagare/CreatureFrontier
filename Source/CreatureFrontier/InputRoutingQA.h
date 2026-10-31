@@ -36,4 +36,10 @@ inline bool Release(ACFPlayerCharacter* Hero,FKey Key)
     for(const auto& B:Input->KeyBindings)if(B.KeyEvent==IE_Released && B.Chord.Key==Key && !B.Chord.bShift && !B.Chord.bCtrl && !B.Chord.bAlt && !B.Chord.bCmd){if(Found)return false;Found=&B;}
     if(!Found || !Found->KeyDelegate.IsBound())return false;Found->KeyDelegate.Execute(Key);return true;
 }
+inline bool ShiftPress(ACFPlayerCharacter* Hero,FKey Key)
+{
+    auto* Input=Hero->FindComponentByClass<UInputComponent>();if(!Input)return false;const FInputKeyBinding* Found=nullptr;
+    for(const auto& B:Input->KeyBindings)if(B.KeyEvent==IE_Pressed && B.Chord.Key==Key && B.Chord.bShift && !B.Chord.bCtrl && !B.Chord.bAlt && !B.Chord.bCmd){if(Found)return false;Found=&B;}
+    if(!Found || !Found->KeyDelegate.IsBound())return false;Found->KeyDelegate.Execute(Key);return true;
+}
 }

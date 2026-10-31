@@ -8,6 +8,16 @@
 #include "ResearchComponent.h"
 #include "EngineUtils.h"
 #include "FrontierOrientation.h"
+#include "WorkStation.h"
+#include "Kismet/GameplayStatics.h"
+
+void ACFPlayerCharacter::QueueBackpackRecipe()
+{
+    if(!bBackpackOpen || bPauseMenu || !HasAuthority() || Health<=0 || UGameplayStatics::IsGamePaused(this))return;
+    auto* Site=TraceFacility();if(!Site || !Site->bPlayerBuilt || Site->RequiredSpecialty!=EWorkSpecialty::Crafting || GetDistanceTo(Site)>300)
+    {Feedback=TEXT("请看向3米内的自建制作设施");return;}
+    const auto* Catalog=UCraftingCatalog::Load();if(Catalog && Catalog->Recipes.IsValidIndex(BackpackRecipe))Site->ToggleCraftOrder(this,Catalog->Recipes[BackpackRecipe].Id);
+}
 
 void ACFPlayerCharacter::ToggleBackpack()
 {

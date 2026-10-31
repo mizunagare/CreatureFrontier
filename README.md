@@ -6,6 +6,8 @@
 
 ## 探索朝向开发候选（限定验证，非最终版）
 
+伙伴加工首版完整Windows：`F:\CreatureFrontierBuilds\CompanionCraftFull\Windows\CreatureFrontier.exe`。看向3米内自建制作设施，C选物品配方，Shift＋回车委托／取消，关闭背包后E派伙伴；伙伴实际工作，完工才扣原料并发货。两端自身真实药品加工／中断续工／冷启动、旧档与非法拒绝、库存边界和原玩法关联通过，见[操作、存档与限定证据](Docs/COMPANION_CRAFT.md)。本次重新编译烹饪归档，不是原生替换；不含批量队列或实体搬料，普通启动不加载QA完成档。
+
 真实屋内加工候选：`F:\CreatureFrontierBuilds\Windows-IndoorCraft\CreatureFrontier.exe`。同一伙伴实采材料、同行采纤维、双方返屋关门后在原新建设施旁编织，留下5材料；两端自身整链、中途恢复及存读通过，各五图已目视，见[原料来源与操作流程](Docs/INDOOR_CRAFT.md)。本轮复用已有玩法，只增加显式整合验证，不新增自动制造或改变普通经济，普通启动不加载QA完成档。
 
 实体设施制作候选：`F:\CreatureFrontierBuilds\Windows-CraftAccess\CreatureFrontier.exe`。制作需要原8米内无遮挡设施；无屋内设施时需出门到台边，伙伴经过不遮断许可，配方／成本不变。两端专项、两尺寸文字、回忆关联及真实原料出台边加工存读通过，见[规则兼容变化与证据](Docs/CRAFTING_FACILITY_ACCESS.md)。尚非自动制造或新屋内设施完整生产链，旧普通存档不自动迁入。

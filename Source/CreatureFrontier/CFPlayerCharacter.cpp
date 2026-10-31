@@ -200,6 +200,7 @@ bool ACFPlayerCharacter::SaveProgress(const FString& Slot)
             Record.Transform = It->GetActorTransform(); Record.Id = It->PersistentId; Record.Specialty = It->RequiredSpecialty;
             Record.StoredFood = It->StoredFood;
             Record.Seeds=It->Crop->Seeds; Record.bPlanted=It->Crop->bPlanted; Record.GrowthWork=It->Crop->GrowthWork;
+            Record.CraftRevision=1;Record.CraftRecipe=It->CraftRecipeId;Record.CraftWork=It->CraftWork;
             Save->Facilities.Add(Record);
         }
     const bool bSaved = UGameplayStatics::SaveGameToSlot(Save, Slot, 0);
@@ -274,7 +275,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
     {
         if(Save->FormatVersion<34 && Record.Transform.GetLocation().Z>7){Feedback=TEXT("旧格式不能包含二层设施");return false;}
         if(Save->FormatVersion<24) {Record.Seeds=0;Record.bPlanted=false;Record.GrowthWork=0;}
-        if (!UFarmCropComponent::Validate(Record) || !Record.Id.IsValid() || FacilityIds.Contains(Record.Id) || UBaseBuildingComponent::GetCost(Record.Specialty) <= 0 ||
+        if (!UFarmCropComponent::Validate(Record) || !AWorkStation::ValidateCraft(Record) || !Record.Id.IsValid() || FacilityIds.Contains(Record.Id) || UBaseBuildingComponent::GetCost(Record.Specialty) <= 0 ||
             !UBaseBuildingComponent::IsBuildTransformValid(Record.Transform) || Record.StoredFood < 0 || Record.StoredFood > 30 ||
             (Record.Specialty != EWorkSpecialty::Feeding && Record.Specialty != EWorkSpecialty::Farming && Record.StoredFood != 0) ||
             (Save->FormatVersion<15 && ((Record.Specialty==EWorkSpecialty::Farming && Record.StoredFood!=0) || Record.Specialty==EWorkSpecialty::Transport)))
@@ -461,6 +462,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
         Site->bPlayerBuilt = true; Site->PersistentId = Record.Id; Site->RequiredSpecialty = Record.Specialty;
         Site->StoredFood = Record.StoredFood;
         Site->Crop->Seeds=Record.Seeds; Site->Crop->bPlanted=Record.bPlanted; Site->Crop->GrowthWork=Record.GrowthWork;
+        Site->CraftRecipeId=Record.CraftRecipe;Site->CraftWork=Record.CraftWork;
         Site->FinishSpawning(Record.Transform);
         RestoredBuilt.Add(Site);
     }
@@ -785,6 +787,7 @@ void ACFPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
     PlayerInputComponent->BindKey(EKeys::RightBracket, IE_Pressed, this, &ACFPlayerCharacter::NextRosterCompanion);
     PlayerInputComponent->BindKey(EKeys::LeftBracket, IE_Pressed, this, &ACFPlayerCharacter::PreviousRosterCompanion);
     PlayerInputComponent->BindKey(EKeys::Enter, IE_Pressed, this, &ACFPlayerCharacter::ConfirmInterfaceAction).bExecuteWhenPaused=true;
+    PlayerInputComponent->BindKey(FInputChord(EKeys::Enter,true,false,false,false),IE_Pressed,this,&ACFPlayerCharacter::QueueBackpackRecipe);
     PlayerInputComponent->BindKey(EKeys::I, IE_Pressed, this, &ACFPlayerCharacter::ToggleJournal);
     PlayerInputComponent->BindKey(EKeys::PageDown, IE_Pressed, this, &ACFPlayerCharacter::NextJournalPage);
     PlayerInputComponent->BindKey(EKeys::PageUp, IE_Pressed, this, &ACFPlayerCharacter::PreviousJournalPage);

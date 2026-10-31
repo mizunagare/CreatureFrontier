@@ -84,6 +84,7 @@ void ACreatureCharacter::ResetGathering()
 }
 FString ACreatureCharacter::GetGatheringStatus() const
 {
+    if(IsValid(WorkSite) && WorkSite->RequiredSpecialty==EWorkSpecialty::Crafting && !WorkSite->CraftRecipeId.IsNone())return WorkSite->CraftStatus();
     const FString CargoStatus=Cargo->Status(); if(!CargoStatus.IsEmpty()) return CargoStatus;
     if(auto* Field=FieldResource.Get())
     {

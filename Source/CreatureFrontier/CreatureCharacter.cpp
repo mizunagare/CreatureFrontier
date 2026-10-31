@@ -337,6 +337,7 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
         {
             if (WorkSite->RequiredSpecialty == EWorkSpecialty::Feeding) { SetActivity(ECreatureActivity::Rest); return; }
             if(WorkSite->RequiredSpecialty==EWorkSpecialty::Transport) { TickHauling(DeltaSeconds); return; }
+            if(TickCrafting(DeltaSeconds,OwnerPlayer))return;
             if(WorkSite->RequiredSpecialty!=EWorkSpecialty::Farming) { TickGathering(DeltaSeconds,OwnerPlayer); return; }
             if (ProgressSite.Get() != WorkSite.Get()) { WorkProgress = 0; ProgressSite = WorkSite; }
             // 空圃缺种时只等待原任务；复用原安全侧步，让主人通行，不中断播种或收获。

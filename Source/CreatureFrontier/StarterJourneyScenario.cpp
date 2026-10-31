@@ -41,6 +41,7 @@
 #include "ResearchComponent.h"
 #include "HollowScenario.h"
 #include "CaptureComponent.h"
+#include <limits>
 
 // 施工闭环继续复用本文件的玩家导航探针和运动连续性检查。
 
@@ -1832,6 +1833,64 @@ struct FIndoorCraft : FStarterWorkshop
     }
 };
 }
+namespace
+{
+struct FCompanionCraft : FStarterWorkshop
+{
+    float HeldWork=0;
+    bool Done()const{return Hero->Inventory->Count(EFrontierItem::Material)==0 && Hero->Inventory->Count(EFrontierItem::Medicine)==Bag.FindRef(EFrontierItem::Medicine)+1;}
+    bool End(bool Pass,const TCHAR* Why){if(Input.IsValid())Input->Direction=FVector::ZeroVector;CFInputQA::Release(Hero,EKeys::LeftShift);const auto Feedback=Hero->Feedback;if(!Pass)Hero->SaveProgress(TEXT("CompanionCraftBlocked"));UE_LOG(LogTemp,Display,TEXT("CF_COMPANION_CRAFT %s reason=%s phase=%d work=%.4f hero=%s new=%s feedback=%s"),Pass?TEXT("PASS"):TEXT("FAIL"),Why,Phase,Indoor.IsValid()?Indoor->CraftWork:-1,*Hero->GetActorLocation().ToString(),Recruit.IsValid()?*Recruit->GetActorLocation().ToString():TEXT("none"),*Feedback);FPlatformMisc::RequestExitWithStatus(false,Pass?0:1);return false;}
+    bool Budget()const
+    {
+        if(!Pet.IsValid() || !Recruit.IsValid() || !Farm.IsValid() || !Indoor.IsValid() || Hero->Health!=PlayerHealth || Hero->Health<=0 || Pet->Health!=110 || Recruit->Health!=80 || Pet->Level!=2 || Pet->Experience!=40 || Pet->BondPoints!=6 || Pet->Nickname!=Nickname || Recruit->Level!=1 || Recruit->Experience!=(Done()?18:17) || Recruit->BondPoints!=0 || Hero->GetCompanionRoster().Num()!=2 || Pet->Activity!=ECreatureActivity::Work || Pet->WorkSite!=Farm.Get())return false;
+        auto Expected=Bag;Expected.Add(EFrontierItem::Material,Done()?0:5);Expected.Add(EFrontierItem::Medicine,Bag.FindRef(EFrontierItem::Medicine)+(Done()?1:0));for(int32 I=0;I<static_cast<int32>(EFrontierItem::Count);++I)if(Hero->Inventory->Count(static_cast<EFrontierItem>(I))!=Expected.FindRef(static_cast<EFrontierItem>(I)))return false;
+        if(Farm->StoredFood!=Garden.StoredFood || Farm->Crop->Seeds!=Garden.Seeds || Farm->Crop->bPlanted!=Garden.bPlanted || Farm->Crop->GrowthWork!=Garden.GrowthWork || !Farm->GetActorTransform().Equals(Garden.Transform,.01) || !Farm->CraftRecipeId.IsNone() || Farm->CraftWork!=0)return false;
+        if(Done()){if(!Indoor->CraftRecipeId.IsNone() || Indoor->CraftWork!=0 || Recruit->Activity!=ECreatureActivity::Rest || Recruit->WorkSite!=Indoor.Get())return false;}
+        else if(Phase>=1 && (Indoor->CraftRecipeId!=TEXT("Medicine") || Indoor->CraftWork<0 || Indoor->CraftWork>=8))return false;
+        int32 Facilities=0;for(TActorIterator<AWorkStation> It(World);It;++It)if(It->bPlayerBuilt){++Facilities;if(It->PersistentId!=Garden.Id && It->PersistentId!=IndoorId)return false;}if(Facilities!=2 || !Indoor->GetActorTransform().Equals(Placement(),.01))return false;
+        const auto Layout=HomeLayout::Collect(World);if(Layout.Num()!=Original.Num())return false;for(const auto& R:Original){const auto* V=Layout.FindByPredicate([&](const FHomeModuleRecord& X){return X.Id==R.Id;});if(!V || V->Definition!=R.Definition || !V->Transform.Equals(R.Transform,.01) || V->PaidMaterials!=R.PaidMaterials || !V->StoredItems.OrderIndependentCompareEqual(R.StoredItems))return false;}
+        for(TActorIterator<AResourceNode> It(World);It;++It)if(const auto* Before=Resources.Find(It->PersistentId))if(It->Remaining!=*Before)return false;
+        return Pet->Cargo->Count()==0 && Recruit->Cargo->Count()==0 && Hero->GetObjectives().Claimed==5;
+    }
+    bool BadRecords()
+    {
+        const auto HB=Hero->GetActorLocation(),PB=Pet->GetActorLocation(),RB=Recruit->GetActorLocation();
+        for(int32 Case=0;Case<7;++Case){auto* Bad=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(Read?TEXT("CompanionCraftInput"):TEXT("CompanionCraftMid"),0));if(!Bad)return false;auto* Record=Bad->Facilities.FindByPredicate([&](const FFacilitySaveRecord& X){return X.Id==IndoorId;});if(!Record)return false;
+            if(Case==0)Record->CraftRecipe=TEXT("UnknownRecipe");if(Case==1)Record->CraftWork=std::numeric_limits<float>::quiet_NaN();if(Case==2)Record->CraftWork=9;if(Case==3)Record->CraftWork=-1;if(Case==4)Record->CraftRevision=2;if(Case==5)Record->Specialty=EWorkSpecialty::Farming;if(Case==6)Record->CraftRevision=0;
+            if(!UGameplayStatics::SaveGameToSlot(Bad,TEXT("CompanionCraftBad"),0) || Hero->LoadProgress(TEXT("CompanionCraftBad")) || !Budget() || Indoor->CraftWork!=HeldWork || !Hero->GetActorLocation().Equals(HB,.01) || !Pet->GetActorLocation().Equals(PB,.01) || !Recruit->GetActorLocation().Equals(RB,.01))return false;
+        }
+        UE_LOG(LogTemp,Display,TEXT("CF_COMPANION_CRAFT_INVALID PASS rejected=7 worldUnchanged=1"));return true;
+    }
+    bool Tick()
+    {
+        if(!Budget() || FPlatformTime::Seconds()>Deadline)return End(false,TEXT("budget-time"));const auto H=Hero->GetActorLocation(),P=Pet->GetActorLocation(),R=Recruit->GetActorLocation();const double Dt=World->GetTimeSeconds()-LastTime;
+        if(!Motion(Hero,LastH,VelocityH,Dt) || !Motion(Pet.Get(),LastP,VelocityP,Dt) || !Motion(Recruit.Get(),LastR,VelocityR,Dt))return End(false,TEXT("motion"));LastH=H;LastP=P;LastR=R;VelocityH=Hero->GetVelocity();VelocityP=Pet->GetVelocity();VelocityR=Recruit->GetVelocity();LastTime=World->GetTimeSeconds();
+        int32 Regions=0;for(TActorIterator<AWildEncounter> It(World);It;++It){++Regions;if(!It->IsActorTickEnabled())return End(false,TEXT("region"));}if(Regions!=3)return End(false,TEXT("regions"));for(TActorIterator<ACreatureCharacter> It(World);It;++It)if(It->Health>0 && (!It->IsActorTickEnabled() || !It->GetActorEnableCollision() || It->GetCharacterMovement()->MovementMode==MOVE_None))return End(false,TEXT("ecology"));
+        if(FPlatformTime::Seconds()<ShotUntil)return true;
+        if(Phase==-1){if(World->GetTimeSeconds()-At<2 || UNavigationSystemV1::IsNavigationBeingBuiltOrLocked(World))return true;Phase=Read?6:0;At=World->GetTimeSeconds();return true;}
+        if(Phase==0){Face(R);if(Hero->TraceCreature()!=Recruit.Get() || !CFInputQA::Press(Hero,EKeys::L))return End(false,TEXT("select"));Face(Indoor->GetActorLocation()+FVector(0,0,25));if(!CFInputQA::Press(Hero,EKeys::C) || !CFInputQA::Press(Hero,EKeys::Down) || !CFInputQA::ShiftPress(Hero,EKeys::Enter) || Indoor->CraftRecipeId!=TEXT("Medicine") || Indoor->CraftWork!=0 || !Budget())return End(false,TEXT("queue"));if(!CFInputQA::ShiftPress(Hero,EKeys::Enter) || !Indoor->CraftRecipeId.IsNone() || !Budget() || !CFInputQA::ShiftPress(Hero,EKeys::Enter))return End(false,TEXT("cancel-requeue"));UE_LOG(LogTemp,Display,TEXT("CF_COMPANION_CRAFT_CANCEL PASS noSpend=1 requeued=1"));if(Photo(TEXT("Queued"),Indoor->GetActorLocation())){Phase=8;return true;}Phase=8;return true;}
+        if(Phase==8){if(Hero->IsBackpackOpen() && !CFInputQA::Press(Hero,EKeys::C))return End(false,TEXT("close-menu"));Face(FVector(-200,-400,245));if(Door->DoorState==1 && (AHomeModule::TraceDoor(Hero)!=Door.Get() || !CFInputQA::Press(Hero,EKeys::E) || Door->DoorState!=2))return End(false,TEXT("open"));Phase=9;At=World->GetTimeSeconds();return true;}
+        if(Phase==9){if(World->GetTimeSeconds()-At<1 || UNavigationSystemV1::IsNavigationBeingBuiltOrLocked(World))return true;if(!CFInputQA::Press(Hero,EKeys::F) || !Plan(FVector(-450,-400,40),1))return End(false,TEXT("outside"));return true;}
+        if(Phase==1){const int32 Result=Move();if(Result<0)return End(false,TEXT("outside-walk"));if(!Result)return true;if(R.X> -250){if(World->GetTimeSeconds()-At>20)return End(false,TEXT("pet-outside"));return true;}if(Indoor->CraftWork!=0)return End(false,TEXT("idle-produced"));Face(Indoor->GetActorLocation()+FVector(0,0,25));if(!CFInputQA::Press(Hero,EKeys::E) || Recruit->WorkSite!=Indoor.Get() || Recruit->Activity!=ECreatureActivity::Work || !Plan(FVector(-100,-550,60),2))return End(false,TEXT("assign"));return true;}
+        if(Phase==2){const int32 Result=Move();if(Result<0)return End(false,TEXT("inside-walk"));if(Result){Phase=3;At=World->GetTimeSeconds();}return true;}
+        if(Phase==3){if(Indoor->CraftWork<1){if(World->GetTimeSeconds()-At>20)return End(false,TEXT("work-arrival"));return true;}if(Photo(TEXT("Working"),R))return true;if(Indoor->CraftWork<2)return true;if(!CFInputQA::Press(Hero,EKeys::F) || Recruit->Activity!=ECreatureActivity::Follow)return End(false,TEXT("interrupt"));HeldWork=Indoor->CraftWork;Phase=4;At=World->GetTimeSeconds();return true;}
+        if(Phase==4){if(Indoor->CraftWork!=HeldWork)return End(false,TEXT("interrupted-advanced"));if(World->GetTimeSeconds()-At<1)return true;if(Recruit->Activity==ECreatureActivity::Follow){Face(Indoor->GetActorLocation()+FVector(0,0,25));if(!CFInputQA::Press(Hero,EKeys::T) || Recruit->Activity!=ECreatureActivity::Rest || Recruit->bResumeWorkAfterRest || Recruit->WorkSite!=Indoor.Get())return End(false,TEXT("hold-rest"));return true;}if(Recruit->GetDistanceTo(Indoor.Get())>220 || R.Z<50 || !VisibleIndoor()){if(World->GetTimeSeconds()-At>25)return End(false,TEXT("hold-arrival"));return true;}Face(FVector(-200,-400,245));if(Door->DoorState==2 && (AHomeModule::TraceDoor(Hero)!=Door.Get() || !CFInputQA::Press(Hero,EKeys::E) || Door->DoorState!=1))return End(false,TEXT("close"));if(!Hero->SaveProgress(TEXT("CompanionCraftMid")))return End(false,TEXT("mid-save"));UE_LOG(LogTemp,Display,TEXT("CF_COMPANION_CRAFT_MID PASS progress=%.4f material=5 noEarlyOutput=1"),HeldWork);if(Photo(TEXT("Interrupted"),Indoor->GetActorLocation())){Phase=5;return true;}Phase=5;return true;}
+        if(Phase==5){if(!BadRecords())return End(false,TEXT("invalid-records"));Phase=6;return true;}
+        if(Phase==6){if(Read){Face(R);if(Hero->TraceCreature()!=Recruit.Get() || !CFInputQA::Press(Hero,EKeys::L))return End(false,TEXT("read-select"));if(!BadRecords())return End(false,TEXT("read-invalid"));}Face(Indoor->GetActorLocation()+FVector(0,0,25));if(!CFInputQA::Press(Hero,EKeys::E) || Recruit->WorkSite!=Indoor.Get() || Recruit->Activity!=ECreatureActivity::Work)return End(false,TEXT("resume-work"));Phase=7;At=World->GetTimeSeconds();return true;}
+        if(Phase==7){if(!Done()){if(World->GetTimeSeconds()-At>15)return End(false,TEXT("finish-time"));return true;}if(Photo(TEXT("Completed"),Indoor->GetActorLocation()))return true;const auto HB=H,PB=P,RB=R;if(!Hero->SaveProgress(TEXT("CompanionCraftDone")) || !Hero->LoadProgress(TEXT("CompanionCraftDone")))return End(false,TEXT("save"));BindWorkshop();if(!Budget() || Door->DoorState!=1 || !Hero->GetActorLocation().Equals(HB,.01) || !Pet->GetActorLocation().Equals(PB,.01) || !Recruit->GetActorLocation().Equals(RB,.01))return End(false,TEXT("restore"));UE_LOG(LogTemp,Display,TEXT("CF_COMPANION_CRAFT_LIFE PASS medicineAdded=1 materialPaid=5 newXP=18 oldXP=40 rest=1 identity=1 once=1"));return End(true,TEXT("complete"));}
+        return true;
+    }
+};
+}
+void RunCompanionCraftScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read)
+{
+    auto S=MakeShared<FCompanionCraft>();S->World=World;S->Hero=Hero;S->Read=Read;S->At=World->GetTimeSeconds();S->Deadline=FPlatformTime::Seconds()+120;
+    const auto* Source=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("CompanionCraftInput"),0));if(!Source || Source->FormatVersion!=38 || Source->Facilities.Num()!=2 || Source->HomeModules.Num()!=7 || !Hero->LoadProgress(TEXT("CompanionCraftInput"))){S->End(false,TEXT("source"));return;}
+    S->Original=Source->HomeModules;for(const auto& F:Source->Facilities){if(F.Specialty==EWorkSpecialty::Farming)S->Garden=F;if(F.Specialty==EWorkSpecialty::Crafting){S->IndoorId=F.Id;S->HeldWork=F.CraftWork;if(Read?(F.CraftRevision!=1 || F.CraftRecipe!=TEXT("Medicine") || F.CraftWork<=0 || F.CraftWork>=8):(F.CraftRevision!=0 || !F.CraftRecipe.IsNone() || F.CraftWork!=0)){S->End(false,TEXT("source-job"));return;}}}S->Bag=Hero->Inventory->GetStacks();S->PlayerHealth=Hero->Health;for(TActorIterator<ACreatureCharacter> It(World);It;++It)if(It->Tamer==Hero->GetController() && It->Definition){if(It->Definition->Form==ECreatureForm::Leaf){S->PetId=It->PersistentId;S->Nickname=It->Nickname;}if(It->Definition->Form==ECreatureForm::Ember)S->RecruitId=It->PersistentId;}S->BindWorkshop();for(const auto& N:Source->ResourceNodes)S->Resources.Add(N.Id,N.Remaining);
+    if(!S->Budget() || Hero->Inventory->Count(EFrontierItem::Material)!=5 || !Hero->GetActorTransform().Equals(Source->PlayerTransform,.01)){S->End(false,TEXT("source-budget"));return;}if(!Read)UE_LOG(LogTemp,Display,TEXT("CF_COMPANION_CRAFT_LEGACY PASS oldRecordEmpty=1 inventoryUnchanged=1"));
+    S->LastH=Hero->GetActorLocation();S->LastP=S->Pet->GetActorLocation();S->LastR=S->Recruit->GetActorLocation();S->VelocityH=Hero->GetVelocity();S->VelocityP=S->Pet->GetVelocity();S->VelocityR=S->Recruit->GetVelocity();S->LastTime=World->GetTimeSeconds();S->Input=NewObject<UHomeMovementProbe>(Hero);S->Input->RegisterComponent();S->Preview=FParse::Param(FCommandLine::Get(),TEXT("CFCompanionCraftPreview"));if(S->Preview){S->Root=FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir()/TEXT("CompanionCraftPreview")/FGuid::NewGuid().ToString(EGuidFormats::Digits));IFileManager::Get().MakeDirectory(*S->Root,true);UE_LOG(LogTemp,Display,TEXT("CF_COMPANION_CRAFT_PREVIEW_ROOT %s"),*S->Root);}FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([S](float){return S->Tick();}));
+}
+
 void RunIndoorCraftScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read)
 {
     auto S=MakeShared<FIndoorCraft>();S->World=World;S->Hero=Hero;S->Read=Read;S->At=World->GetTimeSeconds();S->Deadline=FPlatformTime::Seconds()+180;

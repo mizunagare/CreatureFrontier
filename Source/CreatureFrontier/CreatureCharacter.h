@@ -172,6 +172,7 @@ private:
     double GatherExpires=0, FailedResourceUntil=0;
     float GatherRetry=0;
     bool bGatheringActive=false;
+    bool TickCrafting(float DeltaSeconds,class ACFPlayerCharacter* Hero);
     bool HasClearFollowApproach(const FVector& Destination) const;
     FVector FindFollowApproach(const FVector& Destination) const;
     FName VisualState=TEXT("Idle");

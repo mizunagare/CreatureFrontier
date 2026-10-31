@@ -132,6 +132,7 @@ public:
     void ToggleBackpack();
     void StepBackpackRecipe(int32 Direction);
     void CraftBackpackRecipe();
+    void QueueBackpackRecipe();
     bool IsBackpackOpen() const { return bBackpackOpen; }
     int32 GetBackpackRecipe() const { return BackpackRecipe; }
     int32 GetBackpackRecipeCost(int32 Index) const;
