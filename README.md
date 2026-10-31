@@ -6,6 +6,8 @@
 
 ## 探索朝向开发候选（限定验证，非最终版）
 
+伙伴棚屋施工候选：`F:\CreatureFrontierBuilds\Windows-StarterShelter\CreatureFrontier.exe`。真实补采、原箱供料、伙伴两墙／屋顶施工、双方进入、三处碰撞、拆支撑拒绝及自身携料存档恢复均有两端证据，见[棚屋施工记录](Docs/STARTER_SHELTER.md)。目前为五模块开放棚屋，不是完整封闭房屋；下一步补齐门窗／围护与共同生活。候选共享不可变文件，不可直接改写；旧存档不会自动迁移。
+
 领奖后家园指引候选：`F:\CreatureFrontierBuilds\Windows-HomeGrowth\CreatureFrontier.exe`。五项目标后继续提示原恢复／地板／箱子／伙伴施工操作，真实奖励材料经原输入用于地板、箱子及存料，详见[家园基础记录](Docs/HOME_GROWTH.md)。尚未在该来源建成房屋或完成伙伴施工，下一步继续墙顶建设；候选共享不可变文件，不可直接改写共享文件，旧存档不会自动迁移。
 
 真实首领胜利候选：`F:\CreatureFrontierBuilds\Windows-StarterVictory\CreatureFrontier.exe`。从真实恢复档经原持续近战／伙伴战斗／跳跃击败首领、自动拾取、N领第五项奖励及返家存读，两端与各自胜利档冷启动均通过，见[首领胜利记录](Docs/STARTER_VICTORY.md)。不是完整人类新手流程或最终版，不新增必胜机制；本地候选共享不可变文件，不可直接改写共享文件，旧存档不会自动迁移。
