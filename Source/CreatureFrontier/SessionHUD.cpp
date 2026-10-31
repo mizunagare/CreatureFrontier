@@ -51,7 +51,7 @@ void ACFHUD::DrawControlHelp(ACFPlayerCharacter* Player)
         TEXT("J 喂食伙伴/向温顺野生生物分享食物 | H 自疗"),
         TEXT("Y 安静陪伴 / F6 玩耍（安全2.5米，玩耍耗体力/饱食20）"),
         TEXT("B 建造 | V 切换设施 | X 拆除"),
-        TEXT("建造时：8 切换设施/房屋 | 9 旋转墙体"),
+        TEXT("建造时：8 切换设施/房屋 | 9 旋转"),
         TEXT("C 背包/配方 | 1 制作捕捉器（3材料）"),
         TEXT("2 制作药品（5材料）| 3 制作食物（2材料）"),
         FString::Printf(TEXT("4 制作长矛（%d）| 5 制作护甲（%d）"),Player->Equipment->GetSpearCost(),Player->Equipment->GetVestCost()),

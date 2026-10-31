@@ -6,6 +6,8 @@
 
 ## 探索朝向开发候选（限定验证，非最终版）
 
+设施旋转候选：`F:\CreatureFrontierBuilds\Windows-FacilityRotation\CreatureFrontier.exe`。B进入设施建造、9每次旋转90度，手动朝向不会随瞄准转回；V切设施与8切房屋后返回保持朝向，取消重进恢复随视角。两端实际付费放置、伙伴进入、存读／冷启动和原房屋输入／帮助关联通过，见[操作与限定验收](Docs/FACILITY_ROTATION.md)。不是已建设施搬迁或最终品质；原生候选复用上个完整归档数据，不自动迁入旧普通存档。
+
 伙伴加工首版完整Windows：`F:\CreatureFrontierBuilds\CompanionCraftFull\Windows\CreatureFrontier.exe`。看向3米内自建制作设施，C选物品配方，Shift＋回车委托／取消，关闭背包后E派伙伴；伙伴实际工作，完工才扣原料并发货。两端自身真实药品加工／中断续工／冷启动、旧档与非法拒绝、库存边界和原玩法关联通过，见[操作、存档与限定证据](Docs/COMPANION_CRAFT.md)。本次重新编译烹饪归档，不是原生替换；不含批量队列或实体搬料，普通启动不加载QA完成档。
 
 真实屋内加工候选：`F:\CreatureFrontierBuilds\Windows-IndoorCraft\CreatureFrontier.exe`。同一伙伴实采材料、同行采纤维、双方返屋关门后在原新建设施旁编织，留下5材料；两端自身整链、中途恢复及存读通过，各五图已目视，见[原料来源与操作流程](Docs/INDOOR_CRAFT.md)。本轮复用已有玩法，只增加显式整合验证，不新增自动制造或改变普通经济，普通启动不加载QA完成档。

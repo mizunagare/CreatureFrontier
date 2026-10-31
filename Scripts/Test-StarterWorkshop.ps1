@@ -1,4 +1,4 @@
-param([string]$BuildRoot='',[Parameter(Mandatory=$true)][string]$ReadInputPath,[switch]$Resume,[switch]$Preview,[ValidateSet('960x540','1280x720')][string]$Resolution='1280x720')
+param([string]$BuildRoot='',[Parameter(Mandatory=$true)][string]$ReadInputPath,[switch]$Resume,[switch]$Preview,[switch]$VerifyRotation,[ValidateSet('960x540','1280x720')][string]$Resolution='1280x720')
 $ErrorActionPreference='Stop'
 $root=Split-Path $PSScriptRoot -Parent
 . (Join-Path $PSScriptRoot 'BuildFingerprint.ps1')
@@ -14,13 +14,16 @@ try{
     Copy-Item -LiteralPath $ReadInputPath -Destination (Join-Path $slots 'StarterWorkshopInput.sav')
     $log=Join-Path $run 'Workshop.log';$flag=if($Resume){'-CFStarterWorkshopRead'}else{'-CFStarterWorkshopTest'}
     $arguments=@($flag,'-nullrhi','-nosound','-unattended','-nop4',('-abslog="'+$log+'"'))
+    if($VerifyRotation){$arguments+='-CFFacilityRotationTest'}
     if($Preview){$size=$Resolution.Split('x');$arguments=@($arguments|Where-Object {$_ -ne '-nullrhi'})+@('-CFStarterWorkshopPreview','-RenderOffscreen','-ForceRes',('-ResX='+$size[0]),('-ResY='+$size[1]),'-norhithread','-forcerhibypass','-ExecCmds="t.MaxFPS 60,r.MotionBlurQuality 0,r.AntiAliasingMethod 1"')}
     $exe=if($BuildRoot){$module}elseif($Preview){'D:\Epic\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe'}else{'D:\Epic\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe'}
     if(!$BuildRoot){$arguments=@(('"'+(Join-Path $root 'CreatureFrontier.uproject')+'"'),'-game')+$arguments}
-    [pscustomobject]@{BuildRoot=$BuildRoot;Resume=[bool]$Resume;Preview=[bool]$Preview;Resolution=$Resolution;BuildSHA256=$hash;Input=$ReadInputPath;InputSHA256=$inputHash}|Export-Csv (Join-Path $run 'Run.csv') -NoTypeInformation
+    [pscustomobject]@{BuildRoot=$BuildRoot;Resume=[bool]$Resume;Preview=[bool]$Preview;VerifyRotation=[bool]$VerifyRotation;Resolution=$Resolution;BuildSHA256=$hash;Input=$ReadInputPath;InputSHA256=$inputHash}|Export-Csv (Join-Path $run 'Run.csv') -NoTypeInformation
     $started=[DateTime]::UtcNow;Write-Host ('室内工作设施证据：'+$run);$p=Start-Process -FilePath $exe -ArgumentList $arguments -WindowStyle Hidden -PassThru
     if(!$p.WaitForExit(240000)){$p.Kill();$p.WaitForExit();throw '室内工作设施验证超时'}
     $raw=Get-Content -LiteralPath $log -Raw
+    if($VerifyRotation -and !$raw.Contains('CF_FACILITY_ROTATION PASS quarter=1 viewHeld=1 cycle=1 finalYaw=270')){throw '设施旋转、视角保持或循环未通过；旋转专项需使用建造前来源'}
+    if($VerifyRotation -and !$raw.Contains('CF_FACILITY_ROTATION_RESET PASS cancel=1 load=1 category=1')){throw '设施旋转取消／读档重置或分类切换未通过'}
     if($p.ExitCode -ne 0 -or $raw -match '\bFAIL\b|Fatal error|Assertion failed' -or !$raw.Contains('CF_STARTER_WORKSHOP_LIFE PASS facilities=2 modules=7 paid=15 material=0 newXP=15 inside=1 visible=1 identity=1') -or !$raw.Contains('LogExit: Exiting.')){throw ('室内工作设施验证失败：'+$log)}
     if(!$raw.Contains('CF_STARTER_WORKSHOP_BUILD PASS originalInput=1 paid=15 supported=1 facilities=2') -and !($Resume -and $raw.Contains('CF_STARTER_WORKSHOP_BUILD_RESTORED PASS facilities=2 paidCheckpoint=1'))){throw '缺少原输入建造与成本记录'}
     if(!$Resume -and !$raw.Contains('CF_STARTER_WORKSHOP_MID PASS actualTaken=14 material=15 newXP=15 oldXP=40')){throw '缺少实际采集材料记录'}

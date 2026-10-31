@@ -60,7 +60,7 @@ void UBaseBuildingComponent::Cancel()
 {
     if(auto* Hero=Cast<ACFPlayerCharacter>(GetOwner())) Hero->HomeBuilding->Cancel();
     bHomeMode=false;
-    bActive = false; bValid = false;
+    bActive = false; bValid = false;bManualFacilityRotation=false;FacilityYaw=0;
     if (IsValid(Preview)) Preview->Destroy();
     Preview = nullptr; PreviewMaterial = nullptr;
 }
@@ -85,7 +85,11 @@ void UBaseBuildingComponent::SwitchCategory()
 }
 void UBaseBuildingComponent::RotateHome()
 {
-    if(bActive && bHomeMode) CastChecked<ACFPlayerCharacter>(GetOwner())->HomeBuilding->Rotate();
+    auto* Hero=Cast<ACFPlayerCharacter>(GetOwner());if(!bActive || !Hero || Hero->Health<=0 || !Hero->HasAuthority())return;
+    if(bHomeMode){Hero->HomeBuilding->Rotate();return;}
+    // 未手动旋转时保留原视角吸附；按9后锁定朝向，瞄准与移动只改变位置。
+    const float Previous=bManualFacilityRotation?FacilityYaw:FMath::GridSnap(Hero->GetControlRotation().Yaw,90.f);
+    FacilityYaw=FMath::UnwindDegrees(Previous+90);bManualFacilityRotation=true;UpdatePlacement();
 }
 void UBaseBuildingComponent::ReplaceHome()
 {
@@ -140,7 +144,8 @@ bool UBaseBuildingComponent::UpdatePlacement()
     const bool Ground = GetWorld()->LineTraceSingleByChannel(Hit,Start,Start+Hero->FirstPersonCamera->GetForwardVector()*800,ECC_Visibility,Params);
     if (!Ground) { Status = TEXT("请瞄准8米内的地面"); bValid = false; if (Preview) Preview->SetActorHiddenInGame(true); return false; }
     const FVector Position(FMath::GridSnap(Hit.ImpactPoint.X,100.0),FMath::GridSnap(Hit.ImpactPoint.Y,100.0),Hit.ImpactPoint.Z+35);
-    Placement = FTransform(FRotator(0,FMath::GridSnap(static_cast<double>(Hero->GetControlRotation().Yaw),90.0),0),Position,FVector(2,1,.7));
+    const double Yaw=bManualFacilityRotation?FacilityYaw:FMath::GridSnap(static_cast<double>(Hero->GetControlRotation().Yaw),90.0);
+    Placement = FTransform(FRotator(0,Yaw,0),Position,FVector(2,1,.7));
     bValid = ValidatePlacement(Placement,Status);
     if (Preview) { Preview->SetActorTransform(Placement); Preview->SetActorHiddenInGame(false); }
     if (PreviewMaterial) PreviewMaterial->SetVectorParameterValue(TEXT("Tint"),bValid ? FLinearColor(.08f,.8f,.15f) : FLinearColor(.9f,.04f,.02f));
@@ -213,6 +218,6 @@ void UBaseBuildingComponent::Dismantle()
 FString UBaseBuildingComponent::GetHint() const
 {
     if(bHomeMode) return CastChecked<ACFPlayerCharacter>(GetOwner())->HomeBuilding->GetHint();
-    return FString::Printf(TEXT("设施 %s（%d材料）| V 选择 | 8 房屋\n%s"),
-        *FrontierChinese::Specialty(Selected),GetCost(Selected),*Status);
+    return FString::Printf(TEXT("设施 %s（%d材料）| V 选择 | 8 房屋\n9 旋转 | 朝向%d（%s）\n%s"),
+        *FrontierChinese::Specialty(Selected),GetCost(Selected),FMath::RoundToInt(FRotator::ClampAxis(Placement.Rotator().Yaw)),bManualFacilityRotation?TEXT("手动"):TEXT("随视角"),*Status);
 }

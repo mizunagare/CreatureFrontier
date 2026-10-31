@@ -23,6 +23,7 @@ public:
     void ReplaceHome();
     bool IsActive() const { return bActive; }
     FString GetHint() const;
+    FTransform GetPlacementTransform() const { return Placement; }
     static int32 GetCost(EWorkSpecialty Specialty);
     static bool IsBuildTransformValid(const FTransform& Transform);
     bool ValidatePlacement(const FTransform& Transform, FString& Reason) const;
@@ -39,4 +40,6 @@ private:
     FTransform Placement;
     UPROPERTY() TObjectPtr<class AStaticMeshActor> Preview;
     UPROPERTY() TObjectPtr<class UMaterialInstanceDynamic> PreviewMaterial;
+    bool bManualFacilityRotation=false;
+    float FacilityYaw=0;
 };
