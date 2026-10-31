@@ -774,6 +774,7 @@ void ACFPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
     PlayerInputComponent->BindKey(EKeys::J, IE_Pressed, this, &ACFPlayerCharacter::FeedAimedCompanion);
     PlayerInputComponent->BindKey(EKeys::U, IE_Pressed, this, &ACFPlayerCharacter::DepositTroughFood);
     PlayerInputComponent->BindKey(EKeys::O, IE_Pressed, this, &ACFPlayerCharacter::WithdrawTroughFood);
+    PlayerInputComponent->BindKey(FInputChord(EKeys::O,true,false,false,false),IE_Pressed,this,&ACFPlayerCharacter::WithdrawSingleFood);
     PlayerInputComponent->BindKey(EKeys::H, IE_Pressed, this, &ACFPlayerCharacter::UseMedicine);
     PlayerInputComponent->BindKey(EKeys::B, IE_Pressed, this, &ACFPlayerCharacter::ToggleBuilding);
     PlayerInputComponent->BindKey(EKeys::V, IE_Pressed, this, &ACFPlayerCharacter::CycleBuilding);

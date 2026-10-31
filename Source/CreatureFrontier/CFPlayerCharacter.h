@@ -66,6 +66,7 @@ public:
     AWorkStation* TraceFacility() const;
     void DepositTroughFood();
     void WithdrawTroughFood();
+    void WithdrawSingleFood();
     bool WithdrawCompanionCargo(ACreatureCharacter* Pet);
     void WithdrawAimedCargo();
     void UseMedicine();

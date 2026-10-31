@@ -20,7 +20,7 @@ public:
     UPROPERTY(BlueprintReadOnly, Category="Feeding") int32 StoredFood = 0;
     UPROPERTY(VisibleAnywhere,BlueprintReadOnly) TObjectPtr<class UFarmCropComponent> Crop;
     void RefreshFarm() { RefreshLabel(); }
-    bool TransferFood(class ACFPlayerCharacter* Hero, bool Deposit);
+    bool TransferFood(class ACFPlayerCharacter* Hero, bool Deposit,bool SingleWithdrawal=false);
     bool ServeFood(class ACreatureCharacter* Pet);
     bool IsFoodStore() const { return RequiredSpecialty==EWorkSpecialty::Feeding || RequiredSpecialty==EWorkSpecialty::Farming; }
     bool AdjustFoodStock(int32 Delta);

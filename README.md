@@ -1,5 +1,7 @@
 # 幻兽边境
 
+最新限定操作改进：Shift＋O只取1份食物，便于备料时保留基地口粮；原O／U仍最多5份。Windows入口 `F:\CreatureFrontierBuilds\Windows-FoodPortion\CreatureFrontier.exe`，两端真实档、边界与显示证据见[单份取粮](Docs/FOOD_PORTION.md)。这是后续采纤维／伙伴制种的准备，尚非补种整链或最终发布版。
+
 最新限定整合：农业回补食槽。F2向农圃存原种子，伙伴种植收获后O取粮，实际返屋U补入食槽；两端已以原1种子把储粮2补至3，生长中途恢复通过。Windows入口 `F:\CreatureFrontierBuilds\Windows-PantryRefill\CreatureFrontier.exe`，证据与限制见[农业回补食槽](Docs/PANTRY_REFILL.md)。复用已有玩法，种子会耗尽，并非永续经营或最终发布版。
 
 最新限定交付：室内食槽与工人返岗。原B建食槽（12材料）、U存粮；原饥饿伙伴在8米范围内自行进食并保留工作，工人可以安全绕过静止休息的同主人伙伴。Windows入口 `F:\CreatureFrontierBuilds\Windows-StarterPantry\CreatureFrontier.exe`，真实物资链、构建方式、边界和剩余范围见[室内照料与返岗](Docs/WORK_REST_DETOUR.md)。目前是本地原生候选和灰盒原型，不是最终发布品质。

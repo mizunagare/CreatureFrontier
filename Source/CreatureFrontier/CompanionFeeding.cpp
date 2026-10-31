@@ -59,6 +59,13 @@ void ACFPlayerCharacter::WithdrawTroughFood()
     else Site->TransferFood(this,false);
 }
 
+void ACFPlayerCharacter::WithdrawSingleFood()
+{
+    auto* Site=TraceFacility();
+    if(!Site || !Site->IsFoodStore())Feedback=TEXT("请瞄准6米内的农圃或食槽");
+    else Site->TransferFood(this,false,true);
+}
+
 bool ACFPlayerCharacter::WithdrawCompanionCargo(ACreatureCharacter* Pet)
 {
     if(!HasAuthority() || Health<=0 || !IsValid(Pet) || Pet->Tamer!=GetController() || Pet->Disposition!=ECreatureDisposition::Tamed || GetDistanceTo(Pet)>600) return false;

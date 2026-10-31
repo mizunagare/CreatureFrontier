@@ -3,7 +3,7 @@
 #include "CreatureCharacter.h"
 #include "InventoryComponent.h"
 
-bool AWorkStation::TransferFood(ACFPlayerCharacter* Hero, bool Deposit)
+bool AWorkStation::TransferFood(ACFPlayerCharacter* Hero, bool Deposit,bool SingleWithdrawal)
 {
     if (!HasAuthority() || !IsFoodStore() || !IsValid(Hero) || Hero->Health <= 0 || GetDistanceTo(Hero) > 600) return false;
     FHitResult Hit;
@@ -11,11 +11,11 @@ bool AWorkStation::TransferFood(ACFPlayerCharacter* Hero, bool Deposit)
     if (GetWorld()->LineTraceSingleByChannel(Hit,Hero->GetPawnViewLocation(),GetActorLocation(),ECC_Visibility,Params) && Hit.GetActor() != this)
     { Hero->Feedback = TEXT("食物设施被障碍物遮挡"); return false; }
     const int32 Amount = Deposit ? FMath::Min3(5,30-StoredFood,Hero->Inventory->Count(EFrontierItem::Food)) :
-        FMath::Min3(5,StoredFood,UInventoryComponent::StackLimit-Hero->Inventory->Count(EFrontierItem::Food));
+        FMath::Min3(SingleWithdrawal?1:5,StoredFood,UInventoryComponent::StackLimit-Hero->Inventory->Count(EFrontierItem::Food));
     if (Amount <= 0) { Hero->Feedback = TEXT("没有可转移食物，或目标容量已满"); return false; }
     if (Deposit ? !Hero->Inventory->Consume(EFrontierItem::Food,Amount) : !Hero->Inventory->AddItem(EFrontierItem::Food,Amount)) return false;
     StoredFood += Deposit ? Amount : -Amount;
-    Hero->Feedback = FString::Printf(TEXT("食物储量 %d/30 | U 存入 | O 取出"),StoredFood);
+    Hero->Feedback = FString::Printf(TEXT("已%s%d份食物 | 储量 %d/30"),Deposit?TEXT("存入"):TEXT("取出"),Amount,StoredFood);
     RefreshLabel(); return true;
 }
 

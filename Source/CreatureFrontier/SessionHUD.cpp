@@ -56,7 +56,7 @@ void ACFHUD::DrawControlHelp(ACFPlayerCharacter* Player)
         TEXT("2 制作药品（5材料）| 3 制作食物（2材料）"),
         FString::Printf(TEXT("4 制作长矛（%d）| 5 制作护甲（%d）"),Player->Equipment->GetSpearCost(),Player->Equipment->GetVestCost()),
         TEXT("6 / 7 装备或卸下长矛/护甲"),
-        TEXT("U 存入食物 | O 从农圃/食槽取出"),
+        TEXT("U 存粮 | O 取最多5份 | Shift+O取1份"),
         TEXT("Z 取回瞄准伙伴携带的物品"),
         TEXT("Tab 队伍 | [ / ] 翻页 | 回车选择"),
         TEXT("I 图鉴 | 上翻页键 / 下翻页键"),

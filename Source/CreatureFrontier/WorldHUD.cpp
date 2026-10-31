@@ -121,7 +121,7 @@ void ACFHUD::DrawWorldHUD(ACFPlayerCharacter* Player)
     {
         Audit.Context=Site->RequiredSpecialty==EWorkSpecialty::Farming?EFrontierHUDContext::Garden:Site->IsFoodStore()?EFrontierHUDContext::FoodStore:EFrontierHUDContext::Facility;
         Rows.Add({Site->RequiredSpecialty==EWorkSpecialty::Farming?TEXT("农圃"):TEXT("工作设施"),Blue});
-        if(Site->IsFoodStore())Rows.Add({FString::Printf(TEXT("食物 %d/30 | U 存入 | O 取出（6米）"),Site->StoredFood),Yellow,2});
+        if(Site->IsFoodStore())Rows.Add({FString::Printf(TEXT("食物 %d/30 | U 存入最多5份\nO 取最多5份 | Shift+O 取1份（6米）"),Site->StoredFood),Yellow,2});
         if(Site->RequiredSpecialty==EWorkSpecialty::Farming)Rows.Add({Site->Crop->Status(),Green,3});
         if(Site->bPlayerBuilt && Site->RequiredSpecialty==EWorkSpecialty::Crafting)Rows.Add({Site->CraftStatus(),Green,3});
         Rows.Add({TEXT("E 指派工作 | T 休息后续工 | F 跟随/取消"),Yellow,2});
