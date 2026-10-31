@@ -21,6 +21,7 @@
 #include "TimerManager.h"
 #include "PlayerEquipmentComponent.h"
 #include "ResourceNode.h"
+#include "ResourceDefinition.h"
 #include "ResourcePersistence.h"
 #include "HomeBuildingComponent.h"
 #include "HomeLayout.h"
@@ -650,10 +651,20 @@ void ACFPlayerCharacter::CommandWork()
 void ACFPlayerCharacter::CommandRest()
 {
     if (!HasAuthority() || Health <= 0 || UGameplayStatics::IsGamePaused(this)) return;
-    AWorkStation* Site = nullptr;
-    float Best = 800;
-    for (TActorIterator<AWorkStation> It(GetWorld()); It; ++It)
-        if (GetDistanceTo(*It) < Best) { Best = GetDistanceTo(*It); Site = *It; }
+    // 远处看清的设施只用于反馈超距；实际休息指派仍保留原8米限制。
+    FHitResult Hit; FCollisionQueryParams Params(SCENE_QUERY_STAT(RestOrder),false,this);
+    const FVector Start=FirstPersonCamera->GetComponentLocation();
+    GetWorld()->LineTraceSingleByChannel(Hit,Start,Start+FirstPersonCamera->GetForwardVector()*1300,ECC_Visibility,Params);
+    AWorkStation* Aimed=Cast<AWorkStation>(Hit.GetActor());
+    if(IsValid(Aimed) && Aimed->IsActorBeingDestroyed())Aimed=nullptr;
+    const bool TooFar=IsValid(Aimed) && GetDistanceTo(Aimed)>800;
+    AWorkStation* Site=TooFar?nullptr:Aimed;
+    if(!Aimed)
+    {
+        float Best=800;
+        for(TActorIterator<AWorkStation> It(GetWorld());It;++It)
+            if(!It->IsActorBeingDestroyed() && GetDistanceTo(*It)<Best){Best=GetDistanceTo(*It);Site=*It;}
+    }
     int32 Count = 0, ResumeCount = 0;
     for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It)
         if (IsCommandTarget(*It) && It->Health > 0)
@@ -668,7 +679,10 @@ void ACFPlayerCharacter::CommandRest()
             {It->CancelFieldResource();It->bResumeWorkAfterRest=false;It->WorkSite=Site;It->SetActivity(ECreatureActivity::Rest);++Count;}
         }
     Feedback = ResumeCount>0?FString::Printf(TEXT("%d位伙伴休息后续工；%d位回基地休息。F取消/跟随"),ResumeCount,Count):
-        !Site?TEXT("休息命令需要靠近基地工作设施（8米）"):FString::Printf(TEXT("%d位伙伴正回基地恢复生命和体力"), Count);
+        TooFar?TEXT("瞄准设施超过8米，未改派\n有工作伙伴仍保留原任务休息续工"):
+        !Site?TEXT("休息命令需要靠近基地工作设施（8米）"):
+        Count>0?FString::Printf(TEXT("%d位伙伴正去%s设施休息（%s）| F取消/跟随"),Count,*FrontierChinese::Specialty(Site->RequiredSpecialty),Aimed?TEXT("瞄准"):TEXT("就近")):
+        TEXT("当前范围没有可休息的存活伙伴；L单选，K全队");
 }
 
 void ACFPlayerCharacter::HealCompanion()
