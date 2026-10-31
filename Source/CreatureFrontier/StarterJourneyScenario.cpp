@@ -1302,7 +1302,7 @@ struct FStarterHomeLife : FStarterRoom
         if(Phase==9)
         {
             Face(FVector(-200,-555,100));if(Door->DoorState==2 && (!CFInputQA::Press(Hero,EKeys::E) || Door->DoorState!=1))return End(false,TEXT("close"));if(Photo(TEXT("Home"),P))return true;
-            if(!Hero->GetObjectiveHint().Contains(TEXT("家园已可进出")) || Pet->Stamina<99)return End(false,TEXT("ready-hint"));
+            if(!Hero->GetObjectiveHint().Contains(TEXT("农圃")) || Pet->Stamina<99)return End(false,TEXT("provisions-hint"));
             const float SP=Pet->Stamina,N=Pet->Nutrition;const auto HB=H,PB=P;
             if(!Hero->SaveProgress(TEXT("StarterHomeLifeDone")) || !Hero->LoadProgress(TEXT("StarterHomeLifeDone")))return End(false,TEXT("save"));Find();
             if(!Budget() || Door->DoorState!=1 || !Hero->GetActorLocation().Equals(HB,.01) || !Pet->GetActorLocation().Equals(PB,.01) || !FMath::IsNearlyEqual(Pet->Stamina,SP,.01) || !FMath::IsNearlyEqual(Pet->Nutrition,N,.01))return End(false,TEXT("restore"));
@@ -1322,5 +1322,86 @@ void RunStarterHomeLifeScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read
     if(Read){S->RestSite=S->Pet->WorkSite;if(!S->RestSite.IsValid() || S->Pet->Activity!=ECreatureActivity::Rest){S->End(false,TEXT("source-rest"));return;}}
     S->LastH=Hero->GetActorLocation();S->LastP=S->Pet->GetActorLocation();S->VelocityH=Hero->GetVelocity();S->VelocityP=S->Pet->GetVelocity();S->LastTime=World->GetTimeSeconds();S->LastStamina=S->Pet->Stamina;S->Input=NewObject<UHomeMovementProbe>(Hero);S->Input->RegisterComponent();
     S->Preview=FParse::Param(FCommandLine::Get(),TEXT("CFStarterHomeLifePreview"));if(S->Preview){S->Root=FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir()/TEXT("StarterHomeLifePreview")/FGuid::NewGuid().ToString(EGuidFormats::Digits));IFileManager::Get().MakeDirectory(*S->Root,true);UE_LOG(LogTemp,Display,TEXT("CF_STARTER_HOME_LIFE_PREVIEW_ROOT %s"),*S->Root);}
+    FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([S](float){return S->Tick();}));
+}
+
+namespace
+{
+struct FStarterHomeFarm : FStarterRoom
+{
+    TWeakObjectPtr<AWorkStation> Farm;bool Deposited=false,Withdrew=false,FarmMid=false;
+    void BindFarm(){Farm.Reset();for(TActorIterator<AWorkStation> It(World);It;++It)if(It->PersistentId==Garden.Id)Farm=*It;}
+    bool End(bool Pass,const TCHAR* Reason)
+    {
+        if(Input.IsValid())Input->Direction=FVector::ZeroVector;CFInputQA::Release(Hero,EKeys::LeftShift);
+        const auto Feedback=Hero->Feedback;if(!Pass)Hero->SaveProgress(TEXT("StarterHomeFarmBlocked"));
+        UE_LOG(LogTemp,Display,TEXT("CF_STARTER_HOME_FARM %s reason=%s phase=%d heroTravel=%.1f petTravel=%.1f farm=%s food=%d stock=%d seeds=%d growth=%.2f feedback=%s"),Pass?TEXT("PASS"):TEXT("FAIL"),Reason,Phase,HeroTravel,PetTravel,Farm.IsValid()?*Farm->GetActorLocation().ToString():TEXT("none"),Hero->Inventory->Count(EFrontierItem::Food),Farm.IsValid()?Farm->StoredFood:-1,Farm.IsValid()?Farm->Crop->Seeds:-1,Farm.IsValid()?Farm->Crop->GrowthWork:-1,*Feedback);FPlatformMisc::RequestExitWithStatus(false,Pass?0:1);return false;
+    }
+    bool Budget()const
+    {
+        if(!Pet.IsValid() || !Farm.IsValid() || !Door.IsValid() || !Supply.IsValid() || Supply->Remaining!=2)return false;
+        const int32 Harvests=Pet->Experience-37;
+        if(Harvests<0 || Harvests>1 || Hero->Health!=100 || Pet->Health<=0 || Pet->Level!=2 || Pet->BondPoints!=6 || Pet->Nickname!=Nickname || Hero->Inventory->Count(EFrontierItem::Material)!=0 || Pet->Cargo->Count()!=0 || Hero->Inventory->Count(EFrontierItem::Seeds)!=(Deposited?0:1) || Hero->Inventory->Count(EFrontierItem::Food)!=(Withdrew?2:1) || Hero->Inventory->Count(EFrontierItem::Food)+Farm->StoredFood!=1+Harvests || Hero->Inventory->Count(EFrontierItem::Seeds)+Farm->Crop->Seeds+(Farm->Crop->bPlanted?1:0)+Harvests!=1)return false;
+        const auto Layout=HomeLayout::Collect(World);if(Layout.Num()!=7)return false;int32 Paid=0;
+        for(const auto& R:Original){const auto* Current=Layout.FindByPredicate([&](const FHomeModuleRecord& V){return V.Id==R.Id;});if(!Current || !Current->Transform.Equals(R.Transform,.01) || Current->Definition!=R.Definition || Current->PaidMaterials!=R.PaidMaterials || !Current->StoredItems.OrderIndependentCompareEqual(R.StoredItems))return false;Paid+=Current->PaidMaterials;}
+        int32 Farms=0;for(TActorIterator<AWorkStation> It(World);It;++It)if(It->bPlayerBuilt)++Farms;
+        return Paid==58 && Farms==1 && Farm->GetActorTransform().Equals(Garden.Transform,.01) && Farm->RequiredSpecialty==EWorkSpecialty::Farming && Hero->GetObjectives().Claimed==5 && Hero->GetObjectives().bAlphaResolved && Hero->Inventory->Count(EFrontierItem::Medicine)==0 && Hero->Inventory->Count(EFrontierItem::CaptureDevice)==10;
+    }
+    bool Tick()
+    {
+        if(!Budget() || FPlatformTime::Seconds()>Deadline)return End(false,TEXT("budget-time"));
+        const auto H=Hero->GetActorLocation(),P=Pet->GetActorLocation();const double Delta=World->GetTimeSeconds()-LastTime;
+        if(!Motion(Hero,LastH,VelocityH,Delta) || !Motion(Pet.Get(),LastP,VelocityP,Delta))return End(false,TEXT("motion"));
+        HeroTravel+=FVector::Dist(H,LastH);PetTravel+=FVector::Dist(P,LastP);LastH=H;LastP=P;VelocityH=Hero->GetVelocity();VelocityP=Pet->GetVelocity();LastTime=World->GetTimeSeconds();
+        for(TActorIterator<ACreatureCharacter> It(World);It;++It)if(It->Health>0 && (!It->IsActorTickEnabled() || !It->GetActorEnableCollision() || It->GetCharacterMovement()->MovementMode==MOVE_None))return End(false,TEXT("ecology"));
+        if(!FarmMid && Farm->Crop->bPlanted && Farm->Crop->GrowthWork>=1 && Farm->Crop->GrowthWork<5 && Pet->WorkSite==Farm.Get())
+        {if(!Hero->SaveProgress(TEXT("StarterHomeFarmMid")))return End(false,TEXT("mid-save"));FarmMid=true;Photo(TEXT("Growing"),Farm->GetActorLocation());UE_LOG(LogTemp,Display,TEXT("CF_STARTER_HOME_FARM_MID PASS planted=1 food=1 xp=37 growth=%.2f"),Farm->Crop->GrowthWork);}
+        if(FPlatformTime::Seconds()<ShotUntil)return true;
+        if(Phase==-1){if(World->GetTimeSeconds()-At<2 || UNavigationSystemV1::IsNavigationBeingBuiltOrLocked(World))return true;Phase=Read?3:0;return true;}
+        if(Phase==0)
+        {if(Photo(TEXT("Ready"),P))return true;if(!Hero->GetObjectiveHint().Contains(TEXT("农圃")))return End(false,TEXT("farm-hint"));Face(FVector(-200,-555,100));if(!CFInputQA::Press(Hero,EKeys::E) || Door->DoorState!=2)return End(false,TEXT("open"));Phase=10;At=World->GetTimeSeconds();return true;}
+        if(Phase==10)
+        {if(World->GetTimeSeconds()-At<2 || UNavigationSystemV1::IsNavigationBeingBuiltOrLocked(World))return true;if(!Plan(Farm->GetActorLocation()+FVector(-190,-140,40),1))return End(false,TEXT("farm-path"));return true;}
+        if(Phase==1 || Phase==4 || Phase==6 || Phase==8)
+        {const int32 R=Move();if(R<0)return End(false,TEXT("walk"));if(!R)return true;Phase=Phase==1?2:Phase==4?5:Phase==6?7:9;At=World->GetTimeSeconds();return true;}
+        if(Phase==2)
+        {
+            Face(Farm->GetActorLocation()+FVector(0,0,30));if(Hero->TraceFacility()!=Farm.Get()){if(World->GetTimeSeconds()-At>5)return End(false,TEXT("farm-sight"));return true;}
+            if(!CFInputQA::Press(Hero,EKeys::F2) || Hero->Inventory->Count(EFrontierItem::Seeds)!=0 || Farm->Crop->Seeds!=1)return End(false,TEXT("deposit-seed"));Deposited=true;Photo(TEXT("Seeded"),Farm->GetActorLocation());
+            if(!CFInputQA::Press(Hero,EKeys::E) || Pet->WorkSite!=Farm.Get() || Pet->Activity!=ECreatureActivity::Work)return End(false,TEXT("assign"));Phase=3;return true;
+        }
+        if(Phase==3)
+        {
+            if(Pet->WorkSite!=Farm.Get())return End(false,TEXT("lost-task"));if(Farm->StoredFood<1)return true;
+            if(!FarmMid || Pet->Experience!=38 || Farm->Crop->Seeds!=0 || Farm->Crop->bPlanted || !Hero->GetObjectiveHint().Contains(TEXT("按O取粮")))return End(false,TEXT("harvest"));
+            Face(Farm->GetActorLocation()+FVector(0,0,30));if(!CFInputQA::Press(Hero,EKeys::O) || Farm->StoredFood!=0 || Hero->Inventory->Count(EFrontierItem::Food)!=2)return End(false,TEXT("withdraw"));Withdrew=true;Photo(TEXT("Harvested"),Farm->GetActorLocation());
+            UE_LOG(LogTemp,Display,TEXT("CF_STARTER_HOME_FARM_HARVEST PASS seedPaid=1 produced=1 withdrawn=1 food=2 xp=38"));if(!CFInputQA::Press(Hero,EKeys::F) || !Plan(FVector(-470,-400,40),4))return End(false,TEXT("return"));return true;
+        }
+        if(Phase==5){if(Door->DoorState!=2 || !Plan(FVector(120,-400,60),6))return End(false,TEXT("enter"));return true;}
+        if(Phase==7){if(P.X< -140 || P.X>160 || FMath::Abs(P.Y+400)>160 || P.Z<50 || Pet->Activity!=ECreatureActivity::Follow){if(World->GetTimeSeconds()-At>20)return End(false,TEXT("pair-enter"));return true;}if(!Plan(FVector(50,-400,60),8))return End(false,TEXT("close-path"));return true;}
+        if(Phase==9)
+        {
+            Face(FVector(-200,-400,245));if(Door->DoorState==2)
+            {if(AHomeModule::TraceDoor(Hero)!=Door.Get()){if(World->GetTimeSeconds()-At>5)return End(false,TEXT("close-sight"));return true;}if(!CFInputQA::Press(Hero,EKeys::E) || Door->DoorState!=1)return End(false,TEXT("close"));}
+            if(Photo(TEXT("Home"),P))return true;
+            if(!Hero->GetObjectiveHint().Contains(TEXT("家园已可进出")))return End(false,TEXT("ready-hint"));const auto HB=H,PB=P;
+            if(!Hero->SaveProgress(TEXT("StarterHomeFarmDone")) || !Hero->LoadProgress(TEXT("StarterHomeFarmDone")))return End(false,TEXT("save"));Find();BindFarm();
+            if(!Budget() || Door->DoorState!=1 || !Hero->GetActorLocation().Equals(HB,.01) || !Pet->GetActorLocation().Equals(PB,.01))return End(false,TEXT("restore"));
+            UE_LOG(LogTemp,Display,TEXT("CF_STARTER_HOME_FARM_LIFE PASS modules=7 paid=58 food=2 seeds=0 xp=38 returned=1 closed=1 identity=1"));return End(true,TEXT("complete"));
+        }
+        return true;
+    }
+};
+}
+void RunStarterHomeFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read)
+{
+    auto S=MakeShared<FStarterHomeFarm>();S->World=World;S->Hero=Hero;S->Read=Read;S->Deposited=Read;S->FarmMid=Read;S->At=World->GetTimeSeconds();S->Deadline=FPlatformTime::Seconds()+150;
+    const auto* Source=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("StarterHomeFarmInput"),0));
+    if(!Source || Source->FormatVersion!=38 || Source->Facilities.Num()!=1 || Source->HomeModules.Num()!=7 || !Hero->LoadProgress(TEXT("StarterHomeFarmInput"))){S->End(false,TEXT("source"));return;}
+    S->Original=Source->HomeModules;S->Garden=Source->Facilities[0];for(TActorIterator<ACreatureCharacter> It(World);It;++It)if(It->Tamer==Hero->GetController()){S->PetId=It->PersistentId;S->Nickname=It->Nickname;}S->Find();S->BindFarm();
+    if(!S->Budget() || S->Pet->Experience!=37 || !Hero->GetActorTransform().Equals(Source->PlayerTransform,.01) || (!Read && (S->Garden.Seeds!=0 || S->Garden.bPlanted || S->Garden.StoredFood!=0 || S->Door->DoorState!=1))){S->End(false,TEXT("source-budget"));return;}
+    if(Read && (!S->Farm->Crop->bPlanted || S->Farm->Crop->GrowthWork<=0 || S->Pet->WorkSite!=S->Farm.Get() || S->Pet->Activity!=ECreatureActivity::Work)){S->End(false,TEXT("source-growing"));return;}
+    S->LastH=Hero->GetActorLocation();S->LastP=S->Pet->GetActorLocation();S->VelocityH=Hero->GetVelocity();S->VelocityP=S->Pet->GetVelocity();S->LastTime=World->GetTimeSeconds();S->Input=NewObject<UHomeMovementProbe>(Hero);S->Input->RegisterComponent();
+    S->Preview=FParse::Param(FCommandLine::Get(),TEXT("CFStarterHomeFarmPreview"));if(S->Preview){S->Root=FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir()/TEXT("StarterHomeFarmPreview")/FGuid::NewGuid().ToString(EGuidFormats::Digits));IFileManager::Get().MakeDirectory(*S->Root,true);UE_LOG(LogTemp,Display,TEXT("CF_STARTER_HOME_FARM_PREVIEW_ROOT %s"),*S->Root);}
     FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([S](float){return S->Tick();}));
 }

@@ -14,6 +14,7 @@
 
 namespace
 {
+    FString FarmingHint(const ACFPlayerCharacter* Hero);
     FString BuiltHomeLifeHint(const ACFPlayerCharacter* Hero)
     {
         bool Ready=false;
@@ -30,6 +31,13 @@ namespace
         {Hungry|=It->Nutrition<=80;Tired|=It->Stamina<80;}
         if(Hungry && Hero->Inventory->Count(EFrontierItem::Food)>0)return TEXT("建房后照料伙伴：瞄准J喂食（消耗1食物）\n开门留出通路，设施附近T休息");
         if(Tired)return TEXT("伙伴体力不足：开门留出通路\n设施附近T休息，恢复后F一起返屋");
+        // 初始食物消耗后接回原农圃，不把所有建成家园都永久提示继续施工或探索。
+        if(Hero->Inventory->Count(EFrontierItem::Food)<=1)
+        {
+            for(TActorIterator<AWorkStation> It(Hero->GetWorld());It;++It)if(It->bPlayerBuilt && It->RequiredSpecialty==EWorkSpecialty::Farming && It->StoredFood>0)
+                return TEXT("农圃已有收获：靠近6米瞄准按O取粮\n补回伙伴照料与下一次探索的食物");
+            return FarmingHint(Hero);
+        }
         return TEXT("家园已可进出：E开关门，勿挡活动区\n照料伙伴后继续探索；F5保存");
     }
     // 恢复提示只读现有状态，不改变治疗许可、任务或奖励进度。

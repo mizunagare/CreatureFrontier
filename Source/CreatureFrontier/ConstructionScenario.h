@@ -1,4 +1,5 @@
 #pragma once
+void RunStarterHomeFarmScenario(class UWorld* World,class ACFPlayerCharacter* Hero,bool Read);
 void RunStarterHomeLifeScenario(class UWorld* World,class ACFPlayerCharacter* Hero,bool Read);
 void RunStarterRoomScenario(class UWorld* World,class ACFPlayerCharacter* Hero,bool Read);
 void RunDoorConstructionScenario(class UWorld* World,class ACFPlayerCharacter* Hero,bool Read);

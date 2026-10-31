@@ -6,6 +6,8 @@
 
 ## 探索朝向开发候选（限定验证，非最终版）
 
+家园农业补给候选：`F:\CreatureFrontierBuilds\Windows-StarterHomeFarm\CreatureFrontier.exe`。原照料档的1份种子由同一伙伴实际耕作产粮，取粮后食物1→2并返屋关门，两端完整链、自身生长档恢复、照料回归及各五图检查通过，见[原农圃补给记录](Docs/STARTER_HOME_FARM.md)。种子已耗尽，尚非永续经济；下一步补种子供应。候选共享不可变文件，不可直接改写；普通旧存档不自动迁入。
+
 建房后照料候选：`F:\CreatureFrontierBuilds\Windows-StarterHomeLife\CreatureFrontier.exe`。真实建房档经原J喂食／T设施休息／F共同返屋、关门存读，两端完整链、自身休息中途恢复、各五图文字检查及原基础备料档回归通过，见[建房后照料记录](Docs/STARTER_HOME_LIFE.md)。休息仍用屋外原设施，没有新增床铺或室内睡眠；消耗存量食物，不代表永续生活经济。候选共享不可变文件，不可直接改写；旧普通存档不自动迁移。
 
 窗门围护候选：`F:\CreatureFrontierBuilds\Windows-StarterRoom\CreatureFrontier.exe`。真实棚屋档的实采22、伙伴窗墙／木门施工、共同进入关门及自身携料恢复已通过Editor／Windows，门工地通行与站位已修正，Windows原实体门七项回归通过；详见[围护限定验收](Docs/STARTER_ROOM.md)。七模块仍为开放窗洞灰盒，尚未完成屋内休息／进食；不是最终版。候选共享不可变文件，不可直接改写；旧普通存档不自动迁移。
