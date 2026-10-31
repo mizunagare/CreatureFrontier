@@ -22,6 +22,7 @@ public:
     void RotateHome();
     void ReplaceHome();
     bool IsActive() const { return bActive; }
+    bool IsRelocating() const { return bRelocating; }
     FString GetHint() const;
     FTransform GetPlacementTransform() const { return Placement; }
     static int32 GetCost(EWorkSpecialty Specialty);
@@ -42,4 +43,7 @@ private:
     UPROPERTY() TObjectPtr<class UMaterialInstanceDynamic> PreviewMaterial;
     bool bManualFacilityRotation=false;
     float FacilityYaw=0;
+    bool bRelocating=false;
+    TWeakObjectPtr<AWorkStation> RelocatingStation;
+    void ConfirmRelocation();
 };

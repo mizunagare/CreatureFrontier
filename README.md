@@ -1,5 +1,7 @@
 # 幻兽边境
 
+最新限定交付：自建设施搬迁。B进入建造，瞄准自建设施按Insert，9旋转、左键确认、右键／B取消；保留库存、加工工序及伙伴指派，不重复收费。Windows入口 `F:\CreatureFrontierBuilds\Windows-FacilityMove\CreatureFrontier.exe`，操作、两端真实链与剩余范围见[设施搬迁](Docs/FACILITY_MOVE.md)。这是复用已核验烹饪数据的本地原生候选，非最终发布版。
+
 本机项目已迁移到 `H:\myGame`，请打开 `H:\myGame\CreatureFrontier.uproject`；引擎本体仍在 `D:\Epic\UE_5.8`。本轮只读检查未发现`D:\myGame`，未执行旧目录删除操作；历史迁移验证与清理边界见[H盘迁移记录](Docs/MIGRATION_H.md)。
 
 项目界面、帮助、物品／生物名称及开发说明统一使用简体中文；后续代码注释和提交说明也使用中文。技术标识、资源路径、按键名称和玩家自定义昵称保留原样。具体约定与检查方法见[中文开发与显示约定](Docs/CHINESE.md)。

@@ -1883,6 +1883,109 @@ struct FCompanionCraft : FStarterWorkshop
     }
 };
 }
+namespace
+{
+struct FFacilityMove : FCompanionCraft
+{
+    bool Moved=false;
+    FTransform Destination()const{return FTransform(FRotator(0,180,0),FVector(-500,-700,-15),FVector(2,1,.7));}
+    bool EndMove(bool Pass,const TCHAR* Why)
+    {
+        if(Input.IsValid())Input->Direction=FVector::ZeroVector;
+        CFInputQA::Release(Hero,EKeys::LeftShift);
+        const FString BeforeFeedback=Hero->Feedback;
+        if(!Pass)Hero->SaveProgress(TEXT("FacilityMoveBlocked"));
+        const TCHAR* Result=Pass?TEXT("PASS"):TEXT("FAIL");
+        UE_LOG(LogTemp,Display,TEXT("CF_FACILITY_MOVE %s reason=%s phase=%d work=%.4f hero=%s pet=%s feedback=%s"),Result,Why,Phase,Indoor.IsValid()?Indoor->CraftWork:-1,*Hero->GetActorLocation().ToString(),Recruit.IsValid()?*Recruit->GetActorLocation().ToString():TEXT("none"),*BeforeFeedback);
+        FPlatformMisc::RequestExitWithStatus(false,Pass?0:1);return false;
+    }
+    bool TickMove()
+    {
+        if(!Budget() || FPlatformTime::Seconds()>Deadline)return EndMove(false,TEXT("budget-time"));
+        const auto H=Hero->GetActorLocation(),P=Pet->GetActorLocation(),R=Recruit->GetActorLocation();const double Dt=World->GetTimeSeconds()-LastTime;
+        if(!Motion(Hero,LastH,VelocityH,Dt) || !Motion(Pet.Get(),LastP,VelocityP,Dt) || !Motion(Recruit.Get(),LastR,VelocityR,Dt))return EndMove(false,TEXT("motion"));
+        LastH=H;LastP=P;LastR=R;VelocityH=Hero->GetVelocity();VelocityP=Pet->GetVelocity();VelocityR=Recruit->GetVelocity();LastTime=World->GetTimeSeconds();
+        int32 Regions=0;for(TActorIterator<AWildEncounter> It(World);It;++It){++Regions;if(!It->IsActorTickEnabled())return EndMove(false,TEXT("region"));}if(Regions!=3)return EndMove(false,TEXT("regions"));
+        for(TActorIterator<ACreatureCharacter> It(World);It;++It)if(It->Health>0 && (!It->IsActorTickEnabled() || !It->GetActorEnableCollision() || It->GetCharacterMovement()->MovementMode==MOVE_None))return EndMove(false,TEXT("ecology"));
+        if(!Done() && Phase<8 && (Indoor->CraftWork!=HeldWork || Recruit->WorkSite!=Indoor.Get() || Recruit->Activity!=ECreatureActivity::Rest || Recruit->bResumeWorkAfterRest))return EndMove(false,TEXT("paused-job"));
+        if(FPlatformTime::Seconds()<ShotUntil)return true;
+        if(Phase==-1){if(World->GetTimeSeconds()-At<2 || UNavigationSystemV1::IsNavigationBeingBuiltOrLocked(World))return true;Phase=Read?7:0;return true;}
+        if(Phase==0)
+        {
+            Face(R);if(Hero->TraceCreature()!=Recruit.Get() || !CFInputQA::Press(Hero,EKeys::L))return EndMove(false,TEXT("select"));
+            Face(FVector(-200,-400,245));if(Door->DoorState==1 && (AHomeModule::TraceDoor(Hero)!=Door.Get() || !CFInputQA::Press(Hero,EKeys::E) || Door->DoorState!=2))return EndMove(false,TEXT("door"));
+            Phase=1;At=World->GetTimeSeconds();return true;
+        }
+        if(Phase==1){if(World->GetTimeSeconds()-At<1 || UNavigationSystemV1::IsNavigationBeingBuiltOrLocked(World))return true;if(!Plan(FVector(-450,-500,40),2))return EndMove(false,TEXT("outside-plan"));return true;}
+        if(Phase==2)
+        {
+            const int32 Result=Move();if(Result<0)return EndMove(false,TEXT("outside-walk"));if(!Result)return true;
+            Face(Indoor->GetActorLocation()+FVector(0,-40,25));
+            FHitResult AimHit;FCollisionQueryParams AimQuery(SCENE_QUERY_STAT(FacilityMovePickup),false,Hero);const FVector AimStart=Hero->FirstPersonCamera->GetComponentLocation();World->LineTraceSingleByChannel(AimHit,AimStart,AimStart+Hero->FirstPersonCamera->GetForwardVector()*600,ECC_Visibility,AimQuery);
+            UE_LOG(LogTemp,Display,TEXT("CF_FACILITY_MOVE_AIM actor=%s point=%s"),*GetNameSafe(AimHit.GetActor()),*AimHit.ImpactPoint.ToString());
+            if(!CFInputQA::Press(Hero,EKeys::B) || !CFInputQA::Press(Hero,EKeys::Insert) || !Hero->Building->IsRelocating())return EndMove(false,TEXT("pickup"));
+            if(!CFInputQA::Press(Hero,EKeys::B) || Hero->Building->IsActive() || !Budget() || Indoor->CraftWork!=HeldWork)return EndMove(false,TEXT("cancel"));
+            UE_LOG(LogTemp,Display,TEXT("CF_FACILITY_MOVE_CANCEL PASS sameActor=1 progress=1 noSpend=1"));
+            Face(Indoor->GetActorLocation()+FVector(0,-40,25));
+            if(!CFInputQA::Press(Hero,EKeys::B) || !CFInputQA::Press(Hero,EKeys::Insert) || !Hero->Building->IsRelocating() || !CFInputQA::Press(Hero,EKeys::Nine))return EndMove(false,TEXT("pickup-again"));
+            Phase=3;return true;
+        }
+        if(Phase==3)
+        {
+            Face(FVector(-500,-700,-50));Hero->Building->TickComponent(0,LEVELTICK_All,nullptr);
+            if(!Hero->Building->GetPlacementTransform().Equals(Destination(),.1))return EndMove(false,TEXT("preview-pose"));
+            FString Reason;if(!Hero->Building->ValidatePlacement(Destination(),Reason))return EndMove(false,TEXT("preview-blocked"));
+            if(Photo(TEXT("Preview"),FVector(-500,-700,-50)))return true;
+            auto* Same=Indoor.Get();if(!CFInputQA::Action(Hero,TEXT("Attack"),EKeys::LeftMouseButton))return EndMove(false,TEXT("confirm-input"));
+            ExpectedPlacement=Destination();Moved=true;
+            if(Hero->Building->IsActive() || Indoor.Get()!=Same || !Budget() || Indoor->CraftWork!=HeldWork)return EndMove(false,TEXT("move-state"));
+            UE_LOG(LogTemp,Display,TEXT("CF_FACILITY_MOVE_COMMIT PASS sameActor=1 sameId=1 progress=1 noSpend=1"));
+            Phase=4;At=World->GetTimeSeconds();return true;
+        }
+        if(Phase==4){if(World->GetTimeSeconds()-At<1 || UNavigationSystemV1::IsNavigationBeingBuiltOrLocked(World))return true;if(!Plan(FVector(-250,-850,40),5))return EndMove(false,TEXT("observer-plan"));return true;}
+        if(Phase==5){const int32 Result=Move();if(Result<0)return EndMove(false,TEXT("observer-walk"));if(Result){Phase=6;At=World->GetTimeSeconds();}return true;}
+        if(Phase==6)
+        {
+            if(Recruit->GetDistanceTo(Indoor.Get())>220 || !VisibleIndoor()){if(World->GetTimeSeconds()-At>30)return EndMove(false,TEXT("arrival"));return true;}
+            if(Photo(TEXT("Arrived"),Indoor->GetActorLocation()))return true;
+            const auto HB=H,PB=P,RB=R;
+            if(!Hero->SaveProgress(TEXT("FacilityMoveMid")) || !Hero->LoadProgress(TEXT("FacilityMoveMid")))return EndMove(false,TEXT("mid-save"));
+            BindWorkshop();if(!Budget() || Indoor->CraftWork!=HeldWork || !Hero->GetActorLocation().Equals(HB,.01) || !Pet->GetActorLocation().Equals(PB,.01) || !Recruit->GetActorLocation().Equals(RB,.01))return EndMove(false,TEXT("mid-restore"));
+            UE_LOG(LogTemp,Display,TEXT("CF_FACILITY_MOVE_MID PASS actualArrival=1 progress=%.4f identity=1 position=1"),HeldWork);
+            Phase=7;return true;
+        }
+        if(Phase==7)
+        {
+            // 读档会清除临时单选范围，正常续工前必须重新选择伙伴。
+            Face(R);if(Hero->TraceCreature()!=Recruit.Get() || !CFInputQA::Press(Hero,EKeys::L))return EndMove(false,TEXT("resume-select"));
+            Face(Indoor->GetActorLocation()+FVector(0,0,25));if(!CFInputQA::Press(Hero,EKeys::E) || Recruit->WorkSite!=Indoor.Get() || Recruit->Activity!=ECreatureActivity::Work)return EndMove(false,TEXT("resume"));
+            Phase=8;At=World->GetTimeSeconds();return true;
+        }
+        if(Phase==8)
+        {
+            if(!Done()){if(World->GetTimeSeconds()-At>20)return EndMove(false,TEXT("finish"));return true;}
+            if(Photo(TEXT("Completed"),Indoor->GetActorLocation()))return true;
+            if(!Hero->SaveProgress(TEXT("FacilityMoveDone")) || !Hero->LoadProgress(TEXT("FacilityMoveDone")))return EndMove(false,TEXT("done-save"));BindWorkshop();
+            if(!Budget())return EndMove(false,TEXT("done-restore"));
+            UE_LOG(LogTemp,Display,TEXT("CF_FACILITY_MOVE_LIFE PASS materialPaid=5 medicineAdded=1 oldXP=40 newXP=18 identity=1 moved=1 saved=1"));return EndMove(true,TEXT("complete"));
+        }
+        return true;
+    }
+};
+}
+void RunFacilityMoveScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read)
+{
+    auto S=MakeShared<FFacilityMove>();S->World=World;S->Hero=Hero;S->Read=Read;S->At=World->GetTimeSeconds();S->Deadline=FPlatformTime::Seconds()+150;
+    const auto* Source=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("FacilityMoveInput"),0));
+    if(!Source || Source->FormatVersion!=38 || Source->Facilities.Num()!=2 || Source->HomeModules.Num()!=7 || !Hero->LoadProgress(TEXT("FacilityMoveInput"))){S->EndMove(false,TEXT("source"));return;}
+    S->Original=Source->HomeModules;for(const auto& F:Source->Facilities){if(F.Specialty==EWorkSpecialty::Farming)S->Garden=F;if(F.Specialty==EWorkSpecialty::Crafting){S->IndoorId=F.Id;S->HeldWork=F.CraftWork;S->ExpectedPlacement=F.Transform;if(F.CraftRevision!=1 || F.CraftRecipe!=TEXT("Medicine") || F.CraftWork<=0 || F.CraftWork>=8){S->EndMove(false,TEXT("source-job"));return;}}}
+    S->Bag=Hero->Inventory->GetStacks();S->PlayerHealth=Hero->Health;for(TActorIterator<ACreatureCharacter> It(World);It;++It)if(It->Tamer==Hero->GetController() && It->Definition){if(It->Definition->Form==ECreatureForm::Leaf){S->PetId=It->PersistentId;S->Nickname=It->Nickname;}if(It->Definition->Form==ECreatureForm::Ember)S->RecruitId=It->PersistentId;}
+    S->BindWorkshop();for(const auto& N:Source->ResourceNodes)S->Resources.Add(N.Id,N.Remaining);
+    if(!S->Budget() || Hero->Inventory->Count(EFrontierItem::Material)!=5 || (Read && !S->ExpectedPlacement.Equals(S->Destination(),.01))){S->EndMove(false,TEXT("source-budget"));return;}
+    S->Moved=Read;S->LastH=Hero->GetActorLocation();S->LastP=S->Pet->GetActorLocation();S->LastR=S->Recruit->GetActorLocation();S->VelocityH=Hero->GetVelocity();S->VelocityP=S->Pet->GetVelocity();S->VelocityR=S->Recruit->GetVelocity();S->LastTime=World->GetTimeSeconds();S->Input=NewObject<UHomeMovementProbe>(Hero);S->Input->RegisterComponent();
+    S->Preview=FParse::Param(FCommandLine::Get(),TEXT("CFFacilityMovePreview"));if(S->Preview){S->Root=FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir()/TEXT("FacilityMovePreview")/FGuid::NewGuid().ToString(EGuidFormats::Digits));IFileManager::Get().MakeDirectory(*S->Root,true);UE_LOG(LogTemp,Display,TEXT("CF_FACILITY_MOVE_PREVIEW_ROOT %s"),*S->Root);}
+    FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([S](float){return S->TickMove();}));
+}
 void RunCompanionCraftScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read)
 {
     auto S=MakeShared<FCompanionCraft>();S->World=World;S->Hero=Hero;S->Read=Read;S->At=World->GetTimeSeconds();S->Deadline=FPlatformTime::Seconds()+120;

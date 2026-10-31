@@ -60,7 +60,7 @@ void UBaseBuildingComponent::Cancel()
 {
     if(auto* Hero=Cast<ACFPlayerCharacter>(GetOwner())) Hero->HomeBuilding->Cancel();
     bHomeMode=false;
-    bActive = false; bValid = false;bManualFacilityRotation=false;FacilityYaw=0;
+    bActive = false; bValid = false;bManualFacilityRotation=false;FacilityYaw=0;bRelocating=false;RelocatingStation.Reset();
     if (IsValid(Preview)) Preview->Destroy();
     Preview = nullptr; PreviewMaterial = nullptr;
 }
@@ -70,6 +70,7 @@ void UBaseBuildingComponent::EndPlay(const EEndPlayReason::Type Reason) { Cancel
 void UBaseBuildingComponent::Cycle()
 {
     if (!bActive) return;
+    if(bRelocating){CastChecked<ACFPlayerCharacter>(GetOwner())->Feedback=TEXT("搬迁保留设施类型；9旋转，确认或取消后再选择类型");return;}
     if(bHomeMode) { CastChecked<ACFPlayerCharacter>(GetOwner())->HomeBuilding->Cycle(); return; }
     Selected = Selected == EWorkSpecialty::Gathering ? EWorkSpecialty::Mining : Selected == EWorkSpecialty::Mining ? EWorkSpecialty::Crafting :
         Selected == EWorkSpecialty::Crafting ? EWorkSpecialty::Farming : Selected == EWorkSpecialty::Farming ? EWorkSpecialty::Feeding : Selected==EWorkSpecialty::Feeding ? EWorkSpecialty::Transport : EWorkSpecialty::Gathering;
@@ -79,6 +80,7 @@ void UBaseBuildingComponent::Cycle()
 void UBaseBuildingComponent::SwitchCategory()
 {
     if(!bActive) return;
+    if(bRelocating){CastChecked<ACFPlayerCharacter>(GetOwner())->Feedback=TEXT("请先确认或取消搬迁，再切换分类");return;}
     auto* Hero=CastChecked<ACFPlayerCharacter>(GetOwner()); bHomeMode=!bHomeMode;
     if(Preview) Preview->SetActorHiddenInGame(bHomeMode);
     if(bHomeMode) Hero->HomeBuilding->StartPreview(); else { Hero->HomeBuilding->Cancel(); UpdatePlacement(); }
@@ -93,26 +95,50 @@ void UBaseBuildingComponent::RotateHome()
 }
 void UBaseBuildingComponent::ReplaceHome()
 {
-    if(bActive && bHomeMode)CastChecked<ACFPlayerCharacter>(GetOwner())->HomeBuilding->ConfirmAimedReplacement();
+    if(!bActive)return;auto* Hero=CastChecked<ACFPlayerCharacter>(GetOwner());
+    if(bHomeMode){Hero->HomeBuilding->ConfirmAimedReplacement();return;}
+    if(Hero->Health<=0 || !Hero->HasAuthority())return;
+    auto* Site=Hero->TraceFacility();
+    if(!IsValid(Site) || Site->IsActorBeingDestroyed() || !Site->bPlayerBuilt || !Site->PersistentId.IsValid() || Site->GetWorld()!=GetWorld() || Hero->GetDistanceTo(Site)>600)
+    {Hero->Feedback=TEXT("请瞄准6米内的自建设施，Insert开始搬迁");return;}
+    bRelocating=true;RelocatingStation=Site;Selected=Site->RequiredSpecialty;FacilityYaw=Site->GetActorRotation().Yaw;bManualFacilityRotation=true;UpdatePlacement();
+    Hero->Feedback=TEXT("搬迁预览：9旋转，左键确认，右键/B取消；原设施仍在原位");
+}
+
+void UBaseBuildingComponent::ConfirmRelocation()
+{
+    auto* Hero=CastChecked<ACFPlayerCharacter>(GetOwner());auto* Site=RelocatingStation.Get();
+    if(!IsValid(Site) || Site->IsActorBeingDestroyed() || !Site->bPlayerBuilt || Site->GetWorld()!=GetWorld())
+    {Cancel();Hero->Feedback=TEXT("搬迁目标已失效，未移动或新增设施");return;}
+    if(!UpdatePlacement()){Hero->Feedback=Status;return;}
+    const FTransform Before=Site->GetActorTransform();
+    if(!Site->SetActorTransform(Placement,false,nullptr,ETeleportType::None) || !Site->GetActorTransform().Equals(Placement,.01))
+    {Site->SetActorTransform(Before,false,nullptr,ETeleportType::None);Hero->Feedback=TEXT("搬迁失败，原设施保持原位");return;}
+    for(TActorIterator<ACreatureCharacter> It(GetWorld());It;++It)It->HandleWorkSiteMoved(Site);
+    Cancel();Hero->Feedback=TEXT("设施已搬迁，库存、委托和伙伴指派保持；未消耗材料");
 }
 
 bool UBaseBuildingComponent::ValidatePlacement(const FTransform& Transform, FString& Reason) const
 {
     auto* Hero = Cast<ACFPlayerCharacter>(GetOwner());
     if (!Hero || !Hero->HasAuthority() || Hero->Health <= 0) { Reason = TEXT("需要存活的玩家"); return false; }
+    auto* Moving=RelocatingStation.Get();
+    if(bRelocating && (!IsValid(Moving) || Moving->IsActorBeingDestroyed() || !Moving->bPlayerBuilt || Moving->GetWorld()!=GetWorld() || Moving->RequiredSpecialty!=Selected))
+    {Reason=TEXT("搬迁目标已失效");return false;}
     if (!IsBuildTransformValid(Transform)) { Reason = TEXT("请使用初始基地12米内的平地"); return false; }
     if (FVector::Dist(Hero->GetActorLocation(),Transform.GetLocation()) > 800) { Reason = TEXT("距离过远（限8米）"); return false; }
     int32 Built = 0;
     for (TActorIterator<AWorkStation> It(GetWorld()); It; ++It) if (It->bPlayerBuilt) ++Built;
-    if (Built >= 20) { Reason = TEXT("基地最多放置20个设施"); return false; }
+    if (!bRelocating && Built >= 20) { Reason = TEXT("基地最多放置20个设施"); return false; }
     const int32 Cost = GetCost(Selected);
-    if (Cost == 0 || Hero->Inventory->Count(EFrontierItem::Material) < Cost) { Reason = TEXT("材料不足"); return false; }
+    if (Cost == 0 || (!bRelocating && Hero->Inventory->Count(EFrontierItem::Material) < Cost)) { Reason = TEXT("材料不足"); return false; }
     if(!HomeLayout::ClearsDoorReservations(FBox(FVector(-112,-62,-33),FVector(112,62,35)).TransformBy(Transform.ToMatrixWithScale()),HomeLayout::Collect(GetWorld())))
     {Reason=TEXT("设施不能占用门扇活动空间");return false;}
     // 与读档使用同一实际设施包围盒，不能把已换算的世界尺寸再次乘以缩放。
     if(!HomeLayout::ClearsStairReservations(FBox(FVector(-50),FVector(50)).TransformBy(Transform.ToMatrixWithScale()),HomeLayout::Collect(GetWorld())))
     {Reason=TEXT("设施不能占用楼梯踏步或通行净空");return false;}
     FCollisionQueryParams Params(SCENE_QUERY_STAT(BuildPlacement), false);
+    if(bRelocating && IsValid(Moving))Params.AddIgnoredActor(Moving);
     if (IsValid(Preview)) Params.AddIgnoredActor(Preview);
     // 检查包括角色在内的完整实体体积，让支撑地面位于检测盒下方。
     const FCollisionObjectQueryParams Objects(FCollisionObjectQueryParams::AllObjects);
@@ -129,7 +155,7 @@ bool UBaseBuildingComponent::ValidatePlacement(const FTransform& Transform, FStr
                  Cast<AHomeModule>(Ground.GetActor()) && CastChecked<AHomeModule>(Ground.GetActor())->GetKind()==EHomeModuleKind::Floor)))
         { Reason = TEXT("每个角下方都需要平坦支撑"); return false; }
     }
-    Reason = TEXT("可以建造");
+    Reason = bRelocating?TEXT("可以搬迁，不消耗材料"):TEXT("可以建造");
     return true;
 }
 
@@ -139,6 +165,7 @@ bool UBaseBuildingComponent::UpdatePlacement()
     if (!Hero) return false;
     FHitResult Hit;
     FCollisionQueryParams Params(SCENE_QUERY_STAT(BuildAim),false,Hero);
+    if(bRelocating && RelocatingStation.IsValid())Params.AddIgnoredActor(RelocatingStation.Get());
     if (IsValid(Preview)) Params.AddIgnoredActor(Preview);
     const FVector Start = Hero->FirstPersonCamera->GetComponentLocation();
     const bool Ground = GetWorld()->LineTraceSingleByChannel(Hit,Start,Start+Hero->FirstPersonCamera->GetForwardVector()*800,ECC_Visibility,Params);
@@ -158,6 +185,7 @@ void UBaseBuildingComponent::TickComponent(float DeltaTime,ELevelTick TickType,F
     if (!bActive) return;
     const auto* Hero = Cast<ACFPlayerCharacter>(GetOwner());
     if (!Hero || Hero->Health <= 0) { Cancel(); return; }
+    if(bRelocating && !RelocatingStation.IsValid()){Cancel();CastChecked<ACFPlayerCharacter>(GetOwner())->Feedback=TEXT("搬迁目标已失效，预览已取消");return;}
     if(bHomeMode) { Hero->HomeBuilding->UpdatePreview(); return; }
     UpdatePlacement();
 }
@@ -165,6 +193,7 @@ void UBaseBuildingComponent::TickComponent(float DeltaTime,ELevelTick TickType,F
 AWorkStation* UBaseBuildingComponent::BuildAt(const FTransform& Transform)
 {
     auto* Hero = Cast<ACFPlayerCharacter>(GetOwner());
+    if(bRelocating){if(Hero)Hero->Feedback=TEXT("搬迁模式不会新增设施，请确认或取消搬迁");return nullptr;}
     FString Reason;
     if (!ValidatePlacement(Transform,Reason)) { if (Hero) Hero->Feedback = Reason; return nullptr; }
     auto* Site = GetWorld()->SpawnActorDeferred<AWorkStation>(AWorkStation::StaticClass(),Transform,nullptr,nullptr,
@@ -180,6 +209,7 @@ AWorkStation* UBaseBuildingComponent::BuildAt(const FTransform& Transform)
 void UBaseBuildingComponent::Confirm()
 {
     if(!bActive) return;
+    if(bRelocating){ConfirmRelocation();return;}
     if(bHomeMode) { CastChecked<ACFPlayerCharacter>(GetOwner())->HomeBuilding->Confirm(); return; }
     if(UpdatePlacement()) BuildAt(Placement);
 }
@@ -192,6 +222,7 @@ bool UBaseBuildingComponent::DismantleStation(AWorkStation* Station)
     if (Station->StoredFood > 0) { Hero->Feedback = TEXT("拆除前请按O取出设施里的食物"); return false; }
     if(Station->Crop->IsOccupied()) {Hero->Feedback=TEXT("拆除前请收获作物并按F3取出预留种子");return false;}
     if (!Hero->Inventory->AddItem(EFrontierItem::Material,Refund)) { Hero->Feedback = TEXT("请为拆除返还物腾出背包空间"); return false; }
+    if(bRelocating && RelocatingStation.Get()==Station)Cancel();
     for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It)
         if (It->WorkSite == Station) { It->WorkSite = nullptr; It->SetActivity(ECreatureActivity::Follow); }
     Station->Destroy();
@@ -218,6 +249,7 @@ void UBaseBuildingComponent::Dismantle()
 FString UBaseBuildingComponent::GetHint() const
 {
     if(bHomeMode) return CastChecked<ACFPlayerCharacter>(GetOwner())->HomeBuilding->GetHint();
-    return FString::Printf(TEXT("设施 %s（%d材料）| V 选择 | 8 房屋\n9 旋转 | 朝向%d（%s）\n%s"),
+    if(bRelocating)return FString::Printf(TEXT("搬迁 %s | 9旋转 | 左键确认 | B取消\n保留库存、委托和指派，不消耗材料\n%s"),*FrontierChinese::Specialty(Selected),*Status);
+    return FString::Printf(TEXT("设施 %s（%d材料）| V 选择 | 8 房屋\n9 旋转 | 朝向%d（%s）| Insert搬迁\n%s"),
         *FrontierChinese::Specialty(Selected),GetCost(Selected),FMath::RoundToInt(FRotator::ClampAxis(Placement.Rotator().Yaw)),bManualFacilityRotation?TEXT("手动"):TEXT("随视角"),*Status);
 }

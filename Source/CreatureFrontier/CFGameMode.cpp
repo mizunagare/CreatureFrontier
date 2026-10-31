@@ -91,6 +91,10 @@ void ACFGameMode::BeginPlay()
             if(!It->bHasHabitat){It->bHasHabitat=true;It->HabitatHome=Origin;}
         }
     SeedFrontierResources(GetWorld());
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFFacilityMoveTest")) || FParse::Param(FCommandLine::Get(),TEXT("CFFacilityMoveRead")))
+    {const bool Read=FParse::Param(FCommandLine::Get(),TEXT("CFFacilityMoveRead"));FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this,Read](){extern void RunFacilityMoveScenario(UWorld*,ACFPlayerCharacter*,bool);if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunFacilityMoveScenario(GetWorld(),Hero,Read);},1.f,false);return;}
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFFacilityMoveRules")))
+    {FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this](){extern void RunFacilityMoveRules(UWorld*,ACFPlayerCharacter*);if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunFacilityMoveRules(GetWorld(),Hero);},1.f,false);return;}
     if(FParse::Param(FCommandLine::Get(),TEXT("CFCompanionCraftRules")))
     {FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this](){extern void RunCompanionCraftRules(UWorld*,ACFPlayerCharacter*);if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunCompanionCraftRules(GetWorld(),Hero);},1.f,false);return;}
     if(FParse::Param(FCommandLine::Get(),TEXT("CFCompanionCraftTest")) || FParse::Param(FCommandLine::Get(),TEXT("CFCompanionCraftRead")))

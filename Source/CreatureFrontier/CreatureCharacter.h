@@ -35,6 +35,7 @@ public:
 
     virtual void Tick(float DeltaSeconds) override;
     void UpdateCreaturePresentation(float DeltaSeconds);
+    void HandleWorkSiteMoved(AWorkStation* Site);
     FName GetVisualState() const { return VisualState; }
     FVector GetFollowDestination() const;
     FString GetGatheringStatus() const;

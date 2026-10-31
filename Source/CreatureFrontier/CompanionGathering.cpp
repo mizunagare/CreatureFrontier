@@ -11,6 +11,20 @@
 
 AResourceNode* ACreatureCharacter::GetFieldResource() const { return FieldResource.Get(); }
 
+void ACreatureCharacter::HandleWorkSiteMoved(AWorkStation* Site)
+{
+    if(!HasAuthority() || !IsValid(Site))return;
+    const bool Assigned=WorkSite==Site;
+    if(Assigned){ResetGathering();ProgressSite.Reset();}
+    if(Assigned || FeedingSite.Get()==Site || HaulTarget.Get()==Site || HaulPost.Get()==Site)
+    {
+        // 保留原任务、携带物与设施工序，只丢弃旧位置的路径和采集缓存。
+        StopNavigation();NextNavigationUpdate=0;
+        if(FeedingSite.Get()==Site)FoodSearchExpires=GetWorld()->GetTimeSeconds()+8;
+        if(HaulTarget.Get()==Site || HaulPost.Get()==Site){HaulExpires=GetWorld()->GetTimeSeconds()+8;HaulRetry=0;}
+    }
+}
+
 bool ACreatureCharacter::AssignFieldResource(AResourceNode* Node)
 {
     if(!HasAuthority() || Health<=0 || Disposition!=ECreatureDisposition::Tamed || !IsValid(Node) ||
