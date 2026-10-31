@@ -1,4 +1,5 @@
 #pragma once
+void RunStarterForgeScenario(class UWorld* World,class ACFPlayerCharacter* Hero,bool Read);
 void RunStarterStudyScenario(class UWorld* World,class ACFPlayerCharacter* Hero,bool Read);
 void RunStarterHomeFarmScenario(class UWorld* World,class ACFPlayerCharacter* Hero,bool Read);
 void RunStarterHomeLifeScenario(class UWorld* World,class ACFPlayerCharacter* Hero,bool Read);

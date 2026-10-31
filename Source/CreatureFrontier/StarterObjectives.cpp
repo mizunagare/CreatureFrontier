@@ -51,6 +51,17 @@ namespace
             for(TActorIterator<AResourceNode> It(Hero->GetWorld());It;++It)if(It->Definition && It->Definition->Discovery==EFrontierResearch::CrystalSample && It->Remaining>0)
             {const auto D=It->GetActorLocation()-Hero->GetActorLocation();return FString::Printf(TEXT("下一步：%s%d米水晶点采样（直线）\n栖息地可能有敌人，备补给后出发"),FrontierOrientation::Heading(FMath::RadiansToDegrees(FMath::Atan2(D.Y,D.X))),FMath::CeilToInt(D.Size()/100));}
         }
+        if(Hero->Research->Has(EFrontierResearch::CrystalStudy) && Hero->Inventory->Count(EFrontierItem::ResonanceDevice)==0)
+        {
+            const auto* Catalog=UCraftingCatalog::Load();const auto* Recipe=Catalog?Catalog->Find(TEXT("ScrapResonator")):nullptr;
+            if(Recipe)
+            {
+                bool Supplied=true;for(const auto& Need:Recipe->Inputs)Supplied&=Hero->Inventory->Count(Need.Key)>=Need.Value;
+                if(Supplied)return FString::Printf(TEXT("探索材料已齐：返初始基地C修复共鸣器\n需要%s，产%d份"),*UCraftingCatalog::FormatItems(Recipe->Inputs),Recipe->OutputAmount);
+                for(TActorIterator<AResourceNode> It(Hero->GetWorld());It;++It)if(It->Definition && It->Definition->OutputItem==EFrontierItem::Scrap && It->Remaining>0)
+                {const auto D=It->GetActorLocation()-Hero->GetActorLocation();return FString::Printf(TEXT("洞穴加工：%s%d米废件点（直线）\nM采集，留水晶返基地C修复共鸣器"),FrontierOrientation::Heading(FMath::RadiansToDegrees(FMath::Atan2(D.Y,D.X))),FMath::CeilToInt(D.Size()/100));}
+            }
+        }
         return TEXT("家园已可进出：E开关门，勿挡活动区\n照料伙伴后继续探索；F5保存");
     }
     // 恢复提示只读现有状态，不改变治疗许可、任务或奖励进度。
