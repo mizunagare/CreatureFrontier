@@ -1233,3 +1233,94 @@ void RunStarterRoomScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read)
     S->Preview=FParse::Param(FCommandLine::Get(),TEXT("CFStarterRoomPreview"));if(S->Preview){S->Root=FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir()/TEXT("StarterRoomPreview")/FGuid::NewGuid().ToString(EGuidFormats::Digits));IFileManager::Get().MakeDirectory(*S->Root,true);UE_LOG(LogTemp,Display,TEXT("CF_STARTER_ROOM_PREVIEW_ROOT %s"),*S->Root);}
     FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([S](float){return S->Tick();}));
 }
+
+namespace
+{
+struct FStarterHomeLife : FStarterRoom
+{
+    TWeakObjectPtr<AWorkStation> RestSite;bool Fed=false,RestMid=false;float LastStamina=0;
+    bool End(bool Pass,const TCHAR* Reason)
+    {
+        if(Input.IsValid())Input->Direction=FVector::ZeroVector;CFInputQA::Release(Hero,EKeys::LeftShift);
+        const FString Feedback=Hero->Feedback;if(!Pass)Hero->SaveProgress(TEXT("StarterHomeLifeBlocked"));
+        UE_LOG(LogTemp,Display,TEXT("CF_STARTER_HOME_LIFE %s reason=%s phase=%d heroTravel=%.1f petTravel=%.1f stamina=%.2f nutrition=%.2f food=%d feedback=%s"),Pass?TEXT("PASS"):TEXT("FAIL"),Reason,Phase,HeroTravel,PetTravel,Pet.IsValid()?Pet->Stamina:-1,Pet.IsValid()?Pet->Nutrition:-1,Hero->Inventory->Count(EFrontierItem::Food),*Feedback);FPlatformMisc::RequestExitWithStatus(false,Pass?0:1);return false;
+    }
+    bool Budget()const
+    {
+        if(!Pet.IsValid() || !Door.IsValid() || !Supply.IsValid() || Supply->Remaining!=2 || Hero->Health!=100 || Pet->Health<=0 || Pet->Level!=2 || Pet->Experience!=37 || Pet->BondPoints!=(Fed?6:3) || Pet->Nickname!=Nickname || Hero->Inventory->Count(EFrontierItem::Food)!=(Fed?1:2) || Hero->Inventory->Count(EFrontierItem::Material)!=0 || Pet->Cargo->Count()!=0 || !Hero->GetObjectives().bAlphaResolved || Hero->GetObjectives().Claimed!=5)return false;
+        const auto Layout=HomeLayout::Collect(World);if(Layout.Num()!=7)return false;int32 Paid=0;
+        for(const auto& R:Original){const auto* Current=Layout.FindByPredicate([&](const FHomeModuleRecord& V){return V.Id==R.Id;});if(!Current || !Current->Transform.Equals(R.Transform,.01) || Current->Definition!=R.Definition || Current->PaidMaterials!=R.PaidMaterials || !Current->StoredItems.OrderIndependentCompareEqual(R.StoredItems))return false;Paid+=Current->PaidMaterials;}
+        int32 Farms=0;for(TActorIterator<AWorkStation> It(World);It;++It)if(It->bPlayerBuilt){++Farms;if(It->PersistentId!=Garden.Id || !It->GetActorTransform().Equals(Garden.Transform,.01) || It->StoredFood!=Garden.StoredFood || It->Crop->Seeds!=Garden.Seeds || It->Crop->bPlanted!=Garden.bPlanted || !FMath::IsNearlyEqual(It->Crop->GrowthWork,Garden.GrowthWork,.01))return false;}
+        return Paid==58 && Farms==1 && Hero->Inventory->Count(EFrontierItem::Medicine)==0 && Hero->Inventory->Count(EFrontierItem::CaptureDevice)==10 && Hero->Inventory->Count(EFrontierItem::Seeds)==1;
+    }
+    bool VisibleRest()const
+    {
+        if(!RestSite.IsValid() || Pet->GetDistanceTo(RestSite.Get())>220)return false;
+        FHitResult Hit;FCollisionQueryParams Q(SCENE_QUERY_STAT(HomeLifeRestSight),false,Pet.Get());
+        return !World->LineTraceSingleByChannel(Hit,Pet->GetActorLocation(),RestSite->GetActorLocation()+FVector(0,0,30),ECC_Visibility,Q) || Hit.GetActor()==RestSite.Get();
+    }
+    bool Tick()
+    {
+        if(!Budget() || FPlatformTime::Seconds()>Deadline)return End(false,TEXT("budget-time"));
+        const auto H=Hero->GetActorLocation(),P=Pet->GetActorLocation();const double Delta=World->GetTimeSeconds()-LastTime;
+        if(!Motion(Hero,LastH,VelocityH,Delta) || !Motion(Pet.Get(),LastP,VelocityP,Delta))return End(false,TEXT("motion"));
+        HeroTravel+=FVector::Dist(H,LastH);PetTravel+=FVector::Dist(P,LastP);LastH=H;LastP=P;VelocityH=Hero->GetVelocity();VelocityP=Pet->GetVelocity();LastTime=World->GetTimeSeconds();
+        for(TActorIterator<ACreatureCharacter> It(World);It;++It)if(It->Health>0 && (!It->IsActorTickEnabled() || !It->GetActorEnableCollision() || It->GetCharacterMovement()->MovementMode==MOVE_None))return End(false,TEXT("ecology"));
+        if(RestSite.IsValid() && Pet->Activity==ECreatureActivity::Rest && Pet->Stamina>LastStamina+.05f && !VisibleRest())return End(false,TEXT("rest-through-obstacle"));LastStamina=Pet->Stamina;
+        if(!RestMid && RestSite.IsValid() && Pet->Activity==ECreatureActivity::Rest && Pet->Stamina>=45 && Pet->Stamina<90 && VisibleRest())
+        {if(!Hero->SaveProgress(TEXT("StarterHomeLifeMid")))return End(false,TEXT("mid-save"));RestMid=true;Photo(TEXT("Resting"),P);UE_LOG(LogTemp,Display,TEXT("CF_STARTER_HOME_LIFE_MID PASS resting=1 visible=1 stamina=%.2f"),Pet->Stamina);}
+        if(FPlatformTime::Seconds()<ShotUntil)return true;
+        if(Phase==-1){if(World->GetTimeSeconds()-At<2 || UNavigationSystemV1::IsNavigationBeingBuiltOrLocked(World))return true;Phase=Read?3:0;At=World->GetTimeSeconds();return true;}
+        if(Phase==0)
+        {
+            if(Photo(TEXT("Tired"),P))return true;Face(P);
+            if(Hero->TraceCreature()!=Pet.Get()){if(World->GetTimeSeconds()-At>5)return End(false,TEXT("feed-sight"));return true;}
+            if(!Hero->GetObjectiveHint().Contains(TEXT("J喂食")))return End(false,TEXT("feed-hint"));
+            const float SP=Pet->Stamina,Food=Pet->Nutrition;
+            if(!CFInputQA::Press(Hero,EKeys::J) || Hero->Inventory->Count(EFrontierItem::Food)!=1 || Pet->BondPoints!=6 || !FMath::IsNearlyEqual(Pet->Stamina,FMath::Min(100.f,SP+15),.01f) || !FMath::IsNearlyEqual(Pet->Nutrition,FMath::Min(100.f,Food+35),.01f))return End(false,TEXT("feed"));
+            Fed=true;LastStamina=Pet->Stamina;if(!Hero->GetObjectiveHint().Contains(TEXT("T休息")))return End(false,TEXT("rest-hint"));Photo(TEXT("Fed"),P);UE_LOG(LogTemp,Display,TEXT("CF_STARTER_HOME_LIFE_FEED PASS foodPaid=1 nutritionAdded=35 staminaAdded=15 bond=6"));Phase=1;return true;
+        }
+        if(Phase==1)
+        {
+            Face(FVector(-200,-555,100));if(!CFInputQA::Press(Hero,EKeys::E) || Door->DoorState!=2 || !CFInputQA::Press(Hero,EKeys::T) || Pet->Activity!=ECreatureActivity::Rest || !IsValid(Pet->WorkSite))return End(false,TEXT("open-rest"));
+            RestSite=Pet->WorkSite;UE_LOG(LogTemp,Display,TEXT("CF_STARTER_HOME_LIFE_REST_TARGET position=%s"),*RestSite->GetActorLocation().ToString());Phase=10;At=World->GetTimeSeconds();return true;
+        }
+        if(Phase==10)
+        {if(World->GetTimeSeconds()-At<2 || UNavigationSystemV1::IsNavigationBeingBuiltOrLocked(World))return true;if(!Plan(RestSite->GetActorLocation()+FVector(-240,-180,40),2))return End(false,TEXT("rest-observer-path"));return true;}
+        if(Phase==2 || Phase==4 || Phase==6 || Phase==8)
+        {const int32 R=Move();if(R<0)return End(false,TEXT("walk"));if(!R)return true;Phase=Phase==2?3:Phase==4?5:Phase==6?7:9;At=World->GetTimeSeconds();return true;}
+        if(Phase==3)
+        {
+            if(Pet->Activity!=ECreatureActivity::Rest || Pet->WorkSite!=RestSite.Get())return End(false,TEXT("rest-task"));if(Pet->Stamina<99 || !VisibleRest())return true;
+            if(!RestMid)return End(false,TEXT("rest-no-mid"));if(Photo(TEXT("Recovered"),P))return true;
+            UE_LOG(LogTemp,Display,TEXT("CF_STARTER_HOME_LIFE_REST PASS stamina=%.2f visible=1"),Pet->Stamina);
+            if(!CFInputQA::Press(Hero,EKeys::F) || !Plan(FVector(-470,-400,40),4))return End(false,TEXT("return-door"));return true;
+        }
+        if(Phase==5){if(Door->DoorState!=2 || !Plan(FVector(120,-400,60),6))return End(false,TEXT("enter-path"));return true;}
+        if(Phase==7)
+        {if(P.X< -140 || P.X>160 || FMath::Abs(P.Y+400)>160 || P.Z<50 || Pet->Activity!=ECreatureActivity::Follow){if(World->GetTimeSeconds()-At>20)return End(false,TEXT("pair-enter"));return true;}if(!Plan(FVector(50,-400,60),8))return End(false,TEXT("close-path"));return true;}
+        if(Phase==9)
+        {
+            Face(FVector(-200,-555,100));if(Door->DoorState==2 && (!CFInputQA::Press(Hero,EKeys::E) || Door->DoorState!=1))return End(false,TEXT("close"));if(Photo(TEXT("Home"),P))return true;
+            if(!Hero->GetObjectiveHint().Contains(TEXT("家园已可进出")) || Pet->Stamina<99)return End(false,TEXT("ready-hint"));
+            const float SP=Pet->Stamina,N=Pet->Nutrition;const auto HB=H,PB=P;
+            if(!Hero->SaveProgress(TEXT("StarterHomeLifeDone")) || !Hero->LoadProgress(TEXT("StarterHomeLifeDone")))return End(false,TEXT("save"));Find();
+            if(!Budget() || Door->DoorState!=1 || !Hero->GetActorLocation().Equals(HB,.01) || !Pet->GetActorLocation().Equals(PB,.01) || !FMath::IsNearlyEqual(Pet->Stamina,SP,.01) || !FMath::IsNearlyEqual(Pet->Nutrition,N,.01))return End(false,TEXT("restore"));
+            UE_LOG(LogTemp,Display,TEXT("CF_STARTER_HOME_LIFE_LIFE PASS modules=7 paid=58 food=1 bond=6 rested=1 returned=1 closed=1 identity=1"));return End(true,TEXT("complete"));
+        }
+        return true;
+    }
+};
+}
+void RunStarterHomeLifeScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read)
+{
+    auto S=MakeShared<FStarterHomeLife>();S->World=World;S->Hero=Hero;S->Read=Read;S->Fed=Read;S->RestMid=Read;S->At=World->GetTimeSeconds();S->Deadline=FPlatformTime::Seconds()+150;
+    const auto* Source=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("StarterHomeLifeInput"),0));
+    if(!Source || Source->FormatVersion!=38 || Source->Facilities.Num()!=1 || Source->HomeModules.Num()!=7 || !Hero->LoadProgress(TEXT("StarterHomeLifeInput"))){S->End(false,TEXT("source"));return;}
+    S->Original=Source->HomeModules;S->Garden=Source->Facilities[0];for(TActorIterator<ACreatureCharacter> It(World);It;++It)if(It->Tamer==Hero->GetController()){S->PetId=It->PersistentId;S->Nickname=It->Nickname;}S->Find();
+    if(!S->Budget() || !Hero->GetActorTransform().Equals(Source->PlayerTransform,.01) || (!Read && (S->Pet->Stamina>=30 || S->Pet->Nutrition>80 || S->Door->DoorState!=1))){S->End(false,TEXT("source-budget"));return;}
+    if(Read){S->RestSite=S->Pet->WorkSite;if(!S->RestSite.IsValid() || S->Pet->Activity!=ECreatureActivity::Rest){S->End(false,TEXT("source-rest"));return;}}
+    S->LastH=Hero->GetActorLocation();S->LastP=S->Pet->GetActorLocation();S->VelocityH=Hero->GetVelocity();S->VelocityP=S->Pet->GetVelocity();S->LastTime=World->GetTimeSeconds();S->LastStamina=S->Pet->Stamina;S->Input=NewObject<UHomeMovementProbe>(Hero);S->Input->RegisterComponent();
+    S->Preview=FParse::Param(FCommandLine::Get(),TEXT("CFStarterHomeLifePreview"));if(S->Preview){S->Root=FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir()/TEXT("StarterHomeLifePreview")/FGuid::NewGuid().ToString(EGuidFormats::Digits));IFileManager::Get().MakeDirectory(*S->Root,true);UE_LOG(LogTemp,Display,TEXT("CF_STARTER_HOME_LIFE_PREVIEW_ROOT %s"),*S->Root);}
+    FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([S](float){return S->Tick();}));
+}

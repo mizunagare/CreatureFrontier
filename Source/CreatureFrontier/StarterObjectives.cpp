@@ -14,6 +14,24 @@
 
 namespace
 {
+    FString BuiltHomeLifeHint(const ACFPlayerCharacter* Hero)
+    {
+        bool Ready=false;
+        for(TActorIterator<AHomeModule> Floor(Hero->GetWorld());Floor;++Floor)if(!Floor->bPreview && !Floor->bStaged && !Floor->bUnderConstruction && Floor->GetKind()==EHomeModuleKind::Floor)
+        {
+            int32 Sides=0;bool Door=false,Roof=false,Box=false;
+            for(TActorIterator<AHomeModule> It(Hero->GetWorld());It;++It)if(!It->bPreview && !It->bStaged && !It->bUnderConstruction && It->FloorId==Floor->PersistentId)
+            {const auto Kind=It->GetKind();Sides+=Kind==EHomeModuleKind::Wall || Kind==EHomeModuleKind::Window || Kind==EHomeModuleKind::Door || Kind==EHomeModuleKind::Doorway;Door|=Kind==EHomeModuleKind::Door;Roof|=Kind==EHomeModuleKind::Roof;Box|=Kind==EHomeModuleKind::Storage;}
+            Ready|=Sides>=4 && Door && Roof && Box;
+        }
+        if(!Ready)return FString();
+        bool Hungry=false,Tired=false;
+        for(TActorIterator<ACreatureCharacter> It(Hero->GetWorld());It;++It)if(It->Tamer==Hero->GetController() && It->Health>0)
+        {Hungry|=It->Nutrition<=80;Tired|=It->Stamina<80;}
+        if(Hungry && Hero->Inventory->Count(EFrontierItem::Food)>0)return TEXT("建房后照料伙伴：瞄准J喂食（消耗1食物）\n开门留出通路，设施附近T休息");
+        if(Tired)return TEXT("伙伴体力不足：开门留出通路\n设施附近T休息，恢复后F一起返屋");
+        return TEXT("家园已可进出：E开关门，勿挡活动区\n照料伙伴后继续探索；F5保存");
+    }
     // 恢复提示只读现有状态，不改变治疗许可、任务或奖励进度。
     FString RecoveryHint(const ACFPlayerCharacter* Hero)
     {
@@ -135,6 +153,7 @@ FString ACFPlayerCharacter::GetObjectiveHint() const
     {
         // 领奖结束不等于生活循环结束；复用原恢复许可和真实模块成本。
         const FString Recovery=RecoveryHint(this);if(!Recovery.IsEmpty())return Recovery;
+        const FString HomeLife=BuiltHomeLifeHint(this);if(!HomeLife.IsEmpty())return HomeLife;
         bool Floor=false,HomeStorage=false;
         for(TActorIterator<AHomeModule> It(GetWorld());It;++It)if(!It->bPreview && !It->bStaged && !It->bUnderConstruction)
         {Floor|=It->GetKind()==EHomeModuleKind::Floor;HomeStorage|=It->GetKind()==EHomeModuleKind::Storage;}
