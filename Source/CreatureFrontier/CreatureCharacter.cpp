@@ -316,9 +316,9 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
         {
             if (bResumeWorkAfterRest && !GetFieldResource() && (!IsValid(WorkSite) || WorkSite->RequiredSpecialty == EWorkSpecialty::Feeding))
             { bResumeWorkAfterRest = false; WorkSite = nullptr; StopNavigation(); SetActivity(ECreatureActivity::Follow); OwnerPlayer->Feedback=TEXT("指派的工作目标已失效，伙伴改为跟随"); return; }
-            if (IsValid(WorkSite) && GetDistanceTo(WorkSite) > 220.0f)
+            if (IsValid(WorkSite) && !CanReachWorkSite(WorkSite))
             {
-                NavigateTo(WorkSite->GetActorLocation(), 35.0f);
+                ApproachWorkSite(WorkSite);
                 return;
             }
             StopNavigation();
@@ -350,7 +350,7 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
                     NavigateTo(Yield,12);return;
                 }
             }
-            if (!CanReachFarm(WorkSite)) { ApproachFarm(WorkSite); WorkProgress = 0.0f; }
+            if (!CanReachWorkSite(WorkSite)) { ApproachWorkSite(WorkSite); WorkProgress = 0.0f; }
             else
             {
                 StopNavigation();

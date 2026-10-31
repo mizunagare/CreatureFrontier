@@ -15,7 +15,7 @@ public:
     bool IsWorking() const { return bWorking; }
     uint32 GetApproachSearchCount() const { return ApproachSearchCount; }
     bool TickWork(float DeltaSeconds,ACFPlayerCharacter* Hero);
-    void Restore(AHomeModule* Site) { Cancel();Goal=Site; }
+    void Restore(AHomeModule* Site);
 private:
     bool Reach(AActor* Target) const;
     void Approach(AActor* Target);

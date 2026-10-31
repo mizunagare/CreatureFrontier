@@ -12,6 +12,7 @@
 AHomeModule* UCompanionConstructionComponent::GetSite() const
 {auto* Site=Goal.Get();return IsValid(Site) && !Site->IsActorBeingDestroyed() && Site->bUnderConstruction?Site:nullptr;}
 void UCompanionConstructionComponent::Cancel(){Goal.Reset();ApproachTarget.Reset();NextSearch=0;bHasApproach=false;bWorking=false;}
+void UCompanionConstructionComponent::Restore(AHomeModule* Site){Cancel();Goal=Site;}
 bool UCompanionConstructionComponent::Assign(AHomeModule* Site,AHomeModule* Crate,ACFPlayerCharacter* Hero)
 {
     auto* Pet=Cast<ACreatureCharacter>(GetOwner());

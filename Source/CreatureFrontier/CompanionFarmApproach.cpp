@@ -9,14 +9,14 @@
 #include "GameFramework/Controller.h"
 #include "CFPlayerCharacter.h"
 
-bool ACreatureCharacter::CanReachFarm(const AWorkStation* Site) const
+bool ACreatureCharacter::CanReachWorkSite(const AWorkStation* Site) const
 {
     if(!IsValid(Site) || GetDistanceTo(Site)>220) return false;
     FHitResult Hit;FCollisionQueryParams Params(SCENE_QUERY_STAT(FarmApproachSight),false,this);
     return !GetWorld()->LineTraceSingleByChannel(Hit,GetActorLocation(),Site->GetActorLocation()+FVector(0,0,30),ECC_Visibility,Params) || Hit.GetActor()==Site;
 }
 
-void ACreatureCharacter::ApproachFarm(AWorkStation* Site)
+void ACreatureCharacter::ApproachWorkSite(AWorkStation* Site)
 {
     const double Now=GetWorld()->GetTimeSeconds();
     if(Now<NextNavigationUpdate)return;
@@ -33,7 +33,7 @@ void ACreatureCharacter::ApproachFarm(AWorkStation* Site)
         const FVector Center=Projected.Location+FVector(0,0,GetCapsuleComponent()->GetScaledCapsuleHalfHeight());
         if(FVector::Dist(Center,Site->GetActorLocation())>210)continue;
         FHitResult Hit;FCollisionQueryParams Params(SCENE_QUERY_STAT(FarmStandSight),false,this);
-        // 农圃旁的导航面不代表角色能站下，尤其不能选择主人正占据的门边位置。
+        // 设施旁的导航面不代表角色能站下，尤其不能选择主人正占据的门边位置。
         const auto* Shape=GetCapsuleComponent();
         if(GetWorld()->OverlapBlockingTestByChannel(Center,FQuat::Identity,ECC_Pawn,FCollisionShape::MakeCapsule(Shape->GetScaledCapsuleRadius()-1,Shape->GetScaledCapsuleHalfHeight()-1),Params))
         {
@@ -55,18 +55,21 @@ void ACreatureCharacter::ApproachFarm(AWorkStation* Site)
     }
     if(Found)
     {
-        if(auto* FarmOwner=Tamer?Cast<ACFPlayerCharacter>(Tamer->GetPawn()):nullptr;FarmOwner && FarmOwner->Feedback==TEXT("农圃接近通道被角色占用，请让开通路；伙伴保留原工作"))
-            FarmOwner->Feedback=TEXT("农圃通路已恢复，伙伴继续原工作");
+        if(auto* FarmOwner=Tamer?Cast<ACFPlayerCharacter>(Tamer->GetPawn()):nullptr;FarmOwner)
+        {
+            if(FarmOwner->Feedback==TEXT("农圃接近通道被角色占用，请让开通路；伙伴保留原工作"))FarmOwner->Feedback=TEXT("农圃通路已恢复，伙伴继续原工作");
+            else if(FarmOwner->Feedback==TEXT("休息设施通道被角色占用，请让开通路；伙伴保留原指令"))FarmOwner->Feedback=TEXT("休息设施通路已恢复，伙伴继续前往");
+        }
         NextFarmBlockHint=0;
         if(FParse::Param(FCommandLine::Get(),TEXT("CFFarmApproachTrace")))UE_LOG(LogTemp,Display,TEXT("CF_FARM_APPROACH_SELECT goal=%s length=%.1f"),*Best.ToString(),BestLength);
         NavigateTo(Best,15);
     }
     else
     {
-        // 无安全接近通道时明确告知玩家，保留原农业任务，让开后按原更新继续。
+        // 无安全接近通道时保留原指令，让开后按原更新继续。
         auto* FarmOwner=Tamer?Cast<ACFPlayerCharacter>(Tamer->GetPawn()):nullptr;
         if(CharacterBlocked && FarmOwner && Now>=NextFarmBlockHint)
-        {FarmOwner->Feedback=TEXT("农圃接近通道被角色占用，请让开通路；伙伴保留原工作");NextFarmBlockHint=Now+5;}
+        {FarmOwner->Feedback=Activity==ECreatureActivity::Rest?TEXT("休息设施通道被角色占用，请让开通路；伙伴保留原指令"):TEXT("农圃接近通道被角色占用，请让开通路；伙伴保留原工作");NextFarmBlockHint=Now+5;}
         StopNavigation();NextNavigationUpdate=Now+.4;
     }
 }

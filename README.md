@@ -1,10 +1,12 @@
 # 幻兽边境
 
-本机项目已迁移到 `H:\myGame`，请打开 `H:\myGame\CreatureFrontier.uproject`；引擎本体仍在 `D:\Epic\UE_5.8`。D盘旧项目副本尚未删除，不再用于开发，详细验证与手动清理边界见[H盘迁移记录](Docs/MIGRATION_H.md)。
+本机项目已迁移到 `H:\myGame`，请打开 `H:\myGame\CreatureFrontier.uproject`；引擎本体仍在 `D:\Epic\UE_5.8`。本轮只读检查未发现`D:\myGame`，未执行旧目录删除操作；历史迁移验证与清理边界见[H盘迁移记录](Docs/MIGRATION_H.md)。
 
 项目界面、帮助、物品／生物名称及开发说明统一使用简体中文；后续代码注释和提交说明也使用中文。技术标识、资源路径、按键名称和玩家自定义昵称保留原样。具体约定与检查方法见[中文开发与显示约定](Docs/CHINESE.md)。
 
 ## 探索朝向开发候选（限定验证，非最终版）
+
+屋内设施候选：`F:\CreatureFrontierBuilds\Windows-StarterWorkshop\CreatureFrontier.exe`。伙伴实际补采、原成本建造室内制作设施、实际进入与存读在Editor／Windows通过；休息复用原农业安全站位，避免目标投影到屋顶后停在屋外，见[限定验证记录与操作流程](Docs/STARTER_WORKSHOP_PROGRESS.md)。不是正式睡眠、持续室内生产或最终品质，普通存档不自动迁入。
 
 农圃等待让行候选：`F:\CreatureFrontierBuilds\Windows-FarmWaitingYield\CreatureFrontier.exe`。缺种空圃工人会安全侧步，保持原任务；两端对同一旧失败档的原路线验证通过，Windows自己的双伙伴档与工作循环／休息选址关联通过，见[等待让行修复](Docs/FARM_WAITING_YIELD.md)。仅解决已复现的等待工人阻挡，不是所有通路或最终品质完成。共享不可变文件勿直接改写，旧普通存档不自动迁入。
 

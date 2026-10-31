@@ -1,4 +1,5 @@
 #pragma once
+void RunStarterWorkshopScenario(class UWorld* World,class ACFPlayerCharacter* Hero,bool Read);
 void RunStarterRestAimScenario(class UWorld* World,class ACFPlayerCharacter* Hero,bool Read);
 void RunStarterHouseholdScenario(class UWorld* World,class ACFPlayerCharacter* Hero,bool Read);
 void RunStarterRecruitScenario(class UWorld* World,class ACFPlayerCharacter* Hero,bool Read);
