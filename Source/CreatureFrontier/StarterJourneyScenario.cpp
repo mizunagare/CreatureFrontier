@@ -1100,3 +1100,136 @@ void RunStarterShelterScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read)
     S->Preview=FParse::Param(FCommandLine::Get(),TEXT("CFStarterShelterPreview"));if(S->Preview){S->Root=FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir()/TEXT("StarterShelterPreview")/FGuid::NewGuid().ToString(EGuidFormats::Digits));IFileManager::Get().MakeDirectory(*S->Root,true);UE_LOG(LogTemp,Display,TEXT("CF_STARTER_SHELTER_PREVIEW_ROOT %s"),*S->Root);}
     FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([S](float){return S->Tick();}));
 }
+
+namespace
+{
+// 继续真实棚屋存档，复用导航探针及原输入，不设置角色位置、资源数量或施工进度。
+struct FStarterRoom : FStarterJourney
+{
+    TWeakObjectPtr<AHomeModule> Floor,Box,Site,Door;TWeakObjectPtr<AResourceNode> Supply;
+    TArray<FHomeModuleRecord> Original;FFacilitySaveRecord Garden;FString Nickname;
+    int32 Part=0;bool Gathering=false,Mid=false;
+    FVector Position()const{return FVector(Part==0?200:-200,-400,-30);}
+    FVector Observer()const{return FVector(Part==0?440:-520,-400,40);}
+    void Find()
+    {
+        Pet.Reset();Floor.Reset();Box.Reset();Door.Reset();Supply.Reset();
+        for(TActorIterator<ACreatureCharacter> It(World);It;++It)if(It->PersistentId==PetId)Pet=*It;
+        for(TActorIterator<AHomeModule> It(World);It;++It)if(!It->bPreview && !It->bStaged)
+        {if(It->GetKind()==EHomeModuleKind::Floor)Floor=*It;if(It->GetKind()==EHomeModuleKind::Storage)Box=*It;if(It->GetKind()==EHomeModuleKind::Door)Door=*It;}
+        for(TActorIterator<AResourceNode> It(World);It;++It)if(It->PersistentId==FGuid(0xCF170000,0,0,4))Supply=*It;
+    }
+    bool End(bool Pass,const TCHAR* Reason)
+    {
+        if(Input.IsValid())Input->Direction=FVector::ZeroVector;CFInputQA::Release(Hero,EKeys::LeftShift);CFInputQA::Release(Hero,EKeys::M);
+        if(auto* PC=Cast<APlayerController>(Hero->GetController()))PC->InputKey(FInputKeyEventArgs(nullptr,INPUTDEVICEID_NONE,EKeys::RightShift,IE_Released,0.f,false,FPlatformTime::Cycles64()));
+        if(!Pass)Hero->SaveProgress(TEXT("StarterRoomBlocked"));
+        const auto Here=Hero->GetActorLocation();const auto Next=Route.IsValidIndex(Point)?Route[Point]:Here;FHitResult Obstacle;FCollisionQueryParams Q(SCENE_QUERY_STAT(RoomStopped),false,Hero);
+        World->LineTraceSingleByChannel(Obstacle,Here,Next+FVector(0,0,50),ECC_Visibility,Q);
+        UE_LOG(LogTemp,Display,TEXT("CF_STARTER_ROOM %s reason=%s phase=%d part=%d heroTravel=%.1f petTravel=%.1f hero=%s pet=%s next=%s obstacle=%s feedback=%s"),Pass?TEXT("PASS"):TEXT("FAIL"),Reason,Phase,Part,HeroTravel,PetTravel,*Here.ToString(),Pet.IsValid()?*Pet->GetActorLocation().ToString():TEXT("none"),*Next.ToString(),*GetNameSafe(Obstacle.GetActor()),*Hero->Feedback);FPlatformMisc::RequestExitWithStatus(false,Pass?0:1);return false;
+    }
+    bool Budget()const
+    {
+        if(!Pet.IsValid() || !Floor.IsValid() || !Box.IsValid() || !Supply.IsValid())return false;
+        const int32 Taken=24-Supply->Remaining;int32 Total=Hero->Inventory->Count(EFrontierItem::Material)+Pet->Cargo->Count(),Farms=0;
+        const auto Layout=HomeLayout::Collect(World);
+        for(const auto& R:Layout)Total+=R.PaidMaterials+R.StoredItems.FindRef(EFrontierItem::Material);
+        for(const auto& R:Original){const auto* Current=Layout.FindByPredicate([&](const FHomeModuleRecord& V){return V.Id==R.Id;});if(!Current || !Current->Transform.Equals(R.Transform,.01) || Current->Definition!=R.Definition || Current->PaidMaterials!=R.PaidMaterials)return false;}
+        for(TActorIterator<AWorkStation> It(World);It;++It)if(It->bPlayerBuilt){++Farms;if(It->PersistentId!=Garden.Id || !It->GetActorTransform().Equals(Garden.Transform,.01) || It->StoredFood!=Garden.StoredFood || It->Crop->Seeds!=Garden.Seeds || It->Crop->bPlanted!=Garden.bPlanted || !FMath::IsNearlyEqual(It->Crop->GrowthWork,Garden.GrowthWork,.01))return false;}
+        return Taken>=0 && Taken<=22 && Total==36+Taken && Farms==1 && Hero->Health==100 && Pet->Health>0 && Pet->Level==2 && Pet->Experience==37 && Pet->BondPoints==3 && Pet->Nickname==Nickname && Hero->GetObjectives().Claimed==5 && Hero->GetObjectives().bAlphaResolved && Hero->Inventory->Count(EFrontierItem::Medicine)==0 && Hero->Inventory->Count(EFrontierItem::CaptureDevice)==10 && Hero->Inventory->Count(EFrontierItem::Food)==2 && Hero->Inventory->Count(EFrontierItem::Seeds)==1;
+    }
+    bool Tick()
+    {
+        if(!Budget() || FPlatformTime::Seconds()>Deadline)return End(false,TEXT("budget-time"));
+        if(World->GetTimeSeconds()>=NextDiagnostic)
+        {NextDiagnostic=World->GetTimeSeconds()+5;UE_LOG(LogTemp,Display,TEXT("CF_STARTER_ROOM_STATE phase=%d part=%d stock=%d cargo=%d supplied=%d work=%.2f stamina=%.1f pet=%s feedback=%s"),Phase,Part,Box->StorageInventory->Count(EFrontierItem::Material),Pet->Cargo->Count(),Site.IsValid()?Site->StorageInventory->Count(EFrontierItem::Material):0,Site.IsValid()?Site->ConstructionWork:0,Pet->Stamina,*Pet->GetActorLocation().ToString(),*Hero->Feedback);}
+        const auto H=Hero->GetActorLocation(),P=Pet->GetActorLocation();const double Delta=World->GetTimeSeconds()-LastTime;
+        if(!Motion(Hero,LastH,VelocityH,Delta) || !Motion(Pet.Get(),LastP,VelocityP,Delta))return End(false,TEXT("motion"));
+        HeroTravel+=FVector::Dist(H,LastH);PetTravel+=FVector::Dist(P,LastP);LastH=H;LastP=P;VelocityH=Hero->GetVelocity();VelocityP=Pet->GetVelocity();LastTime=World->GetTimeSeconds();
+        for(TActorIterator<ACreatureCharacter> It(World);It;++It)if(It->Health>0 && (!It->IsActorTickEnabled() || !It->GetActorEnableCollision() || It->GetCharacterMovement()->MovementMode==MOVE_None))return End(false,TEXT("ecology"));
+        for(TActorIterator<AWildEncounter> It(World);It;++It)if(!It->IsActorTickEnabled())return End(false,TEXT("region"));
+        if(!Mid && Site.IsValid() && Part==0 && Pet->Cargo->Count()==3)
+        {if(!Hero->SaveProgress(TEXT("StarterRoomMid")))return End(false,TEXT("mid"));Mid=true;UE_LOG(LogTemp,Display,TEXT("CF_STARTER_ROOM_MID PASS carried=3 total=58"));}
+        if(FPlatformTime::Seconds()<ShotUntil)return true;
+        if(Phase==-1)
+        {if(World->GetTimeSeconds()-At<2 || UNavigationSystemV1::IsNavigationBeingBuiltOrLocked(World))return true;if(!Plan(Read?FVector(-280,-350,40):FVector(-1220,900,40),Read?3:0))return End(false,TEXT("initial-path"));return true;}
+        if(Phase==0 || Phase==3 || Phase==5 || Phase==10 || Phase==12 || Phase==15 || Phase==17)
+        {const int32 R=Move();if(R<0)return End(false,TEXT("walk"));if(!R)return true;Phase=Phase==0?1:Phase==3?4:Phase==5?6:Phase==10?9:Phase==12?13:Phase==15?16:18;At=World->GetTimeSeconds();return true;}
+        if(Phase==1)
+        {Face(Supply->GetActorLocation());if(Hero->TraceResource()!=Supply.Get()){if(World->GetTimeSeconds()-At>5)return End(false,TEXT("gather-sight"));return true;}if(!CFInputQA::Press(Hero,EKeys::M))return End(false,TEXT("gather-input"));Gathering=true;Phase=2;return true;}
+        if(Phase==2)
+        {if(Hero->Inventory->Count(EFrontierItem::Material)<22){if(!Hero->Gathering->IsGathering())return End(false,TEXT("gather-stopped"));return true;}if(!CFInputQA::Release(Hero,EKeys::M) || Supply->Remaining!=2)return End(false,TEXT("gather-cost"));Gathering=false;Photo(TEXT("Gathered"),Supply->GetActorLocation());UE_LOG(LogTemp,Display,TEXT("CF_STARTER_ROOM_GATHER PASS harvested=22 remaining=2 total=58"));if(!Plan(FVector(-280,-350,40),3))return End(false,TEXT("return-path"));return true;}
+        if(Phase==4)
+        {
+            Face(Box->GetActorLocation()+FVector(0,0,35));
+            if(!Read){if(!CFInputQA::Press(Hero,EKeys::E) || Hero->Storage->GetCrate()!=Box.Get() || !CFInputQA::Press(Hero,EKeys::Right) || Box->StorageInventory->Count(EFrontierItem::Material)!=22 || !CFInputQA::Press(Hero,EKeys::E))return End(false,TEXT("stock"));Photo(TEXT("Stocked"),Box->GetActorLocation());}
+            if(!CFInputQA::Press(Hero,EKeys::V) || Hero->GetDeliveryCrate()!=Box.Get() || !Plan(Read?FVector(520,-400,40):Observer(),Read?10:5))return End(false,TEXT("source-observer"));return true;
+        }
+        if(Phase==6)
+        {
+            Face(FVector(Part==0?180:-180,-400,-30));if(!CFInputQA::Press(Hero,EKeys::B) || !CFInputQA::Press(Hero,EKeys::Eight))return End(false,TEXT("build-open"));
+            const auto Kind=Part==0?EHomeModuleKind::Window:EHomeModuleKind::Door;
+            for(int32 I=0;Hero->HomeBuilding->Selected!=Kind && I<10;++I)if(!CFInputQA::Press(Hero,EKeys::V))return End(false,TEXT("select"));
+            const auto* RotationPreview=Hero->HomeBuilding->GetPreview();if(!RotationPreview)return End(false,TEXT("rotation-preview"));
+            if(!FMath::IsNearlyEqual(FMath::Abs(RotationPreview->GetActorRotation().Yaw),90.,.01) && !CFInputQA::Press(Hero,EKeys::Nine))return End(false,TEXT("rotate"));
+            CastChecked<APlayerController>(Hero->GetController())->InputKey(FInputKeyEventArgs(nullptr,INPUTDEVICEID_NONE,EKeys::RightShift,IE_Pressed,1.f,false,FPlatformTime::Cycles64()));Phase=7;At=World->GetTimeSeconds();return true;
+        }
+        if(Phase==7)
+        {
+            Face(FVector(Part==0?180:-180,-400,-30));Hero->HomeBuilding->UpdatePreview();const auto* Ghost=Hero->HomeBuilding->GetPreview();
+            if(!Ghost || Ghost->IsHidden() || !Ghost->GetActorLocation().Equals(Position(),.01) || !Hero->HomeBuilding->GetHint().Contains(TEXT("可以建造"))){if(World->GetTimeSeconds()-At>5)return End(false,TEXT("preview"));return true;}
+            if(!CFInputQA::Action(Hero,TEXT("Attack"),EKeys::LeftMouseButton))return End(false,TEXT("confirm"));
+            CastChecked<APlayerController>(Hero->GetController())->InputKey(FInputKeyEventArgs(nullptr,INPUTDEVICEID_NONE,EKeys::RightShift,IE_Released,0.f,false,FPlatformTime::Cycles64()));CFInputQA::Press(Hero,EKeys::B);
+            Site.Reset();for(TActorIterator<AHomeModule> It(World);It;++It)if(!It->bPreview && It->bUnderConstruction && It->GetActorLocation().Equals(Position(),.01))Site=*It;
+            if(!Site.IsValid() || Site->PaidMaterials!=0 || Site->FloorId!=Floor->PersistentId)return End(false,TEXT("site"));Phase=8;At=World->GetTimeSeconds();return true;
+        }
+        if(Phase==8)
+        {Face(Site->GetActorTransform().TransformPosition(FVector(-160,0,50)));if(AHomeModule::TraceConstruction(Hero)!=Site.Get()){if(World->GetTimeSeconds()-At>5)return End(false,TEXT("site-sight"));return true;}if(!CFInputQA::Press(Hero,EKeys::E) || Pet->Construction->GetSite()!=Site.Get() || !Plan(FVector(Part==0?520:-520,-400,40),10))return End(false,TEXT("assign-yield"));return true;}
+        if(Phase==9)
+        {
+            if(!Site.IsValid())return End(false,TEXT("work-site"));if(Site->bUnderConstruction)return true;
+            if(Site->PaidMaterials!=(Part==0?10:12) || Pet->Cargo->Count()!=0 || Pet->Construction->GetSite())return End(false,TEXT("completion"));
+            UE_LOG(LogTemp,Display,TEXT("CF_STARTER_ROOM_PART PASS part=%d paid=%d"),Part,Site->PaidMaterials);Photo(Part==0?TEXT("Window"):TEXT("DoorClosed"),Site->GetActorLocation()+FVector(0,0,100));++Part;
+            if(Part==1){if(!Plan(Observer(),5))return End(false,TEXT("door-path"));return true;}
+            Door=Site;if(!Mid || !CFInputQA::Press(Hero,EKeys::F) || !Plan(FVector(-470,-400,40),12))return End(false,TEXT("approach-door"));return true;
+        }
+        if(Phase==13)
+        {
+            Face(FVector(-200,-555,100));if(!CFInputQA::Press(Hero,EKeys::E) || Door->DoorState!=2)return End(false,TEXT("door-open"));Photo(TEXT("DoorOpen"),Door->GetActorLocation()+FVector(-110,-110,120));Phase=14;At=World->GetTimeSeconds();return true;
+        }
+        if(Phase==14)
+        {if(UNavigationSystemV1::IsNavigationBeingBuiltOrLocked(World) || World->GetTimeSeconds()-At<1)return true;if(!Plan(FVector(120,-400,60),15))return End(false,TEXT("enter-path"));return true;}
+        if(Phase==16)
+        {
+            if(P.X< -140 || P.X>160 || FMath::Abs(P.Y+400)>160 || P.Z<50 || Pet->Activity!=ECreatureActivity::Follow){if(World->GetTimeSeconds()-At>20)return End(false,TEXT("pair-enter"));return true;}
+            // 先让伙伴完全离开门扇活动区，再由玩家实际走回可操作门框的位置。
+            if(!Plan(FVector(50,-400,60),17))return End(false,TEXT("inside-door-path"));return true;
+        }
+        if(Phase==18)
+        {
+            Face(FVector(-200,-555,100));if(Door->DoorState==2 && (!CFInputQA::Press(Hero,EKeys::E) || Door->DoorState!=1))return End(false,TEXT("close-inside"));
+            if(Photo(TEXT("Inside"),P))return true;
+            FString Reason;const auto Layout=HomeLayout::Collect(World);if(Layout.Num()!=7 || !HomeLayout::Validate(Layout,Reason) || Hero->HomeBuilding->Dismantle(Floor.Get()))return End(false,TEXT("layout-support"));
+            FCollisionQueryParams Q(SCENE_QUERY_STAT(StarterRoomGeometry),false,Hero);Q.AddIgnoredActor(Pet.Get());FHitResult Hit;
+            if(!World->LineTraceSingleByChannel(Hit,FVector(0,-400,140),FVector(-400,-400,140),ECC_Visibility,Q) || Hit.GetActor()!=Door.Get())return End(false,TEXT("closed-collision"));
+            const auto HB=H,PB=P;if(!Hero->SaveProgress(TEXT("StarterRoomDone")) || !Hero->LoadProgress(TEXT("StarterRoomDone")))return End(false,TEXT("save"));Find();
+            if(!Budget() || !Door.IsValid() || Door->DoorState!=1 || !Hero->GetActorLocation().Equals(HB,.01) || !Pet->GetActorLocation().Equals(PB,.01))return End(false,TEXT("restore"));
+            UE_LOG(LogTemp,Display,TEXT("CF_STARTER_ROOM_LIFE PASS modules=7 paid=58 entered=1 closed=1 identity=1"));return End(true,TEXT("complete"));
+        }
+        return true;
+    }
+};
+}
+void RunStarterRoomScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read)
+{
+    auto S=MakeShared<FStarterRoom>();S->World=World;S->Hero=Hero;S->Read=Read;S->At=World->GetTimeSeconds();S->Deadline=FPlatformTime::Seconds()+210;
+    const auto* Source=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("StarterRoomInput"),0));
+    if(!Source || Source->FormatVersion!=38 || Source->Facilities.Num()!=1 || Source->HomeModules.Num()!=(Read?6:5) || !Hero->LoadProgress(TEXT("StarterRoomInput"))){S->End(false,TEXT("source"));return;}
+    S->Garden=Source->Facilities[0];for(const auto& R:Source->HomeModules)if(!R.bUnderConstruction)S->Original.Add(R);
+    for(TActorIterator<ACreatureCharacter> It(World);It;++It)if(It->Tamer==Hero->GetController()){S->PetId=It->PersistentId;S->Nickname=It->Nickname;}S->Find();
+    if(!S->Budget() || !Hero->GetActorTransform().Equals(Source->PlayerTransform,.01)){S->End(false,TEXT("source-budget"));return;}
+    if(Read){for(TActorIterator<AHomeModule> It(World);It;++It)if(It->bUnderConstruction)S->Site=*It;if(!S->Site.IsValid() || S->Site->GetKind()!=EHomeModuleKind::Window || S->Pet->Cargo->Count()!=3 || S->Pet->Construction->GetSite()!=S->Site.Get()){S->End(false,TEXT("source-work"));return;}S->Mid=true;}
+    S->LastH=Hero->GetActorLocation();S->LastP=S->Pet->GetActorLocation();S->VelocityH=Hero->GetVelocity();S->VelocityP=S->Pet->GetVelocity();S->LastTime=World->GetTimeSeconds();S->Input=NewObject<UHomeMovementProbe>(Hero);S->Input->RegisterComponent();
+    S->Preview=FParse::Param(FCommandLine::Get(),TEXT("CFStarterRoomPreview"));if(S->Preview){S->Root=FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir()/TEXT("StarterRoomPreview")/FGuid::NewGuid().ToString(EGuidFormats::Digits));IFileManager::Get().MakeDirectory(*S->Root,true);UE_LOG(LogTemp,Display,TEXT("CF_STARTER_ROOM_PREVIEW_ROOT %s"),*S->Root);}
+    FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([S](float){return S->Tick();}));
+}

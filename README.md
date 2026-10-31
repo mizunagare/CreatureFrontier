@@ -6,6 +6,8 @@
 
 ## 探索朝向开发候选（限定验证，非最终版）
 
+四向围护整合开发中：真实棚屋档的实采、伙伴窗墙／木门施工、共同进入关门及自身携料恢复已通过Editor，门工地通行与施工站位已修正；详见[开发进度与失败证据](Docs/STARTER_ROOM_PROGRESS.md)。Windows新版尚未验收，下面旧候选不包含这轮新几何修正。
+
 木门伙伴施工开发候选：`F:\CreatureFrontierBuilds\Windows-DoorConstruction\CreatureFrontier.exe`。木门可用原料箱／伙伴搬运施工，新增能力的两端独立夹具及自身携料恢复通过，Windows原实体门七进程回归通过，见[木门施工进度](Docs/DOOR_CONSTRUCTION.md)。新工地图形及真实来源的完整围护尚未验收；不是完整建房阶段交付。共享文件不可直接改写，旧普通存档不自动迁移。
 
 伙伴棚屋施工候选：`F:\CreatureFrontierBuilds\Windows-StarterShelter\CreatureFrontier.exe`。真实补采、原箱供料、伙伴两墙／屋顶施工、双方进入、三处碰撞、拆支撑拒绝及自身携料存档恢复均有两端证据，见[棚屋施工记录](Docs/STARTER_SHELTER.md)。目前为五模块开放棚屋，不是完整封闭房屋；下一步补齐门窗／围护与共同生活。候选共享不可变文件，不可直接改写；旧存档不会自动迁移。

@@ -36,6 +36,12 @@ void RunDoorConstructionScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Rea
         auto* Door=Hero->HomeBuilding->QueueAt(FTransform(FVector(-400,-600,-30)),Floor->PersistentId);
         if(!Box || !Door || Door->DoorState!=1 || Door->PaidMaterials || !Hero->Inventory->TransferTo(Box->StorageInventory,{{EFrontierItem::Material,12}}) || Door->ToggleDoor(Hero))
         {Fail(TEXT("queue"));return;}
+        FHitResult Passage;FCollisionQueryParams PassageQuery(SCENE_QUERY_STAT(DoorConstructionPassage),false,Hero);
+        if(World->SweepSingleByChannel(Passage,FVector(-400,-750,60),FVector(-400,-450,60),FQuat::Identity,ECC_Visibility,FCollisionShape::MakeCapsule(34,88),PassageQuery))
+        {Fail(TEXT("scaffold-passage"));return;}
+        UE_LOG(LogTemp,Display,TEXT("CF_DOOR_CONSTRUCTION_PASSAGE PASS capsule=1 collisionRetained=1"));
+        if(Door->ClearsCompletedPawn(Hero,FVector(-400,-430,60)) || !Door->ClearsCompletedPawn(Hero,FVector(-400,-770,60)))
+        {Fail(TEXT("door-worker-reservation"));return;}
         const FTransform Start(FVector(-750,-800,40));
         auto* Pet=World->SpawnActorDeferred<ACreatureCharacter>(ACreatureCharacter::StaticClass(),Start,nullptr,nullptr,ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
         if(!Pet){Fail(TEXT("pet"));return;}

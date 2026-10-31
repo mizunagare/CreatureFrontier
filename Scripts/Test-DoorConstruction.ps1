@@ -25,6 +25,7 @@ try{
     $raw=Get-Content -LiteralPath $log -Raw
     if($p.ExitCode -ne 0 -or $raw -match '\bFAIL\b|Fatal error|Assertion failed' -or !$raw.Contains('CF_DOOR_CONSTRUCTION PASS paid=12 total=26 closed=1 carried=0 restored=1') -or !$raw.Contains('LogExit: Exiting.')){throw '木门施工验证失败'}
     if(!$ReadInputPath -and !$raw.Contains('CF_DOOR_CONSTRUCTION_MID PASS carried=3 unfinishedToggle=0 badOpenRejected=1')){throw '缺少携料和非法状态检查'}
+    if(!$ReadInputPath -and !$raw.Contains('CF_DOOR_CONSTRUCTION_PASSAGE PASS capsule=1 collisionRetained=1')){throw '缺少门工地实体通行检查'}
     if((Get-FileHash -LiteralPath $module).Hash -ne $hash -or ($ReadInputPath -and (Get-FileHash -LiteralPath $ReadInputPath).Hash -ne $inputHash)){throw '程序或来源改变'}
     [pscustomobject]@{Pass=$true;BuildSHA256=$hash;Log=$log}|Export-Csv (Join-Path $run 'Results.csv') -NoTypeInformation
     Write-Host '木门搬运施工与存读通过；独立夹具无图形，不代表完整建房体验'

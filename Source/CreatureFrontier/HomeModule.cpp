@@ -129,6 +129,10 @@ bool AHomeModule::SupportsConstruction(EHomeModuleKind Kind)
 }
 TArray<FHomePart> AHomeModule::ConstructionParts(EHomeModuleKind Kind,bool ElevatedFloor)
 {
+    // 门工地保留可通行门洞，料箱放在立柱脚下；围护合拢时伙伴仍须穿门取料。
+    if(Kind==EHomeModuleKind::Door)
+        return {{FVector(-155,0,150),FVector(45,10,150)},{FVector(155,0,150),FVector(45,10,150)},
+            {FVector(0,0,275),FVector(110,10,25)},{FVector(-155,0,12),FVector(35,25,12)}};
     // 楼梯工地只有低矮实体边框和料箱，不提前生成可通往上层的踏步。
     if(Kind==EHomeModuleKind::Stairs)
         return {{FVector(-195,0,12),FVector(5,100,8)},{FVector(195,0,12),FVector(5,100,8)},
@@ -162,7 +166,9 @@ bool AHomeModule::ClearsCompletedPawn(const ACharacter* Pawn,const FVector& Cent
     const FVector Local=GetActorTransform().InverseTransformPosition(Center);
     const double Radius=Shape->GetScaledCapsuleRadius(),Segment=Shape->GetScaledCapsuleHalfHeight()-Radius;
     // 判断真实直立胶囊与完工模块的实体，不把当前门洞开口当作安全施工站位。
-    for(const auto& Part:Parts(GetKind()))
+    // 木门还要求工人避开最终门扇预留区，否则会反复站在完工校验必拒绝的位置。
+    const auto Geometry=GetKind()==EHomeModuleKind::Door?PlacementParts(GetKind()):Parts(GetKind());
+    for(const auto& Part:Geometry)
     {
         const FVector Delta=(Local-Part.Center).GetAbs()-Part.Extent-FVector(1);
         const double X=FMath::Max(0.,Delta.X),Y=FMath::Max(0.,Delta.Y),Z=FMath::Max(0.,Delta.Z-Segment);

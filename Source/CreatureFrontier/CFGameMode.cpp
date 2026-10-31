@@ -91,6 +91,8 @@ void ACFGameMode::BeginPlay()
             if(!It->bHasHabitat){It->bHasHabitat=true;It->HabitatHome=Origin;}
         }
     SeedFrontierResources(GetWorld());
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFStarterRoomTest")) || FParse::Param(FCommandLine::Get(),TEXT("CFStarterRoomRead")))
+    {const bool Read=FParse::Param(FCommandLine::Get(),TEXT("CFStarterRoomRead"));FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this,Read](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunStarterRoomScenario(GetWorld(),Hero,Read);},1.f,false);return;}
     if(FParse::Param(FCommandLine::Get(),TEXT("CFDoorConstructionTest")) || FParse::Param(FCommandLine::Get(),TEXT("CFDoorConstructionRead")))
     {const bool Read=FParse::Param(FCommandLine::Get(),TEXT("CFDoorConstructionRead"));FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this,Read](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunDoorConstructionScenario(GetWorld(),Hero,Read);},1.f,false);return;}
     if(FParse::Param(FCommandLine::Get(),TEXT("CFStarterShelterTest")) || FParse::Param(FCommandLine::Get(),TEXT("CFStarterShelterRead")))
