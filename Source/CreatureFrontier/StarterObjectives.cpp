@@ -31,6 +31,9 @@ namespace
         {Hungry|=It->Nutrition<=80;Tired|=It->Stamina<80;}
         if(Hungry && Hero->Inventory->Count(EFrontierItem::Food)>0)return TEXT("建房后照料伙伴：瞄准J喂食（消耗1食物）\n开门留出通路，设施附近T休息");
         if(Tired)return TEXT("伙伴体力不足：开门留出通路\n设施附近T休息，恢复后F一起返屋");
+        if(Hero->Inventory->Count(EFrontierItem::Seeds)==0)
+            for(TActorIterator<AWorkStation> It(Hero->GetWorld());It;++It)if(It->bPlayerBuilt && It->RequiredSpecialty==EWorkSpecialty::Farming && !It->Crop->bPlanted && It->Crop->Seeds==0 && It->StoredFood==0)
+            {const auto* Catalog=UCraftingCatalog::Load();const auto* Recipe=Catalog?Catalog->Find(TEXT("PlantingSeeds")):nullptr;if(Recipe)return FString::Printf(TEXT("补种：基地C选择准备种子（产%d份）\n需要%s，M采集后返家制作"),Recipe->OutputAmount,*UCraftingCatalog::FormatItems(Recipe->Inputs));}
         // 初始食物消耗后接回原农圃，不把所有建成家园都永久提示继续施工或探索。
         if(Hero->Inventory->Count(EFrontierItem::Food)<=1)
         {
