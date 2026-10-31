@@ -16,6 +16,19 @@
 #include "ResourceNode.h"
 #include "ResourceDefinition.h"
 #include "Kismet/GameplayStatics.h"
+#include "Components/StaticMeshComponent.h"
+#include "Engine/StaticMesh.h"
+#include "Camera/CameraComponent.h"
+#include "GameFramework/Controller.h"
+
+namespace
+{
+AActor* CraftAccessWall(UWorld* World,const FVector& Position=FVector(1300,-1000,100),const FVector& Extent=FVector(10,250,200))
+{
+    auto* Wall=World->SpawnActor<AActor>();auto* Mesh=NewObject<UStaticMeshComponent>(Wall);Wall->SetRootComponent(Mesh);
+    Mesh->SetStaticMesh(LoadObject<UStaticMesh>(nullptr,TEXT("/Engine/BasicShapes/Cube.Cube")));Mesh->SetCollisionProfileName(TEXT("BlockAll"));Mesh->RegisterComponent();Wall->SetActorLocation(Position);Wall->SetActorScale3D(Extent/50);return Wall;
+}
+}
 
 void RunBackpackScenario(UWorld* World,ACFPlayerCharacter* Hero)
 {
@@ -66,11 +79,17 @@ void RunBackpackScenario(UWorld* World,ACFPlayerCharacter* Hero)
     for(const auto& Stock:Stocks)Stock.Key->Remaining=Stock.Value;
     Hero->Inventory->Restore({{EFrontierItem::Material,100},{EFrontierItem::CaptureDevice,999}}); Hero->ConfirmInterfaceAction();
     Reject &= Hero->Inventory->Count(EFrontierItem::Material)==100 && Hero->Inventory->Count(EFrontierItem::CaptureDevice)==999 && Hero->GetBackpackRecipeStatus(0).StartsWith(TEXT("产物已满"));
-    Hero->Inventory->Restore({{EFrontierItem::Material,100}}); Hero->SetActorLocation(FVector(0,-3000,40));
+    Hero->Inventory->Restore({{EFrontierItem::Material,100}}); Hero->SetActorLocation(FVector(1200,-1000,40));
     auto* Trough=World->SpawnActor<AWorkStation>(Hero->GetActorLocation()+FVector(200,0,0),FRotator::ZeroRotator); Trough->RequiredSpecialty=EWorkSpecialty::Feeding;
     Hero->ConfirmInterfaceAction();
     Reject &= !Hero->IsNearWorkStation() && Hero->Inventory->Count(EFrontierItem::Material)==100 && Hero->GetBackpackRecipeStatus(0).Contains(TEXT("8米"));
-    Trough->Destroy(); Hero->SetActorLocation(Base);
+    auto* AccessSite=Trough;AccessSite->RequiredSpecialty=EWorkSpecialty::Crafting;
+    auto* AccessWall=CraftAccessWall(World);const auto AccessBag=Hero->Inventory->GetStacks();
+    const bool Blocked=!Hero->IsNearWorkStation();const bool NotSpent=!Hero->CraftRecipe(TEXT("Medicine")) && Hero->Inventory->GetStacks().OrderIndependentCompareEqual(AccessBag) && Hero->Feedback.Contains(TEXT("无遮挡"));
+    AccessWall->Destroy();FHitResult AccessHit;FCollisionQueryParams AccessQuery(SCENE_QUERY_STAT(CraftAccessDebug),false,Hero);World->LineTraceSingleByChannel(AccessHit,Hero->FirstPersonCamera->GetComponentLocation(),AccessSite->GetActorLocation()+FVector(0,0,30),ECC_Visibility,AccessQuery);UE_LOG(LogTemp,Display,TEXT("CF_WORKSHOP_ACCESS_TRACE camera=%s site=%s hit=%s location=%s destroying=%d"),*Hero->FirstPersonCamera->GetComponentLocation().ToString(),*AccessSite->GetActorLocation().ToString(),*GetNameSafe(AccessHit.GetActor()),*AccessHit.Location.ToString(),AccessHit.GetActor()?AccessHit.GetActor()->IsActorBeingDestroyed():false);const bool Visible=Hero->IsNearWorkStation() && Hero->CraftRecipe(TEXT("Medicine")) && Hero->Inventory->Count(EFrontierItem::Material)==95 && Hero->Inventory->Count(EFrontierItem::Medicine)==1;
+    UE_LOG(LogTemp,Display,TEXT("CF_WORKSHOP_ACCESS_VISIBLE near=%d material=%d medicine=%d feedback=%s"),Hero->IsNearWorkStation(),Hero->Inventory->Count(EFrontierItem::Material),Hero->Inventory->Count(EFrontierItem::Medicine),*Hero->Feedback);
+    Hero->SetActorLocation(FVector(2400,-1000,40));const bool Far=!Hero->IsNearWorkStation();AccessSite->Destroy();const bool Access=Blocked && NotSpent && Visible && Far;
+    Hero->Inventory->Restore({{EFrontierItem::Material,100}});Hero->SetActorLocation(Base);
     Hero->TakeDamage(1000,FDamageEvent(),nullptr,nullptr); Hero->ConfirmInterfaceAction();
     Reject &= Hero->Health<=0 && !Hero->IsBackpackOpen() && Hero->Inventory->Count(EFrontierItem::Material)==100;
     Hero->Health=100;
@@ -83,9 +102,24 @@ void RunBackpackScenario(UWorld* World,ACFPlayerCharacter* Hero)
     Hero->ToggleBackpack(); Hero->Inventory->Restore({}); Hero->Equipment->Restore({});
     const bool Loaded=Hero->LoadProgress(TEXT("FrontierBackpackAutomation"));
     const bool Persistence=Saved && Loaded && !Hero->IsBackpackOpen() && Hero->GetBackpackRecipe()==0 && Hero->Inventory->Count(EFrontierItem::Material)==70 && Hero->Equipment->GetState().bOwnSpear && Hero->Equipment->GetState().bOwnVest;
-    const bool Passed=Craft && Reject && Panels && Persistence && Guidance;
+    const bool Passed=Craft && Reject && Panels && Persistence && Guidance && Access;
+    UE_LOG(LogTemp,Display,TEXT("CF_WORKSHOP_ACCESS %s blocked=%d noSpend=%d visibleCraft=%d originalCost=5 farRejected=%d"),Access?TEXT("PASS"):TEXT("FAIL"),Blocked,NotSpent,Visible,Far);
     UE_LOG(LogTemp,Display,TEXT("CF_BACKPACK_GUIDANCE %s cases=7"),Guidance?TEXT("PASS"):TEXT("FAIL"));
     UE_LOG(LogTemp,Display,TEXT("CF_BACKPACK %s craft=%d reject=%d panels=%d persistence=%d"),Passed?TEXT("PASS"):TEXT("FAIL"),Craft,Reject,Panels,Persistence);
+    if(Passed && FParse::Param(FCommandLine::Get(),TEXT("CFWorkshopAccessPreview")))
+    {
+        // 隔离的权限夹具，不作为真实开局或材料来源证据；使用实体墙和地板呈现阻挡。
+        Hero->SetActorLocation(FVector(1200,-1000,40));Hero->Inventory->Restore({{EFrontierItem::Material,30}});Hero->ToggleBackpack();
+        auto* Site=World->SpawnActor<AWorkStation>(FVector(1400,-1000,40),FRotator::ZeroRotator);Site->RequiredSpecialty=EWorkSpecialty::Crafting;
+        auto* Wall=CraftAccessWall(World);CraftAccessWall(World,FVector(1200,-1000,-20),FVector(1000,1000,20));
+        const auto Rotation=(Site->GetActorLocation()+FVector(0,0,30)-Hero->FirstPersonCamera->GetComponentLocation()).Rotation();Hero->GetController()->SetControlRotation(Rotation);Hero->FirstPersonCamera->SetWorldRotation(Rotation);
+        const FString Root=FPaths::ProjectSavedDir()/TEXT("WorkshopAccessPreview");IFileManager::Get().MakeDirectory(*Root,true);
+        FTimerHandle BlockedShot,Open,ReadyShot,Done;
+        World->GetTimerManager().SetTimer(BlockedShot,[Hero,Root](){Hero->CraftRecipe(TEXT("Medicine"));FScreenshotRequest::RequestScreenshot(Root/TEXT("Blocked.png"),false,false);},.6f,false);
+        World->GetTimerManager().SetTimer(Open,[Wall](){Wall->Destroy();},1.2f,false);
+        World->GetTimerManager().SetTimer(ReadyShot,[Hero,Root](){const bool OK=Hero->CraftRecipe(TEXT("Medicine")) && Hero->Inventory->Count(EFrontierItem::Material)==25;UE_LOG(LogTemp,Display,TEXT("CF_WORKSHOP_ACCESS_PREVIEW %s"),OK?TEXT("PASS"):TEXT("FAIL"));FScreenshotRequest::RequestScreenshot(Root/TEXT("Ready.png"),false,false);},1.8f,false);
+        World->GetTimerManager().SetTimer(Done,[](){FPlatformMisc::RequestExitWithStatus(false,0);},2.5f,false);return;
+    }
     if(Passed && FParse::Param(FCommandLine::Get(),TEXT("CFBackpackPreview")))
     {
         Hero->ToggleBackpack(); const FString Root=FPaths::ProjectSavedDir()/TEXT("BackpackPreview"); IFileManager::Get().MakeDirectory(*Root,true);

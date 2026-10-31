@@ -15,7 +15,7 @@ FString ACFPlayerCharacter::GetRecipeStatus(const FFrontierRecipe& Recipe,bool* 
     if(Recipe.Reward==ERecipeReward::CrystalStudy && Research->Has(EFrontierResearch::CrystalStudy)) return TEXT("已完成水晶研究");
     if(!Research->Has(Recipe.RequiredResearch)) return TEXT("尚未解锁：")+Research->GetHint();
     if(Recipe.Reward==ERecipeReward::Item && Recipe.OutputAmount>UInventoryComponent::StackLimit-(Inventory->Count(Recipe.Output)-Recipe.Inputs.FindRef(Recipe.Output))) return TEXT("产物已满，每种物品最多999个");
-    if(!IsNearWorkStation()) return TEXT("需要位于8米内的工作设施");
+    if(!IsNearWorkStation()) return TEXT("需要8米内、无遮挡的工作设施");
     if(Recipe.bBaseOnly && FVector::Dist2D(GetActorLocation(),UBaseBuildingComponent::BaseOrigin())>800) return TEXT("请回初始基地工作台加工、研究或制作");
     if(auto* Catalog=UCraftingCatalog::Load()) for(const auto& Item:Catalog->Items)
     {

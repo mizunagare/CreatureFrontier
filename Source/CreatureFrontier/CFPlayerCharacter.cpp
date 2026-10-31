@@ -85,8 +85,17 @@ void ACFPlayerCharacter::QuitGame()
 
 bool ACFPlayerCharacter::IsNearWorkStation() const
 {
+    if(!GetWorld())return false;
+    // 制作必须能接触到真实设施；伙伴经过不遮断制作许可，墙体与家具仍正常阻挡。
+    FCollisionQueryParams Params(SCENE_QUERY_STAT(CraftingStationSight),false,this);
+    for(TActorIterator<APawn> It(GetWorld());It;++It)Params.AddIgnoredActor(*It);
+    const FVector Start=FirstPersonCamera?FirstPersonCamera->GetComponentLocation():GetPawnViewLocation();
     for (TActorIterator<AWorkStation> It(GetWorld()); It; ++It)
-        if (It->RequiredSpecialty != EWorkSpecialty::Feeding && GetDistanceTo(*It) <= 800.0f) return true;
+        if (!It->IsActorBeingDestroyed() && It->RequiredSpecialty != EWorkSpecialty::Feeding && GetDistanceTo(*It) <= 800.0f)
+        {
+            FHitResult Hit;
+            if(!GetWorld()->LineTraceSingleByChannel(Hit,Start,It->GetActorLocation()+FVector(0,0,30),ECC_Visibility,Params) || Hit.GetActor()==*It)return true;
+        }
     return false;
 }
 

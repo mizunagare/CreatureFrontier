@@ -1,7 +1,7 @@
 param([string]$BuildRoot='', [switch]$Editor,
       [string[]]$Resolutions=@('1280x720'), [string]$EngineRoot='D:\Epic\UE_5.8',
       [string]$LocalCachePath='',
-      [ValidateSet('Backpack','Storage','Journal','Session','Name','Memory')]
+      [ValidateSet('Backpack','WorkshopAccess','Storage','Journal','Session','Name','Memory')]
       [string[]]$MenuNames=@('Backpack','Storage','Journal','Session','Name','Memory'))
 $ErrorActionPreference='Stop'
 $projectRoot=Split-Path $PSScriptRoot -Parent
@@ -30,6 +30,7 @@ New-Item -ItemType Directory -Path $evidence | Out-Null
 Write-Host "中文菜单证据：$evidence"
 $cases=@(
     @{Name='Backpack';Label='背包';Flag='CFBackpackTest';Preview='CFBackpackPreview';Marker='CF_BACKPACK PASS';Files=@('BackpackPreview/backpack.png')},
+    @{Name='WorkshopAccess';Label='设施制作通路';Flag='CFBackpackTest';Preview='CFWorkshopAccessPreview';Marker='CF_WORKSHOP_ACCESS_PREVIEW PASS';Files=@('WorkshopAccessPreview/Blocked.png','WorkshopAccessPreview/Ready.png')},
     @{Name='Storage';Label='仓储';Flag='CFStorageTest';Preview='CFStoragePreview';Marker='CF_STORAGE PASS';Files=@('StoragePreview/Storage.png')},
     # 旧图鉴预览在完整断言前提前返回，只检查预览；完整逻辑由本地回归另验。
     @{Name='Journal';Label='图鉴';Flag='CFJournalTest';Preview='CFJournalPreview';Marker='';Files=@('JournalPreview/entry1.png','JournalPreview/entry2.png')},

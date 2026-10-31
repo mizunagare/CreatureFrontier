@@ -6,6 +6,8 @@
 
 ## 探索朝向开发候选（限定验证，非最终版）
 
+实体设施制作候选：`F:\CreatureFrontierBuilds\Windows-CraftAccess\CreatureFrontier.exe`。制作需要原8米内无遮挡设施；无屋内设施时需出门到台边，伙伴经过不遮断许可，配方／成本不变。两端专项、两尺寸文字、回忆关联及真实原料出台边加工存读通过，见[规则兼容变化与证据](Docs/CRAFTING_FACILITY_ACCESS.md)。尚非自动制造或新屋内设施完整生产链，旧普通存档不自动迁入。
+
 屋内设施候选：`F:\CreatureFrontierBuilds\Windows-StarterWorkshop\CreatureFrontier.exe`。伙伴实际补采、原成本建造室内制作设施、实际进入与存读在Editor／Windows通过；休息复用原农业安全站位，避免目标投影到屋顶后停在屋外，见[限定验证记录与操作流程](Docs/STARTER_WORKSHOP_PROGRESS.md)。不是正式睡眠、持续室内生产或最终品质，普通存档不自动迁入。
 
 农圃等待让行候选：`F:\CreatureFrontierBuilds\Windows-FarmWaitingYield\CreatureFrontier.exe`。缺种空圃工人会安全侧步，保持原任务；两端对同一旧失败档的原路线验证通过，Windows自己的双伙伴档与工作循环／休息选址关联通过，见[等待让行修复](Docs/FARM_WAITING_YIELD.md)。仅解决已复现的等待工人阻挡，不是所有通路或最终品质完成。共享不可变文件勿直接改写，旧普通存档不自动迁入。
