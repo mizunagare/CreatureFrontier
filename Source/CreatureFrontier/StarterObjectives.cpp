@@ -80,13 +80,16 @@ namespace
         if(Hero->Health<100)
         {
             if(Hero->Inventory->Count(EFrontierItem::Medicine)>0)
+            {
+                if(Hero->GetCompanionRoster().Num()>1)return TEXT("受伤先恢复：H治疗自己（消耗1药）\nL单选受伤伙伴，设施附近T休息，避免打断其他工作");
                 return TEXT("受伤先恢复：H治疗自己（消耗1药）\n伙伴可瞄准P用药，或设施附近T休息");
+            }
             const auto* Catalog=UCraftingCatalog::Load();const auto* Recipe=Catalog?Catalog->Find(TEXT("Medicine")):nullptr;
             if(Recipe)return FString::Printf(TEXT("先恢复：设施附近T让伙伴休息\n缺药：M采料，设施附近2制药（%d材料）"),Recipe->Inputs.FindRef(EFrontierItem::Material));
             return TEXT("先恢复：设施附近T让伙伴休息\n缺药：C查看配方，采料后返家制药");
         }
-        if(PartnerResting)return TEXT("伙伴在设施休息中，恢复生命和体力\n等恢复后F跟随，再准备下一次探索");
-        if(PartnerHurt)return TEXT("伙伴受伤：设施附近T休息恢复\n有药可瞄准P治疗，恢复后F跟随");
+        if(PartnerResting)return Hero->GetCompanionRoster().Num()>1?TEXT("伙伴在设施休息中，恢复生命和体力\nL选择其他伙伴派工；K会改为全队指挥"):TEXT("伙伴在设施休息中，恢复生命和体力\n等恢复后F跟随，再准备下一次探索");
+        if(PartnerHurt)return Hero->GetCompanionRoster().Num()>1?TEXT("伙伴受伤：L单选后设施附近T休息恢复\n单只照料不打断其他伙伴工作；瞄准P可用药"):TEXT("伙伴受伤：设施附近T休息恢复\n有药可瞄准P治疗，恢复后F跟随");
         return FString();
     }
     constexpr int32 StarterObjectiveTargets[]={1,1,3,2,1};

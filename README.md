@@ -6,6 +6,8 @@
 
 ## 探索朝向开发候选（限定验证，非最终版）
 
+双伙伴生活候选：`F:\CreatureFrontierBuilds\Windows-StarterHousehold\CreatureFrontier.exe`。原单只指令让新伙伴休息恢复、旧伙伴独立耕作取粮，食物3／种子1，新伙伴恢复到80生命；两端整链、自身实际并行档恢复、原派工回归及五图检查通过，见[双伙伴生活记录](Docs/STARTER_HOUSEHOLD.md)。玩家伤势不变，未新增室内睡眠或全自动经营。共享不可变文件勿直接改写，旧普通存档不自动迁入。
+
 新伙伴分工候选：`F:\CreatureFrontierBuilds\Windows-StarterRecruit\CreatureFrontier.exe`。Windows从真实加工成果正常出发，原长矛削弱、使用1共鸣器捕捉第二伙伴，L单选派工采1材料，旧伙伴原设施休息不被打断，自身捕捉后恢复及存读通过，五张整链图已目视，见[新伙伴分工记录](Docs/STARTER_RECRUIT_PROGRESS.md)。Editor仅证明连续失败后原R恢复的后续链，不混用结果。新伙伴与玩家仍受伤，下一步照料及共同生活，非最终品质。共享不可变文件勿直接改写，旧普通存档不自动迁入。
 
 洞穴加工候选：`F:\CreatureFrontierBuilds\Windows-StarterForge\CreatureFrontier.exe`。真实研究档经原药品／伙伴休息准备、同行进洞采废件、返家原配方制2共鸣捕捉器，双方返屋关门存读、两端自身撤离档恢复和研究关联回归通过，各八张整链图已目视，见[洞穴加工记录](Docs/STARTER_FORGE.md)。仍有真实受伤，尚未用本次产出捕捉下一伙伴，不等于最终品质。共享不可变文件勿直接改写，旧普通存档不自动迁入。
