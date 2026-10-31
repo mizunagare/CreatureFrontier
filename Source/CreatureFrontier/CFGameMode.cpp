@@ -91,6 +91,8 @@ void ACFGameMode::BeginPlay()
             if(!It->bHasHabitat){It->bHasHabitat=true;It->HabitatHome=Origin;}
         }
     SeedFrontierResources(GetWorld());
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFPantryRefillTest")) || FParse::Param(FCommandLine::Get(),TEXT("CFPantryRefillRead")))
+    {const bool Read=FParse::Param(FCommandLine::Get(),TEXT("CFPantryRefillRead"));FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this,Read](){extern void RunPantryRefillScenario(UWorld*,ACFPlayerCharacter*,bool);if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunPantryRefillScenario(GetWorld(),Hero,Read);},1.f,false);return;}
     if(FParse::Param(FCommandLine::Get(),TEXT("CFWorkRestDetourRules")))
     {FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this](){extern void RunWorkRestDetourRules(UWorld*,ACFPlayerCharacter*);if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunWorkRestDetourRules(GetWorld(),Hero);},1.f,false);return;}
     if(FParse::Param(FCommandLine::Get(),TEXT("CFStarterPantryTest")) || FParse::Param(FCommandLine::Get(),TEXT("CFStarterPantryRead")))
