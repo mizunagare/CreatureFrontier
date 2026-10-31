@@ -32,6 +32,14 @@
 #include "PlayerGatheringComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "PlayerEquipmentComponent.h"
+#include "HomeModule.h"
+#include "HomeBuildingComponent.h"
+#include "StorageInteractionComponent.h"
+#include "CompanionConstructionComponent.h"
+#include "CompanionCargoComponent.h"
+#include "InputKeyEventArgs.h"
+
+// 施工闭环继续复用本文件的玩家导航探针和运动连续性检查。
 
 namespace
 {
@@ -963,4 +971,127 @@ void RunStarterFlankScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read)
     S->LastH=Hero->GetActorLocation();S->LastP=S->Pet->GetActorLocation();S->VelocityH=Hero->GetVelocity();S->VelocityP=S->Pet->GetVelocity();S->LastTime=S->At=World->GetTimeSeconds();S->Input=NewObject<UHomeMovementProbe>(Hero);S->Input->RegisterComponent();
     S->Preview=FParse::Param(FCommandLine::Get(),TEXT("CFStarterFlankPreview"));if(S->Preview){S->Root=FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir()/TEXT("StarterFlankPreview")/FGuid::NewGuid().ToString(EGuidFormats::Digits));IFileManager::Get().MakeDirectory(*S->Root,true);UE_LOG(LogTemp,Display,TEXT("CF_STARTER_FLANK_PREVIEW_ROOT %s"),*S->Root);}
     UE_LOG(LogTemp,Display,TEXT("CF_STARTER_FLANK_SOURCE PASS read=%d positionRetained=1 pet=%s"),Read,*S->PetId.ToString());FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([S](float){return S->Tick();}));
+}
+
+namespace
+{
+struct FStarterShelter : FStarterJourney
+{
+    TWeakObjectPtr<AHomeModule> Floor,Box,Site;TWeakObjectPtr<AResourceNode> Stone;
+    FHomeModuleRecord OriginalFloor,OriginalBox;FFacilitySaveRecord Garden;
+    FString Nickname;int32 Part=0;bool Gathering=false,SavedMid=false;
+    FVector Position()const{return Part==0?FVector(0,-200,-30):Part==1?FVector(0,-600,-30):FVector(0,-400,280);}
+    FVector Observer()const{return FVector(-350,Part==0?-200:Part==1?-600:-400,40);}
+    FVector Aim()const{return Part==0?FVector(0,-220,-30):Part==1?FVector(0,-580,-30):FVector(0,-400,-30);}
+    bool End(bool Pass,const TCHAR* Reason)
+    {
+        if(Input.IsValid())Input->Direction=FVector::ZeroVector;if(Gathering)CFInputQA::Release(Hero,EKeys::M);CFInputQA::Release(Hero,EKeys::LeftShift);
+        if(auto* PC=Cast<APlayerController>(Hero->GetController()))PC->InputKey(FInputKeyEventArgs(nullptr,INPUTDEVICEID_NONE,EKeys::RightShift,IE_Released,0.f,false,FPlatformTime::Cycles64()));
+        if(!Pass)Hero->SaveProgress(TEXT("StarterShelterBlocked"));
+        UE_LOG(LogTemp,Display,TEXT("CF_STARTER_SHELTER %s reason=%s phase=%d part=%d heroTravel=%.1f petTravel=%.1f stock=%d cargo=%d feedback=%s"),Pass?TEXT("PASS"):TEXT("FAIL"),Reason,Phase,Part,HeroTravel,PetTravel,Box.IsValid()?Box->StorageInventory->Count(EFrontierItem::Material):-1,Pet.IsValid()?Pet->Cargo->Count():-1,*Hero->Feedback);FPlatformMisc::RequestExitWithStatus(false,Pass?0:1);return false;
+    }
+    void FindActors()
+    {
+        Pet.Reset();Floor.Reset();Box.Reset();Stone.Reset();
+        for(TActorIterator<ACreatureCharacter> It(World);It;++It)if(It->PersistentId==PetId)Pet=*It;
+        for(TActorIterator<AHomeModule> It(World);It;++It){if(It->PersistentId==OriginalFloor.Id)Floor=*It;if(It->PersistentId==OriginalBox.Id)Box=*It;}
+        for(TActorIterator<AResourceNode> It(World);It;++It)if(It->PersistentId==FGuid(0xCF170000,0,0,2))Stone=*It;
+    }
+    bool Budget()const
+    {
+        if(!Pet.IsValid() || !Floor.IsValid() || !Box.IsValid() || !Stone.IsValid())return false;
+        const int32 Harvested=25-Stone->Remaining;int32 Total=Hero->Inventory->Count(EFrontierItem::Material)+Pet->Cargo->Count(),Farms=0;
+        for(TActorIterator<AHomeModule> It(World);It;++It)if(!It->bPreview && !It->bStaged)Total+=It->PaidMaterials+It->StorageInventory->Count(EFrontierItem::Material);
+        for(TActorIterator<AWorkStation> It(World);It;++It)if(It->bPlayerBuilt){++Farms;if(It->PersistentId!=Garden.Id || !It->GetActorTransform().Equals(Garden.Transform,.01) || It->StoredFood!=Garden.StoredFood || It->Crop->Seeds!=Garden.Seeds || It->Crop->bPlanted!=Garden.bPlanted || !FMath::IsNearlyEqual(It->Crop->GrowthWork,Garden.GrowthWork,.01))return false;}
+        return Harvested>=0 && Harvested<=8 && Total==28+Harvested && Farms==1 && Hero->Health==100 && Pet->Health>0 && Pet->Level==2 && Pet->Experience==37 && Pet->BondPoints==3 && Pet->Nickname==Nickname && Hero->GetObjectives().Claimed==5 && Hero->GetObjectives().bAlphaResolved && Hero->Inventory->Count(EFrontierItem::Medicine)==0 && Hero->Inventory->Count(EFrontierItem::CaptureDevice)==10 && Hero->Inventory->Count(EFrontierItem::Food)==2 && Hero->Inventory->Count(EFrontierItem::Seeds)==1 && Floor->GetActorTransform().Equals(OriginalFloor.Transform,.01) && Box->GetActorTransform().Equals(OriginalBox.Transform,.01);
+    }
+    bool Tick()
+    {
+        if(!Budget() || FPlatformTime::Seconds()>Deadline)return End(false,TEXT("budget-lifetime"));
+        const auto H=Hero->GetActorLocation(),P=Pet->GetActorLocation();const double Delta=World->GetTimeSeconds()-LastTime;
+        if(!Motion(Hero,LastH,VelocityH,Delta) || !Motion(Pet.Get(),LastP,VelocityP,Delta) || !Pet->IsActorTickEnabled())return End(false,TEXT("motion"));
+        HeroTravel+=FVector::Dist(H,LastH);PetTravel+=FVector::Dist(P,LastP);LastH=H;LastP=P;VelocityH=Hero->GetVelocity();VelocityP=Pet->GetVelocity();LastTime=World->GetTimeSeconds();
+        int32 Regions=0;for(TActorIterator<AWildEncounter> It(World);It;++It){++Regions;if(!It->IsActorTickEnabled())return End(false,TEXT("ecology"));}if(Regions!=3)return End(false,TEXT("ecology-count"));
+        for(TActorIterator<ACreatureCharacter> It(World);It;++It)if(It->Health>0 && (!It->IsActorTickEnabled() || !It->GetActorEnableCollision() || It->GetCharacterMovement()->MovementMode==MOVE_None))return End(false,TEXT("disabled"));
+        if(!SavedMid && Part==0 && Site.IsValid() && Pet->Cargo->Count()==3)
+        {if(!Hero->SaveProgress(TEXT("StarterShelterMid")))return End(false,TEXT("mid-save"));SavedMid=true;UE_LOG(LogTemp,Display,TEXT("CF_STARTER_SHELTER_MID PASS carried=3 paid=14 total=36"));}
+        if(FPlatformTime::Seconds()<ShotUntil)return true;
+        if(Phase==-1)
+        {
+            if(UNavigationSystemV1::IsNavigationBeingBuiltOrLocked(World))return true;
+            if(!Plan(Read?FVector(-280,-350,40):FVector(-470,-60,40),Read?10:0))return End(false,TEXT("initial-path"));return true;
+        }
+        if(Phase==0 || Phase==3 || Phase==5 || Phase==10 || Phase==11 || Phase==12)
+        {const int32 Result=Move();if(Result<0)return End(false,TEXT("walk"));if(!Result)return true;Phase=Phase==0?1:Phase==3?4:Phase==5?6:Phase==10?14:Phase==11?8:13;At=World->GetTimeSeconds();return true;}
+        if(Phase==1)
+        {Face(Stone->GetActorLocation());if(Hero->TraceResource()!=Stone.Get()){if(World->GetTimeSeconds()-At>5)return End(false,TEXT("gather-sight"));return true;}if(!CFInputQA::Press(Hero,EKeys::M) || !Hero->Gathering->IsGathering())return End(false,TEXT("gather-input"));Gathering=true;Phase=2;return true;}
+        if(Phase==2)
+        {
+            if(Hero->Inventory->Count(EFrontierItem::Material)<8){if(!Hero->Gathering->IsGathering())return End(false,TEXT("gather-stop"));return true;}
+            if(!CFInputQA::Release(Hero,EKeys::M) || Stone->Remaining!=17)return End(false,TEXT("gather-cost"));Gathering=false;Photo(TEXT("Gathered"),Stone->GetActorLocation());
+            UE_LOG(LogTemp,Display,TEXT("CF_STARTER_SHELTER_GATHER PASS input=1 sourcePaid=8 total=36"));if(!Plan(FVector(-280,-350,40),3))return End(false,TEXT("return-path"));return true;
+        }
+        if(Phase==4 || Phase==14)
+        {
+            Face(Box->GetActorLocation()+FVector(0,0,35));
+            if(Phase==4){if(!CFInputQA::Press(Hero,EKeys::E) || Hero->Storage->GetCrate()!=Box.Get() || !CFInputQA::Press(Hero,EKeys::Right) || Box->StorageInventory->Count(EFrontierItem::Material)!=22 || !CFInputQA::Press(Hero,EKeys::E))return End(false,TEXT("store-input"));Photo(TEXT("Stocked"),Box->GetActorLocation());}
+            if(!CFInputQA::Press(Hero,EKeys::V) || Hero->GetDeliveryCrate()!=Box.Get())return End(false,TEXT("source-select"));
+            if(!Plan(Read && Phase==14?FVector(-450,-400,40):Observer(),Read && Phase==14?11:5))return End(false,TEXT("observer-path"));return true;
+        }
+        if(Phase==6)
+        {
+            Face(Aim());if(!CFInputQA::Press(Hero,EKeys::B) || !CFInputQA::Press(Hero,EKeys::Eight))return End(false,TEXT("plan-open"));
+            const auto Kind=Part<2?EHomeModuleKind::Wall:EHomeModuleKind::Roof;for(int32 I=0;Hero->HomeBuilding->Selected!=Kind && I<10;++I)if(!CFInputQA::Press(Hero,EKeys::V))return End(false,TEXT("plan-select"));
+            CastChecked<APlayerController>(Hero->GetController())->InputKey(FInputKeyEventArgs(nullptr,INPUTDEVICEID_NONE,EKeys::RightShift,IE_Pressed,1.f,false,FPlatformTime::Cycles64()));Phase=7;At=World->GetTimeSeconds();return true;
+        }
+        if(Phase==7)
+        {
+            Face(Aim());Hero->HomeBuilding->UpdatePreview();const auto* Ghost=Hero->HomeBuilding->GetPreview();
+            if(!Ghost || Ghost->IsHidden() || !Ghost->GetActorLocation().Equals(Position(),.01) || !Hero->HomeBuilding->GetHint().Contains(TEXT("可以建造"))){if(World->GetTimeSeconds()-At>5)return End(false,TEXT("plan-preview"));return true;}
+            if(!CFInputQA::Action(Hero,TEXT("Attack"),EKeys::LeftMouseButton))return End(false,TEXT("plan-input"));
+            CastChecked<APlayerController>(Hero->GetController())->InputKey(FInputKeyEventArgs(nullptr,INPUTDEVICEID_NONE,EKeys::RightShift,IE_Released,0.f,false,FPlatformTime::Cycles64()));if(!CFInputQA::Press(Hero,EKeys::B))return End(false,TEXT("plan-close"));
+            Site.Reset();for(TActorIterator<AHomeModule> It(World);It;++It)if(!It->bPreview && It->bUnderConstruction && It->GetActorLocation().Equals(Position(),.01))Site=*It;
+            if(!Site.IsValid() || Site->FloorId!=Floor->PersistentId || Site->PaidMaterials!=0)return End(false,TEXT("site"));Phase=9;At=World->GetTimeSeconds();return true;
+        }
+        if(Phase==9)
+        {
+            Face(Site->ConstructionAnchor()+(Part<2?FVector(-160,0,50):FVector(0,0,12)));
+            if(AHomeModule::TraceConstruction(Hero)!=Site.Get()){if(World->GetTimeSeconds()-At>5)return End(false,TEXT("site-sight"));return true;}
+            if(!CFInputQA::Press(Hero,EKeys::E) || Pet->Construction->GetSite()!=Site.Get())return End(false,TEXT("assign-input"));
+            if(!Plan(FVector(-450,-400,40),11))return End(false,TEXT("yield-path"));return true;
+        }
+        if(Phase==8)
+        {
+            if(!Site.IsValid())return End(false,TEXT("work-site"));if(Site->bUnderConstruction)return true;
+            if(Site->PaidMaterials!=(Part<2?6:10) || Pet->Cargo->Count()!=0 || Pet->Construction->GetSite())return End(false,TEXT("completion"));
+            UE_LOG(LogTemp,Display,TEXT("CF_STARTER_SHELTER_PART PASS part=%d paid=%d"),Part,Site->PaidMaterials);Photo(Part==0?TEXT("Wall1"):Part==1?TEXT("Wall2"):TEXT("Roof"),Site->GetActorLocation());++Part;
+            if(Part<3){if(!Plan(Observer(),5))return End(false,TEXT("next-path"));return true;}
+            if(!SavedMid || !CFInputQA::Press(Hero,EKeys::F) || !Plan(FVector(140,-400,60),12))return End(false,TEXT("enter-path"));return true;
+        }
+        if(Phase==13)
+        {
+            const bool Inside=FMath::Abs(H.X)<180 && FMath::Abs(H.Y+400)<180 && FMath::Abs(P.X)<180 && FMath::Abs(P.Y+400)<180 && H.Z>50 && P.Z>50;
+            if(!Inside || Pet->Activity!=ECreatureActivity::Follow){if(World->GetTimeSeconds()-At>20)return End(false,TEXT("enter-pair"));return true;}
+            if(Photo(TEXT("Inside"),P))return true;
+            FString Reason;auto Layout=HomeLayout::Collect(World);if(Layout.Num()!=5 || !HomeLayout::Validate(Layout,Reason) || Hero->HomeBuilding->Dismantle(Floor.Get()))return End(false,TEXT("support"));
+            const auto HBefore=Hero->GetActorLocation(),PBefore=Pet->GetActorLocation();if(!Hero->SaveProgress(TEXT("StarterShelterDone")) || !Hero->LoadProgress(TEXT("StarterShelterDone")))return End(false,TEXT("save"));FindActors();
+            if(!Budget() || !Hero->GetActorLocation().Equals(HBefore,.01) || !Pet->GetActorLocation().Equals(PBefore,.01) || Box->StorageInventory->Count(EFrontierItem::Material)!=0 || HomeLayout::Collect(World).Num()!=5)return End(false,TEXT("restore"));
+            UE_LOG(LogTemp,Display,TEXT("CF_STARTER_SHELTER_LIFE PASS version=38 modules=5 paid=36 stored=0 entered=1 identity=1"));return End(true,TEXT("complete"));
+        }
+        return true;
+    }
+};
+}
+void RunStarterShelterScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read)
+{
+    auto S=MakeShared<FStarterShelter>();S->World=World;S->Hero=Hero;S->Read=Read;S->Deadline=FPlatformTime::Seconds()+150;
+    const auto* Source=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("StarterShelterInput"),0));
+    if(!Source || Source->FormatVersion!=38 || Source->Facilities.Num()!=1 || Source->HomeModules.Num()!=(Read?3:2) || !Hero->LoadProgress(TEXT("StarterShelterInput"))){S->End(false,TEXT("source"));return;}
+    S->Garden=Source->Facilities[0];for(const auto& R:Source->HomeModules){if(R.Definition.Get() && R.Definition.Get()->Kind==EHomeModuleKind::Floor)S->OriginalFloor=R;if(R.Definition.Get() && R.Definition.Get()->Kind==EHomeModuleKind::Storage)S->OriginalBox=R;}
+    for(TActorIterator<ACreatureCharacter> It(World);It;++It)if(It->Tamer==Hero->GetController()){S->PetId=It->PersistentId;S->Nickname=It->Nickname;}S->FindActors();
+    if(!S->Budget() || !Hero->GetActorTransform().Equals(Source->PlayerTransform,.01)){S->End(false,TEXT("source-budget"));return;}
+    if(Read){for(TActorIterator<AHomeModule> It(World);It;++It)if(It->bUnderConstruction)S->Site=*It;if(!S->Site.IsValid() || S->Pet->Cargo->Count()!=3 || S->Pet->Construction->GetSite()!=S->Site.Get()){S->End(false,TEXT("source-work"));return;}S->SavedMid=true;}
+    S->LastH=Hero->GetActorLocation();S->LastP=S->Pet->GetActorLocation();S->VelocityH=Hero->GetVelocity();S->VelocityP=S->Pet->GetVelocity();S->LastTime=World->GetTimeSeconds();S->Input=NewObject<UHomeMovementProbe>(Hero);S->Input->RegisterComponent();
+    S->Preview=FParse::Param(FCommandLine::Get(),TEXT("CFStarterShelterPreview"));if(S->Preview){S->Root=FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir()/TEXT("StarterShelterPreview")/FGuid::NewGuid().ToString(EGuidFormats::Digits));IFileManager::Get().MakeDirectory(*S->Root,true);UE_LOG(LogTemp,Display,TEXT("CF_STARTER_SHELTER_PREVIEW_ROOT %s"),*S->Root);}
+    FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([S](float){return S->Tick();}));
 }
