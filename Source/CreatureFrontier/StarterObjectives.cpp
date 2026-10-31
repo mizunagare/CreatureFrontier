@@ -62,6 +62,8 @@ namespace
                 {const auto D=It->GetActorLocation()-Hero->GetActorLocation();return FString::Printf(TEXT("洞穴加工：%s%d米废件点（直线）\nM采集，留水晶返基地C修复共鸣器"),FrontierOrientation::Heading(FMath::RadiansToDegrees(FMath::Atan2(D.Y,D.X))),FMath::CeilToInt(D.Size()/100));}
             }
         }
+        if(Hero->Inventory->Count(EFrontierItem::ResonanceDevice)>0 && Hero->GetCompanionRoster().Num()==1)
+            return TEXT("新伙伴：0选共鸣器，削弱后右键捕捉\n有失败可能；加入后L单选、E派工分担工作");
         return TEXT("家园已可进出：E开关门，勿挡活动区\n照料伙伴后继续探索；F5保存");
     }
     // 恢复提示只读现有状态，不改变治疗许可、任务或奖励进度。
