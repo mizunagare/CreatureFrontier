@@ -1,6 +1,7 @@
 #include "CreatureCharacter.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
+#include "HomeModule.h"
 #include "CompanionConstructionComponent.h"
 #include "CreatureDefinition.h"
 #include "CompanionCargoComponent.h"
@@ -338,6 +339,17 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
             if(WorkSite->RequiredSpecialty==EWorkSpecialty::Transport) { TickHauling(DeltaSeconds); return; }
             if(WorkSite->RequiredSpecialty!=EWorkSpecialty::Farming) { TickGathering(DeltaSeconds,OwnerPlayer); return; }
             if (ProgressSite.Get() != WorkSite.Get()) { WorkProgress = 0; ProgressSite = WorkSite; }
+            // 空圃缺种时只等待原任务；复用原安全侧步，让主人通行，不中断播种或收获。
+            if(!WorkSite->Crop->IsOccupied())
+            {
+                FVector Yield;const double PreviousYield=OwnerYieldUntil;
+                if(FindOwnerYield(Yield,true))
+                {
+                    if(OwnerYieldUntil!=PreviousYield && FParse::Param(FCommandLine::Get(),TEXT("CFFarmYieldTrace")))
+                        UE_LOG(LogTemp,Display,TEXT("CF_FARM_WAIT_YIELD pet=%s from=%s goal=%s seeds=%d planted=%d xp=%d"),*PersistentId.ToString(),*GetActorLocation().ToString(),*Yield.ToString(),WorkSite->Crop->Seeds,WorkSite->Crop->bPlanted,Experience);
+                    NavigateTo(Yield,12);return;
+                }
+            }
             if (!CanReachFarm(WorkSite)) { ApproachFarm(WorkSite); WorkProgress = 0.0f; }
             else
             {

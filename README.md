@@ -6,6 +6,8 @@
 
 ## 探索朝向开发候选（限定验证，非最终版）
 
+农圃等待让行候选：`F:\CreatureFrontierBuilds\Windows-FarmWaitingYield\CreatureFrontier.exe`。缺种空圃工人会安全侧步，保持原任务；两端对同一旧失败档的原路线验证通过，Windows自己的双伙伴档与工作循环／休息选址关联通过，见[等待让行修复](Docs/FARM_WAITING_YIELD.md)。仅解决已复现的等待工人阻挡，不是所有通路或最终品质完成。共享不可变文件勿直接改写，旧普通存档不自动迁入。
+
 瞄准休息设施候选：`F:\CreatureFrontierBuilds\Windows-StarterRestAim\CreatureFrontier.exe`。T优先看清的8米内设施，无目标就近，超距不改派；原工作仍保留任务休息续工。两端专项、实际到达、自身中途恢复、原规则逻辑及四图文字通过，见[休息选址记录](Docs/REST_FACILITY_AIM.md)。另有原双伙伴回看路径阻挡在新旧程序重现，尚未解决，不是全回归绿色或最终品质。共享不可变文件勿直接改写，旧普通存档不自动迁入。
 
 双伙伴生活候选：`F:\CreatureFrontierBuilds\Windows-StarterHousehold\CreatureFrontier.exe`。原单只指令让新伙伴休息恢复、旧伙伴独立耕作取粮，食物3／种子1，新伙伴恢复到80生命；两端整链、自身实际并行档恢复、原派工回归及五图检查通过，见[双伙伴生活记录](Docs/STARTER_HOUSEHOLD.md)。玩家伤势不变，未新增室内睡眠或全自动经营。共享不可变文件勿直接改写，旧普通存档不自动迁入。
