@@ -6,6 +6,8 @@
 
 ## 探索朝向开发候选（限定验证，非最终版）
 
+水晶采样研究候选：`F:\CreatureFrontierBuilds\Windows-StarterStudy\CreatureFrontier.exe`。真实补种来源继续实采材料／水晶、撤离返家研究、原加工许可解锁并共同返屋存读；两端各完整链、自身撤离档恢复、补种关联回归及图形检查通过，见[采样研究记录](Docs/STARTER_STUDY_PROGRESS.md)。敌人和受伤保留，尚未完成洞穴废件实际加工或最终品质。候选共享不可变文件，不可直接改写；旧普通存档不自动迁入。
+
 家园补种候选：`F:\CreatureFrontierBuilds\Windows-StarterHomeSeed\CreatureFrontier.exe`。实采1纤维、原菜单支付食物制作3种、伙伴用1种完成生产，最终留2食物／2种子并返屋存读；两端完整链、各自采集后恢复、原农圃回归及八图文字检查通过，见[补种供应记录](Docs/STARTER_HOME_SEED.md)。有限储备接下一次探索，不等于长期经济或最终品质完成。候选共享不可变文件，不可直接改写；旧普通存档不自动迁入。
 
 家园农业补给候选：`F:\CreatureFrontierBuilds\Windows-StarterHomeFarm\CreatureFrontier.exe`。原照料档的1份种子由同一伙伴实际耕作产粮，取粮后食物1→2并返屋关门，两端完整链、自身生长档恢复、照料回归及各五图检查通过，见[原农圃补给记录](Docs/STARTER_HOME_FARM.md)。种子已耗尽，尚非永续经济；下一步补种子供应。候选共享不可变文件，不可直接改写；普通旧存档不自动迁入。

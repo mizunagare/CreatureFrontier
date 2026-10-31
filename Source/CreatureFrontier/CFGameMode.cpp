@@ -91,6 +91,8 @@ void ACFGameMode::BeginPlay()
             if(!It->bHasHabitat){It->bHasHabitat=true;It->HabitatHome=Origin;}
         }
     SeedFrontierResources(GetWorld());
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFStarterStudyTest")) || FParse::Param(FCommandLine::Get(),TEXT("CFStarterStudyRead")))
+    {const bool Read=FParse::Param(FCommandLine::Get(),TEXT("CFStarterStudyRead"));FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this,Read](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunStarterStudyScenario(GetWorld(),Hero,Read);},1.f,false);return;}
     if(FParse::Param(FCommandLine::Get(),TEXT("CFStarterHomeSeedTest")) || FParse::Param(FCommandLine::Get(),TEXT("CFStarterHomeSeedRead")))
     {const bool Read=FParse::Param(FCommandLine::Get(),TEXT("CFStarterHomeSeedRead"));FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this,Read](){if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunStarterHomeFarmScenario(GetWorld(),Hero,Read);},1.f,false);return;}
     if(FParse::Param(FCommandLine::Get(),TEXT("CFStarterHomeFarmTest")) || FParse::Param(FCommandLine::Get(),TEXT("CFStarterHomeFarmRead")))

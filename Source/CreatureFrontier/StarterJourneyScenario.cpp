@@ -38,6 +38,7 @@
 #include "CompanionConstructionComponent.h"
 #include "CompanionCargoComponent.h"
 #include "InputKeyEventArgs.h"
+#include "ResearchComponent.h"
 
 // 施工闭环继续复用本文件的玩家导航探针和运动连续性检查。
 
@@ -1409,7 +1410,7 @@ struct FStarterHomeFarm : FStarterRoom
             Face(FVector(-200,-400,245));if(Door->DoorState==2)
             {if(AHomeModule::TraceDoor(Hero)!=Door.Get()){if(World->GetTimeSeconds()-At>5)return End(false,TEXT("close-sight"));return true;}if(!CFInputQA::Press(Hero,EKeys::E) || Door->DoorState!=1)return End(false,TEXT("close"));}
             if(Photo(TEXT("Home"),P))return true;
-            if(!Hero->GetObjectiveHint().Contains(SeedSupply?TEXT("家园已可进出"):TEXT("准备种子")))return End(false,TEXT("ready-hint"));const auto HB=H,PB=P;
+            if(!Hero->GetObjectiveHint().Contains(SeedSupply?TEXT("水晶"):TEXT("准备种子")))return End(false,TEXT("ready-hint"));const auto HB=H,PB=P;
             if(!Hero->SaveProgress(Slot(TEXT("Done"))) || !Hero->LoadProgress(Slot(TEXT("Done"))))return End(false,TEXT("save"));Find();BindFarm();
             if(!Budget() || Door->DoorState!=1 || !Hero->GetActorLocation().Equals(HB,.01) || !Pet->GetActorLocation().Equals(PB,.01))return End(false,TEXT("restore"));
             UE_LOG(LogTemp,Display,TEXT("CF_STARTER_HOME_FARM_LIFE PASS modules=7 paid=58 food=2 seeds=%d xp=%d returned=1 closed=1 identity=1"),SeedSupply?2:0,BaseXP()+1);return End(true,TEXT("complete"));
@@ -1432,5 +1433,102 @@ void RunStarterHomeFarmScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read
     if(Read && S->SeedSupply && (Hero->Inventory->Count(EFrontierItem::Fiber)!=1 || S->Fiber->Remaining!=S->FiberBefore-1 || S->Door->DoorState!=2)){S->End(false,TEXT("source-fiber"));return;}
     S->LastH=Hero->GetActorLocation();S->LastP=S->Pet->GetActorLocation();S->VelocityH=Hero->GetVelocity();S->VelocityP=S->Pet->GetVelocity();S->LastTime=World->GetTimeSeconds();S->Input=NewObject<UHomeMovementProbe>(Hero);S->Input->RegisterComponent();
     S->Preview=FParse::Param(FCommandLine::Get(),TEXT("CFStarterHomeFarmPreview"));if(S->Preview){S->Root=FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir()/TEXT("StarterHomeFarmPreview")/FGuid::NewGuid().ToString(EGuidFormats::Digits));IFileManager::Get().MakeDirectory(*S->Root,true);UE_LOG(LogTemp,Display,TEXT("CF_STARTER_HOME_FARM_PREVIEW_ROOT %s"),*S->Root);}
+    FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([S](float){return S->Tick();}));
+}
+
+namespace
+{
+struct FStarterStudy : FStarterRoom
+{
+    TWeakObjectPtr<AResourceNode> Stone,Crystal;TMap<FGuid,int32> OtherResources;int32 StoneBefore=0,CrystalBefore=0;
+    bool Studied=false,SampleMid=false;double SafeAt=-1;
+    void Minerals(){Stone.Reset();Crystal.Reset();for(TActorIterator<AResourceNode> It(World);It;++It){if(It->PersistentId==FGuid(0xCF170000,0,0,2))Stone=*It;if(It->PersistentId==FGuid(0xCF170000,0,0,7))Crystal=*It;}}
+    bool Travel(FVector Goal,int32 Next,bool Normal=false){if(!Plan(Goal,Next))return false;return !Normal || CFInputQA::Release(Hero,EKeys::LeftShift);}
+    bool End(bool Pass,const TCHAR* Reason)
+    {
+        if(Input.IsValid())Input->Direction=FVector::ZeroVector;CFInputQA::Release(Hero,EKeys::M);CFInputQA::Release(Hero,EKeys::LeftShift);
+        const auto Feedback=Hero->Feedback;if(!Pass)Hero->SaveProgress(TEXT("StarterStudyBlocked"));
+        UE_LOG(LogTemp,Display,TEXT("CF_STARTER_STUDY %s reason=%s phase=%d heroTravel=%.1f petTravel=%.1f heroHP=%.1f petHP=%.1f material=%d crystal=%d feedback=%s"),Pass?TEXT("PASS"):TEXT("FAIL"),Reason,Phase,HeroTravel,PetTravel,Hero->Health,Pet.IsValid()?Pet->Health:-1,Hero->Inventory->Count(EFrontierItem::Material),Hero->Inventory->Count(EFrontierItem::Crystal),*Feedback);FPlatformMisc::RequestExitWithStatus(false,Pass?0:1);return false;
+    }
+    bool Budget()const
+    {
+        if(!Stone.IsValid() || !Crystal.IsValid() || !Pet.IsValid() || !Door.IsValid() || Hero->Health<=0 || Pet->Health<=0 || Pet->Level!=2 || Pet->Experience!=39 || Pet->BondPoints!=6 || Pet->Nickname!=Nickname)return false;
+        const int32 Rock=StoneBefore-Stone->Remaining,Sample=CrystalBefore-Crystal->Remaining;
+        if(Rock<0 || Rock>2 || Sample<0 || Sample>2 || Hero->Inventory->Count(EFrontierItem::Material)+(Studied?2:0)!=Rock || Hero->Inventory->Count(EFrontierItem::Crystal)+(Studied?1:0)!=Sample || Hero->Research->Has(EFrontierResearch::CrystalStudy)!=Studied || Hero->Research->Has(EFrontierResearch::CrystalSample)!=(Sample>0) || Hero->Inventory->Count(EFrontierItem::Food)!=2 || Hero->Inventory->Count(EFrontierItem::Seeds)!=2 || Pet->Cargo->Count()!=0 || Hero->Inventory->Count(EFrontierItem::Medicine)!=0 || Hero->Inventory->Count(EFrontierItem::CaptureDevice)!=10 || Hero->Inventory->Count(EFrontierItem::Scrap)!=0 || Hero->Inventory->Count(EFrontierItem::ResonanceDevice)!=0 || Hero->GetObjectives().Claimed!=5 || !Hero->GetObjectives().bAlphaResolved)return false;
+        const auto Layout=HomeLayout::Collect(World);if(Layout.Num()!=7)return false;
+        for(const auto& R:Original){const auto* V=Layout.FindByPredicate([&](const FHomeModuleRecord& X){return X.Id==R.Id;});if(!V || !V->Transform.Equals(R.Transform,.01) || V->Definition!=R.Definition || V->PaidMaterials!=R.PaidMaterials || !V->StoredItems.OrderIndependentCompareEqual(R.StoredItems))return false;}
+        int32 Farms=0;for(TActorIterator<AWorkStation> It(World);It;++It)if(It->bPlayerBuilt){++Farms;if(It->PersistentId!=Garden.Id || !It->GetActorTransform().Equals(Garden.Transform,.01) || It->StoredFood!=Garden.StoredFood || It->Crop->Seeds!=Garden.Seeds || It->Crop->bPlanted!=Garden.bPlanted || It->Crop->GrowthWork!=Garden.GrowthWork)return false;}
+        for(TActorIterator<AResourceNode> It(World);It;++It)if(const int32* Before=OtherResources.Find(It->PersistentId))if(It->Remaining!=*Before)return false;
+        int32 Paid=0;for(const auto& R:Original)Paid+=R.PaidMaterials;return Farms==1 && Paid==58;
+    }
+    bool Tick()
+    {
+        if(!Budget() || FPlatformTime::Seconds()>Deadline)return End(false,TEXT("budget-time"));
+        const auto H=Hero->GetActorLocation(),P=Pet->GetActorLocation();const double Delta=World->GetTimeSeconds()-LastTime;
+        if(!Motion(Hero,LastH,VelocityH,Delta) || !Motion(Pet.Get(),LastP,VelocityP,Delta))return End(false,TEXT("motion"));
+        HeroTravel+=FVector::Dist(H,LastH);PetTravel+=FVector::Dist(P,LastP);LastH=H;LastP=P;VelocityH=Hero->GetVelocity();VelocityP=Pet->GetVelocity();LastTime=World->GetTimeSeconds();
+        int32 Regions=0;for(TActorIterator<AWildEncounter> It(World);It;++It){++Regions;if(!It->IsActorTickEnabled())return End(false,TEXT("region"));}if(Regions!=3)return End(false,TEXT("regions"));
+        for(TActorIterator<ACreatureCharacter> It(World);It;++It)if(It->Health>0 && (!It->IsActorTickEnabled() || !It->GetActorEnableCollision() || It->GetCharacterMovement()->MovementMode==MOVE_None))return End(false,TEXT("ecology"));
+        if(World->GetTimeSeconds()>=NextDiagnostic){NextDiagnostic=World->GetTimeSeconds()+5;UE_LOG(LogTemp,Display,TEXT("CF_STARTER_STUDY_STATE phase=%d hero=%s pet=%s hp=%.1f/%.1f rocks=%d crystals=%d"),Phase,*H.ToString(),*P.ToString(),Hero->Health,Pet->Health,Stone->Remaining,Crystal->Remaining);}
+        if(FPlatformTime::Seconds()<ShotUntil)return true;
+        if(Phase==-1)
+        {if(World->GetTimeSeconds()-At<2 || UNavigationSystemV1::IsNavigationBeingBuiltOrLocked(World))return true;if(Read){if(!Travel(FVector(50,-400,60),9))return End(false,TEXT("read-return"));return true;}Phase=0;At=World->GetTimeSeconds();return true;}
+        if(Phase==0)
+        {if(Photo(TEXT("Departure"),P))return true;if(!Hero->GetObjectiveHint().Contains(TEXT("水晶")))return End(false,TEXT("departure-hint"));Face(FVector(-200,-400,245));if(AHomeModule::TraceDoor(Hero)!=Door.Get()){if(World->GetTimeSeconds()-At>5)return End(false,TEXT("open-sight"));return true;}if(!CFInputQA::Press(Hero,EKeys::E) || Door->DoorState!=2 || !CFInputQA::Press(Hero,EKeys::F))return End(false,TEXT("open-follow"));Phase=1;At=World->GetTimeSeconds();return true;}
+        if(Phase==1){if(World->GetTimeSeconds()-At<2 || UNavigationSystemV1::IsNavigationBeingBuiltOrLocked(World))return true;if(!Travel(FVector(-470,-60,40),2))return End(false,TEXT("stone-path"));return true;}
+        if(Phase==2 || Phase==5 || Phase==6 || Phase==8 || Phase==9 || Phase==11 || Phase==13)
+        {const int32 R=Move();if(R<0)return End(false,TEXT("walk"));if(!R)return true;At=World->GetTimeSeconds();
+            if(Phase==2)Phase=3;else if(Phase==5){if(!Travel(FVector(1450,1800,40),6,true))return End(false,TEXT("sample-path"));}else if(Phase==6)Phase=7;else if(Phase==8)Phase=14;else if(Phase==9)Phase=10;else if(Phase==11)Phase=12;else Phase=15;return true;}
+        if(Phase==3)
+        {Face(Stone->GetActorLocation());if(Hero->TraceResource()!=Stone.Get()){if(World->GetTimeSeconds()-At>5)return End(false,TEXT("stone-sight"));return true;}if(!CFInputQA::Press(Hero,EKeys::M))return End(false,TEXT("stone-input"));Phase=4;return true;}
+        if(Phase==4)
+        {if(Hero->Inventory->Count(EFrontierItem::Material)<2){if(!Hero->Gathering->IsGathering())return End(false,TEXT("stone-interrupted"));return true;}if(!CFInputQA::Release(Hero,EKeys::M) || StoneBefore-Stone->Remaining!=2)return End(false,TEXT("stone-cost"));Photo(TEXT("Materials"),Stone->GetActorLocation());if(!Travel(FVector(900,1800,40),5))return End(false,TEXT("north-path"));return true;}
+        if(Phase==7)
+        {
+            Face(Crystal->GetActorLocation());if(Hero->Inventory->Count(EFrontierItem::Crystal)==0){if(Hero->TraceResource()!=Crystal.Get()){if(World->GetTimeSeconds()-At>2)return End(false,TEXT("crystal-sight"));return true;}if(!Hero->Gathering->IsGathering() && !CFInputQA::Press(Hero,EKeys::M))return End(false,TEXT("crystal-input"));}
+            if(Hero->Inventory->Count(EFrontierItem::Crystal)<2){if(World->GetTimeSeconds()-At>5)return End(false,TEXT("crystal-gather"));return true;}
+            if(!CFInputQA::Release(Hero,EKeys::M) || CrystalBefore-Crystal->Remaining!=2 || !Hero->Research->Has(EFrontierResearch::CrystalSample))return End(false,TEXT("sample-cost"));
+            UE_LOG(LogTemp,Display,TEXT("CF_STARTER_STUDY_SAMPLE PASS materialPaid=2 crystalPaid=2 sampled=1"));Photo(TEXT("Sample"),Crystal->GetActorLocation());if(!CFInputQA::Press(Hero,EKeys::F) || !Travel(FVector(200,1800,40),8,true))return End(false,TEXT("withdraw-path"));return true;
+        }
+        if(Phase==14)
+        {
+            bool Safe=Pet->GetDistanceTo(Hero)<250;
+            for(TActorIterator<ACreatureCharacter> It(World);It;++It)if(It->Disposition==ECreatureDisposition::Hostile && It->Health>0 && (It->GetDistanceTo(Hero)<700 || It->GetDistanceTo(Pet.Get())<700))Safe=false;
+            if(!Safe){SafeAt=-1;if(World->GetTimeSeconds()-At>20)return End(false,TEXT("withdraw-safe"));return true;}
+            if(SafeAt<0)SafeAt=World->GetTimeSeconds();if(World->GetTimeSeconds()-SafeAt<2)return true;
+            if(!Hero->SaveProgress(TEXT("StarterStudyMid")))return End(false,TEXT("mid-save"));SampleMid=true;Photo(TEXT("Retreated"),P);UE_LOG(LogTemp,Display,TEXT("CF_STARTER_STUDY_MID PASS material=2 crystal=2 sample=1 study=0 safe=1"));if(!Travel(FVector(50,-400,60),9))return End(false,TEXT("return-path"));return true;
+        }
+        if(Phase==10)
+        {
+            const auto* Catalog=UCraftingCatalog::Load();if(!Catalog)return End(false,TEXT("catalog"));
+            if(!Hero->IsBackpackOpen()){if(!CFInputQA::Press(Hero,EKeys::C) || !Hero->IsBackpackOpen())return End(false,TEXT("menu"));const int32 Index=Catalog->Recipes.IndexOfByPredicate([](const FFrontierRecipe& R){return R.Id==TEXT("StudyCrystal");});if(Index<0)return End(false,TEXT("recipe"));for(int32 I=0;I<Index;++I)if(!CFInputQA::Press(Hero,EKeys::Down))return End(false,TEXT("recipe-select"));if(Photo(TEXT("Research"),P))return true;}
+            if(!CFInputQA::Press(Hero,EKeys::Enter) || !Hero->Research->Has(EFrontierResearch::CrystalStudy) || Hero->Inventory->Count(EFrontierItem::Material)!=0 || Hero->Inventory->Count(EFrontierItem::Crystal)!=1)return End(false,TEXT("study"));Studied=true;
+            const auto Bag=Hero->Inventory->GetStacks();if(!CFInputQA::Press(Hero,EKeys::Enter) || !Hero->Inventory->GetStacks().OrderIndependentCompareEqual(Bag) || !CFInputQA::Press(Hero,EKeys::C) || Hero->IsBackpackOpen())return End(false,TEXT("repeat-study"));
+            const auto* Repair=Catalog->Find(TEXT("ScrapResonator"));bool CanCraft=false;const auto Status=Repair?Hero->GetRecipeStatus(*Repair,&CanCraft):FString();if(!Repair || CanCraft || !Status.Contains(TEXT("机械废件")) || Status.Contains(TEXT("尚未解锁")))return End(false,TEXT("unlock"));
+            UE_LOG(LogTemp,Display,TEXT("CF_STARTER_STUDY_RESEARCH PASS materialUsed=2 crystalUsed=1 repeated=0 repairUnlocked=1"));Photo(TEXT("Studied"),P);if(!SampleMid || !Travel(FVector(120,-400,60),11))return End(false,TEXT("regroup-path"));return true;
+        }
+        if(Phase==12){if(P.X< -140 || P.X>160 || FMath::Abs(P.Y+400)>160 || P.Z<50 || Pet->Activity!=ECreatureActivity::Follow){if(World->GetTimeSeconds()-At>20)return End(false,TEXT("pair-enter"));return true;}if(!Travel(FVector(50,-400,60),13))return End(false,TEXT("close-path"));return true;}
+        if(Phase==15)
+        {
+            Face(FVector(-200,-400,245));if(Door->DoorState==2){if(AHomeModule::TraceDoor(Hero)!=Door.Get()){if(World->GetTimeSeconds()-At>5)return End(false,TEXT("close-sight"));return true;}if(!CFInputQA::Press(Hero,EKeys::E) || Door->DoorState!=1)return End(false,TEXT("close"));}if(Photo(TEXT("Home"),P))return true;
+            const auto HB=H,PB=P;if(!Hero->SaveProgress(TEXT("StarterStudyDone")) || !Hero->LoadProgress(TEXT("StarterStudyDone")))return End(false,TEXT("save"));Find();Minerals();
+            if(!Budget() || Door->DoorState!=1 || !Hero->GetActorLocation().Equals(HB,.01) || !Pet->GetActorLocation().Equals(PB,.01))return End(false,TEXT("restore"));UE_LOG(LogTemp,Display,TEXT("CF_STARTER_STUDY_LIFE PASS modules=7 paid=58 material=0 crystal=1 study=1 food=2 seeds=2 returned=1 closed=1 identity=1"));return End(true,TEXT("complete"));
+        }
+        return true;
+    }
+};
+}
+void RunStarterStudyScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read)
+{
+    auto S=MakeShared<FStarterStudy>();S->World=World;S->Hero=Hero;S->Read=Read;S->SampleMid=Read;S->At=World->GetTimeSeconds();S->Deadline=FPlatformTime::Seconds()+180;
+    const auto* Source=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("StarterStudyInput"),0));
+    if(!Source || Source->FormatVersion!=38 || Source->Facilities.Num()!=1 || Source->HomeModules.Num()!=7 || Source->Research.bCrystalStudy || !Hero->LoadProgress(TEXT("StarterStudyInput"))){S->End(false,TEXT("source"));return;}
+    S->Original=Source->HomeModules;S->Garden=Source->Facilities[0];for(TActorIterator<ACreatureCharacter> It(World);It;++It)if(It->Tamer==Hero->GetController()){S->PetId=It->PersistentId;S->Nickname=It->Nickname;}S->Find();S->Minerals();
+    if(S->Stone.IsValid())S->StoneBefore=S->Stone->Remaining+(Read?2:0);if(S->Crystal.IsValid())S->CrystalBefore=S->Crystal->Remaining+(Read?2:0);
+    for(const auto& R:Source->ResourceNodes)if(R.Id!=FGuid(0xCF170000,0,0,2) && R.Id!=FGuid(0xCF170000,0,0,7))S->OtherResources.Add(R.Id,R.Remaining);
+    if(!S->Budget() || !Hero->GetActorTransform().Equals(Source->PlayerTransform,.01) || (Read && (Hero->Inventory->Count(EFrontierItem::Crystal)!=2 || Hero->Inventory->Count(EFrontierItem::Material)!=2)) || (!Read && (Source->Research.bCrystalSample || Hero->Inventory->Count(EFrontierItem::Material)!=0 || Hero->Inventory->Count(EFrontierItem::Crystal)!=0))){S->End(false,TEXT("source-budget"));return;}
+    for(TActorIterator<AWildEncounter> It(World);It;++It)if(It->bBoss)UE_LOG(LogTemp,Display,TEXT("CF_STARTER_STUDY_SOURCE bossAlive=%d remaining=%.1f stone=%d crystal=%d"),It->GetResident()!=nullptr,It->GetSavedRemaining(),S->StoneBefore,S->CrystalBefore);
+    S->LastH=Hero->GetActorLocation();S->LastP=S->Pet->GetActorLocation();S->VelocityH=Hero->GetVelocity();S->VelocityP=S->Pet->GetVelocity();S->LastTime=World->GetTimeSeconds();S->Input=NewObject<UHomeMovementProbe>(Hero);S->Input->RegisterComponent();
+    S->Preview=FParse::Param(FCommandLine::Get(),TEXT("CFStarterStudyPreview"));if(S->Preview){S->Root=FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir()/TEXT("StarterStudyPreview")/FGuid::NewGuid().ToString(EGuidFormats::Digits));IFileManager::Get().MakeDirectory(*S->Root,true);UE_LOG(LogTemp,Display,TEXT("CF_STARTER_STUDY_PREVIEW_ROOT %s"),*S->Root);}
     FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([S](float){return S->Tick();}));
 }

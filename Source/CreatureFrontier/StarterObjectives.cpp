@@ -11,6 +11,9 @@
 #include "CraftingCatalog.h"
 #include "HomeModule.h"
 #include "HomeModuleDefinition.h"
+#include "ResearchComponent.h"
+#include "ResourceNode.h"
+#include "ResourceDefinition.h"
 
 namespace
 {
@@ -40,6 +43,13 @@ namespace
             for(TActorIterator<AWorkStation> It(Hero->GetWorld());It;++It)if(It->bPlayerBuilt && It->RequiredSpecialty==EWorkSpecialty::Farming && It->StoredFood>0)
                 return TEXT("农圃已有收获：靠近6米瞄准按O取粮\n补回伙伴照料与下一次探索的食物");
             return FarmingHint(Hero);
+        }
+        if(!Hero->Research->Has(EFrontierResearch::CrystalStudy))
+        {
+            if(Hero->Research->Has(EFrontierResearch::CrystalSample))
+            {const auto* Catalog=UCraftingCatalog::Load();const auto* Recipe=Catalog?Catalog->Find(TEXT("StudyCrystal")):nullptr;if(Recipe)return FString::Printf(TEXT("带样本返初始基地，C选择研究水晶\n原配方需要%s"),*UCraftingCatalog::FormatItems(Recipe->Inputs));}
+            for(TActorIterator<AResourceNode> It(Hero->GetWorld());It;++It)if(It->Definition && It->Definition->Discovery==EFrontierResearch::CrystalSample && It->Remaining>0)
+            {const auto D=It->GetActorLocation()-Hero->GetActorLocation();return FString::Printf(TEXT("下一步：%s%d米水晶点采样（直线）\n栖息地可能有敌人，备补给后出发"),FrontierOrientation::Heading(FMath::RadiansToDegrees(FMath::Atan2(D.Y,D.X))),FMath::CeilToInt(D.Size()/100));}
         }
         return TEXT("家园已可进出：E开关门，勿挡活动区\n照料伙伴后继续探索；F5保存");
     }
