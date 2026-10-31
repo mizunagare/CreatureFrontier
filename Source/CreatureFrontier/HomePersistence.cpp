@@ -6,6 +6,7 @@
 #include "ResearchComponent.h"
 #include "InventoryComponent.h"
 #include "CFPlayerCharacter.h"
+#include "CreatureCharacter.h"
 #include "GameFramework/Character.h"
 #include "Components/CapsuleComponent.h"
 
@@ -71,7 +72,8 @@ bool FHomeRestoreTransaction::Stage(UFrontierSaveGame* Save)
     }
     FString Reason;
     if(!HomeLayout::Validate(Save->HomeModules,Reason)) return false;
-    for(const auto& Door:Save->HomeModules)if(Door.Definition.Get()->Kind==EHomeModuleKind::Door)
+    // 工地只有脚手架，尚不存在门扇；完工后的实体门继续执行严格的门扇夹人检查。
+    for(const auto& Door:Save->HomeModules)if(Door.Definition.Get()->Kind==EHomeModuleKind::Door && !Door.bUnderConstruction)
     {
         if(!DoorClearsPawn(Door,Save->PlayerTransform,GetDefault<ACFPlayerCharacter>()))return false;
         for(const auto& Creature:Save->Creatures)

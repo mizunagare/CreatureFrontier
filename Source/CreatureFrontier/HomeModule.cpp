@@ -125,7 +125,7 @@ AHomeModule* AHomeModule::TraceConstruction(ACFPlayerCharacter* Hero)
 bool AHomeModule::SupportsConstruction(EHomeModuleKind Kind)
 {
     return Kind==EHomeModuleKind::Floor || Kind==EHomeModuleKind::Roof || Kind==EHomeModuleKind::Wall ||
-        Kind==EHomeModuleKind::Window || Kind==EHomeModuleKind::Doorway || Kind==EHomeModuleKind::Fence || Kind==EHomeModuleKind::Stairs;
+        Kind==EHomeModuleKind::Window || Kind==EHomeModuleKind::Doorway || Kind==EHomeModuleKind::Door || Kind==EHomeModuleKind::Fence || Kind==EHomeModuleKind::Stairs;
 }
 TArray<FHomePart> AHomeModule::ConstructionParts(EHomeModuleKind Kind,bool ElevatedFloor)
 {

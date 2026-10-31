@@ -49,6 +49,7 @@ bool HomeLayout::IsCanonical(const FHomeModuleRecord& Record)
     if(!UInventoryComponent::Validate(Record.StoredItems))return false;
     if(Record.bUnderConstruction)
     {
+        if(Definition->Kind==EHomeModuleKind::Door && Record.DoorState!=1)return false;
         if(!AHomeModule::SupportsConstruction(Definition->Kind) ||
             !Record.PaidExtraItems.IsEmpty() || !Definition->ExtraCosts.IsEmpty() || !FMath::IsFinite(Record.ConstructionWork) || Record.ConstructionWork<0 || Record.ConstructionWork>6)return false;
         for(const auto& Item:Record.StoredItems)if(Item.Key!=EFrontierItem::Material || Item.Value>Definition->MaterialCost)return false;

@@ -25,12 +25,12 @@ AHomeModule* AHomeModule::TraceDoor(ACFPlayerCharacter* Hero)
     const FVector Start=Hero->FirstPersonCamera->GetComponentLocation();
     if(!Hero->GetWorld()->LineTraceSingleByChannel(Hit,Start,Start+Hero->FirstPersonCamera->GetForwardVector()*800,ECC_Visibility,Params))return nullptr;
     auto* Door=Cast<AHomeModule>(Hit.GetActor());
-    return Door && Door->GetKind()==EHomeModuleKind::Door && !Door->bPreview && !Door->bStaged?Door:nullptr;
+    return Door && Door->GetKind()==EHomeModuleKind::Door && !Door->bPreview && !Door->bStaged && !Door->bUnderConstruction?Door:nullptr;
 }
 bool AHomeModule::ToggleDoor(ACFPlayerCharacter* Hero)
 {
     if(!HasAuthority() || !IsValid(Hero) || !Hero->HasAuthority() || Hero->Health<=0 || Hero->GetWorld()!=GetWorld() ||
-        IsActorBeingDestroyed() || bPreview || bStaged || !PersistentId.IsValid() || GetKind()!=EHomeModuleKind::Door ||
+        IsActorBeingDestroyed() || bPreview || bStaged || bUnderConstruction || !PersistentId.IsValid() || GetKind()!=EHomeModuleKind::Door ||
         (DoorState!=1 && DoorState!=2) || UGameplayStatics::IsGamePaused(this))return false;
     if(Hero->GetDistanceTo(this)>300 || TraceDoor(Hero)!=this)
     {Hero->Feedback=TEXT("开关门需要瞄准3米内可见的实体门");return false;}

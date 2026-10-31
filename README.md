@@ -6,6 +6,8 @@
 
 ## 探索朝向开发候选（限定验证，非最终版）
 
+木门伙伴施工开发候选：`F:\CreatureFrontierBuilds\Windows-DoorConstruction\CreatureFrontier.exe`。木门可用原料箱／伙伴搬运施工，新增能力的两端独立夹具及自身携料恢复通过，Windows原实体门七进程回归通过，见[木门施工进度](Docs/DOOR_CONSTRUCTION.md)。新工地图形及真实来源的完整围护尚未验收；不是完整建房阶段交付。共享文件不可直接改写，旧普通存档不自动迁移。
+
 伙伴棚屋施工候选：`F:\CreatureFrontierBuilds\Windows-StarterShelter\CreatureFrontier.exe`。真实补采、原箱供料、伙伴两墙／屋顶施工、双方进入、三处碰撞、拆支撑拒绝及自身携料存档恢复均有两端证据，见[棚屋施工记录](Docs/STARTER_SHELTER.md)。目前为五模块开放棚屋，不是完整封闭房屋；下一步补齐门窗／围护与共同生活。候选共享不可变文件，不可直接改写；旧存档不会自动迁移。
 
 领奖后家园指引候选：`F:\CreatureFrontierBuilds\Windows-HomeGrowth\CreatureFrontier.exe`。五项目标后继续提示原恢复／地板／箱子／伙伴施工操作，真实奖励材料经原输入用于地板、箱子及存料，详见[家园基础记录](Docs/HOME_GROWTH.md)。尚未在该来源建成房屋或完成伙伴施工，下一步继续墙顶建设；候选共享不可变文件，不可直接改写共享文件，旧存档不会自动迁移。
