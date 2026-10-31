@@ -1,5 +1,7 @@
 # 幻兽边境
 
+最新限定交付：室内食槽与工人返岗。原B建食槽（12材料）、U存粮；原饥饿伙伴在8米范围内自行进食并保留工作，工人可以安全绕过静止休息的同主人伙伴。Windows入口 `F:\CreatureFrontierBuilds\Windows-StarterPantry\CreatureFrontier.exe`，真实物资链、构建方式、边界和剩余范围见[室内照料与返岗](Docs/WORK_REST_DETOUR.md)。目前是本地原生候选和灰盒原型，不是最终发布品质。
+
 最新限定交付：自建设施搬迁。B进入建造，瞄准自建设施按Insert，9旋转、左键确认、右键／B取消；保留库存、加工工序及伙伴指派，不重复收费。Windows入口 `F:\CreatureFrontierBuilds\Windows-FacilityMove\CreatureFrontier.exe`，操作、两端真实链与剩余范围见[设施搬迁](Docs/FACILITY_MOVE.md)。这是复用已核验烹饪数据的本地原生候选，非最终发布版。
 
 本机项目已迁移到 `H:\myGame`，请打开 `H:\myGame\CreatureFrontier.uproject`；引擎本体仍在 `D:\Epic\UE_5.8`。本轮只读检查未发现`D:\myGame`，未执行旧目录删除操作；历史迁移验证与清理边界见[H盘迁移记录](Docs/MIGRATION_H.md)。

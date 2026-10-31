@@ -157,7 +157,7 @@ private:
     FVector OwnerYieldGoal=FVector::ZeroVector;
     double OwnerYieldUntil=0,NextOwnerYieldSearch=0;
     const ACharacter* FindFollowPathBlocker(const FVector& Destination) const;
-    bool FindFollowPathDetour(const FVector& Destination,const ACharacter* Blocker,FVector& Out) const;
+    bool FindFollowPathDetour(const FVector& Destination,const ACharacter* Blocker,FVector& Out,float MaxDistance=350,bool RequireVolume=false) const;
     bool bHasFollowPathDetour=false;
     FVector FollowPathDetour=FVector::ZeroVector, FollowPathDetourGoal=FVector::ZeroVector;
     double FollowPathDetourExpires=0, NextFollowDetourSearch=0;
@@ -227,6 +227,9 @@ private:
     bool CanHit(const AActor* Target) const;
     double NextNavigationUpdate = 0.0;
     double NextFarmBlockHint = 0.0;
+    TWeakObjectPtr<AWorkStation> WorkDetourSite;
+    FVector WorkDetourGoal=FVector::ZeroVector;
+    double WorkDetourExpires=0;
     float AttackCooldown = 0.0f;
     float WorkProgress = 0.0f;
     TWeakObjectPtr<AWorkStation> ProgressSite;

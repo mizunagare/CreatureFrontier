@@ -165,6 +165,7 @@ float ACreatureCharacter::GetWorkEfficiency(const AWorkStation* Site) const
 
 void ACreatureCharacter::StopNavigation()
 {
+    WorkDetourSite.Reset();WorkDetourExpires=0;
     OwnerYieldUntil=0;
     bCombatRetreatActive=false;
     CombatRetreatRoute.Reset();
@@ -554,6 +555,8 @@ void ACreatureCharacter::SetActivity(ECreatureActivity NewActivity)
 {
     if (HasAuthority() && (NewActivity == ECreatureActivity::Work || NewActivity == ECreatureActivity::Rest)) ClearCombatOrders();
     if (!HasAuthority() || Activity == NewActivity) return;
+    // 新指令不能继续执行上一工作设施的临时绕行路径。
+    if(WorkDetourExpires>0){StopNavigation();NextNavigationUpdate=0;}
     if(NewActivity!=ECreatureActivity::Work && !(NewActivity==ECreatureActivity::Rest && bResumeWorkAfterRest)) CancelFieldResource();
     if (NewActivity != ECreatureActivity::Rest) bResumeWorkAfterRest = false;
     if (NewActivity != ECreatureActivity::Work) ResetGathering();

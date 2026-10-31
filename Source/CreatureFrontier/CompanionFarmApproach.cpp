@@ -22,8 +22,15 @@ void ACreatureCharacter::ApproachWorkSite(AWorkStation* Site)
     if(Now<NextNavigationUpdate)return;
     auto* Nav=FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
     if(!Nav || !IsValid(Site)){StopNavigation();NextNavigationUpdate=Now+.4;return;}
+    if(WorkDetourSite.Get()==Site && Now<WorkDetourExpires && FVector::Dist2D(GetActorLocation(),WorkDetourGoal)>20)
+    {
+        auto* Path=UNavigationSystemV1::FindPathToLocationSynchronously(GetWorld(),GetActorLocation(),WorkDetourGoal,this);
+        if(FrontierFollowPath::ClearPath(this,Path)){NavigateTo(WorkDetourGoal,15);return;}
+    }
+    WorkDetourSite.Reset();
     // 设施中心不是站立点；限制垂直投影，避免选择同一水平位置上方的屋顶。
     bool Found=false,CharacterBlocked=false;FVector Best=FVector::ZeroVector;double BestLength=DBL_MAX;
+    const ACreatureCharacter* RestBlocker=nullptr;FVector BlockedGoal=FVector::ZeroVector;double BlockedLength=DBL_MAX;
     for(int32 Index=0;Index<8;++Index)
     {
         const double Angle=Index*PI/4;
@@ -48,6 +55,15 @@ void ACreatureCharacter::ApproachWorkSite(AWorkStation* Site)
         if(!FrontierFollowPath::ClearPath(this,Path))
         {
             CharacterBlocked=true;
+            if(Activity==ECreatureActivity::Work && Length<BlockedLength)
+                for(int32 Segment=1;Segment<Path->PathPoints.Num();++Segment)
+                    if(const auto* Body=FrontierFollowPath::Blocker(this,Path->PathPoints[Segment-1],Path->PathPoints[Segment]))
+                    {
+                        const auto* Peer=Cast<ACreatureCharacter>(Body);
+                        if(Peer && Peer->Tamer==Tamer && Peer->Disposition==ECreatureDisposition::Tamed && Peer->Health>0 && Peer->Activity==ECreatureActivity::Rest && !Peer->bResumeWorkAfterRest && !Peer->FeedingSite.IsValid() && Peer->GetVelocity().Size2D()<10)
+                        {RestBlocker=Peer;BlockedGoal=Projected.Location;BlockedLength=Length;}
+                        break;
+                    }
             if(FParse::Param(FCommandLine::Get(),TEXT("CFFarmApproachTrace")))UE_LOG(LogTemp,Display,TEXT("CF_FARM_APPROACH_REJECT reason=character-path goal=%s"),*Center.ToString());
             continue;
         }
@@ -66,10 +82,17 @@ void ACreatureCharacter::ApproachWorkSite(AWorkStation* Site)
     }
     else
     {
+        FVector Detour;
+        if(RestBlocker && FindFollowPathDetour(BlockedGoal,RestBlocker,Detour,600,true))
+        {
+            WorkDetourSite=Site;WorkDetourGoal=Detour;WorkDetourExpires=Now+6;
+            if(FParse::Param(FCommandLine::Get(),TEXT("CFFarmApproachTrace")))UE_LOG(LogTemp,Display,TEXT("CF_WORK_REST_DETOUR actor=%s blocker=%s goal=%s"),*GetName(),*GetNameSafe(RestBlocker),*Detour.ToString());
+            NavigateTo(Detour,15);return;
+        }
         // 无安全接近通道时保留原指令，让开后按原更新继续。
         auto* FarmOwner=Tamer?Cast<ACFPlayerCharacter>(Tamer->GetPawn()):nullptr;
         if(CharacterBlocked && FarmOwner && Now>=NextFarmBlockHint)
         {FarmOwner->Feedback=Activity==ECreatureActivity::Rest?TEXT("休息设施通道被角色占用，请让开通路；伙伴保留原指令"):TEXT("农圃接近通道被角色占用，请让开通路；伙伴保留原工作");NextFarmBlockHint=Now+5;}
-        StopNavigation();NextNavigationUpdate=Now+.4;
+        StopNavigation();NextNavigationUpdate=Now+(RestBlocker?1:.4);
     }
 }

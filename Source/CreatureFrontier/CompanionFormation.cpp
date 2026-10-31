@@ -50,8 +50,8 @@ bool ClearPath(const ACreatureCharacter* Self,const UNavigationPath* Path)
         }
         if(const auto* Hit=Blocker(Self,Path->PathPoints[Index-1],Path->PathPoints[Index]))
         {
-            if(FParse::Param(FCommandLine::Get(),TEXT("CFHollowDetourTrace")))
-                UE_LOG(LogTemp,Display,TEXT("CF_DETOUR_REJECT actor=%s segment=%d from=%s to=%s"),*GetNameSafe(Hit),Index,*Path->PathPoints[Index-1].ToString(),*Path->PathPoints[Index].ToString());
+            if(FParse::Param(FCommandLine::Get(),TEXT("CFHollowDetourTrace")) || FParse::Param(FCommandLine::Get(),TEXT("CFFarmApproachTrace")))
+                UE_LOG(LogTemp,Display,TEXT("CF_DETOUR_REJECT actor=%s actorPos=%s self=%s segment=%d from=%s to=%s"),*GetNameSafe(Hit),*Hit->GetActorLocation().ToString(),*GetNameSafe(Self),Index,*Path->PathPoints[Index-1].ToString(),*Path->PathPoints[Index].ToString());
             return false;
         }
     }
@@ -167,13 +167,55 @@ bool ACreatureCharacter::FindCombatRetreat(const FVector& Destination,const ACha
             (FPlatformTime::Seconds()-SearchStarted)*1000,Queue.Num(),Count,Out.Num(),Found>=0);
     return Out.Num()>0;
 }
-bool ACreatureCharacter::FindFollowPathDetour(const FVector& Destination,const ACharacter* Blocker,FVector& Out) const
+bool ACreatureCharacter::FindFollowPathDetour(const FVector& Destination,const ACharacter* Blocker,FVector& Out,float MaxDistance,bool RequireVolume) const
 {
     auto* Nav=FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
-    if(!Nav || !IsValid(Blocker) || GetDistanceTo(Blocker)>350) return false;
+    if(!Nav || !IsValid(Blocker) || GetDistanceTo(Blocker)>MaxDistance) return false;
     const float Radius=GetCapsuleComponent()->GetScaledCapsuleRadius()+Blocker->GetCapsuleComponent()->GetScaledCapsuleRadius()+80;
+    if(RequireVolume)
+    {
+        // 门外角色与设施可能形成连续两个拐角；单个中转点不能保证静态最短路绕开两者。
+        // 只在同层两圈16节点内搜索至多两个中转点，所有边仍走完整导航及真实胶囊校验。
+        FNavLocation Floor;if(!Nav->ProjectPointToNavigation(GetActorLocation(),Floor,FVector(35,35,120)))return false;
+        const float Height=GetActorLocation().Z-Floor.Location.Z;
+        const bool WorkTrace=FParse::Param(FCommandLine::Get(),TEXT("CFFarmApproachTrace"));
+        FCollisionQueryParams Query(SCENE_QUERY_STAT(WorkDetourVolume),false,this);
+        auto SafePath=[&](const UNavigationPath* Path)
+        {
+            if(!FrontierFollowPath::ClearPath(this,Path))return false;
+            for(int32 I=1;I<Path->PathPoints.Num();++I)
+            {
+                const FVector A=Path->PathPoints[I-1]+FVector(0,0,Height),B=Path->PathPoints[I]+FVector(0,0,Height);FHitResult Hit;bool StepDown=false;
+                if(!FrontierFollowPath::ClearYieldSegment(this,A,B,Query,Hit,StepDown))return false;
+            }
+            return true;
+        };
+        struct FNode{FVector Point;float Start=-1,End=-1;};TArray<FNode> Nodes;
+        float Shortest=MAX_flt;FVector Selected=FVector::ZeroVector;int32 Bends=0;
+        for(int32 I=0;I<16;++I)
+        {
+            const float Angle=(I%8)*PI/4,Distance=Radius+(I/8)*200;FNavLocation Point;
+            FVector Candidate=Blocker->GetActorLocation()+FVector(FMath::Cos(Angle),FMath::Sin(Angle),0)*Distance;Candidate.Z=Floor.Location.Z;
+            if(!Nav->ProjectPointToNavigation(Candidate,Point,FVector(35,35,80)) || FMath::Abs(Point.Location.Z-Floor.Location.Z)>GetCharacterMovement()->MaxStepHeight)continue;
+            FNode Node;Node.Point=Point.Location;
+            auto* Start=UNavigationSystemV1::FindPathToLocationSynchronously(GetWorld(),GetActorLocation(),Node.Point,const_cast<ACreatureCharacter*>(this));
+            auto* End=UNavigationSystemV1::FindPathToLocationSynchronously(GetWorld(),Node.Point,Destination,const_cast<ACreatureCharacter*>(this));
+            if(SafePath(Start))Node.Start=Start->GetPathLength();if(SafePath(End))Node.End=End->GetPathLength();
+            if(Node.Start>=0 && Node.End>=0 && Node.Start+Node.End<Shortest){Shortest=Node.Start+Node.End;Selected=Node.Point;Bends=1;}
+            Nodes.Add(Node);
+        }
+        if(Bends==0)for(int32 A=0;A<Nodes.Num();++A)if(Nodes[A].Start>=0)
+            for(int32 B=0;B<Nodes.Num();++B)if(A!=B && Nodes[B].End>=0)
+            {
+                auto* Middle=UNavigationSystemV1::FindPathToLocationSynchronously(GetWorld(),Nodes[A].Point,Nodes[B].Point,const_cast<ACreatureCharacter*>(this));
+                if(!SafePath(Middle))continue;const float Cost=Nodes[A].Start+Middle->GetPathLength()+Nodes[B].End;
+                if(Cost<Shortest){Shortest=Cost;Selected=Nodes[A].Point;Bends=2;}
+            }
+        if(WorkTrace)UE_LOG(LogTemp,Display,TEXT("CF_WORK_DETOUR_SEARCH actor=%s nodes=%d bends=%d found=%d via=%s"),*GetName(),Nodes.Num(),Bends,Bends>0,*Selected.ToString());
+        if(Bends>0)Out=Selected;return Bends>0;
+    }
     float Best=MAX_flt;
-    const bool Trace=FParse::Param(FCommandLine::Get(),TEXT("CFHollowDetourTrace"));
+    const bool Trace=FParse::Param(FCommandLine::Get(),TEXT("CFHollowDetourTrace")) || (RequireVolume && FParse::Param(FCommandLine::Get(),TEXT("CFFarmApproachTrace")));
     for(int32 Index=0;Index<16;++Index)
     {
         const float Angle=(Index%8)*PI/4;

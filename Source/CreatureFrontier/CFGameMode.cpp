@@ -91,6 +91,12 @@ void ACFGameMode::BeginPlay()
             if(!It->bHasHabitat){It->bHasHabitat=true;It->HabitatHome=Origin;}
         }
     SeedFrontierResources(GetWorld());
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFWorkRestDetourRules")))
+    {FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this](){extern void RunWorkRestDetourRules(UWorld*,ACFPlayerCharacter*);if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunWorkRestDetourRules(GetWorld(),Hero);},1.f,false);return;}
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFStarterPantryTest")) || FParse::Param(FCommandLine::Get(),TEXT("CFStarterPantryRead")))
+    {const bool Read=FParse::Param(FCommandLine::Get(),TEXT("CFStarterPantryRead"));FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this,Read](){extern void RunStarterPantryScenario(UWorld*,ACFPlayerCharacter*,bool);if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunStarterPantryScenario(GetWorld(),Hero,Read);},1.f,false);return;}
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFIndoorFeedingTest")))
+    {FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this](){extern void RunIndoorFeedingScenario(UWorld*,ACFPlayerCharacter*);if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunIndoorFeedingScenario(GetWorld(),Hero);},1.f,false);return;}
     if(FParse::Param(FCommandLine::Get(),TEXT("CFFacilityMoveTest")) || FParse::Param(FCommandLine::Get(),TEXT("CFFacilityMoveRead")))
     {const bool Read=FParse::Param(FCommandLine::Get(),TEXT("CFFacilityMoveRead"));FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this,Read](){extern void RunFacilityMoveScenario(UWorld*,ACFPlayerCharacter*,bool);if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunFacilityMoveScenario(GetWorld(),Hero,Read);},1.f,false);return;}
     if(FParse::Param(FCommandLine::Get(),TEXT("CFFacilityMoveRules")))
