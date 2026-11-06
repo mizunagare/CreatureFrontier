@@ -24,6 +24,55 @@ void RunSeedSupplyRules(UWorld* World,ACFPlayerCharacter* Hero)
     Post->RequiredSpecialty=EWorkSpecialty::Transport;Farm->RequiredSpecialty=EWorkSpecialty::Farming;
     Crate->Definition=NewObject<UHomeModuleDefinition>(Crate);Crate->Definition->Kind=EHomeModuleKind::Storage;
     Pet->Tamer=Hero->GetController();Pet->Disposition=ECreatureDisposition::Tamed;Pet->Activity=ECreatureActivity::Work;Pet->WorkSite=Post;
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFTransportWaiting")))
+    {
+        // 空箱空圃的隔离等待场景；普通AI自行走到岗位，不冻结模拟或移动伙伴。
+        Crate->OnConstruction(Crate->GetActorTransform());
+        Pet->Stamina=60;Pet->Nutrition=100;
+        struct FWaitingState{double Start=0,Settled=-1,NextLog=0,SupplyAt=0,LastTime=0,Travel=0;float Stamina=0,Nutrition=0,SupplyStamina=0;bool Supplied=false,Picked=false;FVector Last;};
+        auto S=MakeShared<FWaitingState>();S->Start=World->GetTimeSeconds();
+        FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([World,Pet,Post,Farm,Crate,S](float)
+        {
+            const double Now=World->GetTimeSeconds();
+            if(S->Supplied)
+            {
+                const double Step=FVector::Dist(S->Last,Pet->GetActorLocation());
+                const bool Continuous=Step<=Pet->GetCharacterMovement()->GetMaxSpeed()*(Now-S->LastTime)+10;
+                S->Travel+=Step;S->Last=Pet->GetActorLocation();S->LastTime=Now;S->Picked |= Pet->CarriedSeeds>0;
+                const bool Intact=Continuous && Pet->WorkSite==Post && Pet->Activity==ECreatureActivity::Work && Pet->GetActorEnableCollision() && Pet->CarriedFood==0 && Farm->StoredFood==0 && !Farm->Crop->bPlanted && Crate->StorageInventory->Count(EFrontierItem::Seeds)+Pet->CarriedSeeds+Farm->Crop->Seeds==3;
+                const bool Delivered=S->Picked && Farm->Crop->Seeds==3 && Pet->CarriedSeeds==0 && S->Travel>50 && Pet->Stamina<S->SupplyStamina-.1f;
+                if(!Intact || Delivered || Now-S->SupplyAt>25)
+                {
+                    const bool Pass=Intact && Delivered;
+                    UE_LOG(LogTemp,Display,TEXT("CF_TRANSPORT_RESUPPLY %s invariant=%d picked=%d farmSeeds=%d travel=%.2f staminaBefore=%.3f staminaAfter=%.3f"),Pass?TEXT("PASS"):TEXT("FAIL"),Intact,S->Picked,Farm->Crop->Seeds,S->Travel,S->SupplyStamina,Pet->Stamina);
+                    FPlatformMisc::RequestExitWithStatus(false,Pass?0:1);return false;
+                }
+                return true;
+            }
+            const bool Stationary=Pet->GetVelocity().Size2D()<3 && FVector::Dist2D(Pet->GetActorLocation(),Post->GetActorLocation()+FVector(-180,0,0))<=70;
+            if(Now>=S->NextLog)
+            {
+                S->NextLog=Now+5;FHitResult Floor;FCollisionQueryParams Query(SCENE_QUERY_STAT(WaitingFloor),false,Pet);
+                World->LineTraceSingleByChannel(Floor,Pet->GetActorLocation(),Pet->GetActorLocation()-FVector(0,0,400),ECC_Visibility,Query);
+                UE_LOG(LogTemp,Display,TEXT("CF_TRANSPORT_WAIT_STATE pos=%s velocity=%s distance=%.2f stamina=%.3f floor=%s floorZ=%.2f crate=%s farm=%s post=%s"),*Pet->GetActorLocation().ToString(),*Pet->GetVelocity().ToString(),FVector::Dist2D(Pet->GetActorLocation(),Post->GetActorLocation()+FVector(-180,0,0)),Pet->Stamina,*GetNameSafe(Floor.GetActor()),Floor.ImpactPoint.Z,*Crate->GetName(),*Farm->GetName(),*Post->GetName());
+            }
+            const bool Intact=Pet->Activity==ECreatureActivity::Work && Pet->WorkSite==Post && Pet->GetActorEnableCollision() && Pet->CarriedSeeds==0 && Pet->CarriedFood==0 && Farm->StoredFood==0 && Crate->StorageInventory->Count(EFrontierItem::Seeds)==0;
+            if(S->Settled<0 && Stationary){S->Settled=Now;S->Stamina=Pet->Stamina;S->Nutrition=Pet->Nutrition;}
+            if(!Intact || Now-S->Start>20 || (S->Settled>=0 && Now-S->Settled>=3))
+            {
+                const bool Pass=Intact && Stationary && S->Settled>=0 && FMath::IsNearlyEqual(Pet->Stamina,S->Stamina,.05f) && Pet->Nutrition<S->Nutrition;
+                UE_LOG(LogTemp,Display,TEXT("CF_TRANSPORT_WAIT %s intact=%d stationary=%d staminaBefore=%.3f staminaAfter=%.3f nutritionBefore=%.3f nutritionAfter=%.3f"),Pass?TEXT("PASS"):TEXT("FAIL"),Intact,Stationary,S->Stamina,Pet->Stamina,S->Nutrition,Pet->Nutrition);
+                if(Pass)
+                {
+                    // 仅为隔离复工测试投入一次3种，后续完全由普通AI搬运；不冒称玩家制种来源。
+                    if(!Crate->StorageInventory->AddItem(EFrontierItem::Seeds,3)){FPlatformMisc::RequestExitWithStatus(false,1);return false;}
+                    S->Supplied=true;S->SupplyAt=Now;S->SupplyStamina=Pet->Stamina;S->Last=Pet->GetActorLocation();S->LastTime=Now;return true;
+                }
+                FPlatformMisc::RequestExitWithStatus(false,Pass?0:1);return false;
+            }
+            return true;
+        }));return;
+    }
     if(Blocked)
     {
         // 高处无通路种箱与地面粮运并存；观察期间不移动设施或改库存。

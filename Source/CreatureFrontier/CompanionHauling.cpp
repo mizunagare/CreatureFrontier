@@ -13,7 +13,10 @@ bool ACreatureCharacter::TickHauling(float DeltaSeconds)
         if(FVector::Dist2D(Waiting,GetActorLocation())>70) NavigateTo(Waiting,35); else StopNavigation();
     };
     WorkProgress=0;
-    Stamina=FMath::Max(0.f,Stamina-DeltaSeconds*1.5f);
+    // 空手到岗等待不空耗体力；赶路、已有目标和携货仍按原规则消耗，不免费恢复。
+    const bool WaitingEmpty=CarriedFood==0 && CarriedSeeds==0 && !HaulTarget.IsValid() && !SeedSupplyTarget.IsValid() &&
+        GetVelocity().SizeSquared2D()<9 && FVector::Dist2D(GetActorLocation(),WorkSite->GetActorLocation()+FVector(-180,0,0))<=70;
+    if(!WaitingEmpty)Stamina=FMath::Max(0.f,Stamina-DeltaSeconds*1.5f);
     if(Stamina<=0) { bResumeWorkAfterRest=true; HaulTarget.Reset(); SetActivity(ECreatureActivity::Rest); StopNavigation(); return true; }
     if(HaulPost.Get()!=WorkSite.Get()) { HaulPost=WorkSite.Get(); HaulTarget.Reset(); SeedSupplyTarget.Reset(); HaulRetry=0; }
     HaulRetry=FMath::Max(0.f,HaulRetry-DeltaSeconds);
