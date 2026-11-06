@@ -60,7 +60,8 @@ try{
     $done=Join-Path $slots $(if($Life){'SeedSupplyLifeDone.sav'}elseif($Resume -or $RecoverFood){'SeedSupplyDone.sav'}else{'SeedSupplyCarry.sav'})
     if(!$Inspect -and !$Invalid -and (!(Test-Path $done) -or (Get-Item $done).LastWriteTimeUtc -lt $started)){throw '缺少本次新输出档'}
     if($Life -and !$raw.Contains('CF_SEED_LIFE_LEDGER PASS')){throw '缺少实际食物守恒账'}
-    if($Preview){$id=[regex]::Match($raw,'CF_SEED_LIFE_PREVIEW_ROOT [^\r\n]*[/\\]([A-F0-9]{32})');if(!$id.Success){throw '缺少截图目录'};foreach($name in @('Carrying','Delivered')){
+    $previewNames=@('Carrying','Delivered');if(!$CarryLife -and !$ContinueLife){$previewNames+=@('TransportHint','StorageHint')}
+    if($Preview){$id=[regex]::Match($raw,'CF_SEED_LIFE_PREVIEW_ROOT [^\r\n]*[/\\]([A-F0-9]{32})');if(!$id.Success){throw '缺少截图目录'};foreach($name in $previewNames){
         $path=Join-Path $saved ('SeedLifePreview/'+$id.Groups[1].Value+'/'+$name+'.png');if(!(Test-Path $path) -or (Get-Item $path).LastWriteTimeUtc -lt $started){throw '缺少本次截图'}
         $bytes=[IO.File]::ReadAllBytes($path);if($bytes.Length -lt 1000 -or $bytes[0] -ne 137 -or $bytes[1] -ne 80 -or $bytes[2] -ne 78 -or $bytes[3] -ne 71){throw '截图不是有效PNG'}
         $width=[int]$bytes[16]*16777216+[int]$bytes[17]*65536+[int]$bytes[18]*256+[int]$bytes[19];$height=[int]$bytes[20]*16777216+[int]$bytes[21]*65536+[int]$bytes[22]*256+[int]$bytes[23]

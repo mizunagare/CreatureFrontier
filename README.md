@@ -2,7 +2,9 @@
 
 ## 仓库补种首版（2026-11-06）
 
-Windows 单机原型入口：`F:\CreatureFrontierBuilds\SeedSupplyFull-Final\Windows\CreatureFrontier.exe`。本次为完整编译、资源烹饪与独立归档，旧构建和普通玩家存档保留；普通启动不会自动加载验证用家园。
+Windows 单机原型入口：`F:\CreatureFrontierBuilds\SupplyHints\Windows\CreatureFrontier.exe`。本次为完整编译、资源烹饪与独立归档，旧构建和普通玩家存档保留；普通启动不会自动加载验证用家园。
+
+瞄准运输站可直接查看补种、送粮、10米服务范围及存种步骤；瞄准储物箱可查看种子数量。Editor双尺寸与Windows小窗口新增提示已目视验证，当前Windows正常来源及自身携种恢复均验证到实际产1粮并送达；不是所有3种全部生产完或长期经营验收，详细证据见开发路线。
 
 1. 准备农圃、运输岗位、食槽和有种子的储物箱；箱子、农圃及食槽放在运输岗位10米内，并留出可走的通路。
 2. 用原制作配方将1食物＋1纤维制成3种子。靠近并瞄准箱子按E，上下选种子、右方向键存入整组、E关闭。

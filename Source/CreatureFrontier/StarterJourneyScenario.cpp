@@ -2120,6 +2120,13 @@ struct FSeedSupplyLife : FStarterJourney
         {if(!CFInputQA::Press(Hero,EKeys::Tab) || !Hero->IsRosterOpen())return Finish(false,TEXT("carry-roster"));CarryPanel=true;Photo(TEXT("Carrying"),Pet->GetActorLocation());}
         if(FPlatformTime::Seconds()<ShotUntil)return true;
         if(CarryPanel){CFInputQA::Press(Hero,EKeys::Tab);CarryPanel=false;}
+        if(Preview && Phase==8 && !Photos.Contains(TEXT("TransportHint")))
+        {
+            const int32 R=Move();if(R<0)return Finish(false,TEXT("transport-hint-walk"));if(!R)return true;
+            Face(Post->GetActorLocation()+FVector(0,0,30));
+            if(Hero->TraceFacility()!=Post || Hero->TraceCreature() || Hero->TraceResource())return Finish(false,TEXT("transport-hint-occluded"));
+            if(Photo(TEXT("TransportHint"),Post->GetActorLocation()+FVector(0,0,30)))return true;
+        }
         if(Phase==-2){if(Now-At<2 || UNavigationSystemV1::IsNavigationBeingBuiltOrLocked(World))return true;if(FVector::Dist2D(Hero->GetActorLocation(),FVector(-900,-1080,40))<30){Phase=13;At=Now;}else if(!Plan(FVector(-900,-1080,40),12))return Finish(false,TEXT("resume-observer-plan"));return true;}
         if(Phase==-1){if(Now-At<2 || UNavigationSystemV1::IsNavigationBeingBuiltOrLocked(World))return true;if(!Plan(FVector(-900,-1080,40),0))return Finish(false,TEXT("west-plan"));return true;}
         if(Phase==0){const int32 R=Move();if(R<0)return Finish(false,TEXT("west-walk"));if(!R)return true;if(!Plan(FVector(-450,-400,40),1))return Finish(false,TEXT("door-plan"));return true;}
@@ -2134,6 +2141,13 @@ struct FSeedSupplyLife : FStarterJourney
         if(Phase==6){Face(Fiber->GetActorLocation());if(Taken<1){if(Now-At>10)return Finish(false,TEXT("gather-time"));return true;}CFInputQA::Release(Hero,EKeys::M);if(!Plan(FVector(-1000,450,40),7))return Finish(false,TEXT("return-west-plan"));return true;}
         if(Phase==7){const int32 R=Move();if(R<0)return Finish(false,TEXT("return-west-walk"));if(!R)return true;if(!Plan(FVector(-300,-600,40),8))return Finish(false,TEXT("craft-plan"));return true;}
         if(Phase==8){const int32 R=Move();if(R<0)return Finish(false,TEXT("craft-walk"));if(!R)return true;Face(Craft->GetActorLocation()+FVector(0,0,25));const auto* Catalog=UCraftingCatalog::Load();const int32 Index=Catalog?Catalog->Recipes.IndexOfByPredicate([](const FFrontierRecipe& X){return X.Id==TEXT("PlantingSeeds");}):INDEX_NONE;if(Index<0 || !CFInputQA::Press(Hero,EKeys::C))return Finish(false,TEXT("craft-menu"));for(int32 I=0;I<Index;++I)CFInputQA::Press(Hero,EKeys::Down);if(!CFInputQA::Press(Hero,EKeys::Enter) || Hero->Inventory->Count(EFrontierItem::Seeds)!=3)return Finish(false,TEXT("craft-payment"));Made=true;CFInputQA::Press(Hero,EKeys::C);UE_LOG(LogTemp,Display,TEXT("CF_SEED_LIFE_CRAFT PASS food=1 fiber=1 seeds=3"));if(!Plan(FVector(-450,-400,40),9))return Finish(false,TEXT("crate-door-plan"));return true;}
+        if(Preview && Phase==10 && !Photos.Contains(TEXT("StorageHint")))
+        {
+            const int32 R=Move();if(R<0)return Finish(false,TEXT("storage-hint-walk"));if(!R)return true;
+            Face(Crate->GetActorLocation()+FVector(0,0,40));
+            if(Hero->Storage->TraceCrate()!=Crate || Hero->TraceCreature() || Hero->TraceResource())return Finish(false,TEXT("storage-hint-occluded"));
+            if(Photo(TEXT("StorageHint"),Crate->GetActorLocation()+FVector(0,0,40)))return true;
+        }
         if(Phase==9){const int32 R=Move();if(R<0)return Finish(false,TEXT("crate-door-walk"));if(!R)return true;if(!Plan(FVector(-50,-400,100),10))return Finish(false,TEXT("crate-plan"));return true;}
         if(Phase==10){const int32 R=Move();if(R<0)return Finish(false,TEXT("crate-walk"));if(!R)return true;Face(Crate->GetActorLocation()+FVector(0,0,40));if(!CFInputQA::Press(Hero,EKeys::E) || Hero->Storage->GetCrate()!=Crate)return Finish(false,TEXT("crate-open"));for(int32 I=0;I<static_cast<int32>(EFrontierItem::Seeds);++I)CFInputQA::Press(Hero,EKeys::Down);if(!CFInputQA::Press(Hero,EKeys::Right) || Hero->Inventory->Count(EFrontierItem::Seeds)!=0 || Crate->StorageInventory->Count(EFrontierItem::Seeds)!=3)return Finish(false,TEXT("crate-deposit"));Stored=true;CFInputQA::Press(Hero,EKeys::E);if(!Plan(FVector(-450,-400,40),11))return Finish(false,TEXT("observer-leave-plan"));return true;}
         if(Phase==11){const int32 R=Move();if(R<0)return Finish(false,TEXT("observer-leave-walk"));if(!R)return true;if(!Plan(FVector(-900,-1080,40),12))return Finish(false,TEXT("observer-west-plan"));return true;}

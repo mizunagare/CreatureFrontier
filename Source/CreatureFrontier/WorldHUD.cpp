@@ -113,6 +113,7 @@ void ACFHUD::DrawWorldHUD(ACFPlayerCharacter* Player)
     {
         Audit.Context=EFrontierHUDContext::Storage;Rows.Add({Player->GetDeliveryCrate()==Crate?TEXT("当前料箱"):TEXT("储物箱"),Blue});
         Rows.Add({FString::Printf(TEXT("材料%d | E开箱补料（3米）"),Crate->StorageInventory->Count(EFrontierItem::Material)),Yellow});
+        Rows.Add({FString::Printf(TEXT("种子%d | 可供附近运输站伙伴补种"),Crate->StorageInventory->Count(EFrontierItem::Seeds)),Green,2});
         Rows.Add({TEXT("V选择料源／运输目标 | X拆除前清空"),Yellow,2});
     }
     else if(auto* Door=AHomeModule::TraceDoor(Player))
@@ -120,7 +121,13 @@ void ACFHUD::DrawWorldHUD(ACFPlayerCharacter* Player)
     else if(auto* Site=Player->TraceFacility())
     {
         Audit.Context=Site->RequiredSpecialty==EWorkSpecialty::Farming?EFrontierHUDContext::Garden:Site->IsFoodStore()?EFrontierHUDContext::FoodStore:EFrontierHUDContext::Facility;
-        Rows.Add({Site->RequiredSpecialty==EWorkSpecialty::Farming?TEXT("农圃"):TEXT("工作设施"),Blue});
+        Rows.Add({Site->RequiredSpecialty==EWorkSpecialty::Farming?TEXT("农圃"):Site->RequiredSpecialty==EWorkSpecialty::Transport?TEXT("运输站"):TEXT("工作设施"),Blue});
+        if(Site->RequiredSpecialty==EWorkSpecialty::Transport)
+        {
+            Rows.Add({TEXT("伙伴从储物箱取种补圃，并将农圃粮食送入食槽"),Green,2});
+            Rows.Add({TEXT("箱、农圃、食槽放在站点10米内，并留出通路"),Yellow,2});
+            Rows.Add({TEXT("缺种时：C制作种子，再用E开箱存入"),Yellow,2});
+        }
         if(Site->IsFoodStore())Rows.Add({FString::Printf(TEXT("食物 %d/30 | U 存入最多5份\nO 取最多5份 | Shift+O 取1份（6米）"),Site->StoredFood),Yellow,2});
         if(Site->RequiredSpecialty==EWorkSpecialty::Farming)Rows.Add({Site->Crop->Status(),Green,3});
         if(Site->bPlayerBuilt && Site->RequiredSpecialty==EWorkSpecialty::Crafting)Rows.Add({Site->CraftStatus(),Green,3});

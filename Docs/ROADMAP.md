@@ -1,5 +1,13 @@
 # 开发路线
 
+2026-11-06补给提示限定验收完成：Windows 14515D91完整候选的960正常来源Saved/SeedPersistenceQA/20261106-124836-0b2ca580通过，新增运输／箱提示两图已目视；账为2+收获1-制种1-进食0=2（尚有种子／作物，不冒称本轮收完3种）。其自身携种档1280独立恢复20261106-124955-caeeec6e通过，账为1+收获1-制种0-进食0=2，携种与送达图已目视；确证重启后继续补种产粮送达，不代表长期经营。当前Windows携种事务／部分取回／中断边界Saved/SeedSupplyQA/20261106-125021-0540ebc9及原Logistics回归Saved/FarmRegressionQA/20261106-125035-476d2eda通过。当前范围仅新增提示、正常来源截图检查及相关回归；无普通玩法／存档字段改动，不重复宣称此前版本全部异常存档矩阵已在本包重跑。README指向新独立Windows入口。Editor两尺寸提示、Windows960提示与1280恢复各按自身证据区分；灰盒、自然长期体验和多目标复杂通路仍待。下一主线应继续改善实际基地工作／生活行为，不再扩张本提示截图矩阵。GitHub推送仍等待认证，本地提交不等于远程备份。
+
+2026-11-06补给提示Editor双尺寸通过、Windows候选已生成：同一35A3D6CA构建的1280×720正常来源整链Saved/SeedPersistenceQA/20261106-124426-7a0b535c通过，粮账2+3-1-1=3；新增运输站／储物箱两图已目视，与960结果分别留存。完整Windows构建／烹饪／归档日志Saved/Package-SupplyHints-20261106.log成功退出0，BuildCookRun 124.91秒；独立目录F:\CreatureFrontierBuilds\SupplyHints\Windows，内部程序SHA256 14515D9116507306B26DBADE79F537A94A6F0A032256C7F49B82C3043B5D655A。该构建Windows自身HomeLifeDone来源的960图形整链已启动（Saved/SeedPersistenceQA/20261106-124836-0b2ca580），结果尚待，不能将Editor证据当Windows通过。中文静态891条通过，功能仍待Windows及恢复验收后提交。
+
+2026-11-06补给提示Editor小窗口验证通过：复用正常来源整链，沿原玩家行走路线分别瞄准运输站与储物箱，验证真实射线目标后截屏；未移动伙伴、冻结生态或修改碰撞。脚本要求整链预览额外生成TransportHint／StorageHint，检查新鲜度及PNG尺寸。Saved/Build-SupplyHints-Preview.log构建28.97秒成功，Editor SHA256 35A3D6CA09D250435F9D674D536CF338C8E3DD209C526C0B14AC146D2278D8F0；Saved/SeedPersistenceQA/20261106-124239-324c279f的960×540正常取粮／采纤维／制种／存箱／伙伴补种生产送粮通过，粮账2+3-1-1=3。两张新增提示图已目视，中文完整且未越界。1280×720及Windows仍待，未提交为阶段完成；Git推送会话74947仍在等待认证。
+
+2026-11-06运输补给提示开发中：普通瞄准HUD区分运输站，说明从箱取种补圃、农圃送粮至食槽、站点10米范围和通路要求；储物箱显示现有种子库存并提示补种用途。只改展示，不修改资源、导航或存档规则。首次构建因误用PlantingSeeds枚举失败（Saved/Build-SupplyHints.log），更正为既有Seeds后Editor构建通过（Saved/Build-SupplyHints-Corrected.log，12.67秒）；中文静态891条及diff检查通过。尚待运输站／储物箱真实瞄准的960×540、1280×720截图目视、相关回归和Windows构建，未标为验收完成，暂不提交。上一阶段提交74643e6的GitHub推送仍等待本机认证，不能声称已备份远程。
+
 ## 当前执行总览（2026-10-31）
 
 2026-11-06仓库补种首版限定验收完成：入口`F:\CreatureFrontierBuilds\SeedSupplyFull-Final\Windows\CreatureFrontier.exe`，完整build／cook／stage／pak／archive日志`Saved/Package-SeedSupplyFull-Final-20261106.log`90.14秒、退出0，内部程序SHA256 `A906B2B05A5F60BC824CD41FCE64B936DDE5400C1DC802E7A462826F144590F4`。Windows自身旧生活档960正常整链`Saved/SeedPersistenceQA/20261106-122733-208a1905`：初始2＋收获3－制种1－进食1＝剩余3；本次自身携种档1280独立恢复`20261106-122853-47660757`：初始1＋收获3－本段制种0－进食1＝剩余3。两端各自最终Editor与Windows图形整链及自身恢复分别见本段与下段，八图均目视，中文携种／农田UI可读。Windows8类实际异常快照拒绝及完整世界快照不变`20261106-122706-b16c9ebe`，携种事务／取回`Saved/SeedSupplyQA/20261106-122928-daf7557f`，不可达种箱不抢占送粮`20261106-122945-11de5a19`，原Logistics`Saved/FarmRegressionQA/20261106-123001-c4247e0a`、WorkCycle`20261106-123021-91823dad`均通过。操作已补README；已有旧档缺字段为零，不补物，正值货物互斥／异常修订拒绝，测试槽运行后恢复。
