@@ -1,4 +1,4 @@
-param([ValidateSet('Crop','Farming','WorkCycle')][string]$Suite='Crop',[string]$BuildRoot='')
+param([ValidateSet('Crop','Farming','WorkCycle','Logistics')][string]$Suite='Crop',[string]$BuildRoot='')
 $ErrorActionPreference='Stop'
 $projectRoot=Split-Path $PSScriptRoot -Parent
 . (Join-Path $PSScriptRoot 'BuildFingerprint.ps1')
@@ -13,8 +13,10 @@ if(!$mutex.WaitOne(0)){$mutex.Dispose();throw '农业关联回归正在运行'}
 try{
     $slotRoot=Join-Path $saved 'SaveGames';New-Item -ItemType Directory -Path $slotRoot -Force | Out-Null
     $names=if($Suite -eq 'Crop'){@('CropCross','CropBad','CropRipe','CropLegacy23')}elseif($Suite -eq 'Farming'){@('FrontierFarmingAutomation','FrontierLegacyFoodAutomation')}else{@('FrontierWorkCycleAutomation','FrontierLegacyWorkCycleAutomation')}
+    if($Suite -eq 'Logistics'){$names=@('FrontierLogisticsAutomation','FrontierLogisticsState','FrontierLogisticsInvalid','FrontierLogisticsLegacy')}
     foreach($name in $names){$path=Join-Path $slotRoot ($name+'.sav');$backup=Join-Path $run ($name+'-before.sav');$before=if(Test-Path -LiteralPath $path){Get-FrontierBuildFingerprint -LiteralPath $path}else{''};if($before){Copy-Item -LiteralPath $path -Destination $backup};$protected+=@{Path=$path;Backup=$backup;Hash=$before}}
     $flag=if($Suite -eq 'Crop'){'CFCropTest'}elseif($Suite -eq 'Farming'){'CFFarmingTest'}else{'CFWorkCycleTest'};$marker=if($Suite -eq 'Crop'){'CF_CROP PASS'}elseif($Suite -eq 'Farming'){'CF_FARM PASS'}else{'CF_WORK_CYCLE PASS'}
+    if($Suite -eq 'Logistics'){$flag='CFLogisticsTest';$marker='CF_LOGISTICS PASS production=1 trip=1 meal=1 storage=1 full=1 pickup=1 save=1 partial=1 orders=1 recovery=1 emergency=1 rest=1 invalid=1 migration=1'}
     $arguments=@(('-'+$flag),'-nullrhi','-nosound','-unattended','-nop4',('-abslog="'+$log+'"'))
     $exe=if($BuildRoot){$module}else{'D:/Epic/UE_5.8/Engine/Binaries/Win64/UnrealEditor-Cmd.exe'}
     if(!$BuildRoot){$arguments=@(('"'+(Join-Path $projectRoot 'CreatureFrontier.uproject')+'"'),'-game')+$arguments}

@@ -2148,6 +2148,144 @@ void RunCompanionSeedScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read)
     S->LastH=Hero->GetActorLocation();S->LastP=S->Pet->GetActorLocation();S->LastR=S->Recruit->GetActorLocation();S->VelocityH=Hero->GetVelocity();S->VelocityP=S->Pet->GetVelocity();S->VelocityR=S->Recruit->GetVelocity();S->LastTime=World->GetTimeSeconds();S->Input=NewObject<UHomeMovementProbe>(Hero);S->Input->RegisterComponent();
     S->Preview=FParse::Param(FCommandLine::Get(),TEXT("CFCompanionSeedPreview"));if(S->Preview){S->Root=FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir()/TEXT("CompanionSeedPreview")/FGuid::NewGuid().ToString(EGuidFormats::Digits));IFileManager::Get().MakeDirectory(*S->Root,true);UE_LOG(LogTemp,Display,TEXT("CF_COMPANION_SEED_PREVIEW_ROOT %s"),*S->Root);}FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([S](float){return S->TickSeed();}));
 }
+
+// 运输站真实备料阶段：不派生旧制种预算，农夫必须能继续消耗种子并产粮。
+void RunHomeSupplyScenario(UWorld* World,ACFPlayerCharacter* Hero)
+{
+    struct FSupply : FStarterJourney
+    {
+        TWeakObjectPtr<AResourceNode> Stone;TWeakObjectPtr<AWorkStation> Farm,Trough;
+        TWeakObjectPtr<ACreatureCharacter> Rest;
+        TMap<EFrontierItem,int32> Bag;TMap<FGuid,int32> Resources;TMap<FGuid,FTransform> Facilities;
+        TArray<FHomeModuleRecord> House;float Health=0;int32 Stock=0;
+        FVector LastRest,RestVelocity;
+        bool Recovery=false;
+        bool Delivery=false,Paid=false,Assigned=false,Picked=false;
+        TWeakObjectPtr<AWorkStation> Post;
+        bool Plan(FVector Goal,int32 Next)
+        {
+            if(!FStarterJourney::Plan(Goal,Next))return false;
+            // 共用室内助手默认按Shift慢走；野外撤离用原正常速度，不修改移动属性。
+            CFInputQA::Release(Hero,EKeys::LeftShift);
+            UE_LOG(LogTemp,Display,TEXT("CF_HOME_SUPPLY_PACE phase=%d maxSpeed=%.1f"),Next,Hero->GetCharacterMovement()->GetMaxSpeed());
+            return true;
+        }
+        bool Finish(bool Pass,const TCHAR* Why)
+        {
+            if(Input.IsValid())Input->Direction=FVector::ZeroVector;
+            CFInputQA::Release(Hero,EKeys::M);CFInputQA::Release(Hero,EKeys::LeftShift);
+            if(!Pass)Hero->SaveProgress(Delivery?TEXT("HomeDeliveryBlocked"):TEXT("HomeSupplyBlocked"));
+            if(Delivery)UE_LOG(LogTemp,Display,TEXT("CF_HOME_DELIVERY %s reason=%s paid=%d assigned=%d picked=%d carried=%d trough=%d rest=%s feedback=%s"),Pass?TEXT("PASS"):TEXT("FAIL"),Why,Paid,Assigned,Picked,Rest.IsValid()?Rest->CarriedFood:-1,Trough.IsValid()?Trough->StoredFood:-1,Rest.IsValid()?*Rest->GetActorLocation().ToString():TEXT("none"),*Hero->Feedback);
+            UE_LOG(LogTemp,Display,TEXT("CF_HOME_SUPPLY %s reason=%s phase=%d material=%d stone=%d food=%d xp=%d"),Pass?TEXT("PASS"):TEXT("FAIL"),Why,Phase,Hero->Inventory->Count(EFrontierItem::Material),Stone.IsValid()?Stone->Remaining:-1,Farm.IsValid()?Farm->StoredFood:-1,Pet.IsValid()?Pet->Experience:-1);
+            UE_LOG(LogTemp,Display,TEXT("CF_HOME_SUPPLY_STATE health=%.3f sourceHealth=%.3f hero=%s seeds=%d planted=%d trough=%d farmerHealth=%.3f restHealth=%.3f farmerActivity=%d restActivity=%d elapsed=%.3f"),Hero->Health,Health,*Hero->GetActorLocation().ToString(),Farm.IsValid()?Farm->Crop->Seeds:-1,Farm.IsValid()?Farm->Crop->bPlanted:false,Trough.IsValid()?Trough->StoredFood:-1,Pet.IsValid()?Pet->Health:-1.f,Rest.IsValid()?Rest->Health:-1.f,Pet.IsValid()?static_cast<int32>(Pet->Activity):-1,Rest.IsValid()?static_cast<int32>(Rest->Activity):-1,World->GetTimeSeconds()-At);
+            FPlatformMisc::RequestExitWithStatus(false,Pass?0:1);return false;
+        }
+        bool Budget()
+        {
+            if(!Stone.IsValid() || !Farm.IsValid() || !Trough.IsValid() || !Pet.IsValid() || !Rest.IsValid())return false;
+            const int32 Taken=Stock-Stone->Remaining,Produced=Pet->Experience-41;
+            if(Taken<0 || Taken>16 || Produced<0 || Produced>3 || Hero->Health!=Health || Health<=0 || Pet->Health!=110 || Rest->Health!=80 || Rest->Experience!=(Assigned && Trough->StoredFood==4?20:19) || Pet->Activity!=ECreatureActivity::Work || Pet->WorkSite!=Farm.Get() || Rest->Activity!=(Assigned?ECreatureActivity::Work:ECreatureActivity::Rest) || Hero->GetCompanionRoster().Num()!=2)return false;
+            if(Assigned && Rest->WorkSite!=Post.Get())return false;
+            auto Expected=Bag;Expected.Add(EFrontierItem::Material,Taken-(Paid?16:0));
+            for(int32 I=0;I<static_cast<int32>(EFrontierItem::Count);++I)if(Hero->Inventory->Count(static_cast<EFrontierItem>(I))!=Expected.FindRef(static_cast<EFrontierItem>(I)))return false;
+            if(Farm->StoredFood+Rest->CarriedFood+Trough->StoredFood!=Produced+1 || Farm->Crop->Seeds+(Farm->Crop->bPlanted?1:0)+Produced!=3 || Trough->StoredFood<1 || Trough->StoredFood>4 || Pet->CarriedFood || (!Assigned && Rest->CarriedFood) || Pet->Cargo->Count() || Rest->Cargo->Count())return false;
+            int32 Count=0;for(TActorIterator<AWorkStation> It(World);It;++It)if(It->bPlayerBuilt){++Count;const auto* Pose=Facilities.Find(It->PersistentId);if(!Pose || !It->GetActorTransform().Equals(*Pose,.01))return false;}if(Count!=(Paid?4:3))return false;
+            const auto Layout=HomeLayout::Collect(World);if(Layout.Num()!=House.Num())return false;
+            for(const auto& R:House){const auto* Now=Layout.FindByPredicate([&](const FHomeModuleRecord& V){return V.Id==R.Id;});if(!Now || Now->Definition!=R.Definition || !Now->Transform.Equals(R.Transform,.01) || !Now->StoredItems.OrderIndependentCompareEqual(R.StoredItems))return false;}
+            for(TActorIterator<AResourceNode> It(World);It;++It)if(*It!=Stone.Get()){const auto* Before=Resources.Find(It->PersistentId);if(!Before || It->Remaining!=*Before)return false;}
+            return true;
+        }
+        bool Step()
+        {
+            if(!Budget() || FPlatformTime::Seconds()>Deadline)return Finish(false,TEXT("budget-time"));
+            const double Dt=World->GetTimeSeconds()-LastTime;
+            if(!Motion(Hero,LastH,VelocityH,Dt) || !Motion(Pet.Get(),LastP,VelocityP,Dt) || !Motion(Rest.Get(),LastRest,RestVelocity,Dt))return Finish(false,TEXT("motion"));
+            LastH=Hero->GetActorLocation();LastP=Pet->GetActorLocation();LastRest=Rest->GetActorLocation();VelocityH=Hero->GetVelocity();VelocityP=Pet->GetVelocity();RestVelocity=Rest->GetVelocity();LastTime=World->GetTimeSeconds();
+            for(TActorIterator<ACreatureCharacter> It(World);It;++It)if(It->Health>0 && (!It->IsActorTickEnabled() || !It->GetActorEnableCollision() || It->GetCharacterMovement()->MovementMode==MOVE_None))return Finish(false,TEXT("ecology"));
+            // 危险现场恢复后导航就绪即移动，不能额外固定站立两秒等待敌人攻击。
+            if(Delivery)
+            {
+                if(FPlatformTime::Seconds()<ShotUntil)return true;
+                if(Phase==-1)
+                {
+                    if(UNavigationSystemV1::IsNavigationBeingBuiltOrLocked(World))return true;
+                    Face(FVector(0,-900,-50));if(!CFInputQA::Press(Hero,EKeys::B))return Finish(false,TEXT("post-open"));
+                    for(int32 I=0;I<6 && Hero->Building->Selected!=EWorkSpecialty::Transport;++I)CFInputQA::Press(Hero,EKeys::V);
+                    Phase=100;return true;
+                }
+                if(Phase==100)
+                {
+                    Face(FVector(0,-900,-50));Hero->Building->TickComponent(0,LEVELTICK_All,nullptr);
+                    if(Photo(TEXT("Preview"),FVector(0,-900,-50)))return true;
+                    if(Hero->Building->Selected!=EWorkSpecialty::Transport || !Hero->Building->GetPlacementTransform().GetLocation().Equals(FVector(0,-900,-15),.1) || !CFInputQA::Action(Hero,TEXT("Attack"),EKeys::LeftMouseButton))return Finish(false,TEXT("post-confirm"));
+                    for(TActorIterator<AWorkStation> It(World);It;++It)if(It->bPlayerBuilt && It->RequiredSpecialty==EWorkSpecialty::Transport)Post=*It;
+                    if(!Post.IsValid())return Finish(false,TEXT("post-missing"));Paid=true;Facilities.Add(Post->PersistentId,Post->GetActorTransform());
+                    if(!CFInputQA::Press(Hero,EKeys::B) || !Budget() || !Plan(FVector(-700,-1100,40),101))return Finish(false,TEXT("post-cost"));return true;
+                }
+                if(Phase==101){const int32 R=Move();if(R<0)return Finish(false,TEXT("west-walk"));if(!R)return true;if(!Plan(FVector(-700,-500,40),102))return Finish(false,TEXT("select-plan"));return true;}
+                if(Phase==102)
+                {
+                    const int32 R=Move();if(R<0)return Finish(false,TEXT("select-walk"));if(!R)return true;Face(Rest->GetActorLocation());
+                    if(Hero->TraceCreature()!=Rest.Get() || !CFInputQA::Press(Hero,EKeys::L) || !Hero->IsCommandTarget(Rest.Get()) || Hero->IsCommandTarget(Pet.Get()) || !Plan(FVector(-700,-1100,40),103))return Finish(false,TEXT("select"));return true;
+                }
+                if(Phase==103){const int32 R=Move();if(R<0)return Finish(false,TEXT("order-west"));if(!R)return true;if(!Plan(FVector(-100,-1200,40),104))return Finish(false,TEXT("order-plan"));return true;}
+                if(Phase==104)
+                {
+                    const int32 R=Move();if(R<0)return Finish(false,TEXT("order-walk"));if(!R)return true;Face(Post->GetActorLocation()+FVector(0,0,25));
+                    if(Hero->TraceFacility()!=Post.Get() || !CFInputQA::Press(Hero,EKeys::E) || Rest->WorkSite!=Post.Get() || Rest->Activity!=ECreatureActivity::Work)return Finish(false,TEXT("assign"));Assigned=true;Phase=105;At=World->GetTimeSeconds();return true;
+                }
+                if(Phase==105)
+                {
+                    if(!Picked && Rest->CarriedFood==3){Picked=true;if(!Hero->SaveProgress(TEXT("HomeDeliveryMid")))return Finish(false,TEXT("carry-save"));UE_LOG(LogTemp,Display,TEXT("CF_HOME_DELIVERY_PICKUP PASS farm=%d carried=3 trough=%d"),Farm->StoredFood,Trough->StoredFood);if(Photo(TEXT("Carrying"),Rest->GetActorLocation()))return true;}
+                    if(Picked && Rest->CarriedFood==0 && Trough->StoredFood==4){if(Preview){if(!Plan(FVector(-700,-1100,40),110))return Finish(false,TEXT("view-plan"));return true;}if(!Budget() || !Hero->SaveProgress(TEXT("HomeDeliveryDone")))return Finish(false,TEXT("delivery-save"));return Finish(true,TEXT("paid-built-delivered-saved"));}
+                    if(World->GetTimeSeconds()-At>35)return Finish(false,TEXT("delivery-timeout"));return true;
+                }
+                // 卸货后玩家沿房屋西侧实走到门外观察，不瞬移相机或冻结伙伴。
+                if(Phase==110){const int32 R=Move();if(R<0)return Finish(false,TEXT("view-west"));if(!R)return true;if(!Plan(FVector(-700,-200,40),111))return Finish(false,TEXT("view-north-plan"));return true;}
+                if(Phase==111){const int32 R=Move();if(R<0)return Finish(false,TEXT("view-north"));if(!R)return true;if(!Plan(FVector(-450,-270,40),112))return Finish(false,TEXT("view-door-plan"));return true;}
+                if(Phase==112){const int32 R=Move();if(R<0)return Finish(false,TEXT("view-door"));if(!R)return true;if(Photo(TEXT("Delivered"),Trough->GetActorLocation()+FVector(0,0,30)))return true;if(!Budget() || !Hero->SaveProgress(TEXT("HomeDeliveryDone")))return Finish(false,TEXT("view-save"));return Finish(true,TEXT("paid-built-delivered-saved"));}
+                return Finish(false,TEXT("delivery-phase"));
+            }
+            if(Phase==-1){if((!Read && World->GetTimeSeconds()-At<2) || UNavigationSystemV1::IsNavigationBeingBuiltOrLocked(World))return true;if(!Plan(Recovery?FVector(990,-1500,40):FVector(600,-1000,40),Recovery?5:(Read?3:0)))return Finish(false,TEXT("east-plan"));return true;}
+            if(Phase==5){const int32 Result=Move();if(Result<0)return Finish(false,TEXT("south-escape"));if(!Result)return true;if(!Plan(FVector(-110,-1500,40),6))return Finish(false,TEXT("south-home-plan"));return true;}
+            if(Phase==6){const int32 Result=Move();if(Result<0)return Finish(false,TEXT("south-home-walk"));if(!Result)return true;if(!Plan(FVector(-110,-1100,40),4))return Finish(false,TEXT("home-plan"));return true;}
+            if(Phase==0){const int32 Result=Move();if(Result<0)return Finish(false,TEXT("east-walk"));if(!Result)return true;if(!Plan(FVector(1250,520,40),1))return Finish(false,TEXT("stone-plan"));return true;}
+            if(Phase==1){const int32 Result=Move();if(Result<0)return Finish(false,TEXT("stone-walk"));if(!Result)return true;Face(Stone->GetActorLocation());if(Hero->TraceResource()!=Stone.Get() || !CFInputQA::Press(Hero,EKeys::M))return Finish(false,TEXT("gather-input"));Phase=2;return true;}
+            if(Phase==2){Face(Stone->GetActorLocation());if(Stock-Stone->Remaining<16)return true;CFInputQA::Release(Hero,EKeys::M);if(!Plan(FVector(600,-1000,40),3))return Finish(false,TEXT("return-plan"));return true;}
+            if(Phase==3){const int32 Result=Move();if(Result<0)return Finish(false,TEXT("return-walk"));if(!Result)return true;if(!Plan(FVector(-110,-1100,40),4))return Finish(false,TEXT("home-plan"));return true;}
+            if(Phase==4){const int32 Result=Move();if(Result<0)return Finish(false,TEXT("home-walk"));if(!Result)return true;if(!Hero->SaveProgress(TEXT("HomeSupplyReady")))return Finish(false,TEXT("save"));return Finish(true,TEXT("gathered16-returned-saved"));}
+            return true;
+        }
+    };
+    auto S=MakeShared<FSupply>();S->World=World;S->Hero=Hero;S->Read=FParse::Param(FCommandLine::Get(),TEXT("CFHomeSupplyRead"));
+    S->Delivery=FParse::Param(FCommandLine::Get(),TEXT("CFHomeDeliveryTest"));
+    const bool DeliveryRead=FParse::Param(FCommandLine::Get(),TEXT("CFHomeDeliveryRead"));
+    if(DeliveryRead){S->Delivery=true;S->Paid=true;S->Assigned=true;S->Picked=true;S->Phase=105;}
+    if(!Hero->LoadProgress(TEXT("HomeSupplyInput"))){S->Finish(false,TEXT("source"));return;}
+    S->Bag=Hero->Inventory->GetStacks();S->Health=Hero->Health;S->House=HomeLayout::Collect(World);
+    for(TActorIterator<AWorkStation> It(World);It;++It)if(It->bPlayerBuilt){S->Facilities.Add(It->PersistentId,It->GetActorTransform());if(It->RequiredSpecialty==EWorkSpecialty::Farming)S->Farm=*It;if(It->RequiredSpecialty==EWorkSpecialty::Feeding)S->Trough=*It;if(It->RequiredSpecialty==EWorkSpecialty::Transport)S->Post=*It;}
+    for(TActorIterator<ACreatureCharacter> It(World);It;++It)if(It->Tamer==Hero->GetController() && It->Definition){if(It->Definition->Form==ECreatureForm::Leaf)S->Pet=*It;if(It->Definition->Form==ECreatureForm::Ember)S->Rest=*It;}
+    for(TActorIterator<AResourceNode> It(World);It;++It){S->Resources.Add(It->PersistentId,It->Remaining);if(It->PersistentId==FGuid(0xCF170000,0,0,5))S->Stone=*It;}
+    if(!S->Stone.IsValid() || !S->Stone->Definition || S->Stone->Definition->OutputItem!=EFrontierItem::Material || (!S->Read && S->Stone->Remaining<16) || Hero->Inventory->Count(EFrontierItem::Material)!=(S->Read && !DeliveryRead?16:0)){S->Finish(false,TEXT("stone-source"));return;}
+    if(DeliveryRead && (!S->Post.IsValid() || !S->Rest.IsValid() || !S->Farm.IsValid() || !S->Trough.IsValid() || S->Rest->CarriedFood!=3 || S->Farm->StoredFood!=0 || S->Trough->StoredFood!=1)){S->Finish(false,TEXT("carry-source"));return;}
+    S->Stock=S->Stone->Remaining+(S->Read?16:0);if(!S->Budget()){S->Finish(false,TEXT("source-budget"));return;}
+    S->Recovery=FParse::Param(FCommandLine::Get(),TEXT("CFHomeSupplyRecovery"));
+    if(S->Recovery)
+    {
+        // 只使用真实背包中的药品和原H输入；先精确核验交易，再更新后续守恒基线。
+        const float Before=Hero->Health;const int32 Medicine=Hero->Inventory->Count(EFrontierItem::Medicine);
+        if(!S->Read || Before<=0 || Before>=100 || Medicine<1 || !CFInputQA::Press(Hero,EKeys::H) || Hero->Health!=FMath::Min(100.f,Before+40.f) || Hero->Inventory->Count(EFrontierItem::Medicine)!=Medicine-1){S->Finish(false,TEXT("paid-recovery"));return;}
+        S->Health=Hero->Health;S->Bag.Add(EFrontierItem::Medicine,Medicine-1);
+        UE_LOG(LogTemp,Display,TEXT("CF_HOME_SUPPLY_RECOVERY PASS before=%.3f after=%.3f medicineBefore=%d medicineAfter=%d"),Before,Hero->Health,Medicine,Medicine-1);
+        if(!S->Budget()){S->Finish(false,TEXT("recovery-budget"));return;}
+    }
+    S->At=S->LastTime=World->GetTimeSeconds();S->Deadline=FPlatformTime::Seconds()+90;
+    S->LastH=Hero->GetActorLocation();S->LastP=S->Pet->GetActorLocation();S->LastRest=S->Rest->GetActorLocation();S->VelocityH=Hero->GetVelocity();S->VelocityP=S->Pet->GetVelocity();S->RestVelocity=S->Rest->GetVelocity();
+    S->Input=NewObject<UHomeMovementProbe>(Hero);S->Input->RegisterComponent();
+    S->Preview=FParse::Param(FCommandLine::Get(),TEXT("CFHomeDeliveryPreview"));
+    if(S->Preview){S->Root=FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir()/TEXT("HomeDeliveryPreview")/FGuid::NewGuid().ToString(EGuidFormats::Digits));IFileManager::Get().MakeDirectory(*S->Root,true);UE_LOG(LogTemp,Display,TEXT("CF_HOME_DELIVERY_PREVIEW_ROOT %s"),*S->Root);}
+    FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([S](float){return S->Step();}));
+}
 void RunPantryRefillScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read)
 {
     auto S=MakeShared<FPantryRefill>();S->World=World;S->Hero=Hero;S->Read=Read;S->Deposited=Read;S->At=World->GetTimeSeconds();S->Deadline=FPlatformTime::Seconds()+100;

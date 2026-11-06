@@ -12,6 +12,7 @@
 #include "ResourceNode.h"
 #include "ResourceDefinition.h"
 #include "InventoryComponent.h"
+#include "FarmCropComponent.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
 
@@ -21,8 +22,14 @@ void RunIndoorFeedingScenario(UWorld* World,ACFPlayerCharacter* Hero)
     {
         if(!Hero->LoadProgress(TEXT("IndoorFeedingInput"))){UE_LOG(LogTemp,Error,TEXT("CF_PANTRY_INSPECT FAIL source"));FPlatformMisc::RequestExitWithStatus(false,1);return;}
         UE_LOG(LogTemp,Display,TEXT("CF_PANTRY_SOURCE hero=%s material=%d food=%d medicine=%d"),*Hero->GetActorLocation().ToString(),Hero->Inventory->Count(EFrontierItem::Material),Hero->Inventory->Count(EFrontierItem::Food),Hero->Inventory->Count(EFrontierItem::Medicine));
+        UE_LOG(LogTemp,Display,TEXT("CF_PANTRY_HEALTH value=%.3f"),Hero->Health);
+        for(TActorIterator<ACreatureCharacter> It(World);It;++It)if(!It->Tamer)
+            UE_LOG(LogTemp,Display,TEXT("CF_PANTRY_WILD id=%s name=%s health=%.3f pos=%s home=%s habitat=%d leash=%.1f activity=%d speed=%.1f distance=%.1f"),*It->PersistentId.ToString(),*It->GetCreatureName(),It->Health,*It->GetActorLocation().ToString(),*It->HabitatHome.ToString(),It->bHasHabitat,It->LeashRadius,static_cast<int32>(It->Activity),It->GetCharacterMovement()->GetMaxSpeed(),It->GetDistanceTo(Hero));
         for(TActorIterator<ACreatureCharacter> It(World);It;++It)if(It->Tamer==Hero->GetController())UE_LOG(LogTemp,Display,TEXT("CF_PANTRY_PET id=%s nutrition=%.3f stamina=%.3f xp=%d activity=%d pos=%s"),*It->PersistentId.ToString(),It->Nutrition,It->Stamina,It->Experience,static_cast<int32>(It->Activity),*It->GetActorLocation().ToString());
-        for(TActorIterator<AResourceNode> It(World);It;++It)UE_LOG(LogTemp,Display,TEXT("CF_PANTRY_RESOURCE id=%s definition=%s stock=%d pos=%s"),*It->PersistentId.ToString(),*GetNameSafe(It->Definition.Get()),It->Remaining,*It->GetActorLocation().ToString());
+        for(TActorIterator<AResourceNode> It(World);It;++It)UE_LOG(LogTemp,Display,TEXT("CF_PANTRY_RESOURCE id=%s definition=%s stock=%d pos=%s output=%d interval=%.3f"),*It->PersistentId.ToString(),*GetNameSafe(It->Definition.Get()),It->Remaining,*It->GetActorLocation().ToString(),It->Definition?static_cast<int32>(It->Definition->OutputItem):-1,It->Definition?It->Definition->HarvestInterval:0.f);
+        // 只读来源核验需要区分现有库存与尚未收获的作物，不能由旧测试结果推算。
+        for(TActorIterator<AWorkStation> It(World);It;++It)if(It->bPlayerBuilt)
+            UE_LOG(LogTemp,Display,TEXT("CF_PANTRY_FACILITY id=%s type=%d food=%d seeds=%d planted=%d growth=%.3f pos=%s"),*It->PersistentId.ToString(),static_cast<int32>(It->RequiredSpecialty),It->StoredFood,It->Crop->Seeds,It->Crop->bPlanted,It->Crop->GrowthWork,*It->GetActorLocation().ToString());
         if(FParse::Param(FCommandLine::Get(),TEXT("CFPantryReturnInspect"))){FTimerHandle Observe;World->GetTimerManager().SetTimer(Observe,[](){UE_LOG(LogTemp,Display,TEXT("CF_PANTRY_INSPECT PASS noSave=1 noGrant=1"));FPlatformMisc::RequestExitWithStatus(false,0);},5.f,false);return;}
         UE_LOG(LogTemp,Display,TEXT("CF_PANTRY_INSPECT PASS noSave=1 noGrant=1"));FPlatformMisc::RequestExitWithStatus(false,0);return;
     }
