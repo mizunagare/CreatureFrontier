@@ -231,10 +231,12 @@ void ACreatureCharacter::NavigateTo(const FVector& Destination, float Acceptance
     FNavLocation Projected;
     // 跟随先寻找队位附近的同层表面，避免室内队位被宽范围投影吸到屋顶。
     // 局部没有导航面时仍保留原有宽范围后备，兼容坡地与原先可达的路线。
-    const bool LocalFollow=Activity==ECreatureActivity::Follow && Nav->ProjectPointToNavigation(NavigationGoal,Projected,FVector(80,80,120));
-    if (!LocalFollow && !Nav->ProjectPointToNavigation(NavigationGoal, Projected, FVector(250,250,300)))
+    // 自动觅食也必须使用目标附近的同层表面；找不到时保留原重试，不投到无通路屋顶。
+    const bool Feeding=FeedingSite.IsValid();
+    const bool LocalFollow=(Activity==ECreatureActivity::Follow || Feeding) && Nav->ProjectPointToNavigation(NavigationGoal,Projected,FVector(80,80,120));
+    if (!LocalFollow && (Feeding || !Nav->ProjectPointToNavigation(NavigationGoal, Projected, FVector(250,250,300))))
     {
-        const APawn* FollowOwner=Activity==ECreatureActivity::Follow && Tamer?Tamer->GetPawn():nullptr;
+        const APawn* FollowOwner=!Feeding && Activity==ECreatureActivity::Follow && Tamer?Tamer->GetPawn():nullptr;
         if(!FollowOwner || !Nav->ProjectPointToNavigation(FollowOwner->GetActorLocation(),Projected,FVector(250,250,300)))
         { StopNavigation(); return; }
         Acceptance=160.f; // 退回主人位置时保留个人空间。
@@ -242,7 +244,7 @@ void ACreatureCharacter::NavigateTo(const FVector& Destination, float Acceptance
     const auto Result=AI->MoveToLocation(Projected.Location, Acceptance, false, true, false, false, nullptr, false);
     if(FParse::Param(FCommandLine::Get(),TEXT("CFHollowDetourTrace")))
         UE_LOG(LogTemp,Display,TEXT("CF_DETOUR_MOVE active=%d goal=%s projected=%s result=%d"),bHasFollowPathDetour,*NavigationGoal.ToString(),*Projected.Location.ToString(),static_cast<int32>(Result));
-    if(Result==EPathFollowingRequestResult::Failed && Activity==ECreatureActivity::Follow && Tamer && Tamer->GetPawn())
+    if(Result==EPathFollowingRequestResult::Failed && !Feeding && Activity==ECreatureActivity::Follow && Tamer && Tamer->GetPawn())
         AI->MoveToActor(Tamer->GetPawn(),160,false,true,false,nullptr,false);
 }
 

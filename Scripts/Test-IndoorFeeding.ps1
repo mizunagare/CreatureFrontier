@@ -22,7 +22,7 @@ try{
     [pscustomobject]@{BuildSHA256=$hash;SourceSHA256=$inputHash;Source=$ReadInputPath;Scope=$scope}|Export-Csv (Join-Path $run 'Run.csv') -NoTypeInformation
     $arguments=@(('"'+(Join-Path $root 'CreatureFrontier.uproject')+'"'),'-game','-CFIndoorFeedingTest','-nullrhi','-nosound','-unattended','-nop4',('-abslog="'+$log+'"'))
     if($Inspect){$arguments+='-CFPantryInspect'}
-    if($TraceReturn){$arguments+=@('-CFPantryReturnInspect','-CFFarmApproachTrace')}
+    if($TraceReturn){$arguments+=@('-CFPantryReturnInspect','-CFFarmApproachTrace','-CFFeedingApproachTrace')}
     Write-Host ('室内进食诊断：'+$run)
     $p=Start-Process -FilePath 'D:/Epic/UE_5.8/Engine/Binaries/Win64/UnrealEditor-Cmd.exe' -ArgumentList $arguments -WindowStyle Hidden -PassThru
     if(!$p.WaitForExit(90000)){$p.Kill();$p.WaitForExit();throw '室内进食诊断超时'}

@@ -8,6 +8,7 @@
 #include "Misc/Parse.h"
 #include "GameFramework/Controller.h"
 #include "CFPlayerCharacter.h"
+#include "FarmCropComponent.h"
 
 bool ACreatureCharacter::CanReachWorkSite(const AWorkStation* Site) const
 {
@@ -56,12 +57,16 @@ void ACreatureCharacter::ApproachWorkSite(AWorkStation* Site)
         if(!FrontierFollowPath::ClearPath(this,Path))
         {
             CharacterBlocked=true;
-            if(Activity==ECreatureActivity::Work)
+            if(Activity==ECreatureActivity::Work || (Activity==ECreatureActivity::Rest && bResumeWorkAfterRest))
                 for(int32 Segment=1;Segment<Path->PathPoints.Num();++Segment)
                     if(const auto* Body=FrontierFollowPath::Blocker(this,Path->PathPoints[Segment-1],Path->PathPoints[Segment]))
                     {
                         const auto* Peer=Cast<ACreatureCharacter>(Body);
-                        if(Peer && Peer->Tamer==Tamer && Peer->Disposition==ECreatureDisposition::Tamed && Peer->Health>0 && Peer->Activity==ECreatureActivity::Rest && !Peer->bResumeWorkAfterRest && !Peer->FeedingSite.IsValid() && Peer->GetVelocity().Size2D()<10)
+                        // 待复工者回休息点时，也允许绕过空圃旁静止等待的伙伴；不改变双方指派。
+                        const bool EmptyFarmWait=Peer && Peer->Activity==ECreatureActivity::Work && IsValid(Peer->WorkSite) && Peer->WorkSite->RequiredSpecialty==EWorkSpecialty::Farming && !Peer->WorkSite->Crop->IsOccupied() && Peer->GetDistanceTo(Peer->WorkSite)<=220;
+                        const bool ManualRest=Peer && Peer->Activity==ECreatureActivity::Rest && !Peer->bResumeWorkAfterRest;
+                        if(FParse::Param(FCommandLine::Get(),TEXT("CFFarmApproachTrace")))UE_LOG(LogTemp,Display,TEXT("CF_WORK_PATH_BLOCKER self=%s blocker=%s emptyFarm=%d manualRest=%d"),*GetName(),*GetNameSafe(Body),EmptyFarmWait,ManualRest);
+                        if(Peer && Peer->Tamer==Tamer && Peer->Disposition==ECreatureDisposition::Tamed && Peer->Health>0 && (ManualRest || (Activity==ECreatureActivity::Rest && bResumeWorkAfterRest && EmptyFarmWait)) && !Peer->FeedingSite.IsValid() && Peer->GetVelocity().Size2D()<10)
                         {BlockedStands.Add({Peer,Projected.Location,Length});}
                         break;
                     }
