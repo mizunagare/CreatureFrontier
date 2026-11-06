@@ -35,6 +35,7 @@ void ACFHUD::DrawRosterPanel(ACFPlayerCharacter* Player)
         if(!Pet->Nickname.IsEmpty())Status=Pet->GetSpeciesName()+TEXT(" | ")+Status;
         if(Pet->WorkSite)Status+=TEXT(" | ")+FrontierChinese::Specialty(Pet->WorkSite->RequiredSpecialty);
         if(Pet->GetFieldResource())Status+=TEXT(" | 野外采集");if(Pet->CarriedFood>0)Status+=FString::Printf(TEXT(" | 携带食物 %d"),Pet->CarriedFood);
+        if(Pet->CarriedSeeds>0)Status+=FString::Printf(TEXT(" | 携带种子 %d，Z取回"),Pet->CarriedSeeds);
         Line(Status,FLinearColor::Green,Y+40*U);Line(Pet->Personality->GetSummary(),FLinearColor(.7f,.9f,1),Y+60*U);Line(Pet->Memory->GetSummary(),FLinearColor(.7f,.85f,1),Y+80*U);
         if(HasRescue)Line(Pet->Memory->GetRescueSummary(),FLinearColor(.7f,.85f,1),Y+100*U);
     }

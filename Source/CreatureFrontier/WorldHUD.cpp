@@ -74,8 +74,8 @@ void ACFHUD::DrawWorldHUD(ACFPlayerCharacter* Player)
                 TEXT("P 使用1份药品救助，恢复40生命"):
                 TEXT("缺少药品：回基地按2制作，再返回救助"),Yellow,2});
             Rows.Add({TEXT("救起后可按F跟随；R复活不会治疗伙伴"),Blue,2});
-            if(Creature->CarriedFood>0 || Creature->Cargo->Count()>0)
-                Rows.Add({FString::Printf(TEXT("携带食物 %d | 资源 %d | Z 取回（6米）"),Creature->CarriedFood,Creature->Cargo->Count()),Yellow});
+            if(Creature->CarriedFood>0 || Creature->CarriedSeeds>0 || Creature->Cargo->Count()>0)
+                Rows.Add({FString::Printf(TEXT("携带食物 %d | 资源 %d | 种子 %d | Z 取回（6米）"),Creature->CarriedFood,Creature->Cargo->Count(),Creature->CarriedSeeds),Yellow});
         }
         else if(Tamed)
         {
@@ -90,7 +90,7 @@ void ACFHUD::DrawWorldHUD(ACFPlayerCharacter* Player)
             const auto Job=Creature->GetGatheringStatus();if(!Job.IsEmpty())Rows.Add({Job,Yellow,2});
             if(Creature->FeedingSite.IsValid())Rows.Add({TEXT("寻找食物中，保留工作指派"),Yellow});
             else if(Creature->bResumeWorkAfterRest)Rows.Add({TEXT("自动休息：体力80 / 饱食20 / 生命80%后复工"),Yellow,2});
-            if(Creature->CarriedFood>0 || Creature->Cargo->Count()>0)Rows.Add({FString::Printf(TEXT("携带食物 %d | 资源 %d | Z 取回（6米）"),Creature->CarriedFood,Creature->Cargo->Count()),Yellow});
+            if(Creature->CarriedFood>0 || Creature->CarriedSeeds>0 || Creature->Cargo->Count()>0)Rows.Add({FString::Printf(TEXT("携带食物 %d | 资源 %d | 种子 %d | Z 取回（6米）"),Creature->CarriedFood,Creature->Cargo->Count(),Creature->CarriedSeeds),Yellow});
             Rows.Add({FString::Printf(TEXT("亲密 %d/100 | 照料冷却 %.0f秒"),Creature->BondPoints,FMath::CeilToFloat(Creature->PettingCooldown)),Green});
             Rows.Add({Creature->Personality->GetSummary(),Blue});Rows.Add({Creature->Memory->GetSummary(),Blue,2});
             const auto RescueSummary=Creature->Memory->GetRescueSummary();if(!RescueSummary.IsEmpty())Rows.Add({RescueSummary,Blue,2});

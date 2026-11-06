@@ -81,6 +81,11 @@ public:
     UPROPERTY(Replicated, BlueprintReadOnly, Category="Work") bool bResumeWorkAfterRest = false;
     UPROPERTY(BlueprintReadOnly, Category="Care") TWeakObjectPtr<AWorkStation> FeedingSite;
     UPROPERTY(BlueprintReadOnly,Category="Transport") int32 CarriedFood=0;
+    int32 CarriedSeeds=0;
+    bool PickUpSeeds(class AHomeModule* Crate,int32 Amount);
+    bool DeliverSeeds(AWorkStation* Farm);
+    bool RecoverSeeds(ACFPlayerCharacter* Hero);
+    static bool ValidateSeedCargo(const struct FCreatureSaveRecord& Record);
     UPROPERTY(Replicated, BlueprintReadOnly, Category="Combat")
     float SpecialCooldownRemaining = 0.0f;
     UPROPERTY(Replicated, BlueprintReadOnly, Category="Combat")
@@ -184,6 +189,11 @@ private:
     void BeginStrikePose(const AActor* Target=nullptr);
     TArray<FTransform> NeutralFeet, NeutralAccents, NeutralEyes, NeutralPupils;
     bool TickHauling(float DeltaSeconds);
+    bool TickSeedSupply();
+    TWeakObjectPtr<AActor> SeedSupplyTarget;
+    double SeedSupplyExpires=0;
+    TWeakObjectPtr<AActor> FailedSeedSupplyTarget;
+    double SeedSupplyRetryUntil=0;
     TWeakObjectPtr<AWorkStation> HaulTarget;
     TWeakObjectPtr<AWorkStation> HaulPost;
     double HaulExpires=0;

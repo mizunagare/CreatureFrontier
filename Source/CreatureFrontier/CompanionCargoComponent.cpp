@@ -28,7 +28,7 @@ bool UCompanionCargoComponent::Assign(AHomeModule* Crate,ACFPlayerCharacter* Her
 {
     auto* Pet=Cast<ACreatureCharacter>(GetOwner());
     if(!Pet || !Pet->HasAuthority() || Pet->Health<=0 || !Hero || Hero->Health<=0 || Pet->Tamer!=Hero->GetController() || Pet->Disposition!=ECreatureDisposition::Tamed ||
-        UGameplayStatics::IsGamePaused(this) || !Pet->GetFieldResource() || Pet->CarriedFood>0 ||
+        UGameplayStatics::IsGamePaused(this) || !Pet->GetFieldResource() || Pet->CarriedFood>0 || Pet->CarriedSeeds>0 ||
         (Pet->Activity!=ECreatureActivity::Work && !(Pet->Activity==ECreatureActivity::Rest && Pet->bResumeWorkAfterRest)) ||
         !IsValid(Crate) || Crate->IsActorBeingDestroyed() || Crate->GetWorld()!=GetWorld() || Crate->bPreview || Crate->bStaged ||
         Crate->GetKind()!=EHomeModuleKind::Storage || !Crate->PersistentId.IsValid()) return false;
@@ -48,7 +48,7 @@ bool UCompanionCargoComponent::ValidateOrder()
 bool UCompanionCargoComponent::CanReceive(EFrontierItem Item) const
 {
     const auto* Pet=Cast<ACreatureCharacter>(GetOwner());
-    return Pet && bOrdered && GetTarget() && !bReturning && Pet->CarriedFood==0 && Count()<Capacity &&
+    return Pet && bOrdered && GetTarget() && !bReturning && Pet->CarriedFood==0 && Pet->CarriedSeeds==0 && Count()<Capacity &&
         IsGatheredResource(Item);
 }
 bool UCompanionCargoComponent::Receive(EFrontierItem Item)

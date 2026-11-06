@@ -44,9 +44,9 @@ bool ClearPath(const ACreatureCharacter* Self,const UNavigationPath* Path)
         if(FParse::Param(FCommandLine::Get(),TEXT("CFHollowDetourTrace")) && Self->GetWorld()->SweepSingleByChannel(VolumeHit,Start,End,FQuat::Identity,ECC_Pawn,
             FCollisionShape::MakeCapsule(Capsule->GetScaledCapsuleRadius(),Capsule->GetScaledCapsuleHalfHeight()),Query))
         {
-            if(FParse::Param(FCommandLine::Get(),TEXT("CFHollowDetourTrace")))
-                UE_LOG(LogTemp,Display,TEXT("CF_DETOUR_VOLUME_REJECT actor=%s from=%s to=%s"),*GetNameSafe(VolumeHit.GetActor()),*Start.ToString(),*End.ToString());
-            return false;
+            // 这是固定高度偏移的诊断扫掠，不是正式通行判据；日志开关不能改变路径结果。
+            // 工作绕行的完整胶囊及逐点地面校验仍由 SafePath/ClearYieldSegment 执行。
+            UE_LOG(LogTemp,Display,TEXT("CF_DETOUR_VOLUME_TRACE actor=%s from=%s to=%s diagnosticOnly=1"),*GetNameSafe(VolumeHit.GetActor()),*Start.ToString(),*End.ToString());
         }
         if(const auto* Hit=Blocker(Self,Path->PathPoints[Index-1],Path->PathPoints[Index]))
         {

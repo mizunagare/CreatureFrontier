@@ -2079,6 +2079,70 @@ struct FPantryRefill : FStarterWorkshop
 }
 namespace
 {
+// 从生活完成档继续实际取粮、采纤维、原配方制种和仓储补种，不注入物资。
+struct FSeedSupplyLife : FStarterJourney
+{
+    ACreatureCharacter* Farmer=nullptr;AWorkStation* Farm=nullptr;AWorkStation* Post=nullptr;AWorkStation* Trough=nullptr;AWorkStation* Craft=nullptr;AHomeModule* Crate=nullptr;AResourceNode* Fiber=nullptr;
+    int32 FiberStart=0;bool TookFood=false,Made=false,Stored=false,Picked=false,CarryPanel=false;float StartHealth=0;
+    TMap<EFrontierItem,int32> Bag;
+    int32 InitialFood=0,Meals=0;bool SourceMade=false;float LastCourierNutrition=0,LastFarmerNutrition=0;
+    int32 FoodTotal()const{return Hero->Inventory->Count(EFrontierItem::Food)+Crate->StorageInventory->Count(EFrontierItem::Food)+Farm->StoredFood+Trough->StoredFood+Pet->CarriedFood+Farmer->CarriedFood;}
+    bool Finish(bool Pass,const TCHAR* Why)
+    {
+        if(Input.IsValid())Input->Direction=FVector::ZeroVector;CFInputQA::Release(Hero,EKeys::M);CFInputQA::Release(Hero,EKeys::LeftShift);
+        const FString Feedback=Hero->Feedback;
+        FHitResult Aim;FCollisionQueryParams Query(SCENE_QUERY_STAT(SeedLifeFailureAim),false,Hero);const FVector Eye=Hero->FirstPersonCamera->GetComponentLocation();
+        World->LineTraceSingleByChannel(Aim,Eye,Eye+Hero->FirstPersonCamera->GetForwardVector()*800,ECC_Visibility,Query);
+        const bool Saved=Hero->SaveProgress(Pass?TEXT("SeedSupplyLifeDone"):TEXT("SeedSupplyLifeBlocked"));Pass &= Saved;
+        UE_LOG(LogTemp,Display,TEXT("CF_SEED_LIFE %s reason=%s phase=%d made=%d stored=%d picked=%d hero=%s aim=%s feedback=%s"),Pass?TEXT("PASS"):TEXT("FAIL"),Why,Phase,Made,Stored,Picked,*Hero->GetActorLocation().ToString(),*GetNameSafe(Aim.GetActor()),*Feedback);FPlatformMisc::RequestExitWithStatus(false,Pass?0:1);return false;
+    }
+    bool TickLife()
+    {
+        const double Now=World->GetTimeSeconds(),Dt=Now-LastTime;
+        if(!Motion(Hero,LastH,VelocityH,Dt) || !Motion(Pet.Get(),LastP,VelocityP,Dt) || Hero->Health!=StartHealth || Pet->WorkSite!=Post || Farmer->WorkSite!=Farm || FPlatformTime::Seconds()>Deadline)return Finish(false,TEXT("motion-state-time"));
+        LastH=Hero->GetActorLocation();LastP=Pet->GetActorLocation();VelocityH=Hero->GetVelocity();VelocityP=Pet->GetVelocity();LastTime=Now;
+        const int32 Taken=FiberStart-Fiber->Remaining,Harvest=Farmer->Experience-44;
+        const int32 NewMeals=(Pet->Nutrition-LastCourierNutrition>20?1:0)+(Farmer->Nutrition-LastFarmerNutrition>20?1:0);
+        Meals+=NewMeals;LastCourierNutrition=Pet->Nutrition;LastFarmerNutrition=Farmer->Nutrition;
+        if(NewMeals)UE_LOG(LogTemp,Display,TEXT("CF_SEED_LIFE_MEAL count=%d total=%d food=%d"),NewMeals,Meals,FoodTotal());
+        const int32 CraftFood=Made&&!SourceMade?1:0;
+        if(FoodTotal()!=InitialFood+Harvest-CraftFood-Meals)return Finish(false,TEXT("food-ledger"));
+        if(Now>=NextDiagnostic)
+        {
+            NextDiagnostic=Now+5;
+            UE_LOG(LogTemp,Display,TEXT("CF_SEED_LIFE_STATE phase=%d courier=%s pos=%s activity=%d seeds=%d food=%d stamina=%.2f nutrition=%.2f farmer=%s farmerPos=%s harvest=%d farmFood=%d farmSeeds=%d trough=%d"),Phase,*Pet->GetName(),*Pet->GetActorLocation().ToString(),static_cast<int32>(Pet->Activity),Pet->CarriedSeeds,Pet->CarriedFood,Pet->Stamina,Pet->Nutrition,*Farmer->GetName(),*Farmer->GetActorLocation().ToString(),Harvest,Farm->StoredFood,Farm->Crop->Seeds,Trough->StoredFood);
+        }
+        const int32 Seeds=Hero->Inventory->Count(EFrontierItem::Seeds)+Crate->StorageInventory->Count(EFrontierItem::Seeds)+Pet->CarriedSeeds+Farm->Crop->Seeds+(Farm->Crop->bPlanted?1:0)+Harvest;
+        if(Taken<0 || Taken>1 || Harvest<0 || Seeds!=(Made?3:0) || Hero->Inventory->Count(EFrontierItem::Fiber)!=Taken-(Made?1:0) || Hero->Inventory->Count(EFrontierItem::Food)!=(TookFood&&!Made?1:0))return Finish(false,TEXT("seed-source-ledger"));
+        for(const auto& Entry:Bag)if(Entry.Key!=EFrontierItem::Food && Entry.Key!=EFrontierItem::Fiber && Entry.Key!=EFrontierItem::Seeds && Hero->Inventory->Count(Entry.Key)!=Entry.Value)return Finish(false,TEXT("other-inventory"));
+        if(Pet->CarriedSeeds>0 && !Picked){Picked=true;if(!Hero->SaveProgress(TEXT("SeedSupplyLifeCarry")))return Finish(false,TEXT("carry-save"));UE_LOG(LogTemp,Display,TEXT("CF_SEED_LIFE_PICKED carried=%d source=crafted"),Pet->CarriedSeeds);}
+        if(Preview && Pet->CarriedSeeds>0 && !Photos.Contains(TEXT("Carrying")))
+        {if(!CFInputQA::Press(Hero,EKeys::Tab) || !Hero->IsRosterOpen())return Finish(false,TEXT("carry-roster"));CarryPanel=true;Photo(TEXT("Carrying"),Pet->GetActorLocation());}
+        if(FPlatformTime::Seconds()<ShotUntil)return true;
+        if(CarryPanel){CFInputQA::Press(Hero,EKeys::Tab);CarryPanel=false;}
+        if(Phase==-2){if(Now-At<2 || UNavigationSystemV1::IsNavigationBeingBuiltOrLocked(World))return true;if(FVector::Dist2D(Hero->GetActorLocation(),FVector(-900,-1080,40))<30){Phase=13;At=Now;}else if(!Plan(FVector(-900,-1080,40),12))return Finish(false,TEXT("resume-observer-plan"));return true;}
+        if(Phase==-1){if(Now-At<2 || UNavigationSystemV1::IsNavigationBeingBuiltOrLocked(World))return true;if(!Plan(FVector(-900,-1080,40),0))return Finish(false,TEXT("west-plan"));return true;}
+        if(Phase==0){const int32 R=Move();if(R<0)return Finish(false,TEXT("west-walk"));if(!R)return true;if(!Plan(FVector(-450,-400,40),1))return Finish(false,TEXT("door-plan"));return true;}
+        if(Phase==1){const int32 R=Move();if(R<0)return Finish(false,TEXT("door-walk"));if(!R)return true;if(!Plan(FVector(-50,-400,100),2))return Finish(false,TEXT("inside-plan"));return true;}
+        if(Phase==2){const int32 R=Move();if(R<0)return Finish(false,TEXT("inside-walk"));if(!R)return true;Face(Trough->GetActorLocation()+FVector(0,0,30));if(Hero->TraceFacility()!=Trough || !CFInputQA::ShiftPress(Hero,EKeys::O) || Hero->Inventory->Count(EFrontierItem::Food)!=1)return Finish(false,TEXT("withdraw-one"));TookFood=true;if(!Plan(FVector(-450,-400,40),3))return Finish(false,TEXT("leave-plan"));return true;}
+        if(Phase==3){const int32 R=Move();if(R<0)return Finish(false,TEXT("leave-walk"));if(!R)return true;if(!Plan(FVector(-1000,450,40),4))return Finish(false,TEXT("fiber-west-plan"));return true;}
+        if(Phase==4){const int32 R=Move();if(R<0)return Finish(false,TEXT("fiber-west-walk"));if(!R)return true;if(!Plan(FVector(-1500,1150,40),5))return Finish(false,TEXT("fiber-plan"));return true;}
+        if(Phase==5 || Phase==50){const int32 R=Move();if(R<0)return Finish(false,TEXT("fiber-walk"));if(!R)return true;Face(Fiber->GetActorLocation());
+            // 野生生物经过准星时，玩家只进行一次正常侧移找视线；不移动生物、不绕过采集校验。
+            if(Hero->TraceResource()!=Fiber){if(Phase==5 && Plan(Fiber->GetActorLocation()+FVector(-200,0,40),50)){UE_LOG(LogTemp,Display,TEXT("CF_SEED_LIFE_GATHER_SIDE_STEP actualMovement=1"));return true;}return Finish(false,TEXT("gather-occluded"));}
+            if(!CFInputQA::Press(Hero,EKeys::M))return Finish(false,TEXT("gather-input"));At=Now;Phase=6;return true;}
+        if(Phase==6){Face(Fiber->GetActorLocation());if(Taken<1){if(Now-At>10)return Finish(false,TEXT("gather-time"));return true;}CFInputQA::Release(Hero,EKeys::M);if(!Plan(FVector(-1000,450,40),7))return Finish(false,TEXT("return-west-plan"));return true;}
+        if(Phase==7){const int32 R=Move();if(R<0)return Finish(false,TEXT("return-west-walk"));if(!R)return true;if(!Plan(FVector(-300,-600,40),8))return Finish(false,TEXT("craft-plan"));return true;}
+        if(Phase==8){const int32 R=Move();if(R<0)return Finish(false,TEXT("craft-walk"));if(!R)return true;Face(Craft->GetActorLocation()+FVector(0,0,25));const auto* Catalog=UCraftingCatalog::Load();const int32 Index=Catalog?Catalog->Recipes.IndexOfByPredicate([](const FFrontierRecipe& X){return X.Id==TEXT("PlantingSeeds");}):INDEX_NONE;if(Index<0 || !CFInputQA::Press(Hero,EKeys::C))return Finish(false,TEXT("craft-menu"));for(int32 I=0;I<Index;++I)CFInputQA::Press(Hero,EKeys::Down);if(!CFInputQA::Press(Hero,EKeys::Enter) || Hero->Inventory->Count(EFrontierItem::Seeds)!=3)return Finish(false,TEXT("craft-payment"));Made=true;CFInputQA::Press(Hero,EKeys::C);UE_LOG(LogTemp,Display,TEXT("CF_SEED_LIFE_CRAFT PASS food=1 fiber=1 seeds=3"));if(!Plan(FVector(-450,-400,40),9))return Finish(false,TEXT("crate-door-plan"));return true;}
+        if(Phase==9){const int32 R=Move();if(R<0)return Finish(false,TEXT("crate-door-walk"));if(!R)return true;if(!Plan(FVector(-50,-400,100),10))return Finish(false,TEXT("crate-plan"));return true;}
+        if(Phase==10){const int32 R=Move();if(R<0)return Finish(false,TEXT("crate-walk"));if(!R)return true;Face(Crate->GetActorLocation()+FVector(0,0,40));if(!CFInputQA::Press(Hero,EKeys::E) || Hero->Storage->GetCrate()!=Crate)return Finish(false,TEXT("crate-open"));for(int32 I=0;I<static_cast<int32>(EFrontierItem::Seeds);++I)CFInputQA::Press(Hero,EKeys::Down);if(!CFInputQA::Press(Hero,EKeys::Right) || Hero->Inventory->Count(EFrontierItem::Seeds)!=0 || Crate->StorageInventory->Count(EFrontierItem::Seeds)!=3)return Finish(false,TEXT("crate-deposit"));Stored=true;CFInputQA::Press(Hero,EKeys::E);if(!Plan(FVector(-450,-400,40),11))return Finish(false,TEXT("observer-leave-plan"));return true;}
+        if(Phase==11){const int32 R=Move();if(R<0)return Finish(false,TEXT("observer-leave-walk"));if(!R)return true;if(!Plan(FVector(-900,-1080,40),12))return Finish(false,TEXT("observer-west-plan"));return true;}
+        if(Phase==12){const int32 R=Move();if(R<0)return Finish(false,TEXT("observer-west-walk"));if(!R)return true;Phase=13;At=Now;return true;}
+        if(Phase==13){if(Picked && Harvest>=1 && Trough->StoredFood>=2 && Farm->StoredFood==0 && Pet->CarriedFood==0){if(Photo(TEXT("Delivered"),Farm->GetActorLocation()))return true;UE_LOG(LogTemp,Display,TEXT("CF_SEED_LIFE_LEDGER PASS initial=%d harvested=%d crafted=%d meals=%d remaining=%d"),InitialFood,Harvest,CraftFood,Meals,FoodTotal());return Finish(true,TEXT("seeded-harvested-delivered"));}if(Now-At>90)return Finish(false,TEXT("production-time"));}
+        return true;
+    }
+};
+
 struct FCompanionSeed : FStarterWorkshop
 {
     TWeakObjectPtr<AWorkStation> Trough;TWeakObjectPtr<AResourceNode> Fiber;FGuid TroughId;FTransform TroughPose;
@@ -2136,6 +2200,28 @@ struct FCompanionSeed : FStarterWorkshop
     }
 };
 }
+void RunSeedSupplyLife(UWorld* World,ACFPlayerCharacter* Hero)
+{
+    auto S=MakeShared<FSeedSupplyLife>();S->World=World;S->Hero=Hero;S->Deadline=FPlatformTime::Seconds()+180;
+    if(!Hero->LoadProgress(TEXT("SeedSupplyInput"))){S->Finish(false,TEXT("source"));return;}
+    for(TActorIterator<AWorkStation> It(World);It;++It)if(It->bPlayerBuilt){if(It->RequiredSpecialty==EWorkSpecialty::Transport)S->Post=*It;if(It->RequiredSpecialty==EWorkSpecialty::Farming)S->Farm=*It;if(It->RequiredSpecialty==EWorkSpecialty::Feeding)S->Trough=*It;if(It->RequiredSpecialty==EWorkSpecialty::Crafting)S->Craft=*It;}
+    for(TActorIterator<ACreatureCharacter> It(World);It;++It)if(It->Tamer==Hero->GetController()){if(It->WorkSite==S->Post)S->Pet=*It;if(It->WorkSite==S->Farm)S->Farmer=*It;}
+    for(TActorIterator<AHomeModule> It(World);It;++It)if(It->GetKind()==EHomeModuleKind::Storage && !It->bPreview && !It->bStaged)S->Crate=*It;
+    for(TActorIterator<AResourceNode> It(World);It;++It)if(It->PersistentId==FGuid(0xCF170000,0,0,8))S->Fiber=*It;
+    const bool Continue=FParse::Param(FCommandLine::Get(),TEXT("CFSeedLifeContinue"));
+    const bool Carry=FParse::Param(FCommandLine::Get(),TEXT("CFSeedLifeCarry"));
+    if(!S->Pet.IsValid() || !S->Farmer || !S->Farm || !S->Post || !S->Trough || !S->Craft || !S->Crate || !S->Fiber || S->Farmer->Experience!=44 ||
+        (Continue?(S->Farm->Crop->Seeds!=3 || S->Farm->Crop->bPlanted || S->Trough->StoredFood!=0):(S->Farm->Crop->IsOccupied() || (Carry?(S->Trough->StoredFood<0 || S->Trough->StoredFood>1):S->Trough->StoredFood!=2))) ||
+        S->Pet->CarriedSeeds!=(Carry?3:0) || S->Crate->StorageInventory->Count(EFrontierItem::Seeds)!=0 || Hero->Inventory->Count(EFrontierItem::Food)!=0 || Hero->Inventory->Count(EFrontierItem::Fiber)!=0 || Hero->Inventory->Count(EFrontierItem::Seeds)!=0){S->Finish(false,TEXT("source-state"));return;}
+    S->FiberStart=S->Fiber->Remaining;S->Bag=Hero->Inventory->GetStacks();S->StartHealth=Hero->Health;S->At=S->LastTime=World->GetTimeSeconds();S->LastH=Hero->GetActorLocation();S->LastP=S->Pet->GetActorLocation();S->VelocityH=Hero->GetVelocity();S->VelocityP=S->Pet->GetVelocity();S->Input=NewObject<UHomeMovementProbe>(Hero);S->Input->RegisterComponent();
+    // 仅恢复本流程已真实制种、送种但返岗阻塞的失败档；不重播采集或发放资源。
+    if(Continue || Carry){S->FiberStart+=1;S->TookFood=S->Made=S->Stored=S->Picked=true;S->Phase=Carry?-2:13;}
+    S->InitialFood=S->FoodTotal();S->SourceMade=S->Made;S->LastCourierNutrition=S->Pet->Nutrition;S->LastFarmerNutrition=S->Farmer->Nutrition;
+    S->Preview=FParse::Param(FCommandLine::Get(),TEXT("CFSeedLifePreview"));
+    if(S->Preview){S->Root=FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir()/TEXT("SeedLifePreview")/FGuid::NewGuid().ToString(EGuidFormats::Digits));IFileManager::Get().MakeDirectory(*S->Root,true);UE_LOG(LogTemp,Display,TEXT("CF_SEED_LIFE_PREVIEW_ROOT %s"),*S->Root);}
+    FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([S](float){return S->TickLife();}));
+}
+
 void RunCompanionSeedScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read)
 {
     auto S=MakeShared<FCompanionSeed>();S->World=World;S->Hero=Hero;S->Read=Read;S->Traveling=Read;S->At=World->GetTimeSeconds();S->Deadline=FPlatformTime::Seconds()+180;

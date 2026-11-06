@@ -233,8 +233,10 @@ void ACreatureCharacter::NavigateTo(const FVector& Destination, float Acceptance
     // 局部没有导航面时仍保留原有宽范围后备，兼容坡地与原先可达的路线。
     // 自动觅食也必须使用目标附近的同层表面；找不到时保留原重试，不投到无通路屋顶。
     const bool Feeding=FeedingSite.IsValid();
-    const bool LocalFollow=(Activity==ECreatureActivity::Follow || Feeding) && Nav->ProjectPointToNavigation(NavigationGoal,Projected,FVector(80,80,120));
-    if (!LocalFollow && (Feeding || !Nav->ProjectPointToNavigation(NavigationGoal, Projected, FVector(250,250,300))))
+    // 送粮与取粮同样不能把室内目标投到屋顶；缺少同层导航时保持原重试和携带物。
+    const bool LocalFacility=Feeding || (Activity==ECreatureActivity::Work && HaulTarget.IsValid());
+    const bool LocalFollow=(Activity==ECreatureActivity::Follow || LocalFacility) && Nav->ProjectPointToNavigation(NavigationGoal,Projected,FVector(80,80,120));
+    if (!LocalFollow && (LocalFacility || !Nav->ProjectPointToNavigation(NavigationGoal, Projected, FVector(250,250,300))))
     {
         const APawn* FollowOwner=!Feeding && Activity==ECreatureActivity::Follow && Tamer?Tamer->GetPawn():nullptr;
         if(!FollowOwner || !Nav->ProjectPointToNavigation(FollowOwner->GetActorLocation(),Projected,FVector(250,250,300)))
@@ -243,7 +245,7 @@ void ACreatureCharacter::NavigateTo(const FVector& Destination, float Acceptance
     }
     const auto Result=AI->MoveToLocation(Projected.Location, Acceptance, false, true, false, false, nullptr, false);
     if(FParse::Param(FCommandLine::Get(),TEXT("CFHollowDetourTrace")))
-        UE_LOG(LogTemp,Display,TEXT("CF_DETOUR_MOVE active=%d goal=%s projected=%s result=%d"),bHasFollowPathDetour,*NavigationGoal.ToString(),*Projected.Location.ToString(),static_cast<int32>(Result));
+        UE_LOG(LogTemp,Display,TEXT("CF_DETOUR_MOVE active=%d goal=%s projected=%s result=%d actor=%s"),bHasFollowPathDetour,*NavigationGoal.ToString(),*Projected.Location.ToString(),static_cast<int32>(Result),*GetName());
     if(Result==EPathFollowingRequestResult::Failed && !Feeding && Activity==ECreatureActivity::Follow && Tamer && Tamer->GetPawn())
         AI->MoveToActor(Tamer->GetPawn(),160,false,true,false,nullptr,false);
 }
@@ -272,7 +274,7 @@ void ACreatureCharacter::Tick(float DeltaSeconds)
     Super::Tick(DeltaSeconds);
     if (VisualPivot)
     {
-        const bool Carrying=CarriedFood>0 || Cargo->Count()>0;
+        const bool Carrying=CarriedFood>0 || CarriedSeeds>0 || Cargo->Count()>0;
         CargoPack->SetVisibility(Carrying); CargoPack->SetHiddenInGame(!Carrying);
         UpdateCreaturePresentation(DeltaSeconds);
         const bool bEffect = Health > 0 && (SpecialWindupRemaining > 0 || SkillPulseRemaining > 0 || GuardRemaining > 0);
@@ -557,6 +559,7 @@ void ACreatureCharacter::SetActivity(ECreatureActivity NewActivity)
 {
     if (HasAuthority() && (NewActivity == ECreatureActivity::Work || NewActivity == ECreatureActivity::Rest)) ClearCombatOrders();
     if (!HasAuthority() || Activity == NewActivity) return;
+    SeedSupplyTarget.Reset();SeedSupplyExpires=0;
     // 新指令不能继续执行上一工作设施的临时绕行路径。
     if(WorkDetourExpires>0){StopNavigation();NextNavigationUpdate=0;}
     if(NewActivity!=ECreatureActivity::Work && !(NewActivity==ECreatureActivity::Rest && bResumeWorkAfterRest)) CancelFieldResource();

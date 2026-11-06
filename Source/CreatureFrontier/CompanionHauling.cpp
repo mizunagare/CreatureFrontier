@@ -15,9 +15,10 @@ bool ACreatureCharacter::TickHauling(float DeltaSeconds)
     WorkProgress=0;
     Stamina=FMath::Max(0.f,Stamina-DeltaSeconds*1.5f);
     if(Stamina<=0) { bResumeWorkAfterRest=true; HaulTarget.Reset(); SetActivity(ECreatureActivity::Rest); StopNavigation(); return true; }
-    if(HaulPost.Get()!=WorkSite.Get()) { HaulPost=WorkSite.Get(); HaulTarget.Reset(); HaulRetry=0; }
+    if(HaulPost.Get()!=WorkSite.Get()) { HaulPost=WorkSite.Get(); HaulTarget.Reset(); SeedSupplyTarget.Reset(); HaulRetry=0; }
     HaulRetry=FMath::Max(0.f,HaulRetry-DeltaSeconds);
     if(HaulRetry>0) { Park(); return true; }
+    if(CarriedFood==0 && TickSeedSupply()){HaulTarget.Reset();return true;}
     auto* Site=HaulTarget.Get();
     if(Site && (GetWorld()->GetTimeSeconds()>HaulExpires || GetDistanceTo(WorkSite)>1800 ||
         (CarriedFood>0 ? Site->RequiredSpecialty!=EWorkSpecialty::Feeding || Site->StoredFood>=30 : Site->RequiredSpecialty!=EWorkSpecialty::Farming || Site->StoredFood<=0)))

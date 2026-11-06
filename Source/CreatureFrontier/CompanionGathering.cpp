@@ -27,7 +27,7 @@ void ACreatureCharacter::HandleWorkSiteMoved(AWorkStation* Site)
 
 bool ACreatureCharacter::AssignFieldResource(AResourceNode* Node)
 {
-    if(!HasAuthority() || Health<=0 || Disposition!=ECreatureDisposition::Tamed || !IsValid(Node) ||
+    if(!HasAuthority() || Health<=0 || CarriedSeeds>0 || Disposition!=ECreatureDisposition::Tamed || !IsValid(Node) ||
         Node->GetWorld()!=GetWorld() || !Node->Definition || !Node->Definition->IsValidDefinition()) return false;
     Construction->Cancel();Cargo->CancelOrder();
     ResetGathering(); StopNavigation(); ClearCombatOrders();

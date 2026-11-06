@@ -17,7 +17,7 @@ bool UCompanionConstructionComponent::Assign(AHomeModule* Site,AHomeModule* Crat
 {
     auto* Pet=Cast<ACreatureCharacter>(GetOwner());
     if(!Pet || !Hero || !Pet->HasAuthority() || Pet->Health<=0 || Hero->Health<=0 || UGameplayStatics::IsGamePaused(this) || Pet->Tamer!=Hero->GetController() ||
-        Pet->Disposition!=ECreatureDisposition::Tamed || Pet->CarriedFood>0 || (Pet->Cargo->Count()>0 && GetSite()!=Site) || !IsValid(Site) || Site->IsActorBeingDestroyed() ||
+        Pet->Disposition!=ECreatureDisposition::Tamed || Pet->CarriedFood>0 || Pet->CarriedSeeds>0 || (Pet->Cargo->Count()>0 && GetSite()!=Site) || !IsValid(Site) || Site->IsActorBeingDestroyed() ||
         !Site->bUnderConstruction || !Site->Definition || !Site->Definition->IsValidDefinition() || !Site->PersistentId.IsValid() || Site->bPreview || Site->bStaged || !IsValid(Crate) || !Crate->PersistentId.IsValid() || Crate->IsActorBeingDestroyed() || Crate->GetKind()!=EHomeModuleKind::Storage ||
         Crate->bPreview || Crate->bStaged || Site->GetWorld()!=GetWorld() || Crate->GetWorld()!=GetWorld())return false;
     for(TActorIterator<ACreatureCharacter> It(GetWorld());It;++It)if(*It!=Pet && It->Construction->GetSite()==Site)return false;

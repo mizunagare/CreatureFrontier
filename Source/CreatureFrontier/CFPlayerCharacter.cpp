@@ -167,6 +167,7 @@ bool ACFPlayerCharacter::SaveProgress(const FString& Slot)
         Record.RoamRadius = It->RoamRadius; Record.LeashRadius = It->LeashRadius;
         Record.bOwned = It->Tamer == GetController();
         Record.CarriedFood=It->CarriedFood;
+        Record.SeedCargoVersion=1;Record.CarriedSeeds=It->CarriedSeeds;
         Record.BondPoints=It->BondPoints; Record.PettingCooldown=It->PettingCooldown;
         It->Personality->EnsurePreference();
         Record.Preference=It->Personality->GetPreference();Record.bPreferenceDiscovered=It->Personality->IsDiscovered();
@@ -344,7 +345,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
             ((Record.CombatCooldownVersion==0 && Record.MeleeCooldown==0) ||
              (Record.CombatCooldownVersion==1 && FMath::IsFinite(Record.MeleeCooldown) && Record.MeleeCooldown>=0 && Record.MeleeCooldown<=Interval));
         if (!CreatureClass || CreatureClass->HasAnyClassFlags(CLASS_Abstract) ||
-            !CooldownValid ||
+            !CooldownValid || !ACreatureCharacter::ValidateSeedCargo(Record) ||
             (Save->FormatVersion>=15 && (Record.CarriedFood<0 || Record.CarriedFood>3 || (Record.CarriedFood>0 && (!Record.bOwned || Record.Disposition!=ECreatureDisposition::Tamed)))) ||
             (Save->FormatVersion>=16 && (Record.BondPoints<0 || Record.BondPoints>100 || !FMath::IsFinite(Record.PettingCooldown) || Record.PettingCooldown<0 || Record.PettingCooldown>30 ||
                 ((Record.BondPoints>0 || Record.PettingCooldown>0) && (!Record.bOwned || Record.Disposition!=ECreatureDisposition::Tamed)))) ||
@@ -420,6 +421,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
         Pet->Disposition = Record.Disposition;
         Pet->Tamer = Record.bOwned ? GetController() : nullptr;
         Pet->CarriedFood=Save->FormatVersion>=15?Record.CarriedFood:0;
+        Pet->CarriedSeeds=Record.CarriedSeeds;
         Pet->BondPoints=Save->FormatVersion>=16?Record.BondPoints:0;
         Pet->PettingCooldown=Save->FormatVersion>=16?Record.PettingCooldown:0;
         Pet->Activity = Record.Activity;

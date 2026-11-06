@@ -91,6 +91,8 @@ void ACFGameMode::BeginPlay()
             if(!It->bHasHabitat){It->bHasHabitat=true;It->HabitatHome=Origin;}
         }
     SeedFrontierResources(GetWorld());
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFSeedSupplyLife")))
+    {FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this](){extern void RunSeedSupplyLife(UWorld*,ACFPlayerCharacter*);if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunSeedSupplyLife(GetWorld(),Hero);},1.f,false);return;}
     if(FParse::Param(FCommandLine::Get(),TEXT("CFHomeSupplyTest")) || FParse::Param(FCommandLine::Get(),TEXT("CFHomeSupplyRead")))
     {FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this](){extern void RunHomeSupplyScenario(UWorld*,ACFPlayerCharacter*);if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunHomeSupplyScenario(GetWorld(),Hero);},1.f,false);return;}
     if(FParse::Param(FCommandLine::Get(),TEXT("CFCompanionSeedTest")) || FParse::Param(FCommandLine::Get(),TEXT("CFCompanionSeedRead")))
@@ -109,6 +111,10 @@ void ACFGameMode::BeginPlay()
     {const bool Read=FParse::Param(FCommandLine::Get(),TEXT("CFFacilityMoveRead"));FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this,Read](){extern void RunFacilityMoveScenario(UWorld*,ACFPlayerCharacter*,bool);if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunFacilityMoveScenario(GetWorld(),Hero,Read);},1.f,false);return;}
     if(FParse::Param(FCommandLine::Get(),TEXT("CFFacilityMoveRules")))
     {FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this](){extern void RunFacilityMoveRules(UWorld*,ACFPlayerCharacter*);if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunFacilityMoveRules(GetWorld(),Hero);},1.f,false);return;}
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFSeedSupplyRules")))
+    {FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this](){extern void RunSeedSupplyRules(UWorld*,ACFPlayerCharacter*);if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunSeedSupplyRules(GetWorld(),Hero);},1.f,false);return;}
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFSeedSupplyPersistence")))
+    {FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this](){extern void RunSeedSupplyPersistence(UWorld*,ACFPlayerCharacter*);if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunSeedSupplyPersistence(GetWorld(),Hero);},1.f,false);return;}
     if(FParse::Param(FCommandLine::Get(),TEXT("CFCompanionCraftRules")))
     {FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this](){extern void RunCompanionCraftRules(UWorld*,ACFPlayerCharacter*);if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunCompanionCraftRules(GetWorld(),Hero);},1.f,false);return;}
     if(FParse::Param(FCommandLine::Get(),TEXT("CFCompanionCraftTest")) || FParse::Param(FCommandLine::Get(),TEXT("CFCompanionCraftRead")))

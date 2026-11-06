@@ -61,6 +61,9 @@ struct FCreatureSaveRecord
     UPROPERTY() float MeleeCooldown = 0.0f;
     UPROPERTY() bool bOwned = false;
     UPROPERTY() int32 CarriedFood=0;
+    // 旧记录缺字段时为0，不补发种子；修订1允许保留取消任务后的携种。
+    UPROPERTY() uint8 SeedCargoVersion=0;
+    UPROPERTY() int32 CarriedSeeds=0;
     UPROPERTY() int32 BondPoints=0;
     UPROPERTY() float PettingCooldown=0;
     UPROPERTY() ECreatureDisposition Disposition = ECreatureDisposition::Wild;
