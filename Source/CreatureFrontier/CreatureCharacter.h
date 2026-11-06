@@ -196,6 +196,7 @@ private:
     double SeedSupplyRetryUntil=0;
     TWeakObjectPtr<AWorkStation> HaulTarget;
     TWeakObjectPtr<AWorkStation> HaulPost;
+    TMap<TWeakObjectPtr<AWorkStation>,double> FailedFoodTargets;
     double HaulExpires=0;
     float HaulRetry=0;
     bool TickAutoFeeding();

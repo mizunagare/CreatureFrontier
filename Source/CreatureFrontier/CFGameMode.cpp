@@ -111,6 +111,8 @@ void ACFGameMode::BeginPlay()
     {const bool Read=FParse::Param(FCommandLine::Get(),TEXT("CFFacilityMoveRead"));FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this,Read](){extern void RunFacilityMoveScenario(UWorld*,ACFPlayerCharacter*,bool);if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunFacilityMoveScenario(GetWorld(),Hero,Read);},1.f,false);return;}
     if(FParse::Param(FCommandLine::Get(),TEXT("CFFacilityMoveRules")))
     {FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this](){extern void RunFacilityMoveRules(UWorld*,ACFPlayerCharacter*);if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunFacilityMoveRules(GetWorld(),Hero);},1.f,false);return;}
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFWorkshopFoodRoute")))
+    {FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this](){extern void RunWorkshopFoodRoute(UWorld*,ACFPlayerCharacter*);if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunWorkshopFoodRoute(GetWorld(),Hero);},1.f,false);return;}
     if(FParse::Param(FCommandLine::Get(),TEXT("CFSeedSupplyRules")))
     {FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this](){extern void RunSeedSupplyRules(UWorld*,ACFPlayerCharacter*);if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunSeedSupplyRules(GetWorld(),Hero);},1.f,false);return;}
     if(FParse::Param(FCommandLine::Get(),TEXT("CFSeedSupplyPersistence")))

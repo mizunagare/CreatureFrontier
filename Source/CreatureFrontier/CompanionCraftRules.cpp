@@ -26,6 +26,21 @@ void RunCompanionCraftRules(UWorld* World,ACFPlayerCharacter* Hero)
     Hero->Inventory->Restore({{EFrontierItem::Material,4}});
     const bool Empty=Site->CraftInventory->GetStacks().IsEmpty();
     Site->PersistentId=FGuid::NewGuid();
+    // 食物需求是只读查询；隔离夹具不代表伙伴已经实际运输。
+    const FVector DemandPosition=Site->GetActorLocation();
+    Site->SetActorLocation(UBaseBuildingComponent::BaseOrigin());
+    Site->CraftRecipeId=TEXT("PlantingSeeds");Site->bCraftUsesLocalStock=true;
+    bool FoodDemand=Site->CraftFoodDemand(Hero)==1;
+    Site->CraftInventory->Restore({{EFrontierItem::Food,1}});FoodDemand &= Site->CraftFoodDemand(Hero)==0;
+    Site->CraftInventory->Restore({{EFrontierItem::Food,999}});FoodDemand &= Site->CraftFoodDemand(Hero)==0;
+    Site->CraftInventory->Restore({});Site->bCraftUsesLocalStock=false;FoodDemand &= Site->CraftFoodDemand(Hero)==0;
+    Site->bCraftUsesLocalStock=true;Site->CraftRecipeId=NAME_None;FoodDemand &= Site->CraftFoodDemand(Hero)==0;
+    Site->CraftRecipeId=TEXT("MissingRecipe");FoodDemand &= Site->CraftFoodDemand(Hero)==0;
+    Site->CraftRecipeId=TEXT("PlantingSeeds");Site->RequiredSpecialty=EWorkSpecialty::Farming;FoodDemand &= Site->CraftFoodDemand(Hero)==0;
+    Site->RequiredSpecialty=EWorkSpecialty::Crafting;Site->bPlayerBuilt=false;FoodDemand &= Site->CraftFoodDemand(Hero)==0;
+    Site->bPlayerBuilt=true;Site->SetActorLocation(DemandPosition);FoodDemand &= Site->CraftFoodDemand(Hero)==0;
+    Site->CraftRecipeId=TEXT("Medicine");Site->bCraftUsesLocalStock=false;
+    UE_LOG(LogTemp,Display,TEXT("CF_WORKSHOP_FOOD_DEMAND %s"),FoodDemand?TEXT("PASS"):TEXT("FAIL"));
     // 快照规则夹具：设施尚未生成时只用已验证记录判断回运身份。
     FFacilitySaveRecord CargoTarget;CargoTarget.Id=Site->PersistentId;CargoTarget.Specialty=EWorkSpecialty::Crafting;
     FCreatureSaveRecord CargoRecord;CargoRecord.bOwned=true;CargoRecord.Disposition=ECreatureDisposition::Tamed;
@@ -94,7 +109,7 @@ void RunCompanionCraftRules(UWorld* World,ACFPlayerCharacter* Hero)
     Bad=Stock;Bad.CraftRevision=1;Bad.bCraftUsesLocalStock=false;Bad.CraftStockRevision=0;Bad.CraftStock.Empty();ModeValid &= AWorkStation::ValidateCraft(Bad);
     const bool Local=LocalOrder && LocalMissing && LocalFull && LocalPartial && LocalCancel && LocalReorder && LocalFinish && ModeValid;
     UE_LOG(LogTemp,Display,TEXT("CF_WORKSHOP_LOCAL %s order=%d missing=%d full=%d partial=%d cancel=%d reorder=%d finish=%d mode=%d"),Local?TEXT("PASS"):TEXT("FAIL"),LocalOrder,LocalMissing,LocalFull,LocalPartial,LocalCancel,LocalReorder,LocalFinish,ModeValid);
-    const bool Pass=Local && StorageInput && StockValid && Empty && Protected && Missing && Full && Partial && Paused && Rest && Exclusive && Finished && Once;
+    const bool Pass=FoodDemand && CargoValid && Local && StorageInput && StockValid && Empty && Protected && Missing && Full && Partial && Paused && Rest && Exclusive && Finished && Once;
     UE_LOG(LogTemp,Display,TEXT("CF_COMPANION_CRAFT_RULES %s missing=%d full=%d partial=%d paused=%d rest=%d exclusive=%d finished=%d once=%d"),Pass?TEXT("PASS"):TEXT("FAIL"),Missing,Full,Partial,Paused,Rest,Exclusive,Finished,Once);
     if(!Pass || !FParse::Param(FCommandLine::Get(),TEXT("CFWorkshopPreview"))){FPlatformMisc::RequestExitWithStatus(false,Pass?0:1);return;}
     // 规则夹具的图形快照，不作为正常物资来源或伙伴生产耗时证据。

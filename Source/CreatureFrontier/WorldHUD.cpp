@@ -124,8 +124,9 @@ void ACFHUD::DrawWorldHUD(ACFPlayerCharacter* Player)
         Rows.Add({Site->RequiredSpecialty==EWorkSpecialty::Farming?TEXT("农圃"):Site->RequiredSpecialty==EWorkSpecialty::Transport?TEXT("运输站"):TEXT("工作设施"),Blue});
         if(Site->RequiredSpecialty==EWorkSpecialty::Transport)
         {
-            Rows.Add({TEXT("从箱或制作设施取种补圃，再将农圃粮食送入食槽"),Green,2});
-            Rows.Add({TEXT("料源、农圃、食槽放在站点10米内，并留出通路"),Yellow,2});
+            Rows.Add({TEXT("取种补圃；粮食先补食槽，再按制作委托缺口备料"),Green,2});
+            Rows.Add({TEXT("站点10米内每位伙伴留1份口粮（至少1份），不抽食槽"),Green,2});
+            Rows.Add({TEXT("料源、农圃、食槽和制作设施须在10米内并留通路"),Yellow,2});
             Rows.Add({TEXT("C选制种配方，Shift+回车委托；C面板E打开设施备料"),Yellow,2});
         }
         if(Site->IsFoodStore())Rows.Add({FString::Printf(TEXT("食物 %d/30 | U 存入最多5份\nO 取最多5份 | Shift+O 取1份（6米）"),Site->StoredFood),Yellow,2});

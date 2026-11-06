@@ -21,6 +21,15 @@ bool AWorkStation::ValidateCraft(const FFacilitySaveRecord& Record)
     return Recipe && Catalog->Validate() && Recipe->Reward==ERecipeReward::Item && (!Recipe->bBaseOnly || FVector::Dist2D(Record.Transform.GetLocation(),UBaseBuildingComponent::BaseOrigin())<=800);
 }
 
+int32 AWorkStation::CraftFoodDemand(ACFPlayerCharacter* Hero) const
+{
+    // 只补当前合法委托的缺口，不把设施当作无限囤粮仓库；旧背包委托不参与。
+    if(IsActorBeingDestroyed() || !bPlayerBuilt || !PersistentId.IsValid() || RequiredSpecialty!=EWorkSpecialty::Crafting || !bCraftUsesLocalStock || CraftRecipeId.IsNone() || !IsValid(Hero) || Hero->GetWorld()!=GetWorld() || Hero->Health<=0 || !IsValid(CraftInventory) || !UInventoryComponent::Validate(CraftInventory->GetStacks()))return 0;
+    const auto* Catalog=UCraftingCatalog::Load();const auto* Recipe=Catalog?Catalog->Find(CraftRecipeId):nullptr;
+    if(!Recipe || !Catalog->Validate() || Recipe->Reward!=ERecipeReward::Item || !Hero->Research->Has(Recipe->RequiredResearch) || (Recipe->bBaseOnly && FVector::Dist2D(GetActorLocation(),UBaseBuildingComponent::BaseOrigin())>800))return 0;
+    return FMath::Max(0,Recipe->Inputs.FindRef(EFrontierItem::Food)-CraftInventory->Count(EFrontierItem::Food));
+}
+
 bool AWorkStation::ToggleCraftOrder(ACFPlayerCharacter* Hero,FName Id)
 {
     if(!HasAuthority() || IsActorBeingDestroyed() || !bPlayerBuilt || RequiredSpecialty!=EWorkSpecialty::Crafting || !IsValid(Hero) || Hero->GetWorld()!=GetWorld() || Hero->Health<=0 || !Hero->IsBackpackOpen() || UGameplayStatics::IsGamePaused(this) || Hero->GetDistanceTo(this)>300 || Hero->TraceFacility()!=this)return false;

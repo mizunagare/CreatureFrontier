@@ -24,6 +24,7 @@ foreach($marker in @('CF_WORKSHOP_INPUT PASS open=1 deposit=1 withdraw=1 close=1
     if(!$raw.Contains($marker)){throw ('缺少设施库存与本地加工证据：'+$marker)}
 }
 if(!$raw.Contains('CF_WORKSHOP_CARGO_SNAPSHOT PASS')){throw '缺少设施回运快照互斥校验证据'}
+if(!$raw.Contains('CF_WORKSHOP_FOOD_DEMAND PASS')){throw '缺少加工食物按需补给规则证据'}
 if($Preview){
     if(!$raw.Contains('CF_WORKSHOP_PREVIEW PASS')){throw '制作设施图形检查未通过'}
     $match=[regex]::Match($raw,'CF_WORKSHOP_PREVIEW_ROOT ([^\r\n]+)');if(!$match.Success){throw '缺少本次截图目录'}

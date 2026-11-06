@@ -32,6 +32,7 @@ public:
     bool ToggleCraftOrder(class ACFPlayerCharacter* Hero,FName Recipe);
     bool WorkCraft(class ACreatureCharacter* Pet,class ACFPlayerCharacter* Hero,float Amount);
     FString CraftStatus() const;
+    int32 CraftFoodDemand(class ACFPlayerCharacter* Hero) const;
     static bool ValidateCraft(const struct FFacilitySaveRecord& Record);
 private:
     TWeakObjectPtr<class ACreatureCharacter> CraftWorker;
