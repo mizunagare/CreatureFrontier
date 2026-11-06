@@ -1,5 +1,7 @@
 # 幻兽边境
 
+最新限定整合：伙伴制种并补回原农圃，修复进食返岗时的绕行阻塞。保留食物1、采纤维1，C选择准备种子，瞄准制作设施Shift＋回车委托、E派工，完成后F2向原农圃存种。Windows入口 `F:\CreatureFrontierBuilds\Windows-CompanionSeed\CreatureFrontier.exe`，两端真实链／存读／边界与限制见[伙伴制种整合](Docs/COMPANION_SEED_PROGRESS.md)。本地原生候选，非完整重烹饪或最终发布版。
+
 最新限定操作改进：Shift＋O只取1份食物，便于备料时保留基地口粮；原O／U仍最多5份。Windows入口 `F:\CreatureFrontierBuilds\Windows-FoodPortion\CreatureFrontier.exe`，两端真实档、边界与显示证据见[单份取粮](Docs/FOOD_PORTION.md)。这是后续采纤维／伙伴制种的准备，尚非补种整链或最终发布版。
 
 最新限定整合：农业回补食槽。F2向农圃存原种子，伙伴种植收获后O取粮，实际返屋U补入食槽；两端已以原1种子把储粮2补至3，生长中途恢复通过。Windows入口 `F:\CreatureFrontierBuilds\Windows-PantryRefill\CreatureFrontier.exe`，证据与限制见[农业回补食槽](Docs/PANTRY_REFILL.md)。复用已有玩法，种子会耗尽，并非永续经营或最终发布版。

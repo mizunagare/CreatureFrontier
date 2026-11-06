@@ -91,6 +91,8 @@ void ACFGameMode::BeginPlay()
             if(!It->bHasHabitat){It->bHasHabitat=true;It->HabitatHome=Origin;}
         }
     SeedFrontierResources(GetWorld());
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFCompanionSeedTest")) || FParse::Param(FCommandLine::Get(),TEXT("CFCompanionSeedRead")))
+    {const bool Read=FParse::Param(FCommandLine::Get(),TEXT("CFCompanionSeedRead"));FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this,Read](){extern void RunCompanionSeedScenario(UWorld*,ACFPlayerCharacter*,bool);if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunCompanionSeedScenario(GetWorld(),Hero,Read);},1.f,false);return;}
     if(FParse::Param(FCommandLine::Get(),TEXT("CFFoodPortionTest")) || FParse::Param(FCommandLine::Get(),TEXT("CFFoodPortionRead")) || FParse::Param(FCommandLine::Get(),TEXT("CFFoodPortionRules")))
     {FTimerHandle Start;GetWorldTimerManager().SetTimer(Start,[this](){extern void RunFoodPortionScenario(UWorld*,ACFPlayerCharacter*);if(auto* Hero=Cast<ACFPlayerCharacter>(UGameplayStatics::GetPlayerCharacter(this,0)))RunFoodPortionScenario(GetWorld(),Hero);},1.f,false);return;}
     if(FParse::Param(FCommandLine::Get(),TEXT("CFPantryRefillTest")) || FParse::Param(FCommandLine::Get(),TEXT("CFPantryRefillRead")))

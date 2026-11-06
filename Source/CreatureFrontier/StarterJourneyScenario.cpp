@@ -2077,6 +2077,77 @@ struct FPantryRefill : FStarterWorkshop
     }
 };
 }
+namespace
+{
+struct FCompanionSeed : FStarterWorkshop
+{
+    TWeakObjectPtr<AWorkStation> Trough;TWeakObjectPtr<AResourceNode> Fiber;FGuid TroughId;FTransform TroughPose;
+    int32 FiberStart=0,Meals=0,LastStock=2,Dropped=0;bool Traveling=false,Assigned=false,Queued=false;
+    bool Done()const{return Recruit.IsValid() && Recruit->Experience==19;}
+    void BindSeed(){BindWorkshop();Trough.Reset();Fiber.Reset();for(TActorIterator<AWorkStation> It(World);It;++It)if(It->PersistentId==TroughId)Trough=*It;for(TActorIterator<AResourceNode> It(World);It;++It)if(It->PersistentId==FGuid(0xCF170000,0,0,8))Fiber=*It;}
+    bool EndSeed(bool Pass,const TCHAR* Why)
+    {
+        if(Input.IsValid())Input->Direction=FVector::ZeroVector;CFInputQA::Release(Hero,EKeys::M);CFInputQA::Release(Hero,EKeys::LeftShift);const FString Feedback=Hero->Feedback;
+        if(!Pass)Hero->SaveProgress(TEXT("CompanionSeedBlocked"));const TCHAR* Result=Pass?TEXT("PASS"):TEXT("FAIL");
+        UE_LOG(LogTemp,Display,TEXT("CF_COMPANION_SEED %s reason=%s phase=%d meals=%d dropped=%d hero=%s new=%s feedback=%s"),Result,Why,Phase,Meals,Dropped,*Hero->GetActorLocation().ToString(),Recruit.IsValid()?*Recruit->GetActorLocation().ToString():TEXT("none"),*Feedback);FPlatformMisc::RequestExitWithStatus(false,Pass?0:1);return false;
+    }
+    bool BudgetSeed()const
+    {
+        if(!Pet.IsValid() || !Recruit.IsValid() || !Farm.IsValid() || !Indoor.IsValid() || !Trough.IsValid() || !Fiber.IsValid() || Hero->Health!=PlayerHealth || Hero->Health<=0 || Pet->Health!=110 || Recruit->Health!=80 || Pet->Level!=2 || Recruit->Level!=1 || Pet->Experience!=41 || Recruit->Experience<18 || Recruit->Experience>19 || Pet->Nickname!=Nickname || Pet->BondPoints!=6 || Recruit->BondPoints!=0 || Pet->WorkSite!=Farm.Get() || Pet->Activity!=ECreatureActivity::Work || Hero->GetCompanionRoster().Num()!=2)return false;
+        const int32 Taken=FiberStart-Fiber->Remaining;if(Taken<0 || Taken>1 || Meals<0 || Meals>1 || Dropped<0 || Dropped>3 || (!Done() && Dropped>0))return false;
+        auto Expected=Bag;Expected.Add(EFrontierItem::Food,Done()?0:1);Expected.Add(EFrontierItem::Fiber,Taken-(Done()?1:0));Expected.Add(EFrontierItem::Seeds,Done()?3-Dropped:0);for(int32 I=0;I<static_cast<int32>(EFrontierItem::Count);++I)if(Hero->Inventory->Count(static_cast<EFrontierItem>(I))!=Expected.FindRef(static_cast<EFrontierItem>(I)))return false;
+        if(!Farm->GetActorTransform().Equals(Garden.Transform,.01) || Farm->StoredFood!=0 || Farm->Crop->Seeds+(Farm->Crop->bPlanted?1:0)!=Dropped || Farm->Crop->GrowthWork<0 || Farm->Crop->GrowthWork>=6 || !Indoor->GetActorTransform().Equals(ExpectedPlacement,.01) || !Trough->GetActorTransform().Equals(TroughPose,.01) || Trough->StoredFood!=2-Meals)return false;
+        if(Done()){if(!Indoor->CraftRecipeId.IsNone() || Indoor->CraftWork!=0 || Recruit->Activity!=ECreatureActivity::Rest || Recruit->WorkSite!=Indoor.Get())return false;}
+        else if(Assigned){if(Recruit->Activity!=ECreatureActivity::Work || Recruit->WorkSite!=Indoor.Get() || Indoor->CraftRecipeId!=TEXT("PlantingSeeds"))return false;}
+        else if(Traveling){if(Recruit->Activity!=ECreatureActivity::Follow || Recruit->WorkSite)return false;}
+        else if(Recruit->Activity!=ECreatureActivity::Rest || Recruit->WorkSite!=Indoor.Get())return false;
+        if(Queued && !Done()){if(Indoor->CraftRecipeId!=TEXT("PlantingSeeds") || Indoor->CraftWork<0 || Indoor->CraftWork>=8)return false;}
+        else if(!Done() && (!Indoor->CraftRecipeId.IsNone() || Indoor->CraftWork!=0))return false;
+        int32 Count=0;for(TActorIterator<AWorkStation> It(World);It;++It)if(It->bPlayerBuilt){++Count;if(It->PersistentId!=Garden.Id && It->PersistentId!=IndoorId && It->PersistentId!=TroughId)return false;}if(Count!=3)return false;
+        const auto Layout=HomeLayout::Collect(World);if(Layout.Num()!=Original.Num())return false;for(const auto& R:Original){const auto* V=Layout.FindByPredicate([&](const FHomeModuleRecord& X){return X.Id==R.Id;});if(!V || V->Definition!=R.Definition || !V->Transform.Equals(R.Transform,.01) || V->PaidMaterials!=R.PaidMaterials || !V->StoredItems.OrderIndependentCompareEqual(R.StoredItems))return false;}
+        for(TActorIterator<AResourceNode> It(World);It;++It)if(It->PersistentId!=Fiber->PersistentId)if(const auto* N=Resources.Find(It->PersistentId))if(It->Remaining!=*N)return false;
+        return Pet->Cargo->Count()==0 && Recruit->Cargo->Count()==0 && Hero->GetObjectives().Claimed==5;
+    }
+    bool TickSeed()
+    {
+        if(Trough.IsValid() && Trough->StoredFood!=LastStock)
+        {
+            const auto P=Pet->GetActorLocation();if(Trough->StoredFood!=LastStock-1 || P.X< -150 || P.X>150 || FMath::Abs(P.Y+400)>160 || P.Z<50 || Pet->Nutrition<=40)return EndSeed(false,TEXT("meal-account"));++Meals;LastStock=Trough->StoredFood;UE_LOG(LogTemp,Display,TEXT("CF_COMPANION_SEED_MEAL PASS count=%d stock=%d natural=1"),Meals,LastStock);
+        }
+        if(!BudgetSeed() || FPlatformTime::Seconds()>Deadline)return EndSeed(false,TEXT("budget-time"));
+        const auto H=Hero->GetActorLocation(),P=Pet->GetActorLocation(),R=Recruit->GetActorLocation();const double Dt=World->GetTimeSeconds()-LastTime;
+        if(!Motion(Hero,LastH,VelocityH,Dt) || !Motion(Pet.Get(),LastP,VelocityP,Dt) || !Motion(Recruit.Get(),LastR,VelocityR,Dt))return EndSeed(false,TEXT("motion"));LastH=H;LastP=P;LastR=R;VelocityH=Hero->GetVelocity();VelocityP=Pet->GetVelocity();VelocityR=Recruit->GetVelocity();LastTime=World->GetTimeSeconds();
+        int32 Regions=0;for(TActorIterator<AWildEncounter> It(World);It;++It){++Regions;if(!It->IsActorTickEnabled())return EndSeed(false,TEXT("region"));}if(Regions!=3)return EndSeed(false,TEXT("regions"));for(TActorIterator<ACreatureCharacter> It(World);It;++It)if(It->Health>0 && (!It->IsActorTickEnabled() || !It->GetActorEnableCollision() || It->GetCharacterMovement()->MovementMode==MOVE_None))return EndSeed(false,TEXT("ecology"));
+        if(FPlatformTime::Seconds()<ShotUntil)return true;
+        if(Phase==-1){if(World->GetTimeSeconds()-At<2 || UNavigationSystemV1::IsNavigationBeingBuiltOrLocked(World))return true;if(Read){Phase=20;return true;}if(!Plan(FVector(-450,-270,40),0))return EndSeed(false,TEXT("outside-plan"));return true;}
+        if(Phase==0){const int32 Result=Move();if(Result<0)return EndSeed(false,TEXT("outside-walk"));if(!Result)return true;Face(R);if(Hero->TraceCreature()!=Recruit.Get() || !CFInputQA::Press(Hero,EKeys::L) || !Hero->IsCommandTarget(Recruit.Get()) || Hero->IsCommandTarget(Pet.Get()) || !CFInputQA::Press(Hero,EKeys::F))return EndSeed(false,TEXT("select-follow"));Traveling=true;if(!Plan(FVector(-1000,450,40),1))return EndSeed(false,TEXT("west-plan"));return true;}
+        if(Phase==1){const int32 Result=Move();if(Result<0)return EndSeed(false,TEXT("west-walk"));if(!Result)return true;if(!Plan(FVector(-1500,1150,40),2))return EndSeed(false,TEXT("fiber-plan"));return true;}
+        if(Phase==2){const int32 Result=Move();if(Result<0)return EndSeed(false,TEXT("fiber-walk"));if(!Result)return true;Face(Fiber->GetActorLocation());if(Hero->TraceResource()!=Fiber.Get() || !CFInputQA::Press(Hero,EKeys::M))return EndSeed(false,TEXT("fiber-input"));Phase=3;At=World->GetTimeSeconds();return true;}
+        if(Phase==3){Face(Fiber->GetActorLocation());if(Hero->Inventory->Count(EFrontierItem::Fiber)<1){if(World->GetTimeSeconds()-At>10)return EndSeed(false,TEXT("fiber-gather"));return true;}CFInputQA::Release(Hero,EKeys::M);if(!Hero->SaveProgress(TEXT("CompanionSeedMid")))return EndSeed(false,TEXT("raw-save"));UE_LOG(LogTemp,Display,TEXT("CF_COMPANION_SEED_MID PASS fiberPaidFromWorld=1 food=1 seeds=0 meals=%d"),Meals);Phase=4;return true;}
+        if(Phase==4){if(Photo(TEXT("Raw"),Fiber->GetActorLocation()))return true;if(!Plan(FVector(-300,-600,40),5))return EndSeed(false,TEXT("return-plan"));return true;}
+        if(Phase==20){Face(R);if(Hero->TraceCreature()!=Recruit.Get() || !CFInputQA::Press(Hero,EKeys::L) || !Hero->IsCommandTarget(Recruit.Get()) || Hero->IsCommandTarget(Pet.Get()))return EndSeed(false,TEXT("read-select"));Phase=4;return true;}
+        if(Phase==5){const int32 Result=Move();if(Result<0)return EndSeed(false,TEXT("return-walk"));if(!Result)return true;Face(Indoor->GetActorLocation()+FVector(0,0,25));const auto* Catalog=UCraftingCatalog::Load();const int32 Index=Catalog?Catalog->Recipes.IndexOfByPredicate([](const FFrontierRecipe& X){return X.Id==TEXT("PlantingSeeds");}):INDEX_NONE;if(Index<0 || Hero->TraceFacility()!=Indoor.Get() || !CFInputQA::Press(Hero,EKeys::C))return EndSeed(false,TEXT("recipe-menu"));for(int32 I=0;I<Index;++I)if(!CFInputQA::Press(Hero,EKeys::Down))return EndSeed(false,TEXT("recipe-select"));Phase=6;return true;}
+        if(Phase==6){Face(Indoor->GetActorLocation()+FVector(0,0,25));if(Photo(TEXT("Recipe"),Indoor->GetActorLocation()))return true;if(!CFInputQA::ShiftPress(Hero,EKeys::Enter) || Indoor->CraftRecipeId!=TEXT("PlantingSeeds") || !CFInputQA::Press(Hero,EKeys::C) || !CFInputQA::Press(Hero,EKeys::E) || Recruit->WorkSite!=Indoor.Get() || Recruit->Activity!=ECreatureActivity::Work)return EndSeed(false,TEXT("queue-assign"));Queued=true;Assigned=true;Phase=7;At=World->GetTimeSeconds();return true;}
+        if(Phase==7){if(!Done()){if(World->GetTimeSeconds()-At>25)return EndSeed(false,TEXT("work"));return true;}UE_LOG(LogTemp,Display,TEXT("CF_COMPANION_SEED_CRAFT PASS foodPaid=1 fiberPaid=1 seeds=3 oldXP=41 newXP=19"));Phase=8;return true;}
+        if(Phase==8){if(Photo(TEXT("Crafted"),Indoor->GetActorLocation()))return true;if(!Plan(FVector(-110,-1100,40),9))return EndSeed(false,TEXT("farm-plan"));return true;}
+        if(Phase==9){const int32 Result=Move();if(Result<0)return EndSeed(false,TEXT("farm-walk"));if(!Result)return true;Face(Farm->GetActorLocation()+FVector(0,0,30));if(Hero->TraceFacility()!=Farm.Get())return EndSeed(false,TEXT("farm-aim"));for(int32 I=0;I<3;++I){if(!CFInputQA::Press(Hero,EKeys::F2))return EndSeed(false,TEXT("seed-deposit"));++Dropped;}if(!BudgetSeed())return EndSeed(false,TEXT("seed-budget"));Phase=10;At=World->GetTimeSeconds();return true;}
+        if(Phase==10){if(!Farm->Crop->bPlanted || Farm->Crop->Seeds!=2 || Farm->Crop->GrowthWork<.5f){if(World->GetTimeSeconds()-At>20)return EndSeed(false,TEXT("sow-resume"));return true;}if(Photo(TEXT("Seeded"),Farm->GetActorLocation()+FVector(0,0,30)))return true;const auto HB=H,PB=P,RB=R;if(!Hero->SaveProgress(TEXT("CompanionSeedDone")) || !Hero->LoadProgress(TEXT("CompanionSeedDone")))return EndSeed(false,TEXT("save"));BindSeed();if(!BudgetSeed() || !Hero->GetActorLocation().Equals(HB,.01) || !Pet->GetActorLocation().Equals(PB,.01) || !Recruit->GetActorLocation().Equals(RB,.01))return EndSeed(false,TEXT("restore"));UE_LOG(LogTemp,Display,TEXT("CF_COMPANION_SEED_LIFE PASS fiberTaken=1 foodPaid=1 seedsMade=3 deposited=3 planted=1 reserveSeeds=2 oldXP=41 newXP=19 meals=%d saved=1"),Meals);return EndSeed(true,TEXT("complete"));}
+        return true;
+    }
+};
+}
+void RunCompanionSeedScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read)
+{
+    auto S=MakeShared<FCompanionSeed>();S->World=World;S->Hero=Hero;S->Read=Read;S->Traveling=Read;S->At=World->GetTimeSeconds();S->Deadline=FPlatformTime::Seconds()+180;
+    const auto* Source=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("CompanionSeedInput"),0));if(!Source || Source->FormatVersion!=38 || Source->Facilities.Num()!=3 || Source->HomeModules.Num()!=7 || !Hero->LoadProgress(TEXT("CompanionSeedInput"))){S->EndSeed(false,TEXT("source"));return;}
+    const auto* Catalog=UCraftingCatalog::Load();const auto* Recipe=Catalog?Catalog->Find(TEXT("PlantingSeeds")):nullptr;if(!Recipe || Recipe->Inputs.Num()!=2 || Recipe->Inputs.FindRef(EFrontierItem::Food)!=1 || Recipe->Inputs.FindRef(EFrontierItem::Fiber)!=1 || Recipe->Output!=EFrontierItem::Seeds || Recipe->OutputAmount!=3){S->EndSeed(false,TEXT("recipe-definition"));return;}
+    S->Original=Source->HomeModules;for(const auto& F:Source->Facilities){if(F.Specialty==EWorkSpecialty::Farming)S->Garden=F;if(F.Specialty==EWorkSpecialty::Crafting){S->IndoorId=F.Id;S->ExpectedPlacement=F.Transform;}if(F.Specialty==EWorkSpecialty::Feeding){S->TroughId=F.Id;S->TroughPose=F.Transform;S->LastStock=F.StoredFood;S->Meals=2-F.StoredFood;}}
+    S->Bag=Hero->Inventory->GetStacks();S->PlayerHealth=Hero->Health;for(TActorIterator<ACreatureCharacter> It(World);It;++It)if(It->Tamer==Hero->GetController() && It->Definition){if(It->Definition->Form==ECreatureForm::Leaf){S->PetId=It->PersistentId;S->Nickname=It->Nickname;}if(It->Definition->Form==ECreatureForm::Ember)S->RecruitId=It->PersistentId;}
+    S->BindSeed();for(const auto& N:Source->ResourceNodes)S->Resources.Add(N.Id,N.Remaining);if(S->Fiber.IsValid())S->FiberStart=S->Fiber->Remaining+(Read?1:0);
+    if(!S->BudgetSeed() || Hero->Inventory->Count(EFrontierItem::Food)!=1 || Hero->Inventory->Count(EFrontierItem::Fiber)!=(Read?1:0) || Hero->Inventory->Count(EFrontierItem::Seeds)!=0 || !S->Door.IsValid() || S->Door->DoorState!=2 || (!Read && S->Meals!=0)){S->EndSeed(false,TEXT("source-budget"));return;}
+    S->LastH=Hero->GetActorLocation();S->LastP=S->Pet->GetActorLocation();S->LastR=S->Recruit->GetActorLocation();S->VelocityH=Hero->GetVelocity();S->VelocityP=S->Pet->GetVelocity();S->VelocityR=S->Recruit->GetVelocity();S->LastTime=World->GetTimeSeconds();S->Input=NewObject<UHomeMovementProbe>(Hero);S->Input->RegisterComponent();
+    S->Preview=FParse::Param(FCommandLine::Get(),TEXT("CFCompanionSeedPreview"));if(S->Preview){S->Root=FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir()/TEXT("CompanionSeedPreview")/FGuid::NewGuid().ToString(EGuidFormats::Digits));IFileManager::Get().MakeDirectory(*S->Root,true);UE_LOG(LogTemp,Display,TEXT("CF_COMPANION_SEED_PREVIEW_ROOT %s"),*S->Root);}FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([S](float){return S->TickSeed();}));
+}
 void RunPantryRefillScenario(UWorld* World,ACFPlayerCharacter* Hero,bool Read)
 {
     auto S=MakeShared<FPantryRefill>();S->World=World;S->Hero=Hero;S->Read=Read;S->Deposited=Read;S->At=World->GetTimeSeconds();S->Deadline=FPlatformTime::Seconds()+100;

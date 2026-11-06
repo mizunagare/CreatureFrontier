@@ -177,16 +177,32 @@ bool ACreatureCharacter::FindFollowPathDetour(const FVector& Destination,const A
         // 门外角色与设施可能形成连续两个拐角；单个中转点不能保证静态最短路绕开两者。
         // 只在同层两圈16节点内搜索至多两个中转点，所有边仍走完整导航及真实胶囊校验。
         FNavLocation Floor;if(!Nav->ProjectPointToNavigation(GetActorLocation(),Floor,FVector(35,35,120)))return false;
-        const float Height=GetActorLocation().Z-Floor.Location.Z;
         const bool WorkTrace=FParse::Param(FCommandLine::Get(),TEXT("CFFarmApproachTrace"));
         FCollisionQueryParams Query(SCENE_QUERY_STAT(WorkDetourVolume),false,this);
+        auto StandingCenter=[&](const FVector& Point,FVector& Center)
+        {
+            // 导航面有体素高度误差，门槛上的当前偏移不能沿用到整条室外路径。
+            // 逐点找实际可行走地面，按角色正常离地间隙放置完整胶囊，不能忽略地板命中。
+            const auto* Movement=GetCharacterMovement();FHitResult Ground;
+            const float Reach=Movement->MaxStepHeight;
+            if(!GetWorld()->LineTraceSingleByChannel(Ground,Point+FVector(0,0,Reach),Point-FVector(0,0,Reach),ECC_Pawn,Query) || !Movement->IsWalkable(Ground))return false;
+            Center=Ground.ImpactPoint+FVector(0,0,GetCapsuleComponent()->GetScaledCapsuleHalfHeight()+
+                (UCharacterMovementComponent::MIN_FLOOR_DIST+UCharacterMovementComponent::MAX_FLOOR_DIST)*.5f);
+            return true;
+        };
         auto SafePath=[&](const UNavigationPath* Path)
         {
             if(!FrontierFollowPath::ClearPath(this,Path))return false;
+            FVector A;if(!StandingCenter(Path->PathPoints[0],A))return false;
             for(int32 I=1;I<Path->PathPoints.Num();++I)
             {
-                const FVector A=Path->PathPoints[I-1]+FVector(0,0,Height),B=Path->PathPoints[I]+FVector(0,0,Height);FHitResult Hit;bool StepDown=false;
-                if(!FrontierFollowPath::ClearYieldSegment(this,A,B,Query,Hit,StepDown))return false;
+                FVector B;if(!StandingCenter(Path->PathPoints[I],B))return false;FHitResult Hit;bool StepDown=false;
+                if(!FrontierFollowPath::ClearYieldSegment(this,A,B,Query,Hit,StepDown))
+                {
+                    if(WorkTrace)UE_LOG(LogTemp,Display,TEXT("CF_WORK_DETOUR_VOLUME actor=%s obstacle=%s from=%s to=%s impact=%s penetrating=%d"),*GetName(),*GetNameSafe(Hit.GetActor()),*A.ToString(),*B.ToString(),*Hit.ImpactPoint.ToString(),Hit.bStartPenetrating);
+                    return false;
+                }
+                A=B;
             }
             return true;
         };
@@ -202,6 +218,7 @@ bool ACreatureCharacter::FindFollowPathDetour(const FVector& Destination,const A
             auto* End=UNavigationSystemV1::FindPathToLocationSynchronously(GetWorld(),Node.Point,Destination,const_cast<ACreatureCharacter*>(this));
             if(SafePath(Start))Node.Start=Start->GetPathLength();if(SafePath(End))Node.End=End->GetPathLength();
             if(Node.Start>=0 && Node.End>=0 && Node.Start+Node.End<Shortest){Shortest=Node.Start+Node.End;Selected=Node.Point;Bends=1;}
+            if(WorkTrace)UE_LOG(LogTemp,Display,TEXT("CF_WORK_DETOUR_NODE actor=%s index=%d point=%s start=%.1f end=%.1f"),*GetName(),I,*Node.Point.ToString(),Node.Start,Node.End);
             Nodes.Add(Node);
         }
         if(Bends==0)for(int32 A=0;A<Nodes.Num();++A)if(Nodes[A].Start>=0)
