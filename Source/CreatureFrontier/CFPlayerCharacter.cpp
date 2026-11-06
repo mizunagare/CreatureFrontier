@@ -201,7 +201,9 @@ bool ACFPlayerCharacter::SaveProgress(const FString& Slot)
             Record.Transform = It->GetActorTransform(); Record.Id = It->PersistentId; Record.Specialty = It->RequiredSpecialty;
             Record.StoredFood = It->StoredFood;
             Record.Seeds=It->Crop->Seeds; Record.bPlanted=It->Crop->bPlanted; Record.GrowthWork=It->Crop->GrowthWork;
-            Record.CraftRevision=1;Record.CraftRecipe=It->CraftRecipeId;Record.CraftWork=It->CraftWork;
+            Record.CraftRevision=It->bCraftUsesLocalStock?2:1;Record.CraftRecipe=It->CraftRecipeId;Record.CraftWork=It->CraftWork;
+            Record.bCraftUsesLocalStock=It->bCraftUsesLocalStock;
+            Record.CraftStockRevision=1;Record.CraftStock=It->CraftInventory->GetStacks();
             Save->Facilities.Add(Record);
         }
     const bool bSaved = UGameplayStatics::SaveGameToSlot(Save, Slot, 0);
@@ -465,6 +467,8 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
         Site->StoredFood = Record.StoredFood;
         Site->Crop->Seeds=Record.Seeds; Site->Crop->bPlanted=Record.bPlanted; Site->Crop->GrowthWork=Record.GrowthWork;
         Site->CraftRecipeId=Record.CraftRecipe;Site->CraftWork=Record.CraftWork;
+        Site->bCraftUsesLocalStock=Record.bCraftUsesLocalStock;
+        Site->CraftInventory->Restore(Record.CraftStock);
         Site->FinishSpawning(Record.Transform);
         RestoredBuilt.Add(Site);
     }
@@ -612,6 +616,12 @@ void ACFPlayerCharacter::CommandWork()
 {
     if (!HasAuthority() || Health <= 0 || UGameplayStatics::IsGamePaused(this) || Building->IsActive()) return;
     if(Storage->IsOpen()){Storage->Close();return;}
+    if(IsBackpackOpen())
+    {
+        auto* Workshop=TraceFacility();
+        if(!Workshop || !Workshop->bPlayerBuilt || Workshop->RequiredSpecialty!=EWorkSpecialty::Crafting){Feedback=TEXT("请瞄准自建制作设施，按E查看设施库存");return;}
+        ToggleBackpack();if(!Storage->OpenWorkshop(Workshop))ToggleBackpack();return;
+    }
     if(auto* ConstructionSite=AHomeModule::TraceConstruction(this))
     {
         if(!GetDeliveryCrate()){Feedback=TEXT("尚未派工：先瞄准材料箱按V，再瞄工地按E");return;}

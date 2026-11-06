@@ -19,6 +19,7 @@ public:
     UPROPERTY(BlueprintReadOnly, Category="Building") FGuid PersistentId;
     UPROPERTY(BlueprintReadOnly, Category="Feeding") int32 StoredFood = 0;
     UPROPERTY(VisibleAnywhere,BlueprintReadOnly) TObjectPtr<class UFarmCropComponent> Crop;
+    UPROPERTY(VisibleAnywhere,BlueprintReadOnly) TObjectPtr<class UInventoryComponent> CraftInventory;
     void RefreshFarm() { RefreshLabel(); }
     bool TransferFood(class ACFPlayerCharacter* Hero, bool Deposit,bool SingleWithdrawal=false);
     bool ServeFood(class ACreatureCharacter* Pet);
@@ -27,6 +28,7 @@ public:
     static constexpr float RequiredCraftWork=8;
     FName CraftRecipeId;
     float CraftWork=0;
+    bool bCraftUsesLocalStock=false;
     bool ToggleCraftOrder(class ACFPlayerCharacter* Hero,FName Recipe);
     bool WorkCraft(class ACreatureCharacter* Pet,class ACFPlayerCharacter* Hero,float Amount);
     FString CraftStatus() const;

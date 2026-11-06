@@ -1,6 +1,7 @@
 #include "WorkStation.h"
 #include "FrontierChinese.h"
 #include "FarmCropComponent.h"
+#include "InventoryComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/TextRenderComponent.h"
 #include "Engine/StaticMesh.h"
@@ -13,6 +14,7 @@ AWorkStation::AWorkStation()
 {
     PrimaryActorTick.bCanEverTick=true;
     Crop=CreateDefaultSubobject<UFarmCropComponent>(TEXT("Crop"));
+    CraftInventory=CreateDefaultSubobject<UInventoryComponent>(TEXT("CraftInventory"));
     auto* Mesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("WorkBench"));
     SetRootComponent(Mesh);
     static ConstructorHelpers::FObjectFinder<UStaticMesh> Cube(TEXT("/Engine/BasicShapes/Cube.Cube"));

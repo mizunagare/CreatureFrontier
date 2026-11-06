@@ -16,11 +16,12 @@
 void RunSeedSupplyRules(UWorld* World,ACFPlayerCharacter* Hero)
 {
     const bool Blocked=FParse::Param(FCommandLine::Get(),TEXT("CFSeedSupplyBlocked"));
-    const bool Route=Blocked || FParse::Param(FCommandLine::Get(),TEXT("CFSeedSupplyRoute"));
+    const bool Workshop=FParse::Param(FCommandLine::Get(),TEXT("CFWorkshopSeedRoute"));
+    const bool Route=Workshop || Blocked || FParse::Param(FCommandLine::Get(),TEXT("CFSeedSupplyRoute"));
     auto* Pet=World->SpawnActor<ACreatureCharacter>(FVector(-1100,-1500,40),FRotator::ZeroRotator);
     auto* Post=World->SpawnActor<AWorkStation>(FVector(-1100,-1750,0),FRotator::ZeroRotator);
     auto* Farm=World->SpawnActor<AWorkStation>(FVector(Route?-500:-950,-1500,0),FRotator::ZeroRotator);
-    auto* Crate=World->SpawnActor<AHomeModule>(FVector(Route?-1600:-1250,-1500,Blocked?700:0),FRotator::ZeroRotator);
+    auto* Crate=World->SpawnActor<AHomeModule>(FVector(Workshop?-2100:Route?-1600:-1250,-1500,Blocked?700:0),FRotator::ZeroRotator);
     Post->RequiredSpecialty=EWorkSpecialty::Transport;Farm->RequiredSpecialty=EWorkSpecialty::Farming;
     Crate->Definition=NewObject<UHomeModuleDefinition>(Crate);Crate->Definition->Kind=EHomeModuleKind::Storage;
     Pet->Tamer=Hero->GetController();Pet->Disposition=ECreatureDisposition::Tamed;Pet->Activity=ECreatureActivity::Work;Pet->WorkSite=Post;
@@ -93,17 +94,25 @@ void RunSeedSupplyRules(UWorld* World,ACFPlayerCharacter* Hero)
     if(Route)
     {
         // 只在夹具初始化时投入3种；观察期间完全交给普通AI，不补值、不瞬移。
-        Crate->StorageInventory->Restore({{EFrontierItem::Seeds,3}});Crate->OnConstruction(Crate->GetActorTransform());Farm->RefreshFarm();
+        Crate->OnConstruction(Crate->GetActorTransform());Farm->RefreshFarm();
+        UInventoryComponent* RouteStock=Crate->StorageInventory;
+        if(Workshop)
+        {
+            auto* Source=World->SpawnActor<AWorkStation>(FVector(-1600,-1500,0),FRotator::ZeroRotator);
+            Source->bPlayerBuilt=true;Source->PersistentId=FGuid::NewGuid();Source->RequiredSpecialty=EWorkSpecialty::Crafting;RouteStock=Source->CraftInventory;
+            UE_LOG(LogTemp,Display,TEXT("CF_WORKSHOP_SEED_SOURCE fixture=1 seeds=3 actualCraft=0"));
+        }
+        RouteStock->Restore({{EFrontierItem::Seeds,3}});
         struct FRouteState{FVector Last;double LastTime=0,Start=0,NextLog=0,Travel=0;bool Picked=false;};
         auto S=MakeShared<FRouteState>();S->Last=Pet->GetActorLocation();S->Start=World->GetTimeSeconds();S->LastTime=S->Start;
-        FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([World,Pet,Post,Farm,Crate,S](float)
+        FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([World,Pet,Post,Farm,RouteStock,S](float)
         {
             const double Now=World->GetTimeSeconds(),Step=FVector::Dist(S->Last,Pet->GetActorLocation());
             const bool Continuous=Step<=Pet->GetCharacterMovement()->GetMaxSpeed()*(Now-S->LastTime)+10;
             S->Travel+=Step;S->Last=Pet->GetActorLocation();S->LastTime=Now;
-            if(Pet->CarriedSeeds>0 && !S->Picked){S->Picked=true;UE_LOG(LogTemp,Display,TEXT("CF_SEED_ROUTE_PICKUP pos=%s carried=%d box=%d"),*S->Last.ToString(),Pet->CarriedSeeds,Crate->StorageInventory->Count(EFrontierItem::Seeds));}
-            const bool Invariant=Continuous && Pet->WorkSite==Post && Pet->GetActorEnableCollision() && Pet->IsActorTickEnabled() && Pet->GetCharacterMovement()->MovementMode!=MOVE_None && Pet->CarriedFood==0 && Farm->StoredFood==0 && !Farm->Crop->bPlanted && Crate->StorageInventory->Count(EFrontierItem::Seeds)+Pet->CarriedSeeds+Farm->Crop->Seeds==3;
-            const bool Delivered=S->Picked && Pet->CarriedSeeds==0 && Farm->Crop->Seeds==3 && Crate->StorageInventory->Count(EFrontierItem::Seeds)==0 && S->Travel>800 && Pet->GetDistanceTo(Farm)<=220;
+            if(Pet->CarriedSeeds>0 && !S->Picked){S->Picked=true;UE_LOG(LogTemp,Display,TEXT("CF_SEED_ROUTE_PICKUP pos=%s carried=%d sourceStock=%d"),*S->Last.ToString(),Pet->CarriedSeeds,RouteStock->Count(EFrontierItem::Seeds));}
+            const bool Invariant=Continuous && Pet->WorkSite==Post && Pet->GetActorEnableCollision() && Pet->IsActorTickEnabled() && Pet->GetCharacterMovement()->MovementMode!=MOVE_None && Pet->CarriedFood==0 && Farm->StoredFood==0 && !Farm->Crop->bPlanted && RouteStock->Count(EFrontierItem::Seeds)+Pet->CarriedSeeds+Farm->Crop->Seeds==3;
+            const bool Delivered=S->Picked && Pet->CarriedSeeds==0 && Farm->Crop->Seeds==3 && RouteStock->Count(EFrontierItem::Seeds)==0 && S->Travel>800 && Pet->GetDistanceTo(Farm)<=220;
             if(!Invariant || Delivered || Now-S->Start>45)
             {const bool Pass=Invariant && Delivered;UE_LOG(LogTemp,Display,TEXT("CF_SEED_ROUTE %s invariant=%d picked=%d farm=%d carried=%d travel=%.1f elapsed=%.3f pos=%s"),Pass?TEXT("PASS"):TEXT("FAIL"),Invariant,S->Picked,Farm->Crop->Seeds,Pet->CarriedSeeds,S->Travel,Now-S->Start,*S->Last.ToString());FPlatformMisc::RequestExitWithStatus(false,Pass?0:1);return false;}
             if(Now>S->NextLog){S->NextLog=Now+5;UE_LOG(LogTemp,Display,TEXT("CF_SEED_ROUTE_STATE pos=%s carried=%d farm=%d"),*S->Last.ToString(),Pet->CarriedSeeds,Farm->Crop->Seeds);}

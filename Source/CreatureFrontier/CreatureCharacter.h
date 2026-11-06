@@ -82,7 +82,7 @@ public:
     UPROPERTY(BlueprintReadOnly, Category="Care") TWeakObjectPtr<AWorkStation> FeedingSite;
     UPROPERTY(BlueprintReadOnly,Category="Transport") int32 CarriedFood=0;
     int32 CarriedSeeds=0;
-    bool PickUpSeeds(class AHomeModule* Crate,int32 Amount);
+    bool PickUpSeeds(AActor* Source,int32 Amount);
     bool DeliverSeeds(AWorkStation* Farm);
     bool RecoverSeeds(ACFPlayerCharacter* Hero);
     static bool ValidateSeedCargo(const struct FCreatureSaveRecord& Record);

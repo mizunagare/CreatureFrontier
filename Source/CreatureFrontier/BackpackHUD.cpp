@@ -33,5 +33,5 @@ void ACFHUD::DrawBackpack(ACFPlayerCharacter* Player)
     if(Catalog->Recipes.IsValidIndex(Player->GetBackpackRecipe())) DrawWrappedText(Catalog->Recipes[Player->GetBackpackRecipe()].Description.ToString(),FLinearColor::Green,Left+14,536+Extra-Compact,440,2);
     DrawWrappedText(Player->GetBackpackGatheringHint(Player->GetBackpackRecipe()),FLinearColor(.5f,.85f,1),Left+14,576+Extra-Compact,440,2);
     DrawText(TEXT("Shift+回车 委托/取消 | 1-5制作 | 6/7装备"),FLinearColor::White,Left+14,586+Extra+Guidance-Compact);
-    DrawText(TEXT("不会自动保存，按 F5 保存物品和装备。"),FLinearColor::White,Left+14,612+Extra+Guidance-Compact);
+    DrawText(TEXT("E 查看瞄准的制作设施库存 | F5保存"),FLinearColor::White,Left+14,612+Extra+Guidance-Compact);
 }

@@ -219,6 +219,7 @@ bool UBaseBuildingComponent::DismantleStation(AWorkStation* Station)
     auto* Hero = Cast<ACFPlayerCharacter>(GetOwner());
     if (!Hero || !Hero->HasAuthority() || Hero->Health <= 0 || !IsValid(Station) || !Station->bPlayerBuilt || Hero->GetDistanceTo(Station) > 600) return false;
     const int32 Refund = GetCost(Station->RequiredSpecialty)/2;
+    for(const auto& Stack:Station->CraftInventory->GetStacks())if(Stack.Value>0){Hero->Feedback=TEXT("拆除前请取出制作设施里的原料和产物");return false;}
     if (Station->StoredFood > 0) { Hero->Feedback = TEXT("拆除前请按O取出设施里的食物"); return false; }
     if(Station->Crop->IsOccupied()) {Hero->Feedback=TEXT("拆除前请收获作物并按F3取出预留种子");return false;}
     if (!Hero->Inventory->AddItem(EFrontierItem::Material,Refund)) { Hero->Feedback = TEXT("请为拆除返还物腾出背包空间"); return false; }

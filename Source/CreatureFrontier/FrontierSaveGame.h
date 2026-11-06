@@ -108,6 +108,10 @@ struct FFacilitySaveRecord
     UPROPERTY() int32 CraftRevision=0;
     UPROPERTY() FName CraftRecipe;
     UPROPERTY() float CraftWork=0;
+    // 设施物资独立修订；旧档默认空库存，不从玩家背包复制或补发。
+    UPROPERTY() uint8 CraftStockRevision=0;
+    UPROPERTY() TMap<EFrontierItem,int32> CraftStock;
+    UPROPERTY() bool bCraftUsesLocalStock=false;
 };
 
 UCLASS()

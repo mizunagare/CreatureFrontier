@@ -14,6 +14,15 @@
 
 namespace
 {
+UInventoryComponent* SeedStock(AActor* Source)
+{
+    if(!IsValid(Source) || Source->IsActorBeingDestroyed())return nullptr;
+    if(auto* Crate=Cast<AHomeModule>(Source))
+        return Crate->GetKind()==EHomeModuleKind::Storage && !Crate->bPreview && !Crate->bStaged && !Crate->bUnderConstruction?Crate->StorageInventory.Get():nullptr;
+    if(auto* Workshop=Cast<AWorkStation>(Source))
+        return Workshop->bPlayerBuilt && Workshop->PersistentId.IsValid() && Workshop->RequiredSpecialty==EWorkSpecialty::Crafting?Workshop->CraftInventory.Get():nullptr;
+    return nullptr;
+}
 bool SeedWorker(const ACreatureCharacter* Pet)
 {
     const auto* Hero=Pet->Tamer?Cast<ACFPlayerCharacter>(Pet->Tamer->GetPawn()):nullptr;
@@ -32,13 +41,13 @@ bool SeedReach(const ACreatureCharacter* Pet,const AActor* Target)
 }
 }
 
-bool ACreatureCharacter::PickUpSeeds(AHomeModule* Crate,int32 Amount)
+bool ACreatureCharacter::PickUpSeeds(AActor* Source,int32 Amount)
 {
-    if(!SeedWorker(this) || CarriedSeeds!=0 || Amount<1 || Amount>3 || !SeedReach(this,Crate) ||
-        Crate->GetKind()!=EHomeModuleKind::Storage || Crate->bPreview || Crate->bStaged || Crate->bUnderConstruction ||
-        !IsValid(Crate->StorageInventory) || !UInventoryComponent::Validate(Crate->StorageInventory->GetStacks()))return false;
+    auto* Stock=SeedStock(Source);
+    if(!SeedWorker(this) || CarriedSeeds!=0 || Amount<1 || Amount>3 || !SeedReach(this,Source) ||
+        !IsValid(Stock) || !UInventoryComponent::Validate(Stock->GetStacks()))return false;
     // 所有失败条件在扣物前检查；游戏线程内不跨回调提交两个状态。
-    if(!Crate->StorageInventory->Consume(EFrontierItem::Seeds,Amount))return false;
+    if(!Stock->Consume(EFrontierItem::Seeds,Amount))return false;
     CarriedSeeds=Amount;return true;
 }
 
@@ -88,14 +97,18 @@ bool ACreatureCharacter::TickSeedSupply()
     AActor* Target=Farm;
     if(CarriedSeeds==0)
     {
-        AHomeModule* Crate=nullptr;float Best=MAX_flt;
+        AActor* Source=nullptr;float Best=MAX_flt;
         for(TActorIterator<AHomeModule> It(GetWorld());It;++It)
             if(!It->IsActorBeingDestroyed() && !FailedRecently(*It) && !It->bPreview && !It->bStaged && !It->bUnderConstruction &&
                 It->GetKind()==EHomeModuleKind::Storage && It->GetDistanceTo(WorkSite)<=1000 &&
                 It->StorageInventory->Count(EFrontierItem::Seeds)>0 && GetDistanceTo(*It)<Best)
-            {Crate=*It;Best=GetDistanceTo(*It);}
-        if(!Crate){SeedSupplyTarget.Reset();return false;}
-        Target=Crate;
+            {Source=*It;Best=GetDistanceTo(*It);}
+        for(TActorIterator<AWorkStation> It(GetWorld());It;++It)
+            if(auto* Stock=SeedStock(*It);Stock && !FailedRecently(*It) && It->GetDistanceTo(WorkSite)<=1000 &&
+                Stock->Count(EFrontierItem::Seeds)>0 && GetDistanceTo(*It)<Best)
+            {Source=*It;Best=GetDistanceTo(*It);}
+        if(!Source){SeedSupplyTarget.Reset();return false;}
+        Target=Source;
     }
     auto DeferTarget=[this,Target,Now]()
     {
@@ -106,7 +119,8 @@ bool ACreatureCharacter::TickSeedSupply()
     };
     if(SeedSupplyTarget.Get()!=Target){SeedSupplyTarget=Target;SeedSupplyExpires=Now+8;}
     if(GetDistanceTo(WorkSite)>1800 || Now>SeedSupplyExpires)return DeferTarget();
-    const bool Done=CarriedSeeds>0?DeliverSeeds(Farm):PickUpSeeds(Cast<AHomeModule>(Target),FMath::Min(3,Cast<AHomeModule>(Target)->StorageInventory->Count(EFrontierItem::Seeds)));
+    auto* Stock=SeedStock(Target);
+    const bool Done=CarriedSeeds>0?DeliverSeeds(Farm):(Stock && PickUpSeeds(Target,FMath::Min(3,Stock->Count(EFrontierItem::Seeds))));
     if(Done){SeedSupplyTarget.Reset();StopNavigation();return true;}
     if(GetWorld()->GetTimeSeconds()<NextNavigationUpdate)return true;
     FVector Goal;

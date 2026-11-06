@@ -22,6 +22,55 @@ void RunSeedSupplyPersistence(UWorld* World,ACFPlayerCharacter* Hero)
     auto Fail=[](const TCHAR* Why){UE_LOG(LogTemp,Error,TEXT("CF_SEED_PERSIST FAIL reason=%s"),Why);FPlatformMisc::RequestExitWithStatus(false,1);};
     const bool Read=FParse::Param(FCommandLine::Get(),TEXT("CFSeedSupplyRead"));
     if(!Hero->LoadProgress(TEXT("SeedSupplyInput"))){Fail(TEXT("load"));return;}
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFWorkshopStockPersistence")))
+    {
+        auto FindWorkshop=[World](){AWorkStation* Found=nullptr;for(TActorIterator<AWorkStation> It(World);It;++It)if(It->bPlayerBuilt && It->RequiredSpecialty==EWorkSpecialty::Crafting){if(Found)return static_cast<AWorkStation*>(nullptr);Found=*It;}return Found;};
+        auto* Site=FindWorkshop();if(!Site){Fail(TEXT("workshop-source"));return;}
+        const TMap<EFrontierItem,int32> Expected={{EFrontierItem::Food,1},{EFrontierItem::Fiber,1},{EFrontierItem::Medicine,2}};
+        if(!Read)
+        {
+            // 隔离存读夹具仅首次投入明确物资和正值工序，不作为正常备料或加工耗时证据。
+            if(!Site->CraftRecipeId.IsNone() || !Site->CraftInventory->GetStacks().IsEmpty()){Fail(TEXT("workshop-not-empty"));return;}
+            Site->CraftInventory->Restore(Expected);Site->CraftRecipeId=TEXT("PlantingSeeds");Site->CraftWork=2;Site->bCraftUsesLocalStock=true;
+        }
+        auto Matches=[&](AWorkStation* Current){return Current && Current->CraftRecipeId==TEXT("PlantingSeeds") && Current->CraftWork==2 && Current->bCraftUsesLocalStock && Current->CraftInventory->GetStacks().OrderIndependentCompareEqual(Expected);};
+        if(!Matches(Site)){Fail(TEXT("workshop-positive-state"));return;}
+        const auto Id=Site->PersistentId;const auto Transform=Site->GetActorTransform();const auto Bag=Hero->Inventory->GetStacks();
+        if(!Hero->SaveProgress(TEXT("SeedSupplyBefore")) || !Hero->LoadProgress(TEXT("SeedSupplyBefore"))){Fail(TEXT("workshop-roundtrip"));return;}
+        Site=FindWorkshop();
+        if(!Matches(Site) || Site->PersistentId!=Id || !Site->GetActorTransform().Equals(Transform,.01) || !Hero->Inventory->GetStacks().OrderIndependentCompareEqual(Bag)){Fail(TEXT("workshop-restored-state"));return;}
+        // 以恢复后的世界为基线，非法读取必须保持实体身份和完整序列化字节不变。
+        TArray<uint8> Before;
+        if(!Hero->SaveProgress(TEXT("SeedSupplyBefore")) || !UGameplayStatics::LoadDataFromSlot(Before,TEXT("SeedSupplyBefore"),0)){Fail(TEXT("workshop-baseline"));return;}
+        for(int32 Case=0;Case<8;++Case)
+        {
+            auto* Bad=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("SeedSupplyBefore"),0));
+            auto* Record=Bad?Bad->Facilities.FindByPredicate([Id](const FFacilitySaveRecord& R){return R.Id==Id;}):nullptr;
+            if(!Record){Fail(TEXT("workshop-record"));return;}
+            switch(Case)
+            {
+                case 0:Record->CraftStockRevision=2;break;
+                case 1:Record->CraftStockRevision=0;break;
+                case 2:Record->CraftStock[EFrontierItem::Food]=-1;break;
+                case 3:Record->CraftStock[EFrontierItem::Food]=1000;break;
+                case 4:Record->CraftStock.Add(EFrontierItem::Count,1);break;
+                case 5:Record->Specialty=EWorkSpecialty::Transport;break;
+                case 6:Record->CraftRevision=1;break;
+                case 7:Record->bCraftUsesLocalStock=false;break;
+            }
+            TArray<uint8> After;
+            if(!UGameplayStatics::SaveGameToSlot(Bad,TEXT("SeedSupplyBad"),0) || Hero->LoadProgress(TEXT("SeedSupplyBad")) || !IsValid(Site) || FindWorkshop()!=Site || !Matches(Site) || !Hero->SaveProgress(TEXT("SeedSupplyAfter")) || !UGameplayStatics::LoadDataFromSlot(After,TEXT("SeedSupplyAfter"),0) || Before!=After){Fail(TEXT("workshop-invalid-transaction"));return;}
+        }
+        auto* Legacy=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("SeedSupplyBefore"),0));
+        auto* Record=Legacy?Legacy->Facilities.FindByPredicate([Id](const FFacilitySaveRecord& R){return R.Id==Id;}):nullptr;
+        if(!Record){Fail(TEXT("workshop-legacy-record"));return;}
+        Record->CraftRevision=1;Record->bCraftUsesLocalStock=false;Record->CraftStockRevision=0;Record->CraftStock.Empty();
+        if(!UGameplayStatics::SaveGameToSlot(Legacy,TEXT("SeedSupplyBad"),0) || !Hero->LoadProgress(TEXT("SeedSupplyBad"))){Fail(TEXT("workshop-legacy-load"));return;}
+        Site=FindWorkshop();
+        if(!Site || Site->PersistentId!=Id || Site->CraftWork!=2 || Site->CraftRecipeId!=TEXT("PlantingSeeds") || Site->bCraftUsesLocalStock || !Site->CraftInventory->GetStacks().IsEmpty() || !Hero->Inventory->GetStacks().OrderIndependentCompareEqual(Bag)){Fail(TEXT("workshop-legacy-state"));return;}
+        if(!Hero->LoadProgress(TEXT("SeedSupplyBefore")) || !Matches(FindWorkshop()) || !Hero->SaveProgress(Read?TEXT("SeedSupplyDone"):TEXT("SeedSupplyCarry"))){Fail(TEXT("workshop-final"));return;}
+        UE_LOG(LogTemp,Display,TEXT("CF_WORKSHOP_STOCK_PERSIST PASS read=%d positive=1 progress=2 invalid=8 worldUnchanged=1 legacy=1"),Read);FPlatformMisc::RequestExitWithStatus(false,0);return;
+    }
     if(FParse::Param(FCommandLine::Get(),TEXT("CFSeedSupplyInvalid")))
     {
         // 实际写盘并走正式读取事务；同一同步调用内比较完整世界快照，不推进或冻结世界。

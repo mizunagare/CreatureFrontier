@@ -4,6 +4,8 @@
 #include "FrontierItems.h"
 #include "StorageInteractionComponent.generated.h"
 class AHomeModule;
+class AWorkStation;
+class UInventoryComponent;
 
 UCLASS()
 class CREATUREFRONTIER_API UStorageInteractionComponent : public UActorComponent
@@ -15,6 +17,9 @@ public:
     bool TryOpenAimed();
     AHomeModule* TraceCrate() const;
     bool Open(AHomeModule* Crate);
+    bool OpenWorkshop(AWorkStation* Workshop);
+    AWorkStation* GetWorkshop() const;
+    UInventoryComponent* GetInventory() const;
     void Close();
     bool IsOpen() const;
     AHomeModule* GetCrate() const;
@@ -27,6 +32,8 @@ public:
     void WithdrawStack();
 private:
     bool CanAccess(const AHomeModule* Crate) const;
+    bool CanAccessWorkshop(const AWorkStation* Workshop) const;
     TWeakObjectPtr<AHomeModule> Target;
+    TWeakObjectPtr<AWorkStation> WorkshopTarget;
     int32 Selection=0;
 };
