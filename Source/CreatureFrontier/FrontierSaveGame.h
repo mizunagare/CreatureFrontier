@@ -17,7 +17,7 @@ class UCreatureDefinition;
 class UResourceDefinition;
 
 // 写盘与当前版本上限共用；历史迁移边界继续使用其原始版本号。
-inline constexpr int32 FrontierCurrentSaveVersion=38;
+inline constexpr int32 FrontierCurrentSaveVersion=39;
 
 USTRUCT()
 struct FResourceSaveRecord
@@ -74,6 +74,8 @@ struct FCreatureSaveRecord
     UPROPERTY() FGuid ConstructionModuleId;
     UPROPERTY() TMap<EFrontierItem,int32> CargoItems;
     UPROPERTY() FGuid DeliveryCrateId;
+    // 与箱子目标互斥；旧档缺字段时不建立设施回运任务。
+    UPROPERTY() FGuid DeliveryWorkshopId;
     UPROPERTY() bool bReturningCargo=false;
     UPROPERTY() FName EncounterId;
     UPROPERTY() bool bAlpha = false;

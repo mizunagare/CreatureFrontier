@@ -4,6 +4,8 @@
 #include "FrontierItems.h"
 #include "CompanionCargoComponent.generated.h"
 class AHomeModule;
+class AWorkStation;
+struct FFacilitySaveRecord;
 class ACFPlayerCharacter;
 struct FCreatureSaveRecord;
 
@@ -17,7 +19,9 @@ public:
     bool HasOrder() const { return bOrdered; }
     bool IsReturning() const { return bReturning; }
     AHomeModule* GetTarget() const;
+    AActor* GetDestination() const;
     bool Assign(AHomeModule* Crate,ACFPlayerCharacter* Hero);
+    bool AssignWorkshop(AWorkStation* Workshop,ACFPlayerCharacter* Hero);
     void CancelOrder();
     bool ValidateOrder();
     bool TickDelivery(float DeltaSeconds,ACFPlayerCharacter* Hero);
@@ -25,12 +29,13 @@ public:
     bool Recover(ACFPlayerCharacter* Hero);
     FString Status() const;
     void WriteSnapshot(FCreatureSaveRecord& Record) const;
-    void RestoreSnapshot(const FCreatureSaveRecord& Record,AHomeModule* Target);
-    static bool ValidateSnapshot(const FCreatureSaveRecord& Record,AHomeModule* Target);
+    void RestoreSnapshot(const FCreatureSaveRecord& Record,AHomeModule* Target,AWorkStation* Workshop=nullptr);
+    static bool ValidateSnapshot(const FCreatureSaveRecord& Record,AHomeModule* Target,const FFacilitySaveRecord* Workshop=nullptr);
 private:
     friend class AResourceNode;
     bool Receive(EFrontierItem Item);
-    TWeakObjectPtr<AHomeModule> Destination;
+    bool AssignDestination(AActor* Target,ACFPlayerCharacter* Hero);
+    TWeakObjectPtr<AActor> Destination;
     bool bOrdered=false, bReturning=false, bFull=false;
     double Expires=0;
     float Retry=0;

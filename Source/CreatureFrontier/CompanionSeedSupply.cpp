@@ -78,7 +78,7 @@ bool ACreatureCharacter::ValidateSeedCargo(const FCreatureSaveRecord& Record)
         (Record.SeedCargoVersion==0 && Record.CarriedSeeds!=0))return false;
     if(Record.CarriedSeeds==0)return true;
     if(!Record.bOwned || Record.Disposition!=ECreatureDisposition::Tamed || Record.CarriedFood!=0 ||
-        Record.FieldResourceId.IsValid() || Record.DeliveryCrateId.IsValid() || Record.ConstructionModuleId.IsValid() || Record.bReturningCargo)return false;
+        Record.FieldResourceId.IsValid() || Record.DeliveryCrateId.IsValid() || Record.DeliveryWorkshopId.IsValid() || Record.ConstructionModuleId.IsValid() || Record.bReturningCargo)return false;
     for(const auto& Entry:Record.CargoItems)if(Entry.Value!=0)return false;
     return true;
 }

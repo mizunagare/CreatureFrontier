@@ -3,6 +3,7 @@
 #include "CreatureCharacter.h"
 #include "CFPlayerCharacter.h"
 #include "HomeModule.h"
+#include "WorkStation.h"
 #include "ResourceNode.h"
 #include "InventoryComponent.h"
 #include "CraftingCatalog.h"
@@ -21,17 +22,34 @@ int32 UCompanionCargoComponent::Count() const
     return Total;
 }
 AHomeModule* UCompanionCargoComponent::GetTarget() const
+{ return Cast<AHomeModule>(GetDestination()); }
+AActor* UCompanionCargoComponent::GetDestination() const
 {
-    auto* Target=Destination.Get(); return IsValid(Target) && !Target->IsActorBeingDestroyed()?Target:nullptr;
+    auto* Target=Destination.Get();
+    if(!IsValid(Target) || Target->IsActorBeingDestroyed())return nullptr;
+    if(const auto* Crate=Cast<AHomeModule>(Target))
+        return !Crate->bPreview && !Crate->bStaged && Crate->GetKind()==EHomeModuleKind::Storage && Crate->PersistentId.IsValid()?Target:nullptr;
+    if(const auto* Workshop=Cast<AWorkStation>(Target))
+        return Workshop->bPlayerBuilt && Workshop->PersistentId.IsValid() && Workshop->RequiredSpecialty==EWorkSpecialty::Crafting?Target:nullptr;
+    return nullptr;
 }
 bool UCompanionCargoComponent::Assign(AHomeModule* Crate,ACFPlayerCharacter* Hero)
+{
+    if(!IsValid(Crate) || Crate->bPreview || Crate->bStaged || Crate->GetKind()!=EHomeModuleKind::Storage || !Crate->PersistentId.IsValid())return false;
+    return AssignDestination(Crate,Hero);
+}
+bool UCompanionCargoComponent::AssignWorkshop(AWorkStation* Workshop,ACFPlayerCharacter* Hero)
+{
+    if(!IsValid(Workshop) || !Workshop->bPlayerBuilt || !Workshop->PersistentId.IsValid() || Workshop->RequiredSpecialty!=EWorkSpecialty::Crafting)return false;
+    return AssignDestination(Workshop,Hero);
+}
+bool UCompanionCargoComponent::AssignDestination(AActor* Crate,ACFPlayerCharacter* Hero)
 {
     auto* Pet=Cast<ACreatureCharacter>(GetOwner());
     if(!Pet || !Pet->HasAuthority() || Pet->Health<=0 || !Hero || Hero->Health<=0 || Pet->Tamer!=Hero->GetController() || Pet->Disposition!=ECreatureDisposition::Tamed ||
         UGameplayStatics::IsGamePaused(this) || !Pet->GetFieldResource() || Pet->CarriedFood>0 || Pet->CarriedSeeds>0 ||
         (Pet->Activity!=ECreatureActivity::Work && !(Pet->Activity==ECreatureActivity::Rest && Pet->bResumeWorkAfterRest)) ||
-        !IsValid(Crate) || Crate->IsActorBeingDestroyed() || Crate->GetWorld()!=GetWorld() || Crate->bPreview || Crate->bStaged ||
-        Crate->GetKind()!=EHomeModuleKind::Storage || !Crate->PersistentId.IsValid()) return false;
+        !IsValid(Crate) || Crate->IsActorBeingDestroyed() || Crate->GetWorld()!=GetWorld()) return false;
     // 玩家通过八米可见性射线选择目标；之后可以远离这个明确选定的
     // 接收设施，再下达资源任务。
     Pet->ResetGathering(); Pet->StopNavigation();
@@ -41,14 +59,14 @@ void UCompanionCargoComponent::CancelOrder() { Destination.Reset(); bOrdered=fal
 bool UCompanionCargoComponent::ValidateOrder()
 {
     auto* Pet=Cast<ACreatureCharacter>(GetOwner());
-    if(!bOrdered || (GetTarget() && Pet && IsValid(Pet->GetFieldResource()) && !Pet->GetFieldResource()->IsActorBeingDestroyed())) return true;
+    if(!bOrdered || (GetDestination() && Pet && IsValid(Pet->GetFieldResource()) && !Pet->GetFieldResource()->IsActorBeingDestroyed())) return true;
     if(Pet) { Pet->StopNavigation(); Pet->SetActivity(ECreatureActivity::Follow); Pet->bResumeWorkAfterRest=false; }
     CancelOrder(); return false;
 }
 bool UCompanionCargoComponent::CanReceive(EFrontierItem Item) const
 {
     const auto* Pet=Cast<ACreatureCharacter>(GetOwner());
-    return Pet && bOrdered && GetTarget() && !bReturning && Pet->CarriedFood==0 && Pet->CarriedSeeds==0 && Count()<Capacity &&
+    return Pet && bOrdered && GetDestination() && !bReturning && Pet->CarriedFood==0 && Pet->CarriedSeeds==0 && Count()<Capacity &&
         IsGatheredResource(Item);
 }
 bool UCompanionCargoComponent::Receive(EFrontierItem Item)
@@ -57,7 +75,7 @@ bool UCompanionCargoComponent::Receive(EFrontierItem Item)
 }
 bool UCompanionCargoComponent::TickDelivery(float DeltaSeconds,ACFPlayerCharacter* Hero)
 {
-    auto* Pet=Cast<ACreatureCharacter>(GetOwner()); auto* Crate=GetTarget();
+    auto* Pet=Cast<ACreatureCharacter>(GetOwner()); auto* Crate=GetDestination();
     if(!bOrdered || !Pet || !Crate || !Hero || Hero->Health<=0 || UGameplayStatics::IsGamePaused(this)) return false;
     if(Count()==0) { bReturning=false; bFull=false; Expires=0; Retry=0; return false; }
     const auto* Node=Pet->GetFieldResource();
@@ -75,8 +93,10 @@ bool UCompanionCargoComponent::TickDelivery(float DeltaSeconds,ACFPlayerCharacte
         Pet->StopNavigation(); Expires=0;
         TMap<EFrontierItem,int32> Items;
         for(const auto& Entry:Pet->CargoInventory->GetStacks()) if(Entry.Value>0) Items.Add(Entry.Key,Entry.Value);
-        if(Pet->CargoInventory->TransferTo(Crate->StorageInventory,Items))
-        { bReturning=false; bFull=false; Hero->Feedback=TEXT("伙伴已把携带批次送入箱子，不重复获得工作经验"); }
+        auto* Box=Cast<AHomeModule>(Crate);
+        auto* Inventory=Box?Box->StorageInventory.Get():Cast<AWorkStation>(Crate)->CraftInventory.Get();
+        if(Pet->CargoInventory->TransferTo(Inventory,Items))
+        { bReturning=false; bFull=false; Hero->Feedback=TEXT("伙伴已把携带批次送入收货库存，不重复获得工作经验"); }
         else { bFull=true; Retry=2; }
         return true;
     }
@@ -111,7 +131,7 @@ FString UCompanionCargoComponent::Status() const
     const auto* Hero=Pet->Tamer?Cast<ACFPlayerCharacter>(Pet->Tamer->GetPawn()):nullptr;
     const FString State=Pet->Health<=0?TEXT("已倒下，保留携带物"):Hero && Hero->Health<=0?TEXT("主人已倒下，携物暂停"):
         !bOrdered?TEXT("已保留，Z 取回"):Pet->Activity==ECreatureActivity::Rest?TEXT("携物休息中"):
-        bFull?TEXT("箱子已满，保留当前批次"):Retry>0?TEXT("重试路径，保留当前批次"):bReturning?TEXT("正在运往储物箱"):TEXT("正在采集批次");
+        bFull?(GetTarget()?TEXT("箱子已满，保留当前批次"):TEXT("设施库存已满，保留当前批次")):Retry>0?TEXT("重试路径，保留当前批次"):bReturning?(GetTarget()?TEXT("正在运往储物箱"):TEXT("正在运往制作设施")):TEXT("正在采集批次");
     return FString::Printf(TEXT("携带 %d/%d | %s | %s"),Count(),Capacity,*State,*UCraftingCatalog::FormatItems(Pet->CargoInventory->GetStacks()));
 }
 void UCompanionCargoComponent::WriteSnapshot(FCreatureSaveRecord& Record) const
@@ -119,31 +139,38 @@ void UCompanionCargoComponent::WriteSnapshot(FCreatureSaveRecord& Record) const
     const auto* Pet=Cast<ACreatureCharacter>(GetOwner()); if(!Pet) return;
     for(const auto& Entry:Pet->CargoInventory->GetStacks()) if(Entry.Value>0) Record.CargoItems.Add(Entry.Key,Entry.Value);
     if(!bOrdered) return;
-    const auto* Target=GetTarget(); const auto* Source=Pet->GetFieldResource();
+    const auto* Target=GetDestination(); const auto* Source=Pet->GetFieldResource();
     if(!Target || !IsValid(Source) || Source->IsActorBeingDestroyed())
     {
         // 即使目标在本帧 AI 更新前被删除，快照也要规范记录失去目标的任务意图。
         Record.FieldResourceId.Invalidate(); Record.bResumeWorkAfterRest=false;
         Record.Activity=Record.Health>0?ECreatureActivity::Follow:ECreatureActivity::Rest; return;
     }
-    Record.DeliveryCrateId=Target->PersistentId; Record.bReturningCargo=bReturning && Count()>0;
+    if(const auto* Box=Cast<AHomeModule>(Target))Record.DeliveryCrateId=Box->PersistentId;
+    else Record.DeliveryWorkshopId=Cast<AWorkStation>(Target)->PersistentId;
+    Record.bReturningCargo=bReturning && Count()>0;
 }
-bool UCompanionCargoComponent::ValidateSnapshot(const FCreatureSaveRecord& Record,AHomeModule* Target)
+bool UCompanionCargoComponent::ValidateSnapshot(const FCreatureSaveRecord& Record,AHomeModule* Target,const FFacilitySaveRecord* Workshop)
 {
     if(!UInventoryComponent::Validate(Record.CargoItems)) return false;
     int32 Total=0;
     for(const auto& Entry:Record.CargoItems)
     { if(!IsGatheredResource(Entry.Key)) return false; Total+=Entry.Value; }
     if(Total>Capacity || (Total>0 && (!Record.bOwned || Record.Disposition!=ECreatureDisposition::Tamed || Record.CarriedFood>0))) return false;
-    if(Record.bReturningCargo && (Total==0 || !Record.DeliveryCrateId.IsValid())) return false;
-    if(Record.DeliveryCrateId.IsValid() && (!Target || Target->GetKind()!=EHomeModuleKind::Storage || !Record.bOwned || Record.Health<=0 ||
+    const bool HasCrate=Record.DeliveryCrateId.IsValid(), HasWorkshop=Record.DeliveryWorkshopId.IsValid();
+    if(HasCrate && HasWorkshop)return false;
+    if(HasCrate && (!Target || Target->PersistentId!=Record.DeliveryCrateId || Target->GetKind()!=EHomeModuleKind::Storage))return false;
+    if(HasWorkshop && (!Workshop || Workshop->Id!=Record.DeliveryWorkshopId || Workshop->Specialty!=EWorkSpecialty::Crafting))return false;
+    if(Record.bReturningCargo && (Total==0 || (!HasCrate && !HasWorkshop))) return false;
+    if((HasCrate || HasWorkshop) && (!Record.bOwned || Record.Health<=0 || Record.CarriedSeeds>0 || Record.ConstructionModuleId.IsValid() ||
         Record.Disposition!=ECreatureDisposition::Tamed || Record.CarriedFood>0 || !Record.FieldResourceId.IsValid() ||
         Record.WorkSiteId.IsValid() || !Record.WorkSiteName.IsNone() ||
         (Record.Activity!=ECreatureActivity::Work && !(Record.Activity==ECreatureActivity::Rest && Record.bResumeWorkAfterRest)))) return false;
     return true;
 }
-void UCompanionCargoComponent::RestoreSnapshot(const FCreatureSaveRecord& Record,AHomeModule* Target)
+void UCompanionCargoComponent::RestoreSnapshot(const FCreatureSaveRecord& Record,AHomeModule* Target,AWorkStation* Workshop)
 {
     auto* Pet=Cast<ACreatureCharacter>(GetOwner()); Pet->CargoInventory->Restore(Record.CargoItems);
-    Destination=Target; bOrdered=Record.DeliveryCrateId.IsValid(); bReturning=Record.bReturningCargo; bFull=false; Expires=0; Retry=0;
+    Destination=Record.DeliveryWorkshopId.IsValid()?static_cast<AActor*>(Workshop):static_cast<AActor*>(Target);
+    bOrdered=Record.DeliveryCrateId.IsValid() || Record.DeliveryWorkshopId.IsValid(); bReturning=Record.bReturningCargo; bFull=false; Expires=0; Retry=0;
 }

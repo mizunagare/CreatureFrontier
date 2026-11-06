@@ -62,6 +62,8 @@ FString ACFPlayerCharacter::GetDeliverySelectionStatus() const
 {
     if(!bDeliverySelection)return FString();
     if(const auto* Crate=GetDeliveryCrate())return FString::Printf(TEXT("已选料箱：材料%d\n工地E派工 | 对空V清除"),Crate->StorageInventory->Count(EFrontierItem::Material));
+    if(const auto* Workshop=DeliveryWorkshopSelection.Get();IsValid(Workshop) && !Workshop->IsActorBeingDestroyed())
+        return TEXT("已选制作设施收货\n资源点E派工 | 对空V清除");
     return TEXT("所选料箱已失效\n瞄准其他箱子按V重选");
 }
 void ACFPlayerCharacter::CycleBuilding()
@@ -70,11 +72,17 @@ void ACFPlayerCharacter::CycleBuilding()
     if(!HasAuthority() || Health<=0 || UGameplayStatics::IsGamePaused(this)) return;
     if(auto* Crate=Storage->TraceCrate())
     {
-        DeliverySelection=Crate; bDeliverySelection=true; int32 Applied=0;
+        DeliveryWorkshopSelection.Reset(); DeliverySelection=Crate; bDeliverySelection=true; int32 Applied=0;
         for(TActorIterator<ACreatureCharacter> It(GetWorld());It;++It) if(IsCommandTarget(*It) && It->Cargo->Assign(Crate,this)) ++Applied;
         Feedback=FString::Printf(TEXT("已选施工料源／运输箱 | 已关联%d项资源工作"),Applied);
     }
-    else { DeliverySelection.Reset(); bDeliverySelection=false; Feedback=TEXT("后续采集直接放入背包；F 取消已有运输工作"); }
+    else if(auto* Workshop=TraceFacility();Workshop && Workshop->bPlayerBuilt && Workshop->PersistentId.IsValid() && Workshop->RequiredSpecialty==EWorkSpecialty::Crafting)
+    {
+        DeliverySelection.Reset(); DeliveryWorkshopSelection=Workshop; bDeliverySelection=true; int32 Applied=0;
+        for(TActorIterator<ACreatureCharacter> It(GetWorld());It;++It)if(IsCommandTarget(*It) && It->Cargo->AssignWorkshop(Workshop,this))++Applied;
+        Feedback=FString::Printf(TEXT("已选制作设施收货 | 已关联%d项资源工作 | 施工仍需选材料箱"),Applied);
+    }
+    else { DeliverySelection.Reset(); DeliveryWorkshopSelection.Reset(); bDeliverySelection=false; Feedback=TEXT("后续采集直接放入背包；F 取消已有运输工作"); }
 }
 void ACFPlayerCharacter::DismantleBuilding() { Building->Dismantle(); }
 
@@ -296,6 +304,8 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
         if(Save->FormatVersion<22) { Record.Id=FGuid::NewGuid(); Record.CargoItems.Reset(); Record.DeliveryCrateId.Invalidate(); Record.bReturningCargo=false; }
         if(!Record.Id.IsValid() || CreatureIds.Contains(Record.Id)) { Feedback=TEXT("生物身份无效或重复，世界未改变"); return false; }
         const bool OwnedTamed=Record.bOwned && Record.Disposition==ECreatureDisposition::Tamed;
+        if(Save->FormatVersion<39 && Record.DeliveryWorkshopId.IsValid())
+        {Feedback=TEXT("设施回运字段与存档版本不符，世界未改变");return false;}
         if(Save->FormatVersion<31)Record.CombatStance=0;
         if(Record.CombatStance>1 || (Record.CombatStance!=0 && !OwnedTamed))
         {Feedback=TEXT("伙伴战斗姿态无效，世界未改变");return false;}
@@ -323,7 +333,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
     {
         const auto* Site=HomeRestore.Find(Record.ConstructionModuleId);
         bool Valid=Save->FormatVersion>=35 && Site && Site->bUnderConstruction && Record.bOwned && Record.Disposition==ECreatureDisposition::Tamed && Record.Health>0 &&
-            !Record.WorkSiteId.IsValid() && Record.WorkSiteName.IsNone() && !Record.FieldResourceId.IsValid() && !Record.DeliveryCrateId.IsValid() && !Record.bReturningCargo && Record.CarriedFood==0 &&
+            !Record.WorkSiteId.IsValid() && Record.WorkSiteName.IsNone() && !Record.FieldResourceId.IsValid() && !Record.DeliveryCrateId.IsValid() && !Record.DeliveryWorkshopId.IsValid() && !Record.bReturningCargo && Record.CarriedFood==0 &&
             (Record.Activity==ECreatureActivity::Work || (Record.Activity==ECreatureActivity::Rest && Record.bResumeWorkAfterRest)) && !ConstructionWorkers.Contains(Record.ConstructionModuleId);
         for(const auto& Item:Record.CargoItems)Valid &= Item.Key==EFrontierItem::Material;
         if(Site)Valid &= Record.CargoItems.FindRef(EFrontierItem::Material)<=Site->Definition->MaterialCost-Site->StorageInventory->Count(EFrontierItem::Material);
@@ -331,7 +341,8 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
         ConstructionWorkers.Add(Record.ConstructionModuleId);
     }
     for(const auto& Record:Save->Creatures)
-        if(!UCompanionCargoComponent::ValidateSnapshot(Record,HomeRestore.Find(Record.DeliveryCrateId)))
+        if(!UCompanionCargoComponent::ValidateSnapshot(Record,HomeRestore.Find(Record.DeliveryCrateId),
+            Save->Facilities.FindByPredicate([&](const FFacilitySaveRecord& Facility){return Facility.Id==Record.DeliveryWorkshopId;})))
         { Feedback=TEXT("携带资源或运输意图无效，世界未改变"); return false; }
     TArray<ACreatureCharacter*> OldCreatures;
     for (TActorIterator<ACreatureCharacter> It(GetWorld()); It; ++It) OldCreatures.Add(*It);
@@ -488,7 +499,9 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
             Pet->Activity = Record.bOwned ? ECreatureActivity::Follow : ECreatureActivity::Idle;
         Pet->bResumeWorkAfterRest = Record.bResumeWorkAfterRest && Record.bOwned && Pet->Health > 0 && Pet->Activity == ECreatureActivity::Rest &&
             (Pet->Construction->GetSite() || Pet->GetFieldResource() || (IsValid(Pet->WorkSite) && Pet->WorkSite->RequiredSpecialty != EWorkSpecialty::Feeding));
-        Pet->Cargo->RestoreSnapshot(Record,HomeRestore.Find(Record.DeliveryCrateId));
+        AWorkStation* DeliveryWorkshop=nullptr;
+        for(auto* Facility:RestoredBuilt)if(Facility->PersistentId==Record.DeliveryWorkshopId){DeliveryWorkshop=Facility;break;}
+        Pet->Cargo->RestoreSnapshot(Record,HomeRestore.Find(Record.DeliveryCrateId),DeliveryWorkshop);
     }
     UCompanionMemoryComponent::CloseAll(GetWorld());Naming->Close(); Pace->StopSlowWalk(); Gathering->Stop(); CancelMeleeAttack(); Building->Cancel();
     ResourceRestore.Commit();
@@ -511,7 +524,7 @@ bool ACFPlayerCharacter::LoadProgress(const FString& Slot)
     Research->Restore(Save->Research); CaptureComponent->ResetSelection();
     GetCharacterMovement()->SetMovementMode(Health > 0 ? MOVE_Walking : MOVE_None);
     SelectedCompanion.Reset();
-    RosterHighlight.Reset(); bBackpackOpen=false; BackpackRecipe=0; Storage->Close(); DeliverySelection.Reset(); bDeliverySelection=false;
+    RosterHighlight.Reset(); bBackpackOpen=false; BackpackRecipe=0; Storage->Close(); DeliverySelection.Reset(); DeliveryWorkshopSelection.Reset(); bDeliverySelection=false;
     Journal=Save->Journal; JournalAssets=LoadedJournalAssets; JournalPage=0;
     Objectives=Save->Objectives;
     // 旧快照中的自有存活伙伴可证明已捕捉；未见过的野生快照不能证明已发现。
@@ -549,7 +562,7 @@ float ACFPlayerCharacter::TakeDamage(float Amount, const FDamageEvent& Event, AC
         UCompanionMemoryComponent::CloseAll(GetWorld());
         Naming->Close();
         Storage->Close();
-        DeliverySelection.Reset(); bDeliverySelection=false;
+        DeliverySelection.Reset(); DeliveryWorkshopSelection.Reset(); bDeliverySelection=false;
         GetCharacterMovement()->StopMovementImmediately(); GetCharacterMovement()->DisableMovement(); StopJumping();
         CancelMeleeAttack();
         Building->Cancel(); bRosterOpen=false; bJournalOpen=false; bBackpackOpen=false;
@@ -636,13 +649,14 @@ void ACFPlayerCharacter::CommandWork()
     GetWorld()->LineTraceSingleByChannel(Hit,Start,Start+FirstPersonCamera->GetForwardVector()*800,ECC_Visibility,Params);
     if(auto* Node=Cast<AResourceNode>(Hit.GetActor()))
     {
-        auto* Crate=DeliverySelection.Get();
-        if(bDeliverySelection && (!IsValid(Crate) || Crate->IsActorBeingDestroyed())) { Feedback=TEXT("所选运输箱已丢失，按V清除或选择其他箱子"); return; }
+        auto* Crate=GetDeliveryCrate(); auto* Workshop=DeliveryWorkshopSelection.Get();
+        const bool ValidWorkshop=IsValid(Workshop) && !Workshop->IsActorBeingDestroyed() && Workshop->bPlayerBuilt && Workshop->PersistentId.IsValid() && Workshop->RequiredSpecialty==EWorkSpecialty::Crafting;
+        if(bDeliverySelection && !Crate && !ValidWorkshop) { Feedback=TEXT("所选收货目标已失效，按V清除或重选"); return; }
         int32 Assigned=0;
         for(TActorIterator<ACreatureCharacter> It(GetWorld());It;++It)
             if(IsCommandTarget(*It) && (!bDeliverySelection || It->CarriedFood==0) && It->AssignFieldResource(Node))
-            { if(bDeliverySelection) It->Cargo->Assign(Crate,this); ++Assigned; }
-        Feedback=FString::Printf(TEXT("已为%d位伙伴指派野外资源 | %s | F 取消"),Assigned,bDeliverySelection?TEXT("运到所选储物箱"):TEXT("直接放入玩家背包"));
+            { if(bDeliverySelection) {if(Crate)It->Cargo->Assign(Crate,this);else It->Cargo->AssignWorkshop(Workshop,this);} ++Assigned; }
+        Feedback=FString::Printf(TEXT("已为%d位伙伴指派野外资源 | %s | F 取消"),Assigned,bDeliverySelection?(Crate?TEXT("运到所选储物箱"):TEXT("运到制作设施库存")):TEXT("直接放入玩家背包"));
         return;
     }
     // 明确瞄准的工作设施优先；没有设施目标时沿用原就近派工。

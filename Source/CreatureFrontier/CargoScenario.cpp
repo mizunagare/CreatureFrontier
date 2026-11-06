@@ -60,7 +60,7 @@ bool Faults(UWorld* World,ACFPlayerCharacter* Hero)
     if(!Pass) return false;
     auto Check=[&](const TCHAR* Stage)
     { UE_LOG(LogTemp,Display,TEXT("CF_CARGO_RECOVERY %s=%d feedback=%s"),Stage,Pass,*Hero->Feedback); return Pass; };
-    for(int32 Case=0;Case<14;++Case)
+    for(int32 Case=0;Case<17;++Case)
     {
         auto* Live=Worker(World,Hero); auto* Bad=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot,0));
         if(!Bad || Bad->Creatures.Num()!=1) return false;
@@ -79,6 +79,9 @@ bool Faults(UWorld* World,ACFPlayerCharacter* Hero)
         if(Case==11) { FCreatureSaveRecord Broken=R; Broken.Id=FGuid::NewGuid(); Broken.Health=-1; Broken.FieldResourceId.Invalidate(); Broken.DeliveryCrateId.Invalidate(); Broken.bReturningCargo=false; Bad->Creatures.Add(Broken); }
         if(Case==12) { const auto Duplicate=R; Bad->Creatures.Add(Duplicate); }
         if(Case==13) R.Id.Invalidate();
+        if(Case==14) R.DeliveryWorkshopId=FGuid::NewGuid();
+        if(Case==15) {R.DeliveryCrateId.Invalidate();R.DeliveryWorkshopId=FGuid::NewGuid();}
+        if(Case==16) {R.DeliveryWorkshopId=R.DeliveryCrateId;R.DeliveryCrateId.Invalidate();}
         Pass &= UGameplayStatics::SaveGameToSlot(Bad,TEXT("CargoBad"),0) && !Hero->LoadProgress(TEXT("CargoBad")) && IsValid(Live) && Worker(World,Hero)==Live && Mid(World,Hero);
         if(!Pass) { UE_LOG(LogTemp,Error,TEXT("CF_CARGO_BAD case=%d feedback=%s"),Case,*Hero->Feedback); return false; }
     }

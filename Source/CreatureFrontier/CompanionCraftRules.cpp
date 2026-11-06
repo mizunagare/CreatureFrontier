@@ -1,5 +1,6 @@
 #include "CFPlayerCharacter.h"
 #include "CreatureCharacter.h"
+#include "CompanionCargoComponent.h"
 #include "WorkStation.h"
 #include "InventoryComponent.h"
 #include "FrontierSaveGame.h"
@@ -25,6 +26,20 @@ void RunCompanionCraftRules(UWorld* World,ACFPlayerCharacter* Hero)
     Hero->Inventory->Restore({{EFrontierItem::Material,4}});
     const bool Empty=Site->CraftInventory->GetStacks().IsEmpty();
     Site->PersistentId=FGuid::NewGuid();
+    // 快照规则夹具：设施尚未生成时只用已验证记录判断回运身份。
+    FFacilitySaveRecord CargoTarget;CargoTarget.Id=Site->PersistentId;CargoTarget.Specialty=EWorkSpecialty::Crafting;
+    FCreatureSaveRecord CargoRecord;CargoRecord.bOwned=true;CargoRecord.Disposition=ECreatureDisposition::Tamed;
+    CargoRecord.Activity=ECreatureActivity::Work;CargoRecord.FieldResourceId=FGuid::NewGuid();
+    CargoRecord.DeliveryWorkshopId=CargoTarget.Id;CargoRecord.CargoItems={{EFrontierItem::Fiber,3}};CargoRecord.bReturningCargo=true;
+    bool CargoValid=UCompanionCargoComponent::ValidateSnapshot(CargoRecord,nullptr,&CargoTarget);
+    auto BadCargo=CargoRecord;BadCargo.DeliveryCrateId=FGuid::NewGuid();CargoValid &= !UCompanionCargoComponent::ValidateSnapshot(BadCargo,nullptr,&CargoTarget);
+    BadCargo=CargoRecord;BadCargo.CarriedSeeds=1;CargoValid &= !UCompanionCargoComponent::ValidateSnapshot(BadCargo,nullptr,&CargoTarget);
+    BadCargo=CargoRecord;BadCargo.CarriedFood=1;CargoValid &= !UCompanionCargoComponent::ValidateSnapshot(BadCargo,nullptr,&CargoTarget);
+    BadCargo=CargoRecord;BadCargo.ConstructionModuleId=FGuid::NewGuid();CargoValid &= !UCompanionCargoComponent::ValidateSnapshot(BadCargo,nullptr,&CargoTarget);
+    CargoValid &= !UCompanionCargoComponent::ValidateSnapshot(CargoRecord,nullptr);
+    CargoTarget.Specialty=EWorkSpecialty::Transport;CargoValid &= !UCompanionCargoComponent::ValidateSnapshot(CargoRecord,nullptr,&CargoTarget);
+    CargoTarget.Specialty=EWorkSpecialty::Crafting;CargoTarget.Id=FGuid::NewGuid();CargoValid &= !UCompanionCargoComponent::ValidateSnapshot(CargoRecord,nullptr,&CargoTarget);
+    UE_LOG(LogTemp,Display,TEXT("CF_WORKSHOP_CARGO_SNAPSHOT %s"),CargoValid?TEXT("PASS"):TEXT("FAIL"));
     Hero->FirstPersonCamera->SetWorldRotation((Site->GetActorLocation()+FVector(0,0,30)-Hero->FirstPersonCamera->GetComponentLocation()).Rotation());
     const bool Opened=CFInputQA::Press(Hero,EKeys::C) && Hero->IsBackpackOpen() && CFInputQA::Press(Hero,EKeys::E) && Hero->Storage->GetWorkshop()==Site && !Hero->IsBackpackOpen();
     const bool Deposited=Opened && CFInputQA::Press(Hero,EKeys::Right) && Site->CraftInventory->Count(EFrontierItem::Material)==4 && Hero->Inventory->Count(EFrontierItem::Material)==0;

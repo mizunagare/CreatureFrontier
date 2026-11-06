@@ -23,6 +23,7 @@ if((Get-FrontierBuildFingerprint -LiteralPath $module) -ne $hash){throw '规则�
 foreach($marker in @('CF_WORKSHOP_INPUT PASS open=1 deposit=1 withdraw=1 close=1','CF_WORKSHOP_STOCK_RULES PASS validation=1 empty=1 dismantleProtected=1','CF_WORKSHOP_LOCAL PASS order=1 missing=1 full=1 partial=1 cancel=1 reorder=1 finish=1 mode=1')){
     if(!$raw.Contains($marker)){throw ('缺少设施库存与本地加工证据：'+$marker)}
 }
+if(!$raw.Contains('CF_WORKSHOP_CARGO_SNAPSHOT PASS')){throw '缺少设施回运快照互斥校验证据'}
 if($Preview){
     if(!$raw.Contains('CF_WORKSHOP_PREVIEW PASS')){throw '制作设施图形检查未通过'}
     $match=[regex]::Match($raw,'CF_WORKSHOP_PREVIEW_ROOT ([^\r\n]+)');if(!$match.Success){throw '缺少本次截图目录'}

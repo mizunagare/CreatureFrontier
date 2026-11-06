@@ -173,6 +173,7 @@ protected:
 
 private:
     TWeakObjectPtr<class AHomeModule> DeliverySelection;
+    TWeakObjectPtr<class AWorkStation> DeliveryWorkshopSelection;
     bool bDeliverySelection=false;
     FString GetQuickSaveSlot() const;
     bool ClosePauseMenu();

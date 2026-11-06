@@ -15,6 +15,9 @@
 #include "NavigationPath.h"
 #include "CompanionApproach.h"
 #include "CompanionClearance.h"
+#include "CompanionCargoComponent.h"
+#include "ResourceNode.h"
+#include "Camera/CameraComponent.h"
 
 // 真实家园副本上的显式存读夹具：仅首次投入3份测试种子，不代表生产来源。
 void RunSeedSupplyPersistence(UWorld* World,ACFPlayerCharacter* Hero)
@@ -22,6 +25,84 @@ void RunSeedSupplyPersistence(UWorld* World,ACFPlayerCharacter* Hero)
     auto Fail=[](const TCHAR* Why){UE_LOG(LogTemp,Error,TEXT("CF_SEED_PERSIST FAIL reason=%s"),Why);FPlatformMisc::RequestExitWithStatus(false,1);};
     const bool Read=FParse::Param(FCommandLine::Get(),TEXT("CFSeedSupplyRead"));
     if(!Hero->LoadProgress(TEXT("SeedSupplyInput"))){Fail(TEXT("load"));return;}
+    if(FParse::Param(FCommandLine::Get(),TEXT("CFWorkshopCargoInvalid")))
+    {
+        ACreatureCharacter* Held=nullptr;AWorkStation* Farm=nullptr;
+        for(TActorIterator<ACreatureCharacter> It(World);It;++It)if(It->Tamer==Hero->GetController() && It->CargoInventory->Count(EFrontierItem::Fiber)==3)Held=*It;
+        for(TActorIterator<AWorkStation> It(World);It;++It)if(It->bPlayerBuilt && It->RequiredSpecialty==EWorkSpecialty::Farming)Farm=*It;
+        auto* Target=Held?Cast<AWorkStation>(Held->Cargo->GetDestination()):nullptr;TArray<uint8> Before;
+        if(!Held || !Target || !Farm || !Held->Cargo->IsReturning() || !Hero->SaveProgress(TEXT("SeedSupplyBefore")) || !UGameplayStatics::LoadDataFromSlot(Before,TEXT("SeedSupplyBefore"),0)){Fail(TEXT("workshop-cargo-baseline"));return;}
+        const auto Id=Held->PersistentId;
+        for(int32 Case=0;Case<10;++Case)
+        {
+            auto* Bad=Cast<UFrontierSaveGame>(UGameplayStatics::LoadGameFromSlot(TEXT("SeedSupplyBefore"),0));
+            auto* R=Bad?Bad->Creatures.FindByPredicate([Id](const FCreatureSaveRecord& Item){return Item.Id==Id;}):nullptr;
+            if(!R){Fail(TEXT("workshop-cargo-record"));return;}
+            switch(Case)
+            {
+                case 0:R->DeliveryWorkshopId=FGuid::NewGuid();break;
+                case 1:R->DeliveryCrateId=FGuid::NewGuid();break;
+                case 2:R->FieldResourceId.Invalidate();break;
+                case 3:R->CarriedFood=1;break;
+                case 4:R->CarriedSeeds=1;R->SeedCargoVersion=1;break;
+                case 5:R->ConstructionModuleId=FGuid::NewGuid();break;
+                case 6:Bad->FormatVersion=38;break;
+                case 7:R->FieldResourceId=FGuid::NewGuid();break;
+                case 8:R->DeliveryWorkshopId=Farm->PersistentId;break;
+                case 9:R->CargoItems[EFrontierItem::Fiber]=4;break;
+            }
+            TArray<uint8> After;
+            const bool Pass=UGameplayStatics::SaveGameToSlot(Bad,TEXT("SeedSupplyBad"),0) && !Hero->LoadProgress(TEXT("SeedSupplyBad")) && IsValid(Held) && !Held->IsActorBeingDestroyed() && IsValid(Target) && !Target->IsActorBeingDestroyed() && Held->Cargo->GetDestination()==Target && Held->CargoInventory->Count(EFrontierItem::Fiber)==3 && Hero->SaveProgress(TEXT("SeedSupplyAfter")) && UGameplayStatics::LoadDataFromSlot(After,TEXT("SeedSupplyAfter"),0) && Before==After;
+            UE_LOG(LogTemp,Display,TEXT("CF_WORKSHOP_CARGO_INVALID_CASE %s case=%d worldBytesUnchanged=%d"),Pass?TEXT("PASS"):TEXT("FAIL"),Case,Before==After);
+            if(!Pass){Fail(TEXT("workshop-cargo-invalid-transaction"));return;}
+        }
+        if(FParse::Param(FCommandLine::Get(),TEXT("CFWorkshopCargoBoundary")))
+        {
+            // 满格边界夹具明确投入999纤维；原携物、位置、资源节点和移动规则不改。
+            Target->CraftInventory->Restore({{EFrontierItem::Fiber,999}});
+            const int32 XP=Held->Experience,Remaining=Held->GetFieldResource()->Remaining;
+            const auto Bag=Hero->Inventory->GetStacks();const FVector Start=Held->GetActorLocation();
+            const double Deadline=FPlatformTime::Seconds()+60;
+            auto Phase=MakeShared<int32>(0);auto FullAt=MakeShared<double>(0);
+            FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([=](float)
+            {
+                if(FPlatformTime::Seconds()>Deadline || !IsValid(Held) || !IsValid(Target) || Held->Experience!=XP || !Held->GetFieldResource() || Held->GetFieldResource()->Remaining!=Remaining || !Hero->Inventory->GetStacks().OrderIndependentCompareEqual(Bag)){Fail(TEXT("cargo-boundary-state"));return false;}
+                const int32 Count=Held->Cargo->Count(),Stock=Target->CraftInventory->Count(EFrontierItem::Fiber);
+                if(*Phase==0)
+                {
+                    if(Count!=3 || Stock!=999){Fail(TEXT("cargo-full-loss"));return false;}
+                    if(!Held->Cargo->Status().Contains(TEXT("设施库存已满")))return true;
+                    if(Held->GetDistanceTo(Target)>220 || FVector::Dist2D(Start,Held->GetActorLocation())<400){Fail(TEXT("cargo-full-no-approach"));return false;}
+                    *FullAt=World->GetTimeSeconds();*Phase=1;return true;
+                }
+                if(*Phase==1)
+                {
+                    if(Count!=3 || Stock!=999){Fail(TEXT("cargo-full-wait-loss"));return false;}
+                    if(World->GetTimeSeconds()-*FullAt<2)return true;
+                    if(!Target->CraftInventory->Consume(EFrontierItem::Fiber,3)){Fail(TEXT("cargo-full-free-space"));return false;}
+                    *Phase=2;return true;
+                }
+                if(Count!=0){if(Count!=3 || Stock!=996){Fail(TEXT("cargo-partial-unload"));return false;}return true;}
+                if(Stock!=999){Fail(TEXT("cargo-unload-conservation"));return false;}
+                auto FindHeld=[World,Id](){for(TActorIterator<ACreatureCharacter> It(World);It;++It)if(It->PersistentId==Id)return *It;return static_cast<ACreatureCharacter*>(nullptr);};
+                if(!Hero->LoadProgress(TEXT("SeedSupplyBefore"))){Fail(TEXT("cargo-cancel-source"));return false;}
+                auto* Pet=FindHeld();if(!Pet){Fail(TEXT("cargo-cancel-pet"));return false;}
+                Hero->CommandFollow();
+                if(Pet->Cargo->Count()!=3 || Pet->Cargo->HasOrder() || Pet->GetFieldResource() || !Hero->SaveProgress(TEXT("SeedSupplyAfter")) || !Hero->LoadProgress(TEXT("SeedSupplyAfter"))){Fail(TEXT("cargo-cancel-save"));return false;}
+                Pet=FindHeld();if(!Pet || Pet->Cargo->Count()!=3 || Pet->Cargo->HasOrder() || Pet->Experience!=XP){Fail(TEXT("cargo-cancel-restore"));return false;}
+                if(!Hero->LoadProgress(TEXT("SeedSupplyBefore"))){Fail(TEXT("cargo-removed-source"));return false;}
+                Pet=FindHeld();auto* Removed=Pet?Pet->Cargo->GetDestination():nullptr;
+                // 模拟目标在本帧AI更新前消失，验证写档规范化，不声称玩家远程拆除。
+                if(!Removed || !Removed->Destroy() || !Hero->SaveProgress(TEXT("SeedSupplyAfter")) || !Hero->LoadProgress(TEXT("SeedSupplyAfter"))){Fail(TEXT("cargo-removed-save"));return false;}
+                Pet=FindHeld();
+                if(!Pet || Pet->Cargo->Count()!=3 || Pet->Cargo->HasOrder() || Pet->GetFieldResource() || Pet->Experience!=XP || !Hero->SaveProgress(TEXT("SeedSupplyCarry"))){Fail(TEXT("cargo-removed-restore"));return false;}
+                UE_LOG(LogTemp,Display,TEXT("CF_WORKSHOP_CARGO_BOUNDARY PASS full=1 waited=1 delivered=1 cancelledRestore=1 removedRestore=1 fixtureStock=999"));
+                UE_LOG(LogTemp,Display,TEXT("CF_WORKSHOP_CARGO_INVALID PASS rejected=10 worldUnchanged=1"));FPlatformMisc::RequestExitWithStatus(false,0);return false;
+            }));return;
+        }
+        if(!Hero->SaveProgress(TEXT("SeedSupplyCarry"))){Fail(TEXT("workshop-cargo-save"));return;}
+        UE_LOG(LogTemp,Display,TEXT("CF_WORKSHOP_CARGO_INVALID PASS rejected=10 worldUnchanged=1"));FPlatformMisc::RequestExitWithStatus(false,0);return;
+    }
     if(FParse::Param(FCommandLine::Get(),TEXT("CFWorkshopStockPersistence")))
     {
         auto FindWorkshop=[World](){AWorkStation* Found=nullptr;for(TActorIterator<AWorkStation> It(World);It;++It)if(It->bPlayerBuilt && It->RequiredSpecialty==EWorkSpecialty::Crafting){if(Found)return static_cast<AWorkStation*>(nullptr);Found=*It;}return Found;};
@@ -98,6 +179,10 @@ void RunSeedSupplyPersistence(UWorld* World,ACFPlayerCharacter* Hero)
     }
     if(FParse::Param(FCommandLine::Get(),TEXT("CFSeedSupplyInspect")))
     {
+        FHitResult Aim;FCollisionQueryParams AimQuery(SCENE_QUERY_STAT(SavedAimInspect),false,Hero);
+        const auto Eye=Hero->FirstPersonCamera->GetComponentLocation();
+        World->LineTraceSingleByChannel(Aim,Eye,Eye+Hero->FirstPersonCamera->GetForwardVector()*800,ECC_Visibility,AimQuery);
+        UE_LOG(LogTemp,Display,TEXT("CF_SEED_INSPECT_AIM actor=%s class=%s distance=%.2f resource=%s eye=%s"),*GetNameSafe(Aim.GetActor()),Aim.GetActor()?*Aim.GetActor()->GetClass()->GetName():TEXT("none"),Aim.Distance,*GetNameSafe(Hero->TraceResource()),*Eye.ToString());
         for(TActorIterator<ACreatureCharacter> It(World);It;++It)if(It->Tamer==Hero->GetController())
             UE_LOG(LogTemp,Display,TEXT("CF_SEED_INSPECT_PET id=%s pos=%s activity=%d health=%.2f stamina=%.2f nutrition=%.2f xp=%d seeds=%d food=%d site=%s"),*It->PersistentId.ToString(),*It->GetActorLocation().ToString(),static_cast<int32>(It->Activity),It->Health,It->Stamina,It->Nutrition,It->Experience,It->CarriedSeeds,It->CarriedFood,IsValid(It->WorkSite)?*It->WorkSite->PersistentId.ToString():TEXT("none"));
         for(TActorIterator<AWorkStation> It(World);It;++It)if(It->bPlayerBuilt)
